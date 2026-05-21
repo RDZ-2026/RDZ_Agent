@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Paramétrage des sites</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 900px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    /* CONTENT */
+    .content { max-width: 900px; margin: 0 auto; padding: 32px 28px; }
+
+    /* PAGE TITLE */
+    .page-header { margin-bottom: 28px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--rdz-black); }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    /* TOOLBAR */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .search-input { padding: 8px 12px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); width: 260px; }
+    .search-input:focus { outline: none; border-color: var(--rdz-red); }
+    .filter-seg { display: flex; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .filter-btn { padding: 7px 14px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border: none; background: #fff; color: var(--rdz-gray); cursor: pointer; border-right: 1px solid var(--rdz-border); transition: all .15s; }
+    .filter-btn:last-child { border-right: none; }
+    .filter-btn.on { background: var(--rdz-black); color: #fff; }
+
+    /* STATS */
+    .stats { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 14px 20px; flex: 1; }
+    .stat-num { font-size: 24px; font-weight: 700; color: var(--rdz-black); }
+    .stat-lbl { font-size: 11px; color: var(--rdz-gray); margin-top: 3px; letter-spacing: .03em; text-transform: uppercase; }
+    .stat-card.red .stat-num { color: var(--rdz-red); }
+    .stat-card.green .stat-num { color: #166534; }
+
+    /* SITES TABLE */
+    .table-wrap { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .table-head { display: grid; grid-template-columns: 1fr 120px 100px 130px; padding: 9px 18px; background: var(--rdz-black); gap: 12px; }
+    .th { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+    .site-row { display: grid; grid-template-columns: 1fr 120px 100px 130px; padding: 0 18px; gap: 12px; border-bottom: 1px solid var(--rdz-border); align-items: center; min-height: 56px; transition: background .1s; }
+    .site-row:last-child { border-bottom: none; }
+    .site-row:hover { background: var(--rdz-bg); }
+    .site-row.inactive-row { opacity: .55; }
+
+    .site-name-cell { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; }
+    .site-name-text { font-size: 14px; font-weight: 600; color: var(--rdz-black); }
+    .site-id { font-size: 10px; color: #bbb; letter-spacing: .03em; }
+
+    .consigne-count { font-size: 13px; font-weight: 600; color: var(--rdz-gray); }
+    .consigne-count span { font-size: 11px; font-weight: 400; color: #aaa; }
+
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .badge-actif { background: #dcfce7; color: #166534; }
+    .badge-inactif { background: #f3f4f6; color: #6b7280; }
+
+    .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .action-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--rdz-border); background: #fff; color: var(--rdz-gray); transition: all .15s; white-space: nowrap; }
+    .action-btn:hover { background: var(--rdz-bg); }
+    .action-btn.toggle-on { border-color: #bbf7d0; color: #166534; background: #f0fdf4; }
+    .action-btn.toggle-on:hover { background: #dcfce7; }
+    .action-btn.toggle-off { border-color: #d0ccc5; color: #6b7280; }
+    .action-btn.toggle-off:hover { background: #f3f4f6; }
+    .action-btn.rename { border-color: #bfdbfe; color: #1e3a5f; background: #eff6ff; }
+    .action-btn.rename:hover { background: #dbeafe; }
+    .action-btn.del-btn { border-color: #fca5a5; color: #7f1d1d; background: #fff5f5; }
+    .action-btn.del-btn:hover { background: #fee2e2; }
+    .action-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 50px 20px; font-size: 14px; color: var(--rdz-gray); }
+
+    /* SAVE STATUS */
+    .save-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--rdz-gray); padding: 10px 0; }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saving { background: #f59e0b; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 80px 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 28px; width: 100%; max-width: 460px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 16px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 20px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 6px; }
+    .field input { width: 100%; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+    .field input:focus { outline: none; border-color: var(--rdz-red); }
+    .field-hint { font-size: 11px; color: #9a9a9a; margin-top: 5px; font-style: italic; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-cancel:hover { background: #ebe9e6; }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+    .mbtn-save:hover { background: var(--rdz-red-dark); }
+
+    /* FOOTER */
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Paramétrage — Gestion des sites</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="index.html">← Accueil</a>
+      <a class="btn-nav" href="consignes.html">Consignes</a>
+      <button class="btn-nav btn-nav-accent" onclick="openAddSite()">+ Nouveau site</button>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Gestion des sites</div>
+    <div class="page-sub">Ajoutez, renommez, activez ou désactivez les sites. Un site inactif n'apparaît plus dans le module consignes.</div>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Sites au total</div></div>
+    <div class="stat-card green"><div class="stat-num" id="stat-actifs">—</div><div class="stat-lbl">Sites actifs</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-inactifs">—</div><div class="stat-lbl">Sites inactifs</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="search" placeholder="🔍  Rechercher un site…" oninput="renderTable()">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
+      <div class="filter-seg">
+        <button class="filter-btn on" data-f="all" onclick="setFilter(this)">Tous</button>
+        <button class="filter-btn" data-f="actif" onclick="setFilter(this)">Actifs</button>
+        <button class="filter-btn" data-f="inactif" onclick="setFilter(this)">Inactifs</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="th">Nom du site</div>
+      <div class="th">Consignes</div>
+      <div class="th">Statut</div>
+      <div class="th" style="text-align:right">Actions</div>
+    </div>
+    <div id="sites-list">
+      <div class="empty">Chargement…</div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<!-- MODAL AJOUTER / RENOMMER -->
+<div class="modal-overlay" id="modal-site">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nouveau site</div>
+    <div class="field">
+      <label>Nom du site</label>
+      <input type="text" id="f-nom" placeholder="Ex : Site Delta — Genève-Rive">
+      <div class="field-hint">Utilisez un format clair : Nom — Lieu</div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveSite()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMER SUPPRESSION -->
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal" style="border-top-color:#7f1d1d">
+    <div class="modal-title" style="color:#7f1d1d">Confirmer la suppression</div>
+    <div style="font-size:13.5px;color:var(--rdz-black);line-height:1.6;margin-bottom:8px">
+      Vous allez supprimer le site <strong id="del-site-name"></strong>.
+    </div>
+    <div style="font-size:12px;color:#dc2626;background:#fff5f5;border:1px solid #fca5a5;border-radius:2px;padding:10px 14px;line-height:1.6">
+      ⚠️ Toutes les consignes associées à ce site seront également supprimées définitivement.
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeDeleteModal()">Annuler</button>
+      <button class="mbtn mbtn-save" style="background:#7f1d1d;border-color:#7f1d1d" onclick="confirmDelete()">Supprimer définitivement</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let sites = [];
+let consignesCount = {}; // site_id -> count
+let filterMode = 'all';
+let editId = null;
+let deleteId = null;
+
+// ── SAVE STATUS ──────────────────────────────────────────────────────────────
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot' + (state ? ' ' + state : '');
+  document.getElementById('save-text').textContent = msg;
+}
+
+// ── LOAD ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [{ data: s, error: se }, { data: c, error: ce }] = await Promise.all([
+      sb.from('sites').select('*').order('nom'),
+      sb.from('consignes').select('site_id')
+    ]);
+    if (se || ce) throw se || ce;
+    sites = s || [];
+    // Compte les consignes par site
+    consignesCount = {};
+    (c || []).forEach(x => { consignesCount[x.site_id] = (consignesCount[x.site_id] || 0) + 1; });
+    setSave('saved', 'Données chargées');
+    updateStats();
+    renderTable();
+  } catch (err) {
+    setSave('error', 'Erreur de connexion');
+    document.getElementById('sites-list').innerHTML = `<div class="empty">Impossible de charger les données.<br><small>${err.message}</small></div>`;
+  }
+}
+
+// ── STATS ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const actifs = sites.filter(s => s.actif !== false).length;
+  const inactifs = sites.filter(s => s.actif === false).length;
+  document.getElementById('stat-total').textContent = sites.length;
+  document.getElementById('stat-actifs').textContent = actifs;
+  document.getElementById('stat-inactifs').textContent = inactifs;
+}
+
+// ── RENDER TABLE ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const search = document.getElementById('search').value.toLowerCase().trim();
+  let filtered = sites.filter(s => {
+    const matchSearch = !search || s.nom.toLowerCase().includes(search);
+    const matchFilter = filterMode === 'all'
+      || (filterMode === 'actif' && s.actif !== false)
+      || (filterMode === 'inactif' && s.actif === false);
+    return matchSearch && matchFilter;
+  });
+
+  const el = document.getElementById('sites-list');
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="empty">Aucun site trouvé.</div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map(s => {
+    const isActif = s.actif !== false;
+    const count = consignesCount[s.id] || 0;
+    return `<div class="site-row${isActif ? '' : ' inactive-row'}">
+      <div class="site-name-cell">
+        <div class="site-name-text">${s.nom}</div>
+      </div>
+      <div class="consigne-count">
+        ${count} <span>consigne${count > 1 ? 's' : ''}</span>
+      </div>
+      <div>
+        <span class="status-badge ${isActif ? 'badge-actif' : 'badge-inactif'}">
+          ${isActif ? '● Actif' : '○ Inactif'}
+        </span>
+      </div>
+      <div class="row-actions">
+        <button class="action-btn rename" onclick="openRename('${s.id}')">✎ Renommer</button>
+        <button class="action-btn ${isActif ? 'toggle-off' : 'toggle-on'}" onclick="toggleActif('${s.id}')">
+          ${isActif ? '⏸ Désactiver' : '▶ Activer'}
+        </button>
+        <button class="action-btn del-btn" onclick="openDelete('${s.id}')" ${count > 0 ? 'title="Supprime aussi les ' + count + ' consigne(s)"' : ''}>✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  filterMode = btn.dataset.f;
+  renderTable();
+}
+
+// ── TOGGLE ACTIF ──────────────────────────────────────────────────────────────
+async function toggleActif(id) {
+  const site = sites.find(s => s.id === id);
+  const newVal = site.actif === false ? true : false;
+  setSave('saving', 'Mise à jour…');
+  const { error } = await sb.from('sites').update({ actif: newVal }).eq('id', id);
+  if (error) { setSave('error', 'Erreur'); return; }
+  site.actif = newVal;
+  setSave('saved', 'Sauvegardé ✓');
+  setTimeout(() => setSave('', 'Prêt'), 3000);
+  updateStats();
+  renderTable();
+}
+
+// ── AJOUTER SITE ─────────────────────────────────────────────────────────────
+function openAddSite() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Nouveau site';
+  document.getElementById('f-nom').value = '';
+  document.getElementById('modal-site').classList.add('open');
+  setTimeout(() => document.getElementById('f-nom').focus(), 100);
+}
+
+// ── RENOMMER ─────────────────────────────────────────────────────────────────
+function openRename(id) {
+  editId = id;
+  const site = sites.find(s => s.id === id);
+  document.getElementById('modal-title').textContent = 'Renommer le site';
+  document.getElementById('f-nom').value = site.nom;
+  document.getElementById('modal-site').classList.add('open');
+  setTimeout(() => document.getElementById('f-nom').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('modal-site').classList.remove('open');
+}
+
+async function saveSite() {
+  const nom = document.getElementById('f-nom').value.trim();
+  if (!nom) { alert('Veuillez saisir un nom.'); return; }
+  setSave('saving', 'Enregistrement…');
+  if (editId) {
+    const { error } = await sb.from('sites').update({ nom }).eq('id', editId);
+    if (error) { setSave('error', 'Erreur'); alert(error.message); return; }
+    sites.find(s => s.id === editId).nom = nom;
+  } else {
+    const { data, error } = await sb.from('sites').insert({ nom, actif: true }).select().single();
+    if (error) { setSave('error', 'Erreur'); alert(error.message); return; }
+    sites.push(data);
+    sites.sort((a, b) => a.nom.localeCompare(b.nom));
+  }
+  setSave('saved', 'Sauvegardé ✓');
+  setTimeout(() => setSave('', 'Prêt'), 3000);
+  closeModal();
+  updateStats();
+  renderTable();
+}
+
+// ── SUPPRIMER ─────────────────────────────────────────────────────────────────
+function openDelete(id) {
+  deleteId = id;
+  const site = sites.find(s => s.id === id);
+  document.getElementById('del-site-name').textContent = '"' + site.nom + '"';
+  document.getElementById('modal-delete').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('modal-delete').classList.remove('open');
+  deleteId = null;
+}
+
+async function confirmDelete() {
+  if (!deleteId) return;
+  setSave('saving', 'Suppression…');
+  const { error } = await sb.from('sites').delete().eq('id', deleteId);
+  if (error) { setSave('error', 'Erreur'); alert(error.message); return; }
+  sites = sites.filter(s => s.id !== deleteId);
+  delete consignesCount[deleteId];
+  setSave('saved', 'Supprimé ✓');
+  setTimeout(() => setSave('', 'Prêt'), 3000);
+  closeDeleteModal();
+  updateStats();
+  renderTable();
+}
+
+// ── FERMER SUR BACKDROP ───────────────────────────────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// ── ENTREE CLAVIER ────────────────────────────────────────────────────────────
+document.getElementById('f-nom').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveSite();
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>

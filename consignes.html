@@ -121,7 +121,7 @@
     </div>
     <nav class="header-nav">
       <a class="btn-nav" href="index.html">← Accueil</a>
-      <button class="btn-nav" onclick="openAddSite()">+ Nouveau site</button>
+      <a class="btn-nav" href="parametrage.html">⚙ Sites</a>
       <button class="btn-nav" onclick="showPrint()">Imprimer</button>
       <button class="btn-nav btn-nav-accent" onclick="openAdd()">+ Nouvelle consigne</button>
     </nav>
@@ -253,7 +253,7 @@ function setSaveStatus(state, msg) {
 async function loadAll() {
   try {
     const [{ data: s, error: se }, { data: c, error: ce }] = await Promise.all([
-      sb.from('sites').select('*').order('nom'),
+      sb.from('sites').select('*').eq('actif', true).order('nom'),
       sb.from('consignes').select('*').order('date_debut')
     ]);
     if (se || ce) throw se || ce;
