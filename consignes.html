@@ -103,10 +103,8 @@
 
     /* PRINT */
     @media print {
-      .header, .toolbar, .card-actions, .site-hdr button, .no-print { display: none !important; }
-      body { background: #fff; }
-      .print-doc { display: block !important; }
-      .content { display: none; }
+      body > * { display: none !important; }
+      .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     }
     .print-doc { display: none; }
@@ -545,7 +543,11 @@ function closePrint() {
 }
 function doPrint() {
   document.getElementById('print-doc').innerHTML = document.getElementById('print-inner').innerHTML;
-  window.print();
+  // Fermer la modale avant d'imprimer pour qu'elle n'apparaisse pas
+  document.getElementById('modal-print').classList.remove('open');
+  setTimeout(() => {
+    window.print();
+  }, 150);
 }
 
 // ─── CLOSE MODALS ON BACKDROP CLICK ─────────────────────────────────────────
