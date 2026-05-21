@@ -269,17 +269,13 @@
     <div class="modal-section">Dates & Statut</div>
     <div class="field-row">
       <div class="field">
-        <label>Date du constat *</label>
-        <input type="date" id="f-date-constat">
-      </div>
-      <div class="field">
-        <label>Date du rapport</label>
+        <label>Date du rapport *</label>
         <input type="date" id="f-date-rapport">
-        <div class="field-hint">Date d'enregistrement officiel</div>
       </div>
       <div class="field">
         <label>Heure du rapport</label>
         <input type="time" id="f-heure-rapport">
+        <div class="field-hint">Heure de référence du rapport</div>
       </div>
     </div>
     <div class="field-row">
@@ -404,7 +400,7 @@ async function loadAll() {
   try {
     const [{ data: s, error: se }, { data: c, error: ce }, { data: j, error: je }] = await Promise.all([
       sb.from('sites').select('*').eq('actif', true).order('nom'),
-      sb.from('constats').select('*').order('date_constat', { ascending: false }),
+      sb.from('constats').select('*').order('date_rapport', { ascending: false }),
       sb.from('constats_journal').select('*').order('date_entree', { ascending: false })
     ]);
     if (se) throw se;
@@ -439,8 +435,7 @@ async function loadAll() {
   procedure text,
   agent text,
   statut text DEFAULT 'En attente',
-  date_constat date NOT NULL,
-  date_rapport date,
+  date_rapport date NOT NULL,
   heure_rapport time,
   created_at timestamptz DEFAULT now()
 );
@@ -543,8 +538,7 @@ function render() {
     return `<div class="constat-card ${sClass}">
       <div class="card-header">
         <div class="card-meta-left">
-          <div class="card-date">📅 ${fmt(c.date_constat)}</div>
-          ${c.date_rapport ? `<div class="card-rapportnum">Rapport : ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</div>` : ''}
+          <div class="card-date">📅 ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</div>
           ${c.agent ? `<div style="font-size:11px;color:var(--rdz-gray);margin-top:2px;">👤 ${c.agent}</div>` : ''}
           <select class="statut-select" onchange="changeStatut('${c.id}', this.value)" style="margin-top:6px">
             ${['En attente','En cours','A surveiller','Transmis au client','Résolu'].map(s =>
@@ -606,7 +600,6 @@ function openAdd() {
   document.getElementById('f-localisation').value = '';
   document.getElementById('f-description').value = '';
   document.getElementById('f-procedure').value = '';
-  document.getElementById('f-date-constat').value = today();
   document.getElementById('f-date-rapport').value = today();
   document.getElementById('f-heure-rapport').value = nowTime();
   document.getElementById('f-agent').value = '';
@@ -623,7 +616,6 @@ function openEdit(id) {
   document.getElementById('f-localisation').value = c.localisation || '';
   document.getElementById('f-description').value = c.description || '';
   document.getElementById('f-procedure').value = c.procedure || '';
-  document.getElementById('f-date-constat').value = c.date_constat || '';
   document.getElementById('f-date-rapport').value = c.date_rapport || '';
   document.getElementById('f-heure-rapport').value = c.heure_rapport ? c.heure_rapport.slice(0,5) : '';
   document.getElementById('f-agent').value = c.agent || '';
@@ -635,9 +627,9 @@ function closeModal() { document.getElementById('modal-constat').classList.remov
 
 async function saveConstat() {
   const description = document.getElementById('f-description').value.trim();
-  const date_constat = document.getElementById('f-date-constat').value;
+  const date_rapport = document.getElementById('f-date-rapport').value;
   if (!description) { alert('Veuillez saisir une description.'); return; }
-  if (!date_constat) { alert('Veuillez saisir la date du constat.'); return; }
+  if (!date_rapport) { alert('Veuillez saisir la date du rapport.'); return; }
 
   const payload = {
     site_id: document.getElementById('f-site').value || null,
@@ -645,8 +637,7 @@ async function saveConstat() {
     localisation: document.getElementById('f-localisation').value.trim() || null,
     description,
     procedure: document.getElementById('f-procedure').value.trim() || null,
-    date_constat,
-    date_rapport: document.getElementById('f-date-rapport').value || null,
+    date_rapport,
     heure_rapport: document.getElementById('f-heure-rapport').value || null,
     agent: document.getElementById('f-agent').value.trim() || null,
     statut: document.getElementById('f-statut').value,
@@ -698,7 +689,7 @@ function openJournal(id) {
   const site = sites.find(s => s.id === c?.site_id);
   document.getElementById('journal-constat-info').innerHTML = `
     <strong>${c?.description || '—'}</strong><br>
-    <span style="font-size:11px;color:var(--rdz-gray)">${site?.nom || ''}${c?.localisation ? ' · ' + c.localisation : ''} · ${fmt(c?.date_constat)} · ${badgeStatut(c?.statut)}</span>`;
+    <span style="font-size:11px;color:var(--rdz-gray)">${site?.nom || ''}${c?.localisation ? ' · ' + c.localisation : ''} · ${fmt(c?.date_rapport)}${c?.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''} · ${badgeStatut(c?.statut)}</span>`;
   document.getElementById('j-date').value = today();
   document.getElementById('j-auteur').value = '';
   document.getElementById('j-texte').value = '';
@@ -810,7 +801,7 @@ function showPrint() {
         <div style="background:#1a1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
         <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
           <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <th style="padding:6px 10px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Date</th>
+            <th style="padding:6px 10px;width:70px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Rapport</th>
             <th style="padding:6px 10px;width:70px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Catégorie</th>
             <th style="padding:6px 10px;width:90px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Localisation</th>
             <th style="padding:6px 10px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Constat / Procédure</th>
@@ -824,7 +815,7 @@ function showPrint() {
         const journal = journaux[c.id] || [];
         const lastEntry = journal.length > 0 ? journal[0] : null;
         html += `<tr style="background:${bg};page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          <td style="padding:8px 10px;font-size:11px;color:#5a5a5a;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">${fmt(c.date_constat)}</td>
+          <td style="padding:8px 10px;font-size:11px;color:#5a5a5a;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">${fmt(c.date_rapport)}${c.heure_rapport ? '<br><span style="font-size:9px;color:#9a9a9a">' + c.heure_rapport.slice(0,5) + '</span>' : ''}</td>
           <td style="padding:8px 10px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;color:#4a4a4a">${c.categorie || '—'}</td>
           <td style="padding:8px 10px;font-size:11px;color:#4a4a4a;border-right:1px solid #e5e2dd;vertical-align:top">${c.localisation || '—'}</td>
           <td style="padding:8px 10px;border-right:1px solid #e5e2dd;vertical-align:top">
