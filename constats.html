@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Registre des constats</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    /* TOOLBAR */
+    .toolbar { background: #fff; border-bottom: 2px solid var(--rdz-black); padding: 10px 28px; }
+    .toolbar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .tsel, .tsearch { padding: 6px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsearch { width: 200px; }
+    .tsel:focus, .tsearch:focus { outline: none; border-color: var(--rdz-red); }
+    .tsep { width: 1px; height: 18px; background: var(--rdz-border); margin: 0 4px; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saving { background: #f59e0b; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* STATS */
+    .stats-bar { background: var(--rdz-black); padding: 10px 28px; }
+    .stats-inner { max-width: 1200px; margin: 0 auto; display: flex; gap: 6px; flex-wrap: wrap; }
+    .stat-pill { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid transparent; color: rgba(255,255,255,.6); background: rgba(255,255,255,.07); }
+    .stat-pill:hover { background: rgba(255,255,255,.14); }
+    .stat-pill.active { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.3); color: #fff; }
+    .stat-num { font-size: 15px; font-weight: 700; color: #fff; }
+    .stat-pill.s-attente .stat-num { color: #fbbf24; }
+    .stat-pill.s-cours .stat-num { color: #60a5fa; }
+    .stat-pill.s-transmis .stat-num { color: #a78bfa; }
+    .stat-pill.s-surveiller .stat-num { color: #fb923c; }
+    .stat-pill.s-resolu .stat-num { color: #4ade80; }
+
+    /* CONTENT */
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
+
+    /* CONSTAT CARD */
+    .constat-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-border); border-radius: 2px; margin-bottom: 10px; transition: border-left-color .15s; }
+    .constat-card.s-En.attente { border-left-color: #f59e0b; }
+    .constat-card.s-En.cours { border-left-color: #3b82f6; }
+    .constat-card.s-Transmis.au.client { border-left-color: #8b5cf6; }
+    .constat-card.s-A.surveiller { border-left-color: #f97316; }
+    .constat-card.s-Résolu { border-left-color: #22c55e; }
+
+    .card-header { padding: 12px 16px; display: flex; align-items: flex-start; gap: 14px; }
+    .card-meta-left { display: flex; flex-direction: column; gap: 5px; min-width: 130px; flex-shrink: 0; }
+    .card-date { font-size: 11px; font-weight: 700; color: var(--rdz-gray); letter-spacing: .04em; }
+    .card-rapportnum { font-size: 10px; color: #bbb; letter-spacing: .03em; }
+    .card-body { flex: 1; min-width: 0; }
+    .card-title-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 5px; flex-wrap: wrap; }
+    .card-description { font-size: 13.5px; font-weight: 600; color: var(--rdz-black); line-height: 1.45; flex: 1; }
+    .card-info-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 11px; color: var(--rdz-gray); }
+    .card-info-item { display: flex; align-items: center; gap: 4px; }
+    .card-info-item strong { color: var(--rdz-black); }
+    .card-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+
+    .badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 2px; white-space: nowrap; }
+    .badge-type-tag { background: #fef3c7; color: #92400e; }
+    .badge-type-technique { background: #dbeafe; color: #1e3a5f; }
+    .badge-type-securite { background: #fee2e2; color: #7f1d1d; }
+    .badge-type-incivilite { background: #f3e8ff; color: #5b21b6; }
+    .badge-type-autre { background: #f3f4f6; color: #4b5563; }
+    .badge-statut { }
+    .badge-s-en-attente { background: #fef3c7; color: #92400e; }
+    .badge-s-en-cours { background: #dbeafe; color: #1e3a5f; }
+    .badge-s-transmis { background: #ede9fe; color: #5b21b6; }
+    .badge-s-surveiller { background: #ffedd5; color: #9a3412; }
+    .badge-s-resolu { background: #dcfce7; color: #166534; }
+
+    .card-procedure { margin-top: 8px; font-size: 11.5px; color: var(--rdz-gray); background: #fffbeb; border-left: 3px solid #f59e0b; padding: 6px 10px; line-height: 1.5; border-radius: 0 2px 2px 0; }
+    .card-procedure-lbl { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #92400e; margin-bottom: 3px; }
+
+    .card-journal-preview { margin-top: 6px; }
+    .journal-entry-mini { font-size: 11px; color: var(--rdz-gray); display: flex; gap: 6px; align-items: baseline; }
+    .journal-entry-mini-date { font-size: 10px; font-weight: 700; color: #bbb; white-space: nowrap; flex-shrink: 0; }
+    .more-journal { font-size: 10px; color: #bbb; font-style: italic; cursor: pointer; }
+    .more-journal:hover { color: var(--rdz-red); }
+
+    .card-actions { display: flex; gap: 5px; margin-left: 8px; flex-shrink: 0; flex-direction: column; align-items: flex-end; }
+    .icon-btn { display: flex; align-items: center; justify-content: center; height: 28px; padding: 0 8px; border-radius: 2px; border: 1px solid var(--rdz-border); background: transparent; color: var(--rdz-gray); cursor: pointer; transition: all .15s; font-size: 11px; font-weight: 700; gap: 4px; white-space: nowrap; }
+    .icon-btn:hover { background: var(--rdz-bg); }
+    .icon-btn.del:hover { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .icon-btn.journal-btn { border-color: #bfdbfe; color: #1e3a5f; background: #eff6ff; }
+    .icon-btn.journal-btn:hover { background: #dbeafe; }
+
+    /* EMPTY */
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 32px; margin-bottom: 12px; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 28px; width: 100%; max-width: 580px; margin: auto; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 16px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 20px; }
+    .modal-section { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--rdz-gray); background: var(--rdz-bg); padding: 6px 10px; border-radius: 2px; margin: 16px 0 12px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 5px; }
+    .field input, .field select, .field textarea { width: 100%; padding: 8px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+    .field textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--rdz-red); }
+    .field-hint { font-size: 11px; color: #9a9a9a; margin-top: 4px; font-style: italic; }
+    .field-row { display: flex; gap: 12px; }
+    .field-row .field { flex: 1; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-cancel:hover { background: #ebe9e6; }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+    .mbtn-save:hover { background: var(--rdz-red-dark); }
+    .mbtn-save:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* JOURNAL MODAL */
+    .journal-list { max-height: 320px; overflow-y: auto; margin-bottom: 16px; }
+    .journal-entry { border-bottom: 1px solid var(--rdz-border); padding: 10px 0; }
+    .journal-entry:last-child { border-bottom: none; }
+    .journal-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .journal-entry-date { font-size: 11px; font-weight: 700; color: var(--rdz-gray); }
+    .journal-entry-author { font-size: 10px; color: #bbb; }
+    .journal-entry-text { font-size: 13px; color: var(--rdz-black); line-height: 1.5; }
+    .journal-delete-btn { font-size: 10px; color: #dc2626; cursor: pointer; border: none; background: none; padding: 0 4px; }
+    .journal-delete-btn:hover { text-decoration: underline; }
+    .journal-add { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--rdz-border); padding-top: 14px; }
+    .journal-add-row { display: flex; gap: 8px; }
+    .journal-add textarea { flex: 1; padding: 8px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; font-family: Arial, sans-serif; resize: none; min-height: 60px; }
+    .journal-add textarea:focus { outline: none; border-color: var(--rdz-red); }
+    .journal-add-meta { display: flex; gap: 8px; }
+    .journal-add-meta input { flex: 1; padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 12px; font-family: Arial, sans-serif; }
+    .journal-add-meta input:focus { outline: none; border-color: var(--rdz-red); }
+    .constat-info-banner { background: var(--rdz-bg); border: 1px solid var(--rdz-border); border-radius: 2px; padding: 10px 14px; margin-bottom: 16px; font-size: 12.5px; color: var(--rdz-black); line-height: 1.5; }
+    .constat-info-banner strong { color: var(--rdz-red); }
+
+    /* STATUT DROPDOWN INLINE */
+    .statut-select { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; border: 1px solid var(--rdz-border); background: #fff; cursor: pointer; }
+
+    /* PRINT */
+    @media print {
+      body > * { display: none !important; }
+      .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+    .print-doc { display: none; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Registre des constats terrain</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="index.html">← Accueil</a>
+      <a class="btn-nav" href="parametrage.html">⚙ Sites</a>
+      <button class="btn-nav" onclick="showPrint()">🖨 Feuille du jour</button>
+      <button class="btn-nav btn-nav-accent" onclick="openAdd()">+ Nouveau constat</button>
+    </nav>
+  </div>
+</header>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-inner" id="stats-bar">
+    <div class="stat-pill active" data-s="all" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-all">—</span> Tous
+    </div>
+    <div class="stat-pill s-attente" data-s="En attente" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-attente">—</span> En attente
+    </div>
+    <div class="stat-pill s-cours" data-s="En cours" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-cours">—</span> En cours
+    </div>
+    <div class="stat-pill s-surveiller" data-s="A surveiller" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-surveiller">—</span> À surveiller
+    </div>
+    <div class="stat-pill s-transmis" data-s="Transmis au client" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-transmis">—</span> Transmis client
+    </div>
+    <div class="stat-pill s-resolu" data-s="Résolu" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-resolu">—</span> Résolus
+    </div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <span class="tlabel">Site</span>
+    <select class="tsel" id="filter-site" onchange="render()">
+      <option value="all">Tous les sites</option>
+    </select>
+    <div class="tsep"></div>
+    <span class="tlabel">Catégorie</span>
+    <select class="tsel" id="filter-cat" onchange="render()">
+      <option value="all">Toutes</option>
+    </select>
+    <div class="tsep"></div>
+    <span class="tlabel">Recherche</span>
+    <input type="text" class="tsearch" id="filter-search" placeholder="Mot-clé…" oninput="render()">
+    <div class="save-status">
+      <div class="save-dot" id="save-dot"></div>
+      <span id="save-text">Chargement…</span>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="content">
+  <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
+</div>
+
+<!-- MODAL CONSTAT -->
+<div class="modal-overlay" id="modal-constat">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nouveau constat</div>
+
+    <div class="modal-section">Identification</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Site *</label>
+        <select id="f-site"></select>
+      </div>
+      <div class="field">
+        <label>Catégorie *</label>
+        <select id="f-categorie"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Localisation précise</label>
+      <input type="text" id="f-localisation" placeholder="Ex : Hall d'entrée, Niveau -1, Porte nord…">
+    </div>
+
+    <div class="modal-section">Constat</div>
+    <div class="field">
+      <label>Description du constat *</label>
+      <textarea id="f-description" placeholder="Décrivez le constat avec précision…"></textarea>
+    </div>
+    <div class="field">
+      <label>Procédure / Attitude à adopter</label>
+      <textarea id="f-procedure" placeholder="Consigne pour les agents : que faire face à ce constat ?" style="min-height:60px"></textarea>
+      <div class="field-hint">Instructions pour les agents de terrain</div>
+    </div>
+
+    <div class="modal-section">Dates & Statut</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date du constat *</label>
+        <input type="date" id="f-date-constat">
+      </div>
+      <div class="field">
+        <label>Date du rapport</label>
+        <input type="date" id="f-date-rapport">
+        <div class="field-hint">Date d'enregistrement officiel</div>
+      </div>
+      <div class="field">
+        <label>Heure du rapport</label>
+        <input type="time" id="f-heure-rapport">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Agent rapporteur</label>
+        <input type="text" id="f-agent" placeholder="Nom de l'agent">
+      </div>
+      <div class="field">
+        <label>Statut initial</label>
+        <select id="f-statut">
+          <option>En attente</option>
+          <option>En cours</option>
+          <option>A surveiller</option>
+          <option>Transmis au client</option>
+          <option>Résolu</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="mbtn mbtn-save" id="btn-save-constat" onclick="saveConstat()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL JOURNAL -->
+<div class="modal-overlay" id="modal-journal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title">📋 Journal de suivi</div>
+    <div class="constat-info-banner" id="journal-constat-info"></div>
+    <div class="journal-list" id="journal-list"></div>
+    <div class="journal-add">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--rdz-gray);margin-bottom:4px">Ajouter une entrée</div>
+      <div class="journal-add-meta">
+        <input type="date" id="j-date" placeholder="Date">
+        <input type="text" id="j-auteur" placeholder="Auteur (optionnel)">
+        <select id="j-type" style="padding:7px 10px;border-radius:2px;border:1px solid var(--rdz-border);font-size:12px">
+          <option value="note">📝 Note</option>
+          <option value="reparation">🔧 Réparation</option>
+          <option value="client">📨 Info client</option>
+          <option value="surveillance">👁 Surveillance</option>
+          <option value="cloture">✅ Clôture</option>
+        </select>
+      </div>
+      <textarea id="j-texte" placeholder="Décrivez l'évolution, la prise en charge, la réparation effectuée…"></textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button class="mbtn mbtn-cancel" onclick="closeJournal()">Fermer</button>
+        <button class="mbtn mbtn-save" onclick="addJournalEntry()">+ Ajouter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRINT -->
+<div class="modal-overlay" id="modal-print">
+  <div class="modal" style="max-width:780px;max-height:88vh;overflow-y:auto;">
+    <div id="print-inner"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-print').classList.remove('open')">Fermer</button>
+      <button class="mbtn mbtn-save" onclick="doPrint()">🖨 Imprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="print-doc" id="print-doc"></div>
+
+<script>
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let sites = [];
+let constats = [];
+let journaux = {}; // id_constat -> entries[]
+let categories = ['Technique', 'Sécurité', 'Incivilité', 'Tag', 'Autre'];
+let statFilter = 'all';
+let editId = null;
+let journalConstatId = null;
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().split('T')[0]; }
+function nowTime() { return new Date().toTimeString().slice(0,5); }
+function fmt(d) { if (!d) return ''; const [y,m,dd] = d.split('-'); return `${dd}.${m}.${y}`; }
+function fmtFull(d) {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+function statClass(s) {
+  if (!s) return '';
+  return 's-' + s.replace(/\s+/g,'.');
+}
+function badgeStatut(s) {
+  const map = {
+    'En attente': 'badge-s-en-attente',
+    'En cours': 'badge-s-en-cours',
+    'Transmis au client': 'badge-s-transmis',
+    'A surveiller': 'badge-s-surveiller',
+    'Résolu': 'badge-s-resolu'
+  };
+  return `<span class="badge badge-statut ${map[s]||''}">${s||'—'}</span>`;
+}
+function badgeType(t) {
+  const map = { 'Technique':'badge-type-technique', 'Sécurité':'badge-type-securite', 'Incivilité':'badge-type-incivilite', 'Tag':'badge-type-tag' };
+  return `<span class="badge ${map[t]||'badge-type-autre'}">${t||'—'}</span>`;
+}
+function typeIcon(t) {
+  const map = { 'note':'📝', 'reparation':'🔧', 'client':'📨', 'surveillance':'👁', 'cloture':'✅' };
+  return map[t] || '📝';
+}
+
+// ─── SAVE STATUS ─────────────────────────────────────────────────────────────
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot' + (state ? ' ' + state : '');
+  document.getElementById('save-text').textContent = msg;
+}
+
+// ─── LOAD ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [{ data: s, error: se }, { data: c, error: ce }, { data: j, error: je }] = await Promise.all([
+      sb.from('sites').select('*').eq('actif', true).order('nom'),
+      sb.from('constats').select('*').order('date_constat', { ascending: false }),
+      sb.from('constats_journal').select('*').order('date_entree', { ascending: false })
+    ]);
+    if (se) throw se;
+    if (ce) throw ce;
+
+    sites = s || [];
+    constats = c || [];
+
+    // Build journal map
+    journaux = {};
+    (j || []).forEach(e => {
+      if (!journaux[e.constat_id]) journaux[e.constat_id] = [];
+      journaux[e.constat_id].push(e);
+    });
+
+    setSave('saved', 'Données chargées');
+    rebuildFilters();
+    updateStats();
+    render();
+  } catch (err) {
+    setSave('error', 'Erreur');
+    document.getElementById('content').innerHTML = `
+      <div class="state-msg"><div class="big">⚠️</div>Impossible de charger les données.<br><small style="color:#9a9a9a">${err.message}</small></div>
+      <div style="max-width:640px;margin:20px auto;background:#fff;border:1px solid var(--rdz-border);border-left:4px solid var(--rdz-red);padding:20px;border-radius:2px;font-size:13px;line-height:1.7">
+        <strong>Tables SQL à créer dans Supabase :</strong>
+        <pre style="background:#f5f4f2;padding:14px;border-radius:2px;font-size:11px;margin-top:10px;overflow-x:auto">CREATE TABLE constats (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  site_id uuid REFERENCES sites(id) ON DELETE SET NULL,
+  categorie text,
+  localisation text,
+  description text NOT NULL,
+  procedure text,
+  agent text,
+  statut text DEFAULT 'En attente',
+  date_constat date NOT NULL,
+  date_rapport date,
+  heure_rapport time,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE constats ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "acces_public" ON constats FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE constats_journal (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  constat_id uuid REFERENCES constats(id) ON DELETE CASCADE,
+  date_entree date NOT NULL,
+  auteur text,
+  type_entree text DEFAULT 'note',
+  texte text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE constats_journal ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "acces_public" ON constats_journal FOR ALL USING (true) WITH CHECK (true);</pre>
+      </div>`;
+  }
+}
+
+// ─── FILTERS & STATS ─────────────────────────────────────────────────────────
+function rebuildFilters() {
+  const sitesSel = document.getElementById('filter-site');
+  const cur = sitesSel.value;
+  sitesSel.innerHTML = '<option value="all">Tous les sites</option>' +
+    sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+  if (cur) sitesSel.value = cur;
+
+  const catSel = document.getElementById('filter-cat');
+  const curCat = catSel.value;
+  catSel.innerHTML = '<option value="all">Toutes</option>' +
+    categories.map(c => `<option value="${c}">${c}</option>`).join('');
+  if (curCat) catSel.value = curCat;
+}
+
+function updateStats() {
+  const counts = { 'En attente': 0, 'En cours': 0, 'A surveiller': 0, 'Transmis au client': 0, 'Résolu': 0 };
+  constats.forEach(c => { if (counts[c.statut] !== undefined) counts[c.statut]++; });
+  document.getElementById('stat-all').textContent = constats.length;
+  document.getElementById('stat-attente').textContent = counts['En attente'];
+  document.getElementById('stat-cours').textContent = counts['En cours'];
+  document.getElementById('stat-surveiller').textContent = counts['A surveiller'];
+  document.getElementById('stat-transmis').textContent = counts['Transmis au client'];
+  document.getElementById('stat-resolu').textContent = counts['Résolu'];
+}
+
+function setStatFilter(btn) {
+  document.querySelectorAll('.stat-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  statFilter = btn.dataset.s;
+  render();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  const siteF = document.getElementById('filter-site').value;
+  const catF = document.getElementById('filter-cat').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  let filtered = constats.filter(c => {
+    if (statFilter !== 'all' && c.statut !== statFilter) return false;
+    if (siteF !== 'all' && c.site_id !== siteF) return false;
+    if (catF !== 'all' && c.categorie !== catF) return false;
+    if (search) {
+      const site = sites.find(s => s.id === c.site_id);
+      const txt = [c.description, c.localisation, c.agent, site?.nom, c.categorie].join(' ').toLowerCase();
+      if (!txt.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const el = document.getElementById('content');
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun constat pour ces filtres.</div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map(c => {
+    const site = sites.find(s => s.id === c.site_id);
+    const journal = journaux[c.id] || [];
+    const sClass = statClass(c.statut);
+
+    const journalHtml = journal.length > 0 ? `
+      <div class="card-journal-preview">
+        ${journal.slice(0,2).map(j => `
+          <div class="journal-entry-mini">
+            <span class="journal-entry-mini-date">${fmt(j.date_entree)} ${typeIcon(j.type_entree)}</span>
+            <span>${j.texte.length > 80 ? j.texte.slice(0,80) + '…' : j.texte}</span>
+          </div>`).join('')}
+        ${journal.length > 2 ? `<span class="more-journal" onclick="openJournal('${c.id}')">+ ${journal.length - 2} entrée(s) supplémentaire(s)</span>` : ''}
+      </div>` : '';
+
+    const procedureHtml = c.procedure ? `
+      <div class="card-procedure">
+        <div class="card-procedure-lbl">⚡ Procédure / Attitude</div>
+        ${c.procedure}
+      </div>` : '';
+
+    return `<div class="constat-card ${sClass}">
+      <div class="card-header">
+        <div class="card-meta-left">
+          <div class="card-date">📅 ${fmt(c.date_constat)}</div>
+          ${c.date_rapport ? `<div class="card-rapportnum">Rapport : ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</div>` : ''}
+          ${c.agent ? `<div style="font-size:11px;color:var(--rdz-gray);margin-top:2px;">👤 ${c.agent}</div>` : ''}
+          <select class="statut-select" onchange="changeStatut('${c.id}', this.value)" style="margin-top:6px">
+            ${['En attente','En cours','A surveiller','Transmis au client','Résolu'].map(s =>
+              `<option value="${s}"${c.statut===s?' selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card-body">
+          <div class="card-title-row">
+            <div class="card-description">${c.description}</div>
+          </div>
+          <div class="card-info-row">
+            ${site ? `<div class="card-info-item">📍 <strong>${site.nom}</strong></div>` : ''}
+            ${c.localisation ? `<div class="card-info-item">🚪 ${c.localisation}</div>` : ''}
+          </div>
+          <div class="card-badges">
+            ${badgeType(c.categorie)}
+            ${badgeStatut(c.statut)}
+            ${journal.length > 0 ? `<span class="badge" style="background:#f0fdf4;color:#166534">📋 ${journal.length} entrée${journal.length>1?'s':''} journal</span>` : ''}
+          </div>
+          ${procedureHtml}
+          ${journalHtml}
+        </div>
+        <div class="card-actions">
+          <button class="icon-btn journal-btn" onclick="openJournal('${c.id}')">📋 Journal</button>
+          <button class="icon-btn" onclick="openEdit('${c.id}')">✎ Modifier</button>
+          <button class="icon-btn del" onclick="deleteConstat('${c.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── STATUT RAPIDE ────────────────────────────────────────────────────────────
+async function changeStatut(id, newStatut) {
+  setSave('saving', 'Mise à jour…');
+  const { error } = await sb.from('constats').update({ statut: newStatut }).eq('id', id);
+  if (error) { setSave('error', 'Erreur'); return; }
+  const c = constats.find(x => x.id === id);
+  if (c) c.statut = newStatut;
+  setSave('saved', 'Sauvegardé ✓');
+  setTimeout(() => setSave('', 'Prêt'), 2000);
+  updateStats();
+  render();
+}
+
+// ─── MODAL CONSTAT ────────────────────────────────────────────────────────────
+function buildSiteOptions(selectedId) {
+  return sites.map(s => `<option value="${s.id}"${s.id===selectedId?' selected':''}>${s.nom}</option>`).join('');
+}
+function buildCatOptions(selected) {
+  return categories.map(c => `<option value="${c}"${c===selected?' selected':''}>${c}</option>`).join('');
+}
+
+function openAdd() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Nouveau constat';
+  document.getElementById('f-site').innerHTML = buildSiteOptions(null);
+  document.getElementById('f-categorie').innerHTML = buildCatOptions('Technique');
+  document.getElementById('f-localisation').value = '';
+  document.getElementById('f-description').value = '';
+  document.getElementById('f-procedure').value = '';
+  document.getElementById('f-date-constat').value = today();
+  document.getElementById('f-date-rapport').value = today();
+  document.getElementById('f-heure-rapport').value = nowTime();
+  document.getElementById('f-agent').value = '';
+  document.getElementById('f-statut').value = 'En attente';
+  document.getElementById('modal-constat').classList.add('open');
+}
+
+function openEdit(id) {
+  editId = id;
+  const c = constats.find(x => x.id === id);
+  document.getElementById('modal-title').textContent = 'Modifier le constat';
+  document.getElementById('f-site').innerHTML = buildSiteOptions(c.site_id);
+  document.getElementById('f-categorie').innerHTML = buildCatOptions(c.categorie);
+  document.getElementById('f-localisation').value = c.localisation || '';
+  document.getElementById('f-description').value = c.description || '';
+  document.getElementById('f-procedure').value = c.procedure || '';
+  document.getElementById('f-date-constat').value = c.date_constat || '';
+  document.getElementById('f-date-rapport').value = c.date_rapport || '';
+  document.getElementById('f-heure-rapport').value = c.heure_rapport ? c.heure_rapport.slice(0,5) : '';
+  document.getElementById('f-agent').value = c.agent || '';
+  document.getElementById('f-statut').value = c.statut || 'En attente';
+  document.getElementById('modal-constat').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-constat').classList.remove('open'); }
+
+async function saveConstat() {
+  const description = document.getElementById('f-description').value.trim();
+  const date_constat = document.getElementById('f-date-constat').value;
+  if (!description) { alert('Veuillez saisir une description.'); return; }
+  if (!date_constat) { alert('Veuillez saisir la date du constat.'); return; }
+
+  const payload = {
+    site_id: document.getElementById('f-site').value || null,
+    categorie: document.getElementById('f-categorie').value || null,
+    localisation: document.getElementById('f-localisation').value.trim() || null,
+    description,
+    procedure: document.getElementById('f-procedure').value.trim() || null,
+    date_constat,
+    date_rapport: document.getElementById('f-date-rapport').value || null,
+    heure_rapport: document.getElementById('f-heure-rapport').value || null,
+    agent: document.getElementById('f-agent').value.trim() || null,
+    statut: document.getElementById('f-statut').value,
+  };
+
+  const btn = document.getElementById('btn-save-constat');
+  btn.disabled = true;
+  setSave('saving', 'Enregistrement…');
+
+  try {
+    if (editId) {
+      const { error } = await sb.from('constats').update(payload).eq('id', editId);
+      if (error) throw error;
+      const idx = constats.findIndex(x => x.id === editId);
+      if (idx >= 0) constats[idx] = { ...constats[idx], ...payload };
+    } else {
+      const { data, error } = await sb.from('constats').insert(payload).select().single();
+      if (error) throw error;
+      constats.unshift(data);
+    }
+    setSave('saved', 'Sauvegardé ✓');
+    setTimeout(() => setSave('', 'Prêt'), 2000);
+    closeModal();
+    updateStats();
+    render();
+  } catch (err) {
+    setSave('error', 'Erreur'); alert('Erreur : ' + err.message);
+  } finally { btn.disabled = false; }
+}
+
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+async function deleteConstat(id) {
+  if (!confirm('Supprimer ce constat et tout son journal de suivi ?')) return;
+  setSave('saving', 'Suppression…');
+  const { error } = await sb.from('constats').delete().eq('id', id);
+  if (error) { setSave('error', 'Erreur'); alert(error.message); return; }
+  constats = constats.filter(c => c.id !== id);
+  delete journaux[id];
+  setSave('saved', 'Supprimé ✓');
+  setTimeout(() => setSave('', 'Prêt'), 2000);
+  updateStats();
+  render();
+}
+
+// ─── JOURNAL ──────────────────────────────────────────────────────────────────
+function openJournal(id) {
+  journalConstatId = id;
+  const c = constats.find(x => x.id === id);
+  const site = sites.find(s => s.id === c?.site_id);
+  document.getElementById('journal-constat-info').innerHTML = `
+    <strong>${c?.description || '—'}</strong><br>
+    <span style="font-size:11px;color:var(--rdz-gray)">${site?.nom || ''}${c?.localisation ? ' · ' + c.localisation : ''} · ${fmt(c?.date_constat)} · ${badgeStatut(c?.statut)}</span>`;
+  document.getElementById('j-date').value = today();
+  document.getElementById('j-auteur').value = '';
+  document.getElementById('j-texte').value = '';
+  document.getElementById('j-type').value = 'note';
+  renderJournalList(id);
+  document.getElementById('modal-journal').classList.add('open');
+}
+
+function renderJournalList(id) {
+  const entries = journaux[id] || [];
+  const el = document.getElementById('journal-list');
+  if (entries.length === 0) {
+    el.innerHTML = `<div style="text-align:center;padding:20px;font-size:12px;color:#9a9a9a;font-style:italic">Aucune entrée dans le journal.</div>`;
+    return;
+  }
+  el.innerHTML = entries.map(j => `
+    <div class="journal-entry">
+      <div class="journal-entry-header">
+        <div class="journal-entry-date">${typeIcon(j.type_entree)} ${fmt(j.date_entree)}${j.auteur ? ' — ' + j.auteur : ''}</div>
+        <button class="journal-delete-btn" onclick="deleteJournalEntry('${j.id}')">Supprimer</button>
+      </div>
+      <div class="journal-entry-text">${j.texte}</div>
+    </div>`).join('');
+}
+
+function closeJournal() { document.getElementById('modal-journal').classList.remove('open'); journalConstatId = null; }
+
+async function addJournalEntry() {
+  const texte = document.getElementById('j-texte').value.trim();
+  const date_entree = document.getElementById('j-date').value;
+  if (!texte) { alert('Veuillez saisir un texte.'); return; }
+  if (!date_entree) { alert('Veuillez saisir une date.'); return; }
+  const payload = {
+    constat_id: journalConstatId,
+    date_entree,
+    auteur: document.getElementById('j-auteur').value.trim() || null,
+    type_entree: document.getElementById('j-type').value,
+    texte
+  };
+  setSave('saving', 'Enregistrement…');
+  const { data, error } = await sb.from('constats_journal').insert(payload).select().single();
+  if (error) { setSave('error', 'Erreur'); alert(error.message); return; }
+  if (!journaux[journalConstatId]) journaux[journalConstatId] = [];
+  journaux[journalConstatId].unshift(data);
+  setSave('saved', 'Ajouté ✓');
+  setTimeout(() => setSave('', 'Prêt'), 2000);
+  document.getElementById('j-texte').value = '';
+  renderJournalList(journalConstatId);
+  render();
+}
+
+async function deleteJournalEntry(id) {
+  if (!confirm('Supprimer cette entrée ?')) return;
+  const { error } = await sb.from('constats_journal').delete().eq('id', id);
+  if (error) { alert(error.message); return; }
+  if (journaux[journalConstatId]) {
+    journaux[journalConstatId] = journaux[journalConstatId].filter(j => j.id !== id);
+  }
+  renderJournalList(journalConstatId);
+  render();
+}
+
+// ─── PRINT FEUILLE DU JOUR ────────────────────────────────────────────────────
+function showPrint() {
+  const ref = today();
+  // Constats actifs (non résolus) au moment de l'impression
+  const actifs = constats.filter(c => c.statut !== 'Résolu');
+  actifs.sort((a,b) => {
+    const order = { 'En attente':0, 'En cours':1, 'A surveiller':2, 'Transmis au client':3 };
+    return (order[a.statut]||99) - (order[b.statut]||99);
+  });
+
+  // Grouper par site
+  const bySite = {};
+  actifs.forEach(c => {
+    const key = c.site_id || '__nosite__';
+    if (!bySite[key]) bySite[key] = [];
+    bySite[key].push(c);
+  });
+
+  const statColors = {
+    'En attente': '#f59e0b',
+    'En cours': '#3b82f6',
+    'A surveiller': '#f97316',
+    'Transmis au client': '#8b5cf6',
+  };
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">
+    <table style="width:100%;margin-bottom:0"><tr>
+      <td style="padding-bottom:10px;vertical-align:bottom">
+        <div style="font-size:15px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+      </td>
+      <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
+        <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+        <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(ref)}</div>
+      </td>
+    </tr></table>
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:14px"></div>
+    <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Registre des constats en cours</div>
+    <div style="font-size:11px;color:#5a5a5a;margin-bottom:14px">Date d'édition : <strong>${fmtFull(ref)}</strong> &nbsp;·&nbsp; ${actifs.length} constat${actifs.length>1?'s':''} actif${actifs.length>1?'s':''}</div>`;
+
+  if (actifs.length === 0) {
+    html += `<div style="padding:20px;text-align:center;color:#9a9a9a;font-style:italic">Aucun constat actif.</div>`;
+  } else {
+    Object.keys(bySite).forEach(siteKey => {
+      const site = sites.find(s => s.id === siteKey);
+      const siteConstats = bySite[siteKey];
+      html += `<div style="margin-bottom:22px;page-break-inside:avoid">
+        <div style="background:#1a1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+          <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            <th style="padding:6px 10px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Date</th>
+            <th style="padding:6px 10px;width:70px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Catégorie</th>
+            <th style="padding:6px 10px;width:90px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Localisation</th>
+            <th style="padding:6px 10px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Constat / Procédure</th>
+            <th style="padding:6px 10px;width:75px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Statut</th>
+          </tr></thead>
+          <tbody>`;
+
+      siteConstats.forEach((c, i) => {
+        const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+        const color = statColors[c.statut] || '#9a9a9a';
+        const journal = journaux[c.id] || [];
+        const lastEntry = journal.length > 0 ? journal[0] : null;
+        html += `<tr style="background:${bg};page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <td style="padding:8px 10px;font-size:11px;color:#5a5a5a;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">${fmt(c.date_constat)}</td>
+          <td style="padding:8px 10px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;color:#4a4a4a">${c.categorie || '—'}</td>
+          <td style="padding:8px 10px;font-size:11px;color:#4a4a4a;border-right:1px solid #e5e2dd;vertical-align:top">${c.localisation || '—'}</td>
+          <td style="padding:8px 10px;border-right:1px solid #e5e2dd;vertical-align:top">
+            <div style="font-size:12px;color:#1a1a1a;line-height:1.5;margin-bottom:${c.procedure ? '5px' : '0'}">${c.description}</div>
+            ${c.procedure ? `<div style="font-size:10px;color:#92400e;background:#fffbeb;border-left:2px solid #f59e0b;padding:4px 8px;line-height:1.5"><strong>⚡ Procédure :</strong> ${c.procedure}</div>` : ''}
+            ${lastEntry ? `<div style="font-size:10px;color:#6b6b6b;margin-top:4px;font-style:italic">${typeIcon(lastEntry.type_entree)} ${fmt(lastEntry.date_entree)} : ${lastEntry.texte.slice(0,80)}${lastEntry.texte.length>80?'…':''}</div>` : ''}
+          </td>
+          <td style="padding:8px 10px;text-align:center;vertical-align:top">
+            <span style="font-size:9px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.04em">${c.statut}</span>
+          </td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+  }
+
+  html += `
+    <div style="margin-top:16px;border-top:2px solid #1a1a1a;padding-top:14px;page-break-inside:avoid">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:12px">Prise de connaissance — à compléter par l'agent</div>
+      <table style="width:100%;border-collapse:collapse">
+        <tr>
+          <td style="width:40%;padding-right:20px;vertical-align:bottom">
+            <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Nom et prénom</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+          </td>
+          <td style="width:20%;padding-right:20px;vertical-align:bottom">
+            <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+          </td>
+          <td style="width:40%;vertical-align:bottom">
+            <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Signature</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
+      <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+      <span>Constats actifs au ${fmt(ref)}</span>
+    </div>
+  </div>`;
+
+  document.getElementById('print-inner').innerHTML = html;
+  document.getElementById('modal-print').classList.add('open');
+}
+
+function doPrint() {
+  document.getElementById('print-doc').innerHTML = document.getElementById('print-inner').innerHTML;
+  document.querySelectorAll('.modal-overlay').forEach(o => o.classList.remove('open'));
+  const orig = document.title;
+  document.title = `RDZ_Constats_${today().replace(/-/g,'')}`;
+  setTimeout(() => { window.print(); document.title = orig; }, 150);
+}
+
+// ─── CLOSE ON BACKDROP ────────────────────────────────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>
