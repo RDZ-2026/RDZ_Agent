@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ Security Management SA — Plateforme de gestion</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--rdz-bg);
+      color: var(--rdz-black);
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    .header {
+      background: var(--rdz-red);
+      border-bottom: 4px solid var(--rdz-red-dark);
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .header-brand {
+      padding: 18px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .header-brand-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .header-brand-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      letter-spacing: .04em;
+    }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .header-meta-item {
+      font-size: 11px;
+      color: rgba(255,255,255,.6);
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    /* BANNER */
+    .banner {
+      background: var(--rdz-black);
+      padding: 10px 0;
+    }
+    .banner-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .banner-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .banner-date {
+      font-size: 12px;
+      color: rgba(255,255,255,.5);
+    }
+
+    /* MAIN */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--rdz-gray);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--rdz-border);
+    }
+
+    /* MODULE GRID */
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .module-card {
+      background: #fff;
+      border: 1px solid var(--rdz-border);
+      border-top: 3px solid var(--rdz-border);
+      border-radius: 2px;
+      padding: 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-top-color .15s, box-shadow .15s;
+      cursor: pointer;
+      position: relative;
+    }
+    .module-card.active {
+      border-top-color: var(--rdz-red);
+    }
+    .module-card.active:hover {
+      box-shadow: 0 4px 16px rgba(139,26,26,.1);
+    }
+    .module-card.coming-soon {
+      opacity: .6;
+      cursor: default;
+    }
+    .module-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .module-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--rdz-red-light);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .module-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--rdz-red);
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .module-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 2px;
+    }
+    .badge-live {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .badge-soon {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+    .badge-wip {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+    .module-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--rdz-black);
+      letter-spacing: .02em;
+    }
+    .module-desc {
+      font-size: 12.5px;
+      color: var(--rdz-gray);
+      line-height: 1.6;
+    }
+    .module-footer {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--rdz-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .module-link {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--rdz-red);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .module-link svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .module-card.coming-soon .module-link {
+      color: #9a9a9a;
+    }
+
+    /* INFO BAR */
+    .info-bar {
+      background: #fff;
+      border: 1px solid var(--rdz-border);
+      border-left: 4px solid var(--rdz-red);
+      padding: 14px 20px;
+      border-radius: 0 2px 2px 0;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 40px;
+    }
+    .info-bar-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--rdz-red-light);
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .info-bar-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: var(--rdz-red);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .info-bar-text {
+      font-size: 12.5px;
+      color: var(--rdz-gray);
+      line-height: 1.5;
+    }
+    .info-bar-text strong {
+      color: var(--rdz-black);
+    }
+
+    /* FOOTER */
+    .footer {
+      border-top: 1px solid var(--rdz-border);
+      padding: 20px 32px;
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #9a9a9a;
+    }
+
+    @media (max-width: 600px) {
+      .header-inner, .banner-inner, .main, .footer { padding-left: 16px; padding-right: 16px; }
+      .modules-grid { grid-template-columns: 1fr; }
+      .header-meta { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="header-brand-name">RDZ Security Management SA</div>
+        <div class="header-brand-sub">Quai du Seujet 22, 1201 Genève &nbsp;·&nbsp; 022 552 26 99 &nbsp;·&nbsp; contact@rdz-security-management.ch</div>
+      </div>
+      <div class="header-meta">
+        <div class="header-meta-item">Plateforme de gestion interne<br>Usage strictement confidentiel</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="banner">
+    <div class="banner-inner">
+      <div class="banner-title">Tableau de bord — Modules disponibles</div>
+      <div class="banner-date" id="current-date"></div>
+    </div>
+  </div>
+
+  <main class="main">
+
+    <div class="info-bar">
+      <div class="info-bar-icon">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="info-bar-text">
+        <strong>Plateforme RDZ — Usage interne uniquement.</strong> Toutes les données sont sauvegardées automatiquement. En cas de problème, contactez votre responsable.
+      </div>
+    </div>
+
+    <div class="section-label">Modules actifs</div>
+    <div class="modules-grid">
+
+      <a class="module-card active" href="consignes.html">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <span class="module-badge badge-live">En ligne</span>
+        </div>
+        <div>
+          <div class="module-name">Consignes particulières</div>
+          <div class="module-desc">Gestion des consignes par site avec dates de validité. Filtrage par date et impression professionnelle pour les agents de terrain.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="section-label">Modules en développement</div>
+    <div class="modules-grid">
+
+      <div class="module-card coming-soon">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <span class="module-badge badge-wip">En cours</span>
+        </div>
+        <div>
+          <div class="module-name">Gestion des stocks</div>
+          <div class="module-desc">Suivi des équipements, tenues et matériels par site. Inventaire, état des articles et alertes de renouvellement.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Bientôt disponible</span>
+        </div>
+      </div>
+
+      <div class="module-card coming-soon">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <span class="module-badge badge-wip">En cours</span>
+        </div>
+        <div>
+          <div class="module-name">Gestion des incidents</div>
+          <div class="module-desc">Déclaration, suivi et traitement des incidents de sécurité par site. Historique, statuts et rapports exportables.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Bientôt disponible</span>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <span>RDZ Security Management SA — Plateforme interne confidentielle</span>
+    <span id="footer-date"></span>
+  </footer>
+
+  <script>
+    function formatDate(d) {
+      return d.toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    }
+    const now = new Date();
+    document.getElementById('current-date').textContent = formatDate(now);
+    document.getElementById('footer-date').textContent = 'Version 1.0 — ' + now.getFullYear();
+  </script>
+
+</body>
+</html>

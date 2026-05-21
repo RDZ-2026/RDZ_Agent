@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Consignes particulières</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    /* TOOLBAR */
+    .toolbar { background: #fff; border-bottom: 2px solid var(--rdz-black); padding: 10px 28px; }
+    .toolbar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .tdate, .tsel { padding: 6px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsep { width: 1px; height: 18px; background: var(--rdz-border); margin: 0 4px; }
+    .seg { display: flex; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .seg-btn { padding: 6px 13px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; background: #fff; color: var(--rdz-gray); cursor: pointer; border-right: 1px solid var(--rdz-border); transition: all .15s; }
+    .seg-btn:last-child { border-right: none; }
+    .seg-btn.on { background: var(--rdz-red); color: #fff; }
+
+    /* SAVE STATUS */
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saving { background: #f59e0b; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* CONTENT */
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
+
+    /* SITE BLOCKS */
+    .site-block { margin-bottom: 24px; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; background: #fff; }
+    .site-hdr { background: var(--rdz-black); padding: 9px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .site-name { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+    .site-count { font-size: 11px; color: rgba(255,255,255,.55); background: rgba(255,255,255,.1); padding: 2px 8px; border-radius: 2px; }
+    .card { background: #fff; border-bottom: 1px solid var(--rdz-border); padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px; }
+    .card:last-child { border-bottom: none; }
+    .card.inactive { opacity: .45; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+    .dot-on { background: #1e5c2e; }
+    .dot-off { background: #c5c1bb; }
+    .card-num { font-size: 10px; font-weight: 700; color: #999; letter-spacing: .04em; min-width: 22px; padding-top: 2px; }
+    .card-body { flex: 1; }
+    .card-text { font-size: 13.5px; color: var(--rdz-black); line-height: 1.55; margin-bottom: 8px; }
+    .card-dates { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--rdz-gray); font-weight: 600; letter-spacing: .02em; }
+    .card-dates span { display: flex; align-items: center; gap: 4px; }
+    .badge-perm { font-size: 10px; background: #dbeafe; color: #1e3a5f; padding: 2px 8px; border-radius: 2px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .card-actions { display: flex; gap: 5px; margin-left: 8px; }
+    .icon-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 2px; border: 1px solid var(--rdz-border); background: transparent; color: var(--rdz-gray); cursor: pointer; transition: all .15s; font-size: 14px; }
+    .icon-btn:hover { background: var(--rdz-bg); }
+    .icon-btn.del:hover { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .empty-site { padding: 16px 18px; font-size: 12px; color: #9a9a9a; font-style: italic; }
+
+    /* LOADING / ERROR */
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 32px; margin-bottom: 12px; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 60px 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 28px; width: 100%; max-width: 520px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 16px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 20px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 6px; }
+    .field textarea, .field input, .field select { width: 100%; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field-row { display: flex; gap: 14px; }
+    .field-row .field { flex: 1; }
+    .field-hint { font-size: 11px; color: #9a9a9a; margin-top: 5px; font-style: italic; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-cancel:hover { background: #ebe9e6; }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+    .mbtn-save:hover { background: var(--rdz-red-dark); }
+    .mbtn-save:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* MODAL SITE */
+    .modal-sm { max-width: 400px; }
+
+    /* PRINT */
+    @media print {
+      .header, .toolbar, .card-actions, .site-hdr button, .no-print { display: none !important; }
+      body { background: #fff; }
+      .print-doc { display: block !important; }
+      .content { display: none; }
+    }
+    .print-doc { display: none; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Consignes particulières</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="index.html">← Accueil</a>
+      <button class="btn-nav" onclick="openAddSite()">+ Nouveau site</button>
+      <button class="btn-nav" onclick="showPrint()">Imprimer</button>
+      <button class="btn-nav btn-nav-accent" onclick="openAdd()">+ Nouvelle consigne</button>
+    </nav>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <span class="tlabel">Date</span>
+    <input type="date" class="tdate" id="ref-date" onchange="render()">
+    <div class="tsep"></div>
+    <span class="tlabel">Site</span>
+    <select class="tsel" id="site-filter" onchange="render()">
+      <option value="all">Tous les sites</option>
+    </select>
+    <div class="tsep"></div>
+    <span class="tlabel">Afficher</span>
+    <div class="seg">
+      <button class="seg-btn on" data-v="all" onclick="setView(this)">Toutes</button>
+      <button class="seg-btn" data-v="active" onclick="setView(this)">Actives</button>
+      <button class="seg-btn" data-v="inactive" onclick="setView(this)">Inactives</button>
+    </div>
+    <div class="save-status" id="save-status">
+      <div class="save-dot" id="save-dot"></div>
+      <span id="save-text">Connecté</span>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="content">
+  <div class="state-msg" id="loading-msg">
+    <div class="big">⏳</div>
+    Chargement des données…
+  </div>
+</div>
+
+<!-- MODAL CONSIGNE -->
+<div class="modal-overlay" id="modal-consigne">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nouvelle consigne</div>
+    <div class="field">
+      <label>Site concerné</label>
+      <select id="f-site"></select>
+    </div>
+    <div class="field">
+      <label>Texte de la consigne</label>
+      <textarea id="f-text" placeholder="Décrivez la consigne avec précision…"></textarea>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Date de début</label>
+        <input type="date" id="f-start">
+      </div>
+      <div class="field">
+        <label>Date de fin</label>
+        <input type="date" id="f-end">
+        <div class="field-hint">Laisser vide = consigne permanente</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="mbtn mbtn-save" id="btn-save" onclick="save()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SITE -->
+<div class="modal-overlay" id="modal-site">
+  <div class="modal modal-sm">
+    <div class="modal-title">Nouveau site</div>
+    <div class="field">
+      <label>Nom du site</label>
+      <input type="text" id="f-site-name" placeholder="Ex : Site Delta — Genève-Rive">
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeSiteModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveSite()">✓ Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRINT PREVIEW -->
+<div class="modal-overlay" id="modal-print">
+  <div class="modal" style="max-width:720px; max-height:88vh; overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--rdz-border);margin-bottom:18px">
+      <div class="modal-title" style="border:none;padding:0;margin:0">Aperçu impression</div>
+      <button class="mbtn mbtn-cancel" onclick="closePrint()" style="padding:5px 10px">✕</button>
+    </div>
+    <div id="print-inner"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closePrint()">Fermer</button>
+      <button class="mbtn mbtn-save" onclick="doPrint()">🖨 Imprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="print-doc" id="print-doc"></div>
+
+<script>
+// ─── SUPABASE ───────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let sites = [];
+let consignes = [];
+let viewMode = 'all';
+let editId = null;
+
+// ─── UTILS ──────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmt(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; }
+function isActive(c, ref) {
+  if (c.date_debut && c.date_debut > ref) return false;
+  if (c.date_fin && c.date_fin < ref) return false;
+  return true;
+}
+
+// ─── SAVE STATUS ────────────────────────────────────────────────────────────
+function setSaveStatus(state, msg) {
+  const dot = document.getElementById('save-dot');
+  const txt = document.getElementById('save-text');
+  dot.className = 'save-dot' + (state ? ' ' + state : '');
+  txt.textContent = msg;
+}
+
+// ─── LOAD DATA ──────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [{ data: s, error: se }, { data: c, error: ce }] = await Promise.all([
+      sb.from('sites').select('*').order('nom'),
+      sb.from('consignes').select('*').order('date_debut')
+    ]);
+    if (se || ce) throw se || ce;
+    sites = s || [];
+    consignes = c || [];
+    setSaveStatus('saved', 'Données chargées');
+    render();
+  } catch (err) {
+    console.error(err);
+    document.getElementById('content').innerHTML = `
+      <div class="state-msg">
+        <div class="big">⚠️</div>
+        Impossible de charger les données.<br>
+        <small style="color:#9a9a9a">Vérifiez votre connexion et la configuration Supabase.</small>
+      </div>`;
+    setSaveStatus('error', 'Erreur de connexion');
+  }
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────────
+function rebuildSiteFilter() {
+  const sel = document.getElementById('site-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">Tous les sites</option>' +
+    sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+function render() {
+  rebuildSiteFilter();
+  const ref = document.getElementById('ref-date').value || today();
+  const siteF = document.getElementById('site-filter').value;
+  const el = document.getElementById('content');
+  const filteredSites = siteF === 'all' ? sites : sites.filter(s => s.id === siteF);
+
+  if (filteredSites.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun site. Commencez par en créer un.</div>`;
+    return;
+  }
+
+  let html = '';
+  filteredSites.forEach(site => {
+    let cons = consignes.filter(c => c.site_id === site.id);
+    if (viewMode === 'active') cons = cons.filter(c => isActive(c, ref));
+    if (viewMode === 'inactive') cons = cons.filter(c => !isActive(c, ref));
+    const activeCount = consignes.filter(c => c.site_id === site.id && isActive(c, ref)).length;
+
+    html += `<div class="site-block">
+      <div class="site-hdr">
+        <div class="site-name">${site.nom}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="site-count">${activeCount} active${activeCount > 1 ? 's' : ''} au ${fmt(ref)}</span>
+          <button class="icon-btn del" onclick="deleteSite('${site.id}')" title="Supprimer le site" style="color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.15)">✕</button>
+        </div>
+      </div>`;
+
+    if (cons.length === 0) {
+      html += `<div class="empty-site">Aucune consigne pour ce filtre.</div>`;
+    } else {
+      cons.forEach((c, i) => {
+        const active = isActive(c, ref);
+        html += `<div class="card${active ? '' : ' inactive'}">
+          <div class="dot ${active ? 'dot-on' : 'dot-off'}"></div>
+          <div class="card-num">${String(i + 1).padStart(2, '0')}</div>
+          <div class="card-body">
+            <div class="card-text">${c.texte}</div>
+            <div class="card-dates">
+              <span>📅 Dès le ${fmt(c.date_debut)}</span>
+              ${c.date_fin
+                ? `<span>⛔ Jusqu'au ${fmt(c.date_fin)}</span>`
+                : `<span class="badge-perm">Permanente</span>`}
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="icon-btn" onclick="openEdit('${c.id}')" title="Modifier">✎</button>
+            <button class="icon-btn del" onclick="del('${c.id}')" title="Supprimer">✕</button>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ─── VIEW TOGGLE ────────────────────────────────────────────────────────────
+function setView(btn) {
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  viewMode = btn.dataset.v;
+  render();
+}
+
+// ─── MODAL CONSIGNE ─────────────────────────────────────────────────────────
+function openAdd() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'Nouvelle consigne';
+  document.getElementById('f-text').value = '';
+  document.getElementById('f-start').value = today();
+  document.getElementById('f-end').value = '';
+  document.getElementById('f-site').innerHTML = sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+  document.getElementById('modal-consigne').classList.add('open');
+}
+
+function openEdit(id) {
+  editId = id;
+  const c = consignes.find(x => x.id === id);
+  document.getElementById('modal-title').textContent = 'Modifier la consigne';
+  document.getElementById('f-text').value = c.texte;
+  document.getElementById('f-start').value = c.date_debut;
+  document.getElementById('f-end').value = c.date_fin || '';
+  document.getElementById('f-site').innerHTML = sites.map(s =>
+    `<option value="${s.id}"${s.id === c.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
+  document.getElementById('modal-consigne').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-consigne').classList.remove('open');
+}
+
+async function save() {
+  const texte = document.getElementById('f-text').value.trim();
+  if (!texte) { alert('Veuillez saisir le texte de la consigne.'); return; }
+  const site_id = document.getElementById('f-site').value;
+  const date_debut = document.getElementById('f-start').value;
+  const date_fin = document.getElementById('f-end').value || null;
+  if (!date_debut) { alert('Veuillez saisir une date de début.'); return; }
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  setSaveStatus('saving', 'Enregistrement…');
+
+  try {
+    if (editId) {
+      const { error } = await sb.from('consignes')
+        .update({ site_id, texte, date_debut, date_fin })
+        .eq('id', editId);
+      if (error) throw error;
+      const idx = consignes.findIndex(x => x.id === editId);
+      if (idx >= 0) consignes[idx] = { ...consignes[idx], site_id, texte, date_debut, date_fin };
+    } else {
+      const { data, error } = await sb.from('consignes')
+        .insert({ site_id, texte, date_debut, date_fin })
+        .select().single();
+      if (error) throw error;
+      consignes.push(data);
+    }
+    setSaveStatus('saved', 'Sauvegardé ✓');
+    setTimeout(() => setSaveStatus('', 'Connecté'), 3000);
+    closeModal();
+    render();
+  } catch (err) {
+    console.error(err);
+    setSaveStatus('error', 'Erreur de sauvegarde');
+    alert('Erreur lors de la sauvegarde : ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── DELETE CONSIGNE ─────────────────────────────────────────────────────────
+async function del(id) {
+  if (!confirm('Supprimer cette consigne ?')) return;
+  setSaveStatus('saving', 'Suppression…');
+  const { error } = await sb.from('consignes').delete().eq('id', id);
+  if (error) { setSaveStatus('error', 'Erreur'); alert(error.message); return; }
+  consignes = consignes.filter(c => c.id !== id);
+  setSaveStatus('saved', 'Supprimé ✓');
+  setTimeout(() => setSaveStatus('', 'Connecté'), 3000);
+  render();
+}
+
+// ─── MODAL SITE ──────────────────────────────────────────────────────────────
+function openAddSite() {
+  document.getElementById('f-site-name').value = '';
+  document.getElementById('modal-site').classList.add('open');
+}
+function closeSiteModal() {
+  document.getElementById('modal-site').classList.remove('open');
+}
+async function saveSite() {
+  const nom = document.getElementById('f-site-name').value.trim();
+  if (!nom) { alert('Veuillez saisir un nom.'); return; }
+  setSaveStatus('saving', 'Enregistrement…');
+  const { data, error } = await sb.from('sites').insert({ nom }).select().single();
+  if (error) { setSaveStatus('error', 'Erreur'); alert(error.message); return; }
+  sites.push(data);
+  sites.sort((a, b) => a.nom.localeCompare(b.nom));
+  setSaveStatus('saved', 'Site ajouté ✓');
+  setTimeout(() => setSaveStatus('', 'Connecté'), 3000);
+  closeSiteModal();
+  render();
+}
+async function deleteSite(id) {
+  const s = sites.find(x => x.id === id);
+  if (!confirm(`Supprimer le site "${s.nom}" et toutes ses consignes ?`)) return;
+  setSaveStatus('saving', 'Suppression…');
+  const { error } = await sb.from('sites').delete().eq('id', id);
+  if (error) { setSaveStatus('error', 'Erreur'); alert(error.message); return; }
+  sites = sites.filter(x => x.id !== id);
+  consignes = consignes.filter(c => c.site_id !== id);
+  setSaveStatus('saved', 'Supprimé ✓');
+  setTimeout(() => setSaveStatus('', 'Connecté'), 3000);
+  render();
+}
+
+// ─── PRINT ───────────────────────────────────────────────────────────────────
+function showPrint() {
+  const ref = document.getElementById('ref-date').value || today();
+  const siteF = document.getElementById('site-filter').value;
+  const filteredSites = siteF === 'all' ? sites : sites.filter(s => s.id === siteF);
+  const totalActive = filteredSites.reduce((n, s) => n + consignes.filter(c => c.site_id === s.id && isActive(c, ref)).length, 0);
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">
+    <table style="width:100%;margin-bottom:0"><tr>
+      <td style="padding-bottom:10px;vertical-align:bottom">
+        <div style="font-size:15px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+        <div style="font-size:11px;color:#9a9a9a;margin-top:2px">Quai du Seujet 22, 1201 Genève &nbsp;·&nbsp; 022 552 26 99 &nbsp;·&nbsp; contact@rdz-security-management.ch</div>
+      </td>
+      <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
+        <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+        <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
+      </td>
+    </tr></table>
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:14px"></div>
+    <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Consignes particulières actives</div>
+    <div style="font-size:11px;color:#5a5a5a;margin-bottom:14px">Date de référence : <strong>${fmt(ref)}</strong> &nbsp;·&nbsp; ${totalActive} consigne${totalActive > 1 ? 's' : ''} active${totalActive > 1 ? 's' : ''}</div>`;
+
+  filteredSites.forEach(site => {
+    const cons = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
+    if (cons.length === 0) return;
+    html += `<div style="margin-bottom:18px;page-break-inside:avoid">
+      <div style="background:#1a1a1a;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">${site.nom}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+        <thead><tr style="background:#f5f4f2">
+          <th style="padding:6px 10px;width:30px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">N°</th>
+          <th style="padding:6px 12px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left">Consigne</th>
+          <th style="padding:6px 10px;width:80px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">Début</th>
+          <th style="padding:6px 10px;width:80px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;text-align:center">Fin</th>
+        </tr></thead>
+        <tbody>`;
+    cons.forEach((c, i) => {
+      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+      html += `<tr style="background:${bg};page-break-inside:avoid">
+        <td style="padding:9px 10px;font-size:10px;font-weight:700;color:#9a9a9a;border-right:1px solid #e5e2dd;text-align:center;vertical-align:top">${String(i + 1).padStart(2, '0')}</td>
+        <td style="padding:9px 12px;font-size:12px;color:#1a1a1a;line-height:1.5;border-right:1px solid #e5e2dd">${c.texte}</td>
+        <td style="padding:9px 10px;font-size:11px;color:#5a5a5a;text-align:center;vertical-align:top;border-right:1px solid #e5e2dd">${fmt(c.date_debut)}</td>
+        <td style="padding:9px 10px;font-size:11px;text-align:center;vertical-align:top;${c.date_fin ? 'color:#5a5a5a' : 'color:#8B1A1A;font-weight:700'}">${c.date_fin ? fmt(c.date_fin) : '—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  html += `
+    <div style="margin-top:28px;border-top:2px solid #1a1a1a;padding-top:16px;page-break-inside:avoid">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:14px">Prise de connaissance — à compléter par l'agent</div>
+      <table style="width:100%;border-collapse:collapse">
+        <tr>
+          <td style="width:40%;padding-right:20px;vertical-align:bottom">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Nom et prénom de l'agent</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+          </td>
+          <td style="width:20%;padding-right:20px;vertical-align:bottom">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Date</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+          </td>
+          <td style="width:40%;vertical-align:bottom">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Signature</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3" style="padding-top:6px">
+            <div style="font-size:9px;color:#9a9a9a;font-style:italic">Je soussigné(e) certifie avoir pris connaissance des consignes particulières en vigueur à la date indiquée et m'engage à les respecter.</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <div style="margin-top:20px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
+      <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+      <span>Date de référence : ${fmt(ref)}</span>
+    </div>
+  </div>`;
+
+  document.getElementById('print-inner').innerHTML = html;
+  document.getElementById('modal-print').classList.add('open');
+}
+
+function closePrint() {
+  document.getElementById('modal-print').classList.remove('open');
+}
+function doPrint() {
+  document.getElementById('print-doc').innerHTML = document.getElementById('print-inner').innerHTML;
+  window.print();
+}
+
+// ─── CLOSE MODALS ON BACKDROP CLICK ─────────────────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+document.getElementById('ref-date').value = today();
+loadAll();
+</script>
+
+</body>
+</html>
