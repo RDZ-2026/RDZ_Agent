@@ -263,7 +263,7 @@
     <div id="recap-inner"></div>
     <div class="modal-footer">
       <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-recap').classList.remove('open')">Fermer</button>
-      <button class="mbtn mbtn-save" onclick="doPrint('recap-inner')">🖨 Imprimer</button>
+      <button class="mbtn mbtn-save" id="btn-recap-print" onclick="doPrint('recap-inner', window._recapFilename)">🖨 Imprimer</button>
     </div>
   </div>
 </div>
@@ -274,7 +274,7 @@
     <div id="ods-inner"></div>
     <div class="modal-footer">
       <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-ods').classList.remove('open')">Fermer</button>
-      <button class="mbtn mbtn-save" onclick="doPrint('ods-inner')">🖨 Imprimer</button>
+      <button class="mbtn mbtn-save" id="btn-ods-print" onclick="doPrint('ods-inner', window._odsFilename)">🖨 Imprimer</button>
     </div>
   </div>
 </div>
@@ -626,6 +626,7 @@ function showPrintRecap() {
   </div></div>`;
 
   document.getElementById('recap-inner').innerHTML = html;
+  window._recapFilename = `recap_events_${ref.replace(/-/g, '')}`;
   document.getElementById('modal-recap').classList.add('open');
 }
 
@@ -650,7 +651,7 @@ function showPrintODS() {
       const serviceDebut = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : (e.heure_debut ? e.heure_debut.slice(0,5) : null);
       const serviceFin   = e.heure_service_fin   ? e.heure_service_fin.slice(0,5)   : (e.heure_fin   ? e.heure_fin.slice(0,5)   : null);
 
-      html += `<div style="${idx > 0 ? 'page-break-before:always;' : ''}">
+      html += `<div style="${idx > 0 ? 'page-break-before:always;break-before:page;display:block;' : ''}">
         ${printHeader(ref)}
 
         <!-- TITRE ODS -->
@@ -769,14 +770,20 @@ function showPrintODS() {
 
   html += `</div>`;
   document.getElementById('ods-inner').innerHTML = html;
+  const odsNames = evDay.map(e => e.titre.replace(/[^a-zA-Z0-9À-ÿ\s\-]/g, '').trim().replace(/\s+/g, '_').slice(0, 40));
+  window._odsFilename = evDay.length === 1
+    ? `RDZ_ODS_${odsNames[0]}_${ref.replace(/-/g, '')}`
+    : `RDZ_ODS_${ref.replace(/-/g, '')}_${evDay.length}evenements`;
   document.getElementById('modal-ods').classList.add('open');
 }
 
 // ── PRINT ────────────────────────────────────────────────────────────────────
-function doPrint(sourceId) {
+function doPrint(sourceId, filename) {
   document.getElementById('print-doc').innerHTML = document.getElementById(sourceId).innerHTML;
   document.querySelectorAll('.modal-overlay').forEach(o => o.classList.remove('open'));
-  setTimeout(() => window.print(), 150);
+  const origTitle = document.title;
+  if (filename) document.title = filename;
+  setTimeout(() => { window.print(); document.title = origTitle; }, 150);
 }
 
 // ── BACKDROP ─────────────────────────────────────────────────────────────────
