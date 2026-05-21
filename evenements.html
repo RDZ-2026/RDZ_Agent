@@ -49,38 +49,12 @@
     .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
 
     /* EVENT CARD */
-    .event-card {
-      background: #fff;
-      border: 1px solid var(--rdz-border);
-      border-left: 4px solid var(--rdz-black);
-      border-radius: 2px;
-      margin-bottom: 14px;
-      overflow: hidden;
-      transition: border-left-color .15s;
-    }
+    .event-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-black); border-radius: 2px; margin-bottom: 14px; overflow: hidden; transition: border-left-color .15s; }
     .event-card.has-agent { border-left-color: var(--rdz-red); }
     .event-card.past { opacity: .55; }
 
-    .event-card-header {
-      padding: 12px 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      border-bottom: 1px solid var(--rdz-border);
-    }
-    .event-time-block {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-width: 70px;
-      background: var(--rdz-black);
-      color: #fff;
-      border-radius: 2px;
-      padding: 8px 10px;
-      text-align: center;
-      flex-shrink: 0;
-    }
+    .event-card-header { padding: 12px 18px; display: flex; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--rdz-border); }
+    .event-time-block { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 70px; background: var(--rdz-black); color: #fff; border-radius: 2px; padding: 8px 10px; text-align: center; flex-shrink: 0; }
     .event-time-block.has-agent { background: var(--rdz-red); }
     .event-time-start { font-size: 16px; font-weight: 700; letter-spacing: .02em; }
     .event-time-sep { font-size: 9px; color: rgba(255,255,255,.5); margin: 1px 0; }
@@ -95,7 +69,7 @@
     .event-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
     .ebadge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 2px; }
     .ebadge-agent { background: #fee2e2; color: #7f1d1d; }
-    .ebadge-site { background: #f3f4f6; color: #374151; }
+    .ebadge-info { background: #e0f2fe; color: #0c4a6e; }
     .ebadge-tenue { background: #fef9c3; color: #854d0e; }
 
     .event-actions { display: flex; gap: 6px; margin-left: 8px; flex-shrink: 0; }
@@ -103,18 +77,10 @@
     .icon-btn:hover { background: var(--rdz-bg); }
     .icon-btn.del:hover { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
 
-    .event-details {
-      padding: 12px 18px 14px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 10px 20px;
-      background: var(--rdz-bg);
-      border-top: 1px solid var(--rdz-border);
-    }
+    .event-details { padding: 12px 18px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 20px; background: var(--rdz-bg); border-top: 1px solid var(--rdz-border); }
     .detail-block { }
     .detail-lbl { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 3px; }
     .detail-val { font-size: 12.5px; color: var(--rdz-black); line-height: 1.5; }
-    .detail-val.empty { color: #aaa; font-style: italic; }
 
     /* JOUR HEADER */
     .day-separator { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-gray); padding: 16px 0 8px; border-bottom: 2px solid var(--rdz-black); margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
@@ -153,9 +119,6 @@
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
     .print-doc { display: none; }
-
-    /* MODAL PRINT */
-    #modal-print .modal { max-width: 760px; max-height: 88vh; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -168,9 +131,9 @@
     </div>
     <nav class="header-nav">
       <a class="btn-nav" href="index.html">← Accueil</a>
-      <a class="btn-nav" href="consignes.html">Consignes</a>
       <a class="btn-nav" href="parametrage.html">⚙ Sites</a>
-      <button class="btn-nav" onclick="showPrint()">🖨 Imprimer</button>
+      <button class="btn-nav" onclick="showPrintRecap()">📋 Récapitulatif</button>
+      <button class="btn-nav" onclick="showPrintODS()">📄 Ordres de service</button>
       <button class="btn-nav btn-nav-accent" onclick="openAdd()">+ Nouvel événement</button>
     </nav>
   </div>
@@ -239,19 +202,15 @@
       </div>
     </div>
     <div class="field">
-      <label>Organisateur / Client</label>
-      <input type="text" id="f-organisateur" placeholder="Ex : CGD Europe">
-    </div>
-    <div class="field">
-      <label>Référence (facturation)</label>
-      <input type="text" id="f-reference" placeholder="Ex : 2940570">
+      <label>Contact événement</label>
+      <input type="text" id="f-contact" placeholder="Ex : Lyanna Tan, 079 573 60 22">
     </div>
 
     <div class="modal-section">Sécurité</div>
     <div class="field-row">
       <div class="field">
         <label>Nombre d'agents</label>
-        <input type="number" id="f-nb-agents" min="0" value="0" placeholder="0">
+        <input type="number" id="f-nb-agents" min="0" value="0">
         <div class="field-hint">0 = agent de site assure le renseignement</div>
       </div>
       <div class="field">
@@ -267,12 +226,12 @@
     </div>
     <div class="field-row">
       <div class="field">
-        <label>Heure de prise de service</label>
+        <label>Prise de service</label>
         <input type="time" id="f-heure-service">
-        <div class="field-hint">Si différente de l'heure de début</div>
+        <div class="field-hint">Si différente de l'heure début</div>
       </div>
       <div class="field">
-        <label>Heure de fin de service</label>
+        <label>Fin de service</label>
         <input type="time" id="f-heure-fin-service">
       </div>
     </div>
@@ -281,22 +240,14 @@
       <input type="text" id="f-agents" placeholder="Ex : Jean Dupont, Marie Martin">
     </div>
     <div class="field">
-      <label>Contact événement</label>
-      <input type="text" id="f-contact" placeholder="Ex : Lyanna Tan, 079 573 60 22">
-    </div>
-    <div class="field">
       <label>Consignes / Remarques sécurité</label>
-      <textarea id="f-consignes" placeholder="Ex : Surveillance pendant l'événement et pendant le cocktail…"></textarea>
+      <textarea id="f-consignes" placeholder="Consignes spécifiques pour les agents…"></textarea>
     </div>
 
-    <div class="modal-section">Restauration & divers</div>
+    <div class="modal-section">Divers</div>
     <div class="field">
-      <label>Restauration</label>
-      <input type="text" id="f-restauration" placeholder="Ex : Cocktail Gourmet Brothers de 20h00 à 21h00">
-    </div>
-    <div class="field">
-      <label>Remarques logistiques</label>
-      <textarea id="f-remarques" placeholder="Configuration, accès, divers…" style="min-height:60px"></textarea>
+      <label>Remarques ou notes diverses</label>
+      <textarea id="f-remarques" placeholder="Configuration, accès, logistique, divers…" style="min-height:60px"></textarea>
     </div>
 
     <div class="modal-footer">
@@ -306,13 +257,24 @@
   </div>
 </div>
 
-<!-- MODAL PRINT -->
-<div class="modal-overlay" id="modal-print">
-  <div class="modal" style="max-width:760px;max-height:88vh;overflow-y:auto;">
-    <div id="print-inner"></div>
+<!-- MODAL RECAP PRINT -->
+<div class="modal-overlay" id="modal-recap">
+  <div class="modal" style="max-width:780px;max-height:88vh;overflow-y:auto;">
+    <div id="recap-inner"></div>
     <div class="modal-footer">
-      <button class="mbtn mbtn-cancel" onclick="closePrint()">Fermer</button>
-      <button class="mbtn mbtn-save" onclick="doPrint()">🖨 Imprimer</button>
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-recap').classList.remove('open')">Fermer</button>
+      <button class="mbtn mbtn-save" onclick="doPrint('recap-inner')">🖨 Imprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ODS PRINT -->
+<div class="modal-overlay" id="modal-ods">
+  <div class="modal" style="max-width:780px;max-height:88vh;overflow-y:auto;">
+    <div id="ods-inner"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-ods').classList.remove('open')">Fermer</button>
+      <button class="mbtn mbtn-save" onclick="doPrint('ods-inner')">🖨 Imprimer</button>
     </div>
   </div>
 </div>
@@ -328,27 +290,22 @@ let sites = [];
 let events = [];
 let editId = null;
 
-// ── UTILS ──────────────────────────────────────────────────────────────────
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmt(d) { if (!d) return ''; const [y,m,dd] = d.split('-'); return `${dd}.${m}.${y}`; }
 function fmtFull(d) {
   if (!d) return '';
-  const dt = new Date(d + 'T00:00:00');
-  return dt.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(d + 'T00:00:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
 function addDays(d, n) {
-  const dt = new Date(d + 'T00:00:00');
-  dt.setDate(dt.getDate() + n);
+  const dt = new Date(d + 'T00:00:00'); dt.setDate(dt.getDate() + n);
   return dt.toISOString().split('T')[0];
 }
 
-// ── SAVE STATUS ────────────────────────────────────────────────────────────
 function setSave(state, msg) {
   document.getElementById('save-dot').className = 'save-dot' + (state ? ' ' + state : '');
   document.getElementById('save-text').textContent = msg;
 }
 
-// ── LOAD ──────────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
     const [{ data: s, error: se }, { data: e, error: ee }] = await Promise.all([
@@ -356,24 +313,18 @@ async function loadAll() {
       sb.from('evenements').select('*').order('date').order('heure_debut')
     ]);
     if (se) throw se;
-    // Si la table n'existe pas encore, on gère gracieusement
     sites = s || [];
-    events = (ee ? [] : e) || [];
+    events = ee ? [] : (e || []);
+    if (ee) console.warn('Table evenements:', ee.message);
     setSave('saved', 'Données chargées');
     render();
   } catch (err) {
-    console.error(err);
     setSave('error', 'Erreur de connexion');
     document.getElementById('content').innerHTML = `
-      <div class="state-msg">
-        <div class="big">⚠️</div>
-        Impossible de charger les données.<br>
-        <small style="color:#9a9a9a">${err.message}</small><br><br>
-        <small style="color:#c0392b;font-weight:bold">→ Vérifiez que la table <code>evenements</code> existe dans Supabase (voir instructions ci-dessous)</small>
-      </div>
+      <div class="state-msg"><div class="big">⚠️</div>Impossible de charger les données.<br><small>${err.message}</small></div>
       <div style="max-width:600px;margin:20px auto;background:#fff;border:1px solid var(--rdz-border);border-left:4px solid var(--rdz-red);padding:20px;border-radius:2px;font-size:13px;line-height:1.7">
-        <strong>Table SQL à créer dans Supabase :</strong><br>
-        <pre style="background:#f5f4f2;padding:14px;border-radius:2px;font-size:12px;margin-top:10px;overflow-x:auto">CREATE TABLE evenements (
+        <strong>Table SQL à créer dans Supabase :</strong>
+        <pre style="background:#f5f4f2;padding:14px;border-radius:2px;font-size:11px;margin-top:10px;overflow-x:auto">CREATE TABLE evenements (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   site_id uuid REFERENCES sites(id) ON DELETE SET NULL,
   titre text NOT NULL,
@@ -383,22 +334,20 @@ async function loadAll() {
   heure_fin time,
   heure_service_debut time,
   heure_service_fin time,
-  organisateur text,
-  reference text,
   nb_agents integer DEFAULT 0,
   agents text,
   tenue text,
   contact text,
   consignes text,
-  restauration text,
   remarques text,
   created_at timestamptz DEFAULT now()
-);</pre>
+);
+ALTER TABLE evenements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "acces_public" ON evenements FOR ALL USING (true) WITH CHECK (true);</pre>
       </div>`;
   }
 }
 
-// ── REBUILD SITE FILTER ────────────────────────────────────────────────────
 function rebuildSiteFilter() {
   const sel = document.getElementById('site-filter');
   const cur = sel.value;
@@ -407,7 +356,6 @@ function rebuildSiteFilter() {
   if (cur) sel.value = cur;
 }
 
-// ── RENDER ─────────────────────────────────────────────────────────────────
 function render() {
   rebuildSiteFilter();
   const ref = document.getElementById('ref-date').value || today();
@@ -420,33 +368,22 @@ function render() {
     if (range === 'week') return e.date >= ref && e.date <= addDays(ref, 7);
     return true;
   });
-
-  filtered.sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return (a.heure_debut || '').localeCompare(b.heure_debut || '');
-  });
+  filtered.sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : (a.heure_debut||'').localeCompare(b.heure_debut||''));
 
   const el = document.getElementById('content');
   if (filtered.length === 0) {
-    el.innerHTML = `<div class="state-msg"><div class="big">📅</div>Aucun événement pour cette période.<br><small>Utilisez le bouton "+ Nouvel événement" pour en créer un.</small></div>`;
+    el.innerHTML = `<div class="state-msg"><div class="big">📅</div>Aucun événement pour cette période.</div>`;
     return;
   }
 
-  // Grouper par date
   const byDate = {};
-  filtered.forEach(e => {
-    if (!byDate[e.date]) byDate[e.date] = [];
-    byDate[e.date].push(e);
-  });
+  filtered.forEach(e => { if (!byDate[e.date]) byDate[e.date] = []; byDate[e.date].push(e); });
 
   let html = '';
   Object.keys(byDate).sort().forEach(date => {
     const evList = byDate[date];
     const isPast = date < today();
-    html += `<div class="day-separator">
-      <span>${fmtFull(date)}</span>
-      <span class="day-count">${evList.length} événement${evList.length > 1 ? 's' : ''}</span>
-    </div>`;
+    html += `<div class="day-separator"><span>${fmtFull(date)}</span><span class="day-count">${evList.length} événement${evList.length > 1 ? 's' : ''}</span></div>`;
     evList.forEach(e => {
       const site = sites.find(s => s.id === e.site_id);
       const hasAgent = e.nb_agents > 0;
@@ -462,13 +399,12 @@ function render() {
             <div class="event-meta">
               ${site ? `<div class="event-meta-item">📍 <strong>${site.nom}</strong></div>` : ''}
               ${e.lieu ? `<div class="event-meta-item">🚪 ${e.lieu}</div>` : ''}
-              ${e.organisateur ? `<div class="event-meta-item">🏢 ${e.organisateur}</div>` : ''}
-              ${e.reference ? `<div class="event-meta-item">📄 Réf. ${e.reference}</div>` : ''}
+              ${e.contact ? `<div class="event-meta-item">📞 ${e.contact}</div>` : ''}
             </div>
             <div class="event-badges">
               ${hasAgent
                 ? `<span class="ebadge ebadge-agent">👮 ${e.nb_agents} agent${e.nb_agents > 1 ? 's' : ''}</span>`
-                : `<span class="ebadge" style="background:#e0f2fe;color:#0c4a6e">ℹ️ Agent de site</span>`}
+                : `<span class="ebadge ebadge-info">ℹ Info</span>`}
               ${e.tenue ? `<span class="ebadge ebadge-tenue">👔 ${e.tenue}</span>` : ''}
               ${e.agents ? `<span class="ebadge" style="background:#f0fdf4;color:#166534">✓ ${e.agents}</span>` : ''}
             </div>
@@ -478,41 +414,30 @@ function render() {
             <button class="icon-btn del" onclick="deleteEvent('${e.id}')" title="Supprimer">✕</button>
           </div>
         </div>
-        ${(e.consignes || e.contact || e.restauration || e.heure_service_debut || e.remarques) ? `
+        ${(e.consignes || e.heure_service_debut || e.remarques) ? `
         <div class="event-details">
           ${e.heure_service_debut ? `<div class="detail-block"><div class="detail-lbl">Prise de service</div><div class="detail-val">${e.heure_service_debut.slice(0,5)}${e.heure_service_fin ? ' → ' + e.heure_service_fin.slice(0,5) : ''}</div></div>` : ''}
-          ${e.contact ? `<div class="detail-block"><div class="detail-lbl">Contact</div><div class="detail-val">${e.contact}</div></div>` : ''}
-          ${e.restauration ? `<div class="detail-block"><div class="detail-lbl">Restauration</div><div class="detail-val">${e.restauration}</div></div>` : ''}
           ${e.consignes ? `<div class="detail-block" style="grid-column:1/-1"><div class="detail-lbl">Consignes sécurité</div><div class="detail-val">${e.consignes}</div></div>` : ''}
           ${e.remarques ? `<div class="detail-block" style="grid-column:1/-1"><div class="detail-lbl">Remarques</div><div class="detail-val">${e.remarques}</div></div>` : ''}
         </div>` : ''}
       </div>`;
     });
   });
-
   el.innerHTML = html;
 }
 
-// ── MODAL ──────────────────────────────────────────────────────────────────
+// ── MODAL ───────────────────────────────────────────────────────────────────
 function openAdd() {
   editId = null;
   document.getElementById('modal-title').textContent = 'Nouvel événement';
-  document.getElementById('f-titre').value = '';
-  document.getElementById('f-lieu').value = '';
+  ['f-titre','f-lieu','f-agents','f-contact','f-consignes','f-remarques'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-date').value = document.getElementById('ref-date').value || today();
   document.getElementById('f-heure-debut').value = '';
   document.getElementById('f-heure-fin').value = '';
   document.getElementById('f-heure-service').value = '';
   document.getElementById('f-heure-fin-service').value = '';
-  document.getElementById('f-organisateur').value = '';
-  document.getElementById('f-reference').value = '';
   document.getElementById('f-nb-agents').value = '0';
-  document.getElementById('f-agents').value = '';
   document.getElementById('f-tenue').value = '';
-  document.getElementById('f-contact').value = '';
-  document.getElementById('f-consignes').value = '';
-  document.getElementById('f-restauration').value = '';
-  document.getElementById('f-remarques').value = '';
   document.getElementById('f-site').innerHTML = sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
   document.getElementById('modal-event').classList.add('open');
 }
@@ -520,7 +445,7 @@ function openAdd() {
 function openEdit(id) {
   editId = id;
   const e = events.find(x => x.id === id);
-  document.getElementById('modal-title').textContent = 'Modifier l\'événement';
+  document.getElementById('modal-title').textContent = "Modifier l'événement";
   document.getElementById('f-titre').value = e.titre || '';
   document.getElementById('f-lieu').value = e.lieu || '';
   document.getElementById('f-date').value = e.date || '';
@@ -528,54 +453,42 @@ function openEdit(id) {
   document.getElementById('f-heure-fin').value = e.heure_fin ? e.heure_fin.slice(0,5) : '';
   document.getElementById('f-heure-service').value = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : '';
   document.getElementById('f-heure-fin-service').value = e.heure_service_fin ? e.heure_service_fin.slice(0,5) : '';
-  document.getElementById('f-organisateur').value = e.organisateur || '';
-  document.getElementById('f-reference').value = e.reference || '';
   document.getElementById('f-nb-agents').value = e.nb_agents || 0;
   document.getElementById('f-agents').value = e.agents || '';
   document.getElementById('f-tenue').value = e.tenue || '';
   document.getElementById('f-contact').value = e.contact || '';
   document.getElementById('f-consignes').value = e.consignes || '';
-  document.getElementById('f-restauration').value = e.restauration || '';
   document.getElementById('f-remarques').value = e.remarques || '';
   document.getElementById('f-site').innerHTML = sites.map(s =>
     `<option value="${s.id}"${s.id === e.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
   document.getElementById('modal-event').classList.add('open');
 }
 
-function closeModal() {
-  document.getElementById('modal-event').classList.remove('open');
-}
+function closeModal() { document.getElementById('modal-event').classList.remove('open'); }
 
 async function saveEvent() {
   const titre = document.getElementById('f-titre').value.trim();
   const date = document.getElementById('f-date').value;
   if (!titre) { alert('Veuillez saisir un titre.'); return; }
   if (!date) { alert('Veuillez saisir une date.'); return; }
-
   const payload = {
     site_id: document.getElementById('f-site').value || null,
-    titre,
+    titre, date,
     lieu: document.getElementById('f-lieu').value.trim() || null,
-    date,
     heure_debut: document.getElementById('f-heure-debut').value || null,
     heure_fin: document.getElementById('f-heure-fin').value || null,
     heure_service_debut: document.getElementById('f-heure-service').value || null,
     heure_service_fin: document.getElementById('f-heure-fin-service').value || null,
-    organisateur: document.getElementById('f-organisateur').value.trim() || null,
-    reference: document.getElementById('f-reference').value.trim() || null,
     nb_agents: parseInt(document.getElementById('f-nb-agents').value) || 0,
     agents: document.getElementById('f-agents').value.trim() || null,
     tenue: document.getElementById('f-tenue').value || null,
     contact: document.getElementById('f-contact').value.trim() || null,
     consignes: document.getElementById('f-consignes').value.trim() || null,
-    restauration: document.getElementById('f-restauration').value.trim() || null,
     remarques: document.getElementById('f-remarques').value.trim() || null,
   };
-
   const btn = document.getElementById('btn-save');
   btn.disabled = true;
   setSave('saving', 'Enregistrement…');
-
   try {
     if (editId) {
       const { error } = await sb.from('evenements').update(payload).eq('id', editId);
@@ -589,15 +502,10 @@ async function saveEvent() {
     }
     setSave('saved', 'Sauvegardé ✓');
     setTimeout(() => setSave('', 'Connecté'), 3000);
-    closeModal();
-    render();
+    closeModal(); render();
   } catch (err) {
-    console.error(err);
-    setSave('error', 'Erreur');
-    alert('Erreur : ' + err.message);
-  } finally {
-    btn.disabled = false;
-  }
+    setSave('error', 'Erreur'); alert('Erreur : ' + err.message);
+  } finally { btn.disabled = false; }
 }
 
 async function deleteEvent(id) {
@@ -611,19 +519,54 @@ async function deleteEvent(id) {
   render();
 }
 
-// ── PRINT ──────────────────────────────────────────────────────────────────
-function showPrint() {
+// ── HELPERS PRINT ───────────────────────────────────────────────────────────
+function printHeader(ref) {
+  return `<table style="width:100%;margin-bottom:0"><tr>
+    <td style="padding-bottom:10px;vertical-align:bottom">
+      <div style="font-size:16px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+    </td>
+    <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
+      <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+      <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
+    </td>
+  </tr></table>
+  <div style="border-bottom:3px solid #8B1A1A;margin-bottom:16px"></div>`;
+}
+
+function signatureBlock() {
+  return `<div style="margin-top:24px;border-top:1px solid #d0ccc5;padding-top:14px;page-break-inside:avoid">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:12px">Prise en charge — à signer par l'agent</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="width:40%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Nom et prénom</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+        </td>
+        <td style="width:20%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+        </td>
+        <td style="width:40%;vertical-align:bottom">
+          <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Signature</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:26px"></div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+}
+
+// ── RÉCAPITULATIF DU JOUR ────────────────────────────────────────────────────
+function showPrintRecap() {
   const ref = document.getElementById('ref-date').value || today();
   const siteF = document.getElementById('site-filter').value;
 
-  // Pour l'impression : toujours le jour sélectionné
   let evDay = events.filter(e => {
     if (siteF !== 'all' && e.site_id !== siteF) return false;
     return e.date === ref;
   });
   evDay.sort((a,b) => (a.heure_debut||'').localeCompare(b.heure_debut||''));
 
-  // Grouper par site pour la feuille d'info
+  // Grouper par site
   const bySite = {};
   evDay.forEach(e => {
     const key = e.site_id || '__nosite__';
@@ -631,22 +574,10 @@ function showPrint() {
     bySite[key].push(e);
   });
 
-  const withAgents = evDay.filter(e => e.nb_agents > 0);
-
-  // ── FEUILLE D'INFORMATION (agents de site) ──
   let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">
-    <table style="width:100%;margin-bottom:0"><tr>
-      <td style="padding-bottom:10px;vertical-align:bottom">
-        <div style="font-size:15px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
-      </td>
-      <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
-        <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
-        <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
-      </td>
-    </tr></table>
-    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:14px"></div>
-    <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Événements du jour — Fiche d'information agent</div>
-    <div style="font-size:11px;color:#5a5a5a;margin-bottom:16px">Date : <strong>${fmtFull(ref)}</strong> &nbsp;·&nbsp; ${evDay.length} événement${evDay.length !== 1 ? 's' : ''}</div>`;
+    ${printHeader(ref)}
+    <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px">Récapitulatif des événements du jour</div>
+    <div style="font-size:11px;color:#5a5a5a;margin-bottom:18px">Date de référence : <strong>${fmtFull(ref)}</strong> &nbsp;·&nbsp; ${evDay.length} événement${evDay.length !== 1 ? 's' : ''}</div>`;
 
   if (evDay.length === 0) {
     html += `<div style="padding:20px;text-align:center;color:#9a9a9a;font-style:italic">Aucun événement ce jour.</div>`;
@@ -654,129 +585,208 @@ function showPrint() {
     Object.keys(bySite).forEach(siteKey => {
       const site = sites.find(s => s.id === siteKey);
       const siteEvs = bySite[siteKey];
-      html += `<div style="margin-bottom:20px;page-break-inside:avoid">
-        <div style="background:#1a1a1a;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
+      html += `<div style="margin-bottom:22px;page-break-inside:avoid">
+        <div style="background:#1a1a1a;color:#fff;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
         <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
           <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <th style="padding:6px 10px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;background:#f5f4f2;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact">Horaire</th>
-            <th style="padding:6px 10px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;background:#f5f4f2;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact">Titre / Organisateur</th>
-            <th style="padding:6px 10px;width:120px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;background:#f5f4f2;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact">Lieu exact</th>
-            <th style="padding:6px 10px;width:110px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;background:#f5f4f2;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact">Contact</th>
+            <th style="padding:6px 10px;width:68px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Horaire</th>
+            <th style="padding:6px 10px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Événement</th>
+            <th style="padding:6px 10px;width:130px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Lieu exact</th>
+            <th style="padding:6px 10px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Agents</th>
+            <th style="padding:6px 10px;width:115px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;letter-spacing:.05em;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Contact</th>
           </tr></thead>
           <tbody>`;
       siteEvs.forEach((e, i) => {
         const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
         html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact;page-break-inside:avoid">
-          <td style="padding:8px 10px;font-size:11px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;color:#1a1a1a">
+          <td style="padding:8px 10px;font-size:12px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;color:#1a1a1a;line-height:1.4">
             ${e.heure_debut ? e.heure_debut.slice(0,5) : '?'}${e.heure_fin ? '<br><span style="font-size:9px;color:#9a9a9a;font-weight:400">→ ' + e.heure_fin.slice(0,5) + '</span>' : ''}
           </td>
           <td style="padding:8px 10px;border-right:1px solid #e5e2dd;vertical-align:top">
-            <div style="font-size:12px;font-weight:700;color:#1a1a1a;line-height:1.4;margin-bottom:3px">${e.titre}</div>
-            ${e.organisateur ? `<div style="font-size:10px;color:#6b6b6b">${e.organisateur}</div>` : ''}
-            ${e.restauration ? `<div style="font-size:10px;color:#854d0e;margin-top:3px">🍽 ${e.restauration}</div>` : ''}
-            ${e.nb_agents > 0 ? `<div style="font-size:10px;color:#7f1d1d;font-weight:700;margin-top:3px">👮 ${e.nb_agents} agent${e.nb_agents>1?'s':''} dédié${e.nb_agents>1?'s':''}</div>` : `<div style="font-size:10px;color:#0c4a6e;margin-top:3px">ℹ Agent de site pour renseignement</div>`}
+            <div style="font-size:12px;font-weight:700;color:#1a1a1a;line-height:1.4;margin-bottom:2px">${e.titre}</div>
+            ${e.remarques ? `<div style="font-size:10px;color:#6b6b6b;margin-top:3px">${e.remarques}</div>` : ''}
+            ${e.consignes ? `<div style="font-size:10px;color:#7f1d1d;margin-top:4px;border-left:2px solid #8B1A1A;padding-left:5px">${e.consignes}</div>` : ''}
           </td>
           <td style="padding:8px 10px;font-size:11px;color:#1a1a1a;border-right:1px solid #e5e2dd;vertical-align:top">${e.lieu || '<span style="color:#ccc">—</span>'}</td>
+          <td style="padding:8px 10px;font-size:11px;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">
+            ${e.nb_agents > 0
+              ? `<span style="font-size:12px;font-weight:700;color:#7f1d1d">${e.nb_agents}</span>`
+              : `<span style="font-size:10px;font-weight:700;color:#0c4a6e">Info</span>`}
+          </td>
           <td style="padding:8px 10px;font-size:10px;color:#4a4a4a;vertical-align:top;line-height:1.5">${e.contact || '<span style="color:#ccc">—</span>'}</td>
         </tr>`;
-        if (e.consignes) {
-          html += `<tr style="background:#fff8f0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-            <td colspan="4" style="padding:6px 10px 6px 30px;font-size:10px;color:#7f1d1d;border-top:1px dashed #f0d0c0">
-              <strong>Consignes :</strong> ${e.consignes}
-            </td>
-          </tr>`;
-        }
       });
       html += `</tbody></table></div>`;
     });
   }
 
-  // ── ORDRE DE SERVICE (si agents dédiés) ──
-  if (withAgents.length > 0) {
-    html += `<div style="margin-top:28px;page-break-before:always">
-      <table style="width:100%;margin-bottom:0"><tr>
-        <td style="padding-bottom:10px;vertical-align:bottom">
-          <div style="font-size:15px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
-        </td>
-        <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
-          <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
-          <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
-        </td>
-      </tr></table>
-      <div style="border-bottom:3px solid #8B1A1A;margin-bottom:14px"></div>
-      <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Ordre de service — Agents de surveillance</div>
-      <div style="font-size:11px;color:#5a5a5a;margin-bottom:16px">Date : <strong>${fmtFull(ref)}</strong></div>`;
+  html += `<div style="margin-top:16px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
+    <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+    <span>Événements du ${fmt(ref)}</span>
+  </div></div>`;
 
-    withAgents.forEach(e => {
+  document.getElementById('recap-inner').innerHTML = html;
+  document.getElementById('modal-recap').classList.add('open');
+}
+
+// ── ORDRES DE SERVICE ────────────────────────────────────────────────────────
+function showPrintODS() {
+  const ref = document.getElementById('ref-date').value || today();
+  const siteF = document.getElementById('site-filter').value;
+
+  let evDay = events.filter(e => {
+    if (siteF !== 'all' && e.site_id !== siteF) return false;
+    return e.date === ref && e.nb_agents > 0;
+  });
+  evDay.sort((a,b) => (a.heure_debut||'').localeCompare(b.heure_debut||''));
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">`;
+
+  if (evDay.length === 0) {
+    html += `${printHeader(ref)}<div style="padding:24px;text-align:center;color:#9a9a9a;font-style:italic">Aucun agent de surveillance prévu ce jour.</div>`;
+  } else {
+    evDay.forEach((e, idx) => {
       const site = sites.find(s => s.id === e.site_id);
-      html += `<div style="margin-bottom:22px;border:1px solid #d0ccc5;border-top:3px solid #8B1A1A;page-break-inside:avoid">
-        <div style="background:#1a1a1a;color:#fff;padding:8px 14px;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          <div style="font-size:12px;font-weight:700;letter-spacing:.05em;color:#fff">${e.titre}</div>
-          <div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:2px">${site ? site.nom + ' · ' : ''}${fmtFull(e.date)}</div>
+      const serviceDebut = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : (e.heure_debut ? e.heure_debut.slice(0,5) : null);
+      const serviceFin   = e.heure_service_fin   ? e.heure_service_fin.slice(0,5)   : (e.heure_fin   ? e.heure_fin.slice(0,5)   : null);
+
+      html += `<div style="${idx > 0 ? 'page-break-before:always;' : ''}">
+        ${printHeader(ref)}
+
+        <!-- TITRE ODS -->
+        <div style="text-align:center;margin-bottom:18px">
+          <div style="font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Ordre de service</div>
+          <div style="font-size:18px;font-weight:700;color:#8B1A1A;letter-spacing:.03em;line-height:1.3">${e.titre}</div>
+          <div style="font-size:12px;color:#4a4a4a;margin-top:6px">${fmtFull(e.date)}</div>
         </div>
-        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px 20px">
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Lieu exact</div><div style="font-size:12px">${e.lieu || site?.nom || '—'}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Horaire événement</div><div style="font-size:12px">${e.heure_debut ? e.heure_debut.slice(0,5) : '—'}${e.heure_fin ? ' → ' + e.heure_fin.slice(0,5) : ''}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Prise / fin de service</div><div style="font-size:12px;font-weight:700;color:#8B1A1A">${e.heure_service_debut ? e.heure_service_debut.slice(0,5) : (e.heure_debut ? e.heure_debut.slice(0,5) : '—')} → ${e.heure_service_fin ? e.heure_service_fin.slice(0,5) : (e.heure_fin ? e.heure_fin.slice(0,5) : '—')}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Tenue</div><div style="font-size:12px">${e.tenue || '—'}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Nombre d'agents</div><div style="font-size:12px;font-weight:700">${e.nb_agents}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Agent(s) désigné(s)</div><div style="font-size:12px">${e.agents || '—'}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Organisateur</div><div style="font-size:12px">${e.organisateur || '—'}</div></div>
-          <div><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Contact événement</div><div style="font-size:12px">${e.contact || '—'}</div></div>
-          ${e.restauration ? `<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Restauration</div><div style="font-size:12px">${e.restauration}</div></div>` : ''}
-          ${e.consignes ? `<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Consignes / Remarques</div><div style="font-size:12px;background:#fff8f8;border-left:3px solid #8B1A1A;padding:8px 10px;line-height:1.6">${e.consignes}</div></div>` : ''}
-          ${e.remarques ? `<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:3px">Informations complémentaires</div><div style="font-size:12px">${e.remarques}</div></div>` : ''}
+
+        <!-- BANDEAU INFOS CLÉS -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:18px;border:1px solid #d0ccc5">
+          <tr>
+            <td style="padding:12px 14px;background:#1a1a1a;color:#fff;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:4px">Lieu</div>
+              <div style="font-size:12px;font-weight:700">${e.lieu || (site ? site.nom : '—')}</div>
+              ${site && e.lieu ? `<div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:2px">${site.nom}</div>` : ''}
+            </td>
+            <td style="padding:12px 14px;background:#8B1A1A;color:#fff;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:4px">Prise de service</div>
+              <div style="font-size:16px;font-weight:700">${serviceDebut || '—'}</div>
+              ${serviceFin ? `<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:1px">Fin : ${serviceFin}</div>` : ''}
+            </td>
+            <td style="padding:12px 14px;background:#f5f4f2;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Horaire événement</div>
+              <div style="font-size:13px;font-weight:700;color:#1a1a1a">${e.heure_debut ? e.heure_debut.slice(0,5) : '—'}${e.heure_fin ? ' → ' + e.heure_fin.slice(0,5) : ''}</div>
+            </td>
+            <td style="padding:12px 14px;background:#f5f4f2;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+              <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Effectif / Tenue</div>
+              <div style="font-size:13px;font-weight:700;color:#1a1a1a">${e.nb_agents} agent${e.nb_agents > 1 ? 's' : ''}</div>
+              ${e.tenue ? `<div style="font-size:10px;color:#4a4a4a;margin-top:2px">${e.tenue}</div>` : ''}
+            </td>
+          </tr>
+        </table>
+
+        ${e.agents ? `
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:2px;padding:8px 14px;margin-bottom:14px;font-size:12px">
+          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#166534;margin-right:8px">Agent(s) désigné(s)</span>
+          <span style="font-weight:700;color:#1a1a1a">${e.agents}</span>
+        </div>` : ''}
+
+        <!-- MISSION -->
+        <div style="margin-bottom:14px">
+          <div style="background:#1a1a1a;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">Mission et consignes</div>
+          <div style="border:1px solid #d0ccc5;border-top:none">
+
+            <div style="padding:0 14px">
+              <!-- AVANT -->
+              <div style="border-bottom:1px dashed #e5e2dd;padding:10px 0">
+                <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Avant l'événement</div>
+                <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+                  · Se présenter au contact sur place pour le briefing initial<br>
+                  · Vérifier les issues de secours (localisation, accessibilité, signalisation)<br>
+                  · Contrôler l'emplacement et l'état du matériel de premiers secours<br>
+                  · Identifier les équipements de sécurité incendie<br>
+                  · Effectuer une reconnaissance des lieux et des circuits de circulation
+                </div>
+              </div>
+
+              <!-- PENDANT -->
+              <div style="border-bottom:1px dashed #e5e2dd;padding:10px 0">
+                <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Pendant l'événement</div>
+                <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+                  · Assurer la surveillance continue des espaces assignés<br>
+                  · Contrôler les accès et la circulation des participants<br>
+                  · Maintenir une attitude professionnelle et discrète tout au long de la mission<br>
+                  · Veiller à la sécurité des participants et du personnel<br>
+                  · Signaler immédiatement tout incident ou situation anormale à l'astreinte et/ou aux organisateurs
+                  ${e.consignes ? `<br><br><span style="font-weight:700;color:#7f1d1d">Consignes spécifiques :</span><br>${e.consignes}` : ''}
+                </div>
+              </div>
+
+              <!-- APRÈS -->
+              <div style="padding:10px 0">
+                <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Après l'événement</div>
+                <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+                  · Vérifier que tous les espaces sont évacués<br>
+                  · S'assurer de la propreté et de l'ordre des espaces avant le départ<br>
+                  · Procéder à la fermeture sécurisée selon les procédures établies du lieu
+                  ${e.remarques ? `<br><br><span style="font-weight:700">Notes :</span> ${e.remarques}` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div style="border-top:1px solid #d0ccc5;padding:12px 14px;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          <div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:10px">Prise en charge — à signer par l'agent</div>
-          <table style="width:100%;border-collapse:collapse">
+
+        <!-- CONTACTS -->
+        <div style="margin-bottom:18px">
+          <div style="background:#1a1a1a;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">Contacts</div>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
             <tr>
-              <td style="width:40%;padding-right:16px;vertical-align:bottom">
-                <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px">Nom et prénom</div>
-                <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
+              <td style="padding:8px 12px;border-right:1px solid #e5e2dd;width:33%;vertical-align:top">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Astreinte RDZ</div>
+                <div style="font-size:12px;font-weight:700;color:#8B1A1A">+41 79 339 13 41</div>
               </td>
-              <td style="width:20%;padding-right:16px;vertical-align:bottom">
-                <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px">Date</div>
-                <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
+              <td style="padding:8px 12px;border-right:1px solid #e5e2dd;width:33%;vertical-align:top">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Contact événement</div>
+                <div style="font-size:12px;color:#1a1a1a">${e.contact || '<span style="color:#ccc;font-style:italic">Non renseigné</span>'}</div>
               </td>
-              <td style="width:40%;vertical-align:bottom">
-                <div style="font-size:9px;color:#9a9a9a;margin-bottom:4px">Signature</div>
-                <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
+              <td style="padding:8px 12px;width:33%;vertical-align:top">
+                <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Urgences</div>
+                <div style="font-size:11px;color:#1a1a1a;line-height:1.6">Police : <strong>117</strong> &nbsp;|&nbsp; Pompiers : <strong>118</strong><br>Ambulance : <strong>144</strong></div>
               </td>
             </tr>
           </table>
+        </div>
+
+        ${signatureBlock()}
+
+        <div style="margin-top:16px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
+          <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+          <span>${fmt(e.date)}</span>
         </div>
       </div>`;
     });
   }
 
-  html += `
-    <div style="margin-top:20px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
-      <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
-      <span>Événements du ${fmt(ref)}</span>
-    </div>
-  </div>`;
-
-  document.getElementById('print-inner').innerHTML = html;
-  document.getElementById('modal-print').classList.add('open');
+  html += `</div>`;
+  document.getElementById('ods-inner').innerHTML = html;
+  document.getElementById('modal-ods').classList.add('open');
 }
 
-function closePrint() { document.getElementById('modal-print').classList.remove('open'); }
-function doPrint() {
-  document.getElementById('print-doc').innerHTML = document.getElementById('print-inner').innerHTML;
-  document.getElementById('modal-print').classList.remove('open');
+// ── PRINT ────────────────────────────────────────────────────────────────────
+function doPrint(sourceId) {
+  document.getElementById('print-doc').innerHTML = document.getElementById(sourceId).innerHTML;
+  document.querySelectorAll('.modal-overlay').forEach(o => o.classList.remove('open'));
   setTimeout(() => window.print(), 150);
 }
 
-// ── BACKDROP ──────────────────────────────────────────────────────────────
+// ── BACKDROP ─────────────────────────────────────────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o => {
   o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 
-// ── INIT ─────────────────────────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────────────────────────────
 document.getElementById('ref-date').value = today();
 loadAll();
 </script>
-
 </body>
 </html>
