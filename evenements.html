@@ -719,7 +719,6 @@ function showPrintODS() {
                   · Maintenir une attitude professionnelle et discrète tout au long de la mission<br>
                   · Veiller à la sécurité des participants et du personnel<br>
                   · Signaler immédiatement tout incident ou situation anormale à l'astreinte et/ou aux organisateurs
-                  ${e.consignes ? `<br><br><span style="font-weight:700;color:#7f1d1d">Consignes spécifiques :</span><br>${e.consignes}` : ''}
                 </div>
               </div>
 
@@ -730,12 +729,33 @@ function showPrintODS() {
                   · Vérifier que tous les espaces sont évacués<br>
                   · S'assurer de la propreté et de l'ordre des espaces avant le départ<br>
                   · Procéder à la fermeture sécurisée selon les procédures établies du lieu
-                  ${e.remarques ? `<br><br><span style="font-weight:700">Notes :</span> ${e.remarques}` : ''}
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        ${e.consignes ? `
+        <!-- CONSIGNES SPÉCIFIQUES -->
+        <div style="margin-bottom:14px;page-break-inside:avoid">
+          <div style="background:#8B1A1A;color:#fff;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            ⚠ Consignes spécifiques à cet événement
+          </div>
+          <div style="border:2px solid #8B1A1A;border-top:none;padding:14px 16px;background:#fff8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            <div style="font-size:12px;color:#1a1a1a;line-height:1.8;white-space:pre-wrap">${e.consignes}</div>
+          </div>
+        </div>` : ''}
+
+        ${e.remarques ? `
+        <!-- NOTES DIVERSES -->
+        <div style="margin-bottom:14px;page-break-inside:avoid">
+          <div style="background:#4a4a4a;color:#fff;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            📋 Notes et informations complémentaires
+          </div>
+          <div style="border:1px solid #4a4a4a;border-top:none;padding:14px 16px;background:#f9f9f9;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            <div style="font-size:12px;color:#1a1a1a;line-height:1.8;white-space:pre-wrap">${e.remarques}</div>
+          </div>
+        </div>` : ''}
 
         <!-- CONTACTS -->
         <div style="margin-bottom:18px">
