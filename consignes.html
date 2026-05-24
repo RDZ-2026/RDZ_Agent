@@ -464,72 +464,82 @@ function showPrint() {
   const filteredSites = siteF === 'all' ? sites : sites.filter(s => s.id === siteF);
   const totalActive = filteredSites.reduce((n, s) => n + consignes.filter(c => c.site_id === s.id && isActive(c, ref)).length, 0);
 
-  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">
-    <table style="width:100%;margin-bottom:0"><tr>
-      <td style="padding-bottom:10px;vertical-align:bottom">
-        <div style="font-size:21px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+  // Échapper le HTML mais préserver les sauts de ligne
+  function escHtml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/
+/g, '<br>');
+  }
 
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
+    <table style="width:100%;margin-bottom:0"><tr>
+      <td style="padding-bottom:8px;vertical-align:bottom">
+        <div style="font-size:14px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
       </td>
-      <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
-        <div style="font-size:14px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
-        <div style="font-size:14px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
+      <td style="text-align:right;vertical-align:bottom;padding-bottom:8px">
+        <div style="font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+        <div style="font-size:9px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
       </td>
     </tr></table>
-    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:14px"></div>
-    <div style="font-size:20px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Consignes particulières actives</div>
-    <div style="font-size:16px;color:#5a5a5a;margin-bottom:14px">Date de référence : <strong>${fmt(ref)}</strong> &nbsp;·&nbsp; ${totalActive} consigne${totalActive > 1 ? 's' : ''} active${totalActive > 1 ? 's' : ''}</div>`;
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:10px"></div>
+    <div style="font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#1a1a1a;margin-bottom:2px">Consignes particulières actives</div>
+    <div style="font-size:11px;color:#5a5a5a;margin-bottom:12px">Date de référence : <strong>${fmt(ref)}</strong> &nbsp;·&nbsp; ${totalActive} consigne${totalActive > 1 ? 's' : ''} active${totalActive > 1 ? 's' : ''}</div>`;
 
   filteredSites.forEach(site => {
     const cons = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
     if (cons.length === 0) return;
-    html += `<div style="margin-bottom:18px;page-break-inside:avoid">
-      <div style="background:#1a1a1a;color:#fff;padding:6px 12px;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site.nom}</div>
+    html += `<div style="margin-bottom:14px">
+      <div style="background:#1a1a1a;color:#fff;padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site.nom}</div>
       <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
         <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-          <th style="padding:6px 10px;width:30px;font-size:14px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">N°</th>
-          <th style="padding:6px 12px;font-size:14px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Consigne</th>
-          <th style="padding:6px 10px;width:80px;font-size:14px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Début</th>
-          <th style="padding:6px 10px;width:80px;font-size:14px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Fin</th>
+          <th style="padding:5px 8px;width:28px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">N°</th>
+          <th style="padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Consigne</th>
+          <th style="padding:5px 8px;width:64px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Début</th>
+          <th style="padding:5px 8px;width:64px;font-size:9px;font-weight:700;letter-spacing:.05em;color:#6b6b6b;text-transform:uppercase;text-align:center;background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">Fin</th>
         </tr></thead>
         <tbody>`;
     cons.forEach((c, i) => {
-      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7'; const printForce = '-webkit-print-color-adjust:exact;print-color-adjust:exact';
-      html += `<tr style="background:${bg};page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-        <td style="padding:9px 10px;font-size:14px;font-weight:700;color:#9a9a9a;border-right:1px solid #e5e2dd;text-align:center;vertical-align:top">${String(i + 1).padStart(2, '0')}</td>
-        <td style="padding:9px 12px;font-size:16px;color:#1a1a1a;line-height:1.5;border-right:1px solid #e5e2dd">${c.texte}</td>
-        <td style="padding:9px 10px;font-size:15px;color:#5a5a5a;text-align:center;vertical-align:top;border-right:1px solid #e5e2dd">${fmt(c.date_debut)}</td>
-        <td style="padding:9px 10px;font-size:15px;text-align:center;vertical-align:top;${c.date_fin ? 'color:#5a5a5a' : 'color:#8B1A1A;font-weight:700'}">${c.date_fin ? fmt(c.date_fin) : '—'}</td>
+      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+      html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <td style="padding:7px 8px;font-size:10px;font-weight:700;color:#9a9a9a;border-right:1px solid #e5e2dd;text-align:center;vertical-align:top">${String(i + 1).padStart(2, '0')}</td>
+        <td style="padding:7px 10px;font-size:11px;color:#1a1a1a;line-height:1.55;border-right:1px solid #e5e2dd;white-space:pre-wrap">${escHtml(c.texte)}</td>
+        <td style="padding:7px 8px;font-size:10px;color:#5a5a5a;text-align:center;vertical-align:top;border-right:1px solid #e5e2dd;white-space:nowrap">${fmt(c.date_debut)}</td>
+        <td style="padding:7px 8px;font-size:10px;text-align:center;vertical-align:top;white-space:nowrap;${c.date_fin ? 'color:#5a5a5a' : 'color:#8B1A1A;font-weight:700'}">${c.date_fin ? fmt(c.date_fin) : '—'}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
   });
 
   html += `
-    <div style="margin-top:28px;border-top:2px solid #1a1a1a;padding-top:16px;page-break-inside:avoid">
-      <div style="font-size:15px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:14px">Prise de connaissance — à compléter par l'agent</div>
+    <div style="margin-top:20px;border-top:2px solid #1a1a1a;padding-top:12px;page-break-inside:avoid">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:12px">Prise de connaissance — à compléter par l'agent</div>
       <table style="width:100%;border-collapse:collapse">
         <tr>
           <td style="width:40%;padding-right:20px;vertical-align:bottom">
-            <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Nom et prénom de l'agent</div>
-            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:5px">Nom et prénom de l'agent</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
           </td>
           <td style="width:20%;padding-right:20px;vertical-align:bottom">
-            <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Date</div>
-            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:5px">Date</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
           </td>
           <td style="width:40%;vertical-align:bottom">
-            <div style="font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:6px">Signature</div>
-            <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b6b6b;margin-bottom:5px">Signature</div>
+            <div style="border-bottom:1px solid #1a1a1a;height:24px"></div>
           </td>
         </tr>
         <tr>
-          <td colspan="3" style="padding-top:6px">
-            <div style="font-size:14px;color:#9a9a9a;font-style:italic">Je soussigné(e) certifie avoir pris connaissance des consignes particulières en vigueur à la date indiquée et m'engage à les respecter.</div>
+          <td colspan="3" style="padding-top:5px">
+            <div style="font-size:9px;color:#9a9a9a;font-style:italic">Je soussigné(e) certifie avoir pris connaissance des consignes particulières en vigueur à la date indiquée et m'engage à les respecter.</div>
           </td>
         </tr>
       </table>
     </div>
-    <div style="margin-top:20px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:14px;color:#9a9a9a">
+    <div style="margin-top:14px;border-top:1px solid #d0ccc5;padding-top:6px;display:flex;justify-content:space-between;font-size:9px;color:#9a9a9a">
       <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
       <span>Date de référence : ${fmt(ref)}</span>
     </div>
