@@ -467,12 +467,9 @@ function showPrint() {
   // Échapper le HTML mais préserver les sauts de ligne
   function escHtml(str) {
     if (!str) return '';
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/
-/g, '<br>');
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML.split(String.fromCharCode(10)).join('<br>');
   }
 
   let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
