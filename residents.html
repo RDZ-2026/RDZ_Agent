@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Résidents & Accès</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* ── HEADER ── */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    /* ── TABS ── */
+    .tabs-bar { background: var(--rdz-black); }
+    .tabs-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; gap: 0; }
+    .tab-btn { padding: 11px 20px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.5); border: none; background: transparent; cursor: pointer; border-bottom: 3px solid transparent; transition: all .15s; }
+    .tab-btn:hover { color: rgba(255,255,255,.85); }
+    .tab-btn.active { color: #fff; border-bottom-color: var(--rdz-red); }
+
+    /* ── CONTENT PANELS ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
+
+    /* ── SAVE STATUS ── */
+    .save-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,.6); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5563; flex-shrink: 0; }
+    .save-dot.saving { background: #f59e0b; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* ── SEARCH PANEL ── */
+    .search-box { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 20px; margin-bottom: 20px; }
+    .search-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 14px; }
+    .search-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .search-input { flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 2px; border: 1.5px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+    .search-input:focus { outline: none; border-color: var(--rdz-red); }
+    .search-input::placeholder { color: #bbb; }
+    .search-btn { padding: 10px 20px; background: var(--rdz-red); color: #fff; border: none; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; transition: background .15s; white-space: nowrap; }
+    .search-btn:hover { background: var(--rdz-red-dark); }
+    .search-clear { padding: 10px 14px; background: var(--rdz-bg); color: var(--rdz-gray); border: 1px solid var(--rdz-border); border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+    .search-clear:hover { background: #ebe9e6; }
+    .search-hints { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .hint-chip { font-size: 11px; color: var(--rdz-gray); background: var(--rdz-bg); border: 1px solid var(--rdz-border); border-radius: 2px; padding: 3px 9px; }
+
+    /* ── RESIDENT CARD ── */
+    .res-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-black); border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+    .res-card-header { padding: 14px 18px; display: flex; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--rdz-border); background: #fff; }
+    .res-avatar { width: 44px; height: 44px; background: var(--rdz-black); color: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; flex-shrink: 0; letter-spacing: .03em; }
+    .res-main { flex: 1; }
+    .res-name { font-size: 16px; font-weight: 700; color: var(--rdz-black); line-height: 1.3; }
+    .res-room { font-size: 12px; color: var(--rdz-gray); margin-top: 3px; }
+    .res-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .rbadge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; white-space: nowrap; }
+    .rbadge-building { background: var(--rdz-black); color: #fff; }
+    .rbadge-type { background: #f3f4f6; color: #374151; }
+    .rbadge-parking { background: #dbeafe; color: #1e3a8a; }
+    .rbadge-fitness { background: #dcfce7; color: #14532d; }
+    .rbadge-locker { background: #fef9c3; color: #713f12; }
+    .rbadge-sublease { background: #ede9fe; color: #3b0764; }
+    .rbadge-shortstay { background: #fee2e2; color: #7f1d1d; }
+    .rbadge-contract { background: var(--rdz-red-light); color: var(--rdz-red-dark); }
+
+    .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0; background: var(--rdz-bg); border-top: 1px solid var(--rdz-border); }
+    .res-section { padding: 14px 18px; border-right: 1px solid var(--rdz-border); border-bottom: 1px solid var(--rdz-border); }
+    .res-section:last-child { border-right: none; }
+    .res-section-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rdz-border); }
+    .res-field { margin-bottom: 7px; }
+    .res-field-lbl { font-size: 10px; color: #9a9a9a; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 2px; }
+    .res-field-val { font-size: 13px; color: var(--rdz-black); line-height: 1.4; font-weight: 600; }
+    .res-field-val.muted { font-weight: 400; color: var(--rdz-gray); }
+    .res-field-val.highlight { color: var(--rdz-red); }
+    .no-data { font-size: 12px; color: #bbb; font-style: italic; }
+
+    /* ── ÉTAT VIDE / CHARGEMENT ── */
+    .state-msg { text-align: center; padding: 60px 20px; }
+    .state-msg .ico { font-size: 36px; margin-bottom: 14px; }
+    .state-msg p { font-size: 14px; color: var(--rdz-gray); }
+    .state-msg small { font-size: 12px; color: #bbb; display: block; margin-top: 6px; }
+
+    /* ── VUE BÂTIMENT ── */
+    .bld-toolbar { background: #fff; border-bottom: 2px solid var(--rdz-black); padding: 10px 28px; }
+    .bld-toolbar-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .tsel { padding: 6px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsel:focus { outline: none; border-color: var(--rdz-red); }
+    .seg { display: flex; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .seg-btn { padding: 6px 13px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; border: none; background: #fff; color: var(--rdz-gray); cursor: pointer; border-right: 1px solid var(--rdz-border); transition: all .15s; }
+    .seg-btn:last-child { border-right: none; }
+    .seg-btn.on { background: var(--rdz-black); color: #fff; }
+    .print-btn { margin-left: auto; padding: 7px 16px; background: var(--rdz-red); color: #fff; border: none; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; transition: background .15s; }
+    .print-btn:hover { background: var(--rdz-red-dark); }
+
+    .bld-table-wrap { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; margin-bottom: 28px; }
+    .bld-table-head { background: var(--rdz-black); padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .bld-table-name { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+    .bld-table-count { font-size: 11px; color: rgba(255,255,255,.5); }
+    table.bld-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.bld-tbl th { background: #f5f4f2; padding: 7px 12px; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #6b6b6b; border-bottom: 1px solid var(--rdz-border); text-align: left; white-space: nowrap; }
+    table.bld-tbl td { padding: 9px 12px; border-bottom: 1px solid #ebebeb; vertical-align: top; color: var(--rdz-black); line-height: 1.4; }
+    table.bld-tbl tr:last-child td { border-bottom: none; }
+    table.bld-tbl tr:hover td { background: #fafaf9; }
+    .cell-room { font-weight: 700; color: var(--rdz-black); white-space: nowrap; }
+    .cell-name { font-weight: 600; }
+    .cell-sub { font-size: 10px; color: var(--rdz-gray); margin-top: 2px; }
+    .cell-tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; margin: 1px 2px 1px 0; white-space: nowrap; }
+    .tag-parking { background: #dbeafe; color: #1e3a8a; }
+    .tag-fitness { background: #dcfce7; color: #14532d; }
+    .tag-locker { background: #fef9c3; color: #713f12; }
+    .tag-sublease { background: #ede9fe; color: #3b0764; }
+    .tag-shortstay { background: #fee2e2; color: #7f1d1d; }
+    .tag-medical { background: #fee2e2; color: #7f1d1d; }
+
+    /* ── IMPORT PANEL ── */
+    .import-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .import-card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 18px; }
+    .import-card-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-black); margin-bottom: 4px; }
+    .import-card-desc { font-size: 11px; color: var(--rdz-gray); margin-bottom: 12px; line-height: 1.5; }
+    .import-card-patterns { font-size: 10px; color: #9a9a9a; margin-bottom: 12px; font-style: italic; }
+    .drop-zone { border: 2px dashed var(--rdz-border); border-radius: 2px; padding: 18px 14px; text-align: center; cursor: pointer; transition: all .15s; position: relative; }
+    .drop-zone:hover, .drop-zone.dragover { border-color: var(--rdz-red); background: var(--rdz-red-light); }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-zone-ico { font-size: 22px; margin-bottom: 6px; }
+    .drop-zone-text { font-size: 12px; color: var(--rdz-gray); }
+    .drop-zone-sub { font-size: 11px; color: #bbb; margin-top: 3px; }
+    .import-status { margin-top: 10px; font-size: 12px; padding: 8px 12px; border-radius: 2px; display: none; }
+    .import-status.loading { display: block; background: #fef9c3; color: #713f12; border: 1px solid #fde68a; }
+    .import-status.success { display: block; background: #dcfce7; color: #14532d; border: 1px solid #bbf7d0; }
+    .import-status.error { display: block; background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }
+
+    .import-log { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .import-log-head { background: var(--rdz-black); padding: 9px 16px; }
+    .import-log-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #fff; }
+    table.log-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.log-tbl th { background: #f5f4f2; padding: 7px 14px; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #6b6b6b; border-bottom: 1px solid var(--rdz-border); text-align: left; }
+    table.log-tbl td { padding: 8px 14px; border-bottom: 1px solid #ebebeb; color: var(--rdz-black); }
+    table.log-tbl tr:last-child td { border-bottom: none; }
+    .log-badge { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; background: #dcfce7; color: #14532d; }
+
+    /* ── MODAL FICHE CHAMBRE ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 4px solid var(--rdz-red); width: 100%; max-width: 700px; margin: auto; }
+    .modal-hdr { padding: 18px 24px; border-bottom: 1px solid var(--rdz-border); display: flex; align-items: center; justify-content: space-between; }
+    .modal-hdr-title { font-size: 14px; font-weight: 700; color: var(--rdz-black); }
+    .modal-hdr-room { font-size: 12px; color: var(--rdz-gray); margin-top: 2px; }
+    .modal-close { width: 28px; height: 28px; border-radius: 2px; border: 1px solid var(--rdz-border); background: transparent; color: var(--rdz-gray); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
+    .modal-body { padding: 20px 24px; }
+    .modal-section { margin-bottom: 18px; }
+    .modal-section-title { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--rdz-gray); padding-bottom: 7px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 10px; }
+    .modal-field-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .modal-field { }
+    .modal-field-lbl { font-size: 10px; color: #9a9a9a; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
+    .modal-field-val { font-size: 13px; color: var(--rdz-black); font-weight: 600; }
+    .modal-field-val.empty { color: #bbb; font-weight: 400; font-style: italic; }
+    .modal-footer { padding: 14px 24px; border-top: 1px solid var(--rdz-border); display: flex; justify-content: flex-end; gap: 10px; }
+    .mbtn { padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-cancel:hover { background: #ebe9e6; }
+    .mbtn-print { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+    .mbtn-print:hover { background: var(--rdz-red-dark); }
+
+    /* ── PRINT ── */
+    @media print {
+      body > *:not(.print-doc) { display: none !important; }
+      .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+    .print-doc { display: none; }
+
+    /* ── FOOTER ── */
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+
+    /* ── STATS BAR ── */
+    .stats-bar { background: #fff; border-bottom: 1px solid var(--rdz-border); }
+    .stats-bar-inner { max-width: 1200px; margin: 0 auto; padding: 10px 28px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+    .stat-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rdz-gray); }
+    .stat-item strong { color: var(--rdz-black); font-size: 14px; }
+    .stat-sep { width: 1px; height: 16px; background: var(--rdz-border); }
+    .last-import { margin-left: auto; font-size: 11px; color: #9a9a9a; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Résidents & Accès — Gestion centralisée</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="index.html">← Accueil</a>
+      <a class="btn-nav" href="consignes.html">Consignes</a>
+      <a class="btn-nav" href="evenements.html">Événements</a>
+      <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
+    </nav>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <div class="tabs-inner">
+    <button class="tab-btn active" onclick="switchTab('search', this)">🔍 Recherche</button>
+    <button class="tab-btn" onclick="switchTab('building', this)">🏢 Par bâtiment</button>
+    <button class="tab-btn" onclick="switchTab('import', this)">📂 Import CSV</button>
+  </div>
+</div>
+
+<!-- ── STATS BAR ── -->
+<div class="stats-bar">
+  <div class="stats-bar-inner" id="stats-bar">
+    <div class="stat-item"><strong id="st-residents">—</strong> résidents</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item"><strong id="st-shortstays">—</strong> courts séjours</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item"><strong id="st-parkings">—</strong> parkings</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item"><strong id="st-fitness">—</strong> pass fitness</div>
+    <div class="stat-sep"></div>
+    <div class="stat-item"><strong id="st-lockers">—</strong> lockers</div>
+    <div class="last-import" id="last-import">Aucun import enregistré</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB 1 — RECHERCHE
+══════════════════════════════════════════════════════════════ -->
+<div class="panel active" id="panel-search">
+  <div class="content">
+    <div class="search-box">
+      <div class="search-title">Rechercher un résident ou un occupant</div>
+      <div class="search-row">
+        <input type="text" class="search-input" id="search-input"
+          placeholder="Nom, prénom, chambre, plaque, n° casier…"
+          onkeydown="if(event.key==='Enter') doSearch()">
+        <button class="search-btn" onclick="doSearch()">Rechercher</button>
+        <button class="search-clear" onclick="clearSearch()">Effacer</button>
+      </div>
+      <div class="search-hints">
+        <span class="hint-chip">Nom partiel : « dupont »</span>
+        <span class="hint-chip">Chambre : « 8001 » ou « Bat 8 »</span>
+        <span class="hint-chip">Plaque : « GE 123 »</span>
+        <span class="hint-chip">Casier : « 110 »</span>
+      </div>
+    </div>
+    <div id="search-results">
+      <div class="state-msg">
+        <div class="ico">🔍</div>
+        <p>Entrez un nom, un numéro de chambre, une plaque ou un numéro de casier.</p>
+        <small>La recherche est partielle — « dup » trouve « Dupont »</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB 2 — VUE BÂTIMENT
+══════════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-building">
+  <div class="bld-toolbar">
+    <div class="bld-toolbar-inner">
+      <span class="tlabel">Bâtiment</span>
+      <select class="tsel" id="bld-filter" onchange="renderBuilding()">
+        <option value="all">Tous les bâtiments</option>
+        <option value="REGM">REGM</option>
+        <option value="MDE">MDE</option>
+        <option value="BARTON">Barton</option>
+      </select>
+      <div class="seg">
+        <button class="seg-btn on" data-s="all" onclick="setBldSeg(this)">Tous</button>
+        <button class="seg-btn" data-s="longstay" onclick="setBldSeg(this)">Long séjour</button>
+        <button class="seg-btn" data-s="shortstay" onclick="setBldSeg(this)">Courts séjours</button>
+      </div>
+      <button class="print-btn" onclick="printBuilding()">🖨 Imprimer ce tableau</button>
+    </div>
+  </div>
+  <div class="content" id="building-content">
+    <div class="state-msg"><div class="ico">⏳</div><p>Chargement…</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB 3 — IMPORT CSV
+══════════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-import">
+  <div class="content">
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--rdz-black);margin-bottom:4px">Import des fichiers CSV</div>
+      <div style="font-size:12px;color:var(--rdz-gray);line-height:1.6">Glissez-déposez ou cliquez pour sélectionner les fichiers. L'application reconnaît automatiquement le type de chaque fichier selon son nom. L'import remplace les données existantes pour ce type.</div>
+    </div>
+
+    <div class="import-grid">
+
+      <!-- RÉSIDENTS REGM -->
+      <div class="import-card">
+        <div class="import-card-title">Résidents REGM</div>
+        <div class="import-card-desc">Résidents long séjour du bâtiment REGM</div>
+        <div class="import-card-patterns">Fichier : <em>Clients_pre_sents_REGM_…</em></div>
+        <div class="drop-zone" id="dz-regm" ondragover="dzOver(event,'dz-regm')" ondragleave="dzLeave('dz-regm')" ondrop="dzDrop(event,'regm')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'regm')">
+          <div class="drop-zone-ico">📋</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-regm"></div>
+      </div>
+
+      <!-- RÉSIDENTS MDE -->
+      <div class="import-card">
+        <div class="import-card-title">Résidents MDE</div>
+        <div class="import-card-desc">Résidents long séjour du bâtiment MDE</div>
+        <div class="import-card-patterns">Fichier : <em>Clients_pre_sents_MDE_…</em></div>
+        <div class="drop-zone" id="dz-mde" ondragover="dzOver(event,'dz-mde')" ondragleave="dzLeave('dz-mde')" ondrop="dzDrop(event,'mde')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'mde')">
+          <div class="drop-zone-ico">📋</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-mde"></div>
+      </div>
+
+      <!-- RÉSIDENTS BARTON -->
+      <div class="import-card">
+        <div class="import-card-title">Résidents Barton</div>
+        <div class="import-card-desc">Résidents long séjour du bâtiment Barton</div>
+        <div class="import-card-patterns">Fichier : <em>Clients_pre_sents_BARTON_…</em></div>
+        <div class="drop-zone" id="dz-barton" ondragover="dzOver(event,'dz-barton')" ondragleave="dzLeave('dz-barton')" ondrop="dzDrop(event,'barton')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'barton')">
+          <div class="drop-zone-ico">📋</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-barton"></div>
+      </div>
+
+      <!-- COURTS SÉJOURS REGM/MDE -->
+      <div class="import-card">
+        <div class="import-card-title">Courts séjours REGM / MDE</div>
+        <div class="import-card-desc">Check-ins courts séjours REGM et MDE</div>
+        <div class="import-card-patterns">Fichier : <em>Check-in_-_Short_stay_REGM_…</em></div>
+        <div class="drop-zone" id="dz-ss-regm" ondragover="dzOver(event,'dz-ss-regm')" ondragleave="dzLeave('dz-ss-regm')" ondrop="dzDrop(event,'ss_regm')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'ss_regm')">
+          <div class="drop-zone-ico">🛎</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-ss-regm"></div>
+      </div>
+
+      <!-- COURTS SÉJOURS BARTON -->
+      <div class="import-card">
+        <div class="import-card-title">Courts séjours Barton</div>
+        <div class="import-card-desc">Check-ins courts séjours Barton</div>
+        <div class="import-card-patterns">Fichier : <em>Check-in_-_Short_Stays_Barton_…</em></div>
+        <div class="drop-zone" id="dz-ss-barton" ondragover="dzOver(event,'dz-ss-barton')" ondragleave="dzLeave('dz-ss-barton')" ondrop="dzDrop(event,'ss_barton')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'ss_barton')">
+          <div class="drop-zone-ico">🛎</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-ss-barton"></div>
+      </div>
+
+      <!-- PARKING ASSIGNÉ -->
+      <div class="import-card">
+        <div class="import-card-title">Parking assigné</div>
+        <div class="import-card-desc">Places de parking assignées (staff, résidents permanents)</div>
+        <div class="import-card-patterns">Fichier : <em>Assigned_Parking_Bookings_…</em></div>
+        <div class="drop-zone" id="dz-pk-assigned" ondragover="dzOver(event,'dz-pk-assigned')" ondragleave="dzLeave('dz-pk-assigned')" ondrop="dzDrop(event,'parking_assigned')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'parking_assigned')">
+          <div class="drop-zone-ico">🚗</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-pk-assigned"></div>
+      </div>
+
+      <!-- PARKING IN-HOUSE -->
+      <div class="import-card">
+        <div class="import-card-title">Parking résidents (In-house)</div>
+        <div class="import-card-desc">Réservations parking des résidents en cours</div>
+        <div class="import-card-patterns">Fichier : <em>In_House_Parking_Bookings_…</em></div>
+        <div class="drop-zone" id="dz-pk-inhouse" ondragover="dzOver(event,'dz-pk-inhouse')" ondragleave="dzLeave('dz-pk-inhouse')" ondrop="dzDrop(event,'parking_inhouse')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'parking_inhouse')">
+          <div class="drop-zone-ico">🚗</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-pk-inhouse"></div>
+      </div>
+
+      <!-- FITNESS -->
+      <div class="import-card">
+        <div class="import-card-title">Pass Fitness</div>
+        <div class="import-card-desc">Pass fitness actifs par résident</div>
+        <div class="import-card-patterns">Fichier : <em>Current_Fitness_Passes_…</em></div>
+        <div class="drop-zone" id="dz-fitness" ondragover="dzOver(event,'dz-fitness')" ondragleave="dzLeave('dz-fitness')" ondrop="dzDrop(event,'fitness')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'fitness')">
+          <div class="drop-zone-ico">💪</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-fitness-imp"></div>
+      </div>
+
+      <!-- LOCKERS -->
+      <div class="import-card">
+        <div class="import-card-title">Lockers / Casiers</div>
+        <div class="import-card-desc">Réservations de casiers actives</div>
+        <div class="import-card-patterns">Fichier : <em>Current_Locker_Bookings_…</em></div>
+        <div class="drop-zone" id="dz-locker" ondragover="dzOver(event,'dz-locker')" ondragleave="dzLeave('dz-locker')" ondrop="dzDrop(event,'locker')">
+          <input type="file" accept=".csv" onchange="handleFile(this,'locker')">
+          <div class="drop-zone-ico">🔒</div>
+          <div class="drop-zone-text">Déposer ou cliquer</div>
+          <div class="drop-zone-sub">CSV uniquement</div>
+        </div>
+        <div class="import-status" id="st-locker-imp"></div>
+      </div>
+
+    </div>
+
+    <!-- LOG -->
+    <div class="import-log">
+      <div class="import-log-head"><div class="import-log-title">Historique des imports</div></div>
+      <div id="import-log-body">
+        <div style="padding:20px;text-align:center;font-size:12px;color:#9a9a9a">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL FICHE DÉTAIL ── -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-hdr-title" id="modal-name">—</div>
+        <div class="modal-hdr-room" id="modal-room">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Fermer</button>
+      <button class="mbtn mbtn-print" onclick="printModal()">🖨 Imprimer la fiche</button>
+    </div>
+  </div>
+</div>
+
+<div class="print-doc" id="print-doc"></div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Résidents & Accès</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let data = {
+  residents: [],
+  short_stays: [],
+  parkings: [],
+  fitness_passes: [],
+  lockers: []
+};
+let bldSegMode = 'all';
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot' + (state ? ' ' + state : '');
+  document.getElementById('save-text').textContent = msg;
+}
+
+function fmt(d) {
+  if (!d) return '—';
+  // Handle ISO date strings and DD/MM/YYYY
+  if (typeof d === 'string' && d.includes('-')) {
+    const [y,m,dd] = d.split('T')[0].split('-');
+    return `${dd}.${m}.${y}`;
+  }
+  return d;
+}
+
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function initials(first, last) {
+  const f = (first||'').trim()[0]||'';
+  const l = (last||'').trim()[0]||'';
+  return (f + l).toUpperCase() || '?';
+}
+
+function normalize(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'building') renderBuilding();
+  if (tab === 'import') loadImportLog();
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOAD ALL DATA
+// ══════════════════════════════════════════════════════════════
+async function loadAll() {
+  setSave('saving', 'Chargement…');
+  try {
+    const [r, ss, p, f, l] = await Promise.all([
+      sb.from('residents').select('*'),
+      sb.from('short_stays').select('*'),
+      sb.from('parkings').select('*'),
+      sb.from('fitness_passes').select('*'),
+      sb.from('lockers').select('*')
+    ]);
+    if (r.error || ss.error || p.error || f.error || l.error) {
+      throw r.error || ss.error || p.error || f.error || l.error;
+    }
+    data.residents = r.data || [];
+    data.short_stays = ss.data || [];
+    data.parkings = p.data || [];
+    data.fitness_passes = f.data || [];
+    data.lockers = l.data || [];
+    setSave('saved', 'Données à jour');
+    updateStats();
+    loadImportLog();
+  } catch(err) {
+    setSave('error', 'Erreur connexion');
+    console.error(err);
+  }
+}
+
+function updateStats() {
+  document.getElementById('st-residents').textContent = data.residents.length;
+  document.getElementById('st-shortstays').textContent = data.short_stays.length;
+  document.getElementById('st-parkings').textContent = data.parkings.length;
+  document.getElementById('st-fitness').textContent = data.fitness_passes.length;
+  document.getElementById('st-lockers').textContent = data.lockers.length;
+}
+
+async function loadImportLog() {
+  const { data: logs } = await sb.from('import_log').select('*').order('imported_at', { ascending: false }).limit(20);
+  const el = document.getElementById('import-log-body');
+  if (!logs || logs.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:#9a9a9a">Aucun import enregistré.</div>';
+    return;
+  }
+  // Update last import display
+  if (logs[0]) {
+    const d = new Date(logs[0].imported_at);
+    document.getElementById('last-import').textContent = 'Dernier import : ' + d.toLocaleDateString('fr-CH') + ' à ' + d.toLocaleTimeString('fr-CH', {hour:'2-digit',minute:'2-digit'});
+  }
+  el.innerHTML = `<table class="log-tbl">
+    <thead><tr><th>Type</th><th>Fichier</th><th>Lignes</th><th>Date</th></tr></thead>
+    <tbody>
+    ${logs.map(l => `<tr>
+      <td><span class="log-badge">${l.file_type}</span></td>
+      <td style="font-size:11px;color:#6b6b6b">${l.filename}</td>
+      <td style="font-weight:600">${l.row_count}</td>
+      <td style="font-size:11px;color:#6b6b6b">${new Date(l.imported_at).toLocaleDateString('fr-CH')} ${new Date(l.imported_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CSV PARSER
+// ══════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVLine(lines[i]);
+    if (vals.every(v => !v.trim())) continue;
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h.trim()] = (vals[idx]||'').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      result.push(cur); cur = '';
+    } else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  // DD/MM/YYYY HH:MM or DD/MM/YYYY
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // Already ISO
+  if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.split(' ')[0];
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FILE HANDLERS — type detection by filename
+// ══════════════════════════════════════════════════════════════
+function detectFileType(filename) {
+  const fn = filename.toLowerCase();
+  if (fn.includes('clients_pre_sents_regm') || fn.includes('clients_présents_regm')) return 'regm';
+  if (fn.includes('clients_pre_sents_mde') || fn.includes('clients_présents_mde')) return 'mde';
+  if (fn.includes('clients_pre_sents_barton') || fn.includes('clients_présents_barton')) return 'barton';
+  if (fn.includes('check-in_-_short_stay_regm') || fn.includes('check-in_-_short_stays_regm')) return 'ss_regm';
+  if (fn.includes('check-in_-_short_stays_barton')) return 'ss_barton';
+  if (fn.includes('assigned_parking')) return 'parking_assigned';
+  if (fn.includes('in_house_parking')) return 'parking_inhouse';
+  if (fn.includes('fitness_passes') || fn.includes('current_fitness')) return 'fitness';
+  if (fn.includes('locker_bookings') || fn.includes('current_locker')) return 'locker';
+  return null;
+}
+
+// Drag & drop helpers
+function dzOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('dragover'); }
+function dzLeave(id) { document.getElementById(id).classList.remove('dragover'); }
+function dzDrop(e, type) {
+  e.preventDefault();
+  const id = 'dz-' + type.replace('_','-');
+  document.getElementById(id)?.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file, type);
+}
+function handleFile(input, type) {
+  if (input.files[0]) processFile(input.files[0], type);
+}
+
+async function processFile(file, type) {
+  // Auto-detect type from filename if needed
+  if (!type) {
+    type = detectFileType(file.name);
+    if (!type) { alert('Fichier non reconnu : ' + file.name); return; }
+  }
+  const statusId = {
+    regm:'st-regm', mde:'st-mde', barton:'st-barton',
+    ss_regm:'st-ss-regm', ss_barton:'st-ss-barton',
+    parking_assigned:'st-pk-assigned', parking_inhouse:'st-pk-inhouse',
+    fitness:'st-fitness-imp', locker:'st-locker-imp'
+  }[type];
+
+  setImportStatus(statusId, 'loading', `Lecture de ${file.name}…`);
+
+  try {
+    const text = await file.text();
+    const rows = parseCSV(text);
+    if (rows.length === 0) { setImportStatus(statusId, 'error', 'Fichier vide ou non reconnu'); return; }
+
+    let records = [];
+    let tableName = '';
+
+    if (type === 'regm' || type === 'mde') {
+      tableName = 'residents';
+      records = rows.map(r => ({
+        building: type.toUpperCase(),
+        name_last: r['Name Last'] || '',
+        name_first: r['Name First'] || '',
+        room_space: (r['Room Space'] || r['Room Space '] || '').trim(),
+        room_type: (r['Room Type'] || r['Room Type '] || '').trim(),
+        contract_start: parseDate(r['Contract Date Start']),
+        contract_end: parseDate(r['Contract Date End']),
+        sublease_tenant: r['Sub-lease Tenant'] || null,
+        sublease_room: r['Sub-lease Room'] || null,
+        imported_at: new Date().toISOString()
+      })).filter(r => r.name_last || r.name_first);
+    }
+
+    else if (type === 'barton') {
+      tableName = 'residents';
+      records = rows.map(r => ({
+        building: 'BARTON',
+        name_last: r['Name Last'] || '',
+        name_first: r['Name First'] || '',
+        room_space: (r['Room Space'] || r['Room Space '] || '').trim(),
+        room_type: (r['Room Type'] || r['Room Type '] || '').trim(),
+        contract_start: parseDate(r['Contract Date Start']),
+        contract_end: parseDate(r['Contract Date End']),
+        sublease_tenant: null,
+        sublease_room: null,
+        imported_at: new Date().toISOString()
+      })).filter(r => r.name_last || r.name_first);
+    }
+
+    else if (type === 'ss_regm') {
+      tableName = 'short_stays';
+      records = rows.map(r => ({
+        building: 'REGM_MDE',
+        entry_id: r['Entry ID'] || '',
+        entry_name: r['Entry Name'] || '',
+        checkin_date: parseDate(r['Check In Date']),
+        checkout_date: parseDate(r['Check Out Date']),
+        entry_status: r['Entry Status'] || '',
+        room_space: r['Room Space'] || '',
+        key_code: r['Key code'] || r['Key Code'] || '',
+        nb_guests: parseInt(r['Number Of Guests']||'1')||1,
+        notes: r['Notes'] || null,
+        email: null, mobile: null, group: null,
+        imported_at: new Date().toISOString()
+      }));
+    }
+
+    else if (type === 'ss_barton') {
+      tableName = 'short_stays';
+      records = rows.map(r => ({
+        building: 'BARTON',
+        entry_id: r['ID'] || '',
+        entry_name: r['Name'] || '',
+        checkin_date: parseDate(r['Check In']),
+        checkout_date: parseDate(r['Check Out']),
+        entry_status: r['Entry Status'] || '',
+        room_space: r['Room'] || '',
+        key_code: r['Key code'] || '',
+        nb_guests: parseInt(r['Guests']||'1')||1,
+        notes: r['Notes'] || null,
+        email: r['Email'] || null,
+        mobile: r['Mobile n°'] || null,
+        group: r['Group'] || null,
+        imported_at: new Date().toISOString()
+      }));
+    }
+
+    else if (type === 'parking_assigned' || type === 'parking_inhouse') {
+      tableName = 'parkings';
+      records = rows.map(r => ({
+        parking_type: type === 'parking_assigned' ? 'assigned' : 'inhouse',
+        entry_id: r['Entry ID'] || '',
+        name_first: r['Name First'] || '',
+        name_last: r['Name Last'] || '',
+        parking_space: r['Parking Space'] || '',
+        date_start: parseDate(r['Date Start']),
+        date_end: parseDate(r['Date End']),
+        license_plate: r['Vehicle License Plate'] || null,
+        vehicle_make: r['Vehicle Make/Model'] || null,
+        vehicle_details: r['Vehicle Details'] || null,
+        alt_vehicle_info: r['Alt. Vehicle Info'] || null,
+        imported_at: new Date().toISOString()
+      })).filter(r => r.parking_space);
+    }
+
+    else if (type === 'fitness') {
+      tableName = 'fitness_passes';
+      records = rows.map(r => ({
+        entry_id: r['Entry ID'] || '',
+        name_first: r['Name First'] || '',
+        name_last: r['Name Last'] || '',
+        description: r['Description'] || '',
+        start_date: parseDate(r['Start Date']),
+        end_date: parseDate(r['End Date']),
+        pass_created: (r['Fitness Pass Created?']||'').toLowerCase() === 'yes',
+        entry_status: r['Entry Status'] || '',
+        room_active: r['Room (Active Booking)'] || '',
+        imported_at: new Date().toISOString()
+      }));
+    }
+
+    else if (type === 'locker') {
+      tableName = 'lockers';
+      records = rows.map(r => ({
+        entry_id: r['Entry ID'] || '',
+        entry_name: r['Entry Name'] || '',
+        locker_number: r['Resource Description'] || '',
+        date_start: parseDate(r['Date Start']),
+        date_end: parseDate(r['Date End']),
+        entry_status: r['Entry Status'] || '',
+        room_active: r['Room (Active Booking)'] || '',
+        imported_at: new Date().toISOString()
+      }));
+    }
+
+    if (!records.length) { setImportStatus(statusId, 'error', 'Aucune donnée valide trouvée'); return; }
+
+    setImportStatus(statusId, 'loading', `Envoi de ${records.length} lignes…`);
+
+    // Delete existing records of this building/type then insert
+    if (tableName === 'residents') {
+      const building = type.toUpperCase();
+      await sb.from('residents').delete().eq('building', building);
+      const { error } = await sb.from('residents').insert(records);
+      if (error) throw error;
+    } else if (tableName === 'short_stays') {
+      const building = type === 'ss_regm' ? 'REGM_MDE' : 'BARTON';
+      await sb.from('short_stays').delete().eq('building', building);
+      const { error } = await sb.from('short_stays').insert(records);
+      if (error) throw error;
+    } else if (tableName === 'parkings') {
+      const ptype = type === 'parking_assigned' ? 'assigned' : 'inhouse';
+      await sb.from('parkings').delete().eq('parking_type', ptype);
+      const { error } = await sb.from('parkings').insert(records);
+      if (error) throw error;
+    } else {
+      await sb.from(tableName).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      const { error } = await sb.from(tableName).insert(records);
+      if (error) throw error;
+    }
+
+    // Log the import
+    await sb.from('import_log').insert({ file_type: type, filename: file.name, row_count: records.length });
+
+    setImportStatus(statusId, 'success', `✓ ${records.length} lignes importées`);
+    await loadAll();
+
+  } catch(err) {
+    console.error(err);
+    setImportStatus(statusId, 'error', 'Erreur : ' + err.message);
+  }
+}
+
+function setImportStatus(id, state, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'import-status ' + state;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════════════
+// SEARCH
+// ══════════════════════════════════════════════════════════════
+function doSearch() {
+  const q = normalize(document.getElementById('search-input').value);
+  if (!q || q.length < 2) {
+    document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🔍</div><p>Entrez au moins 2 caractères.</p></div>`;
+    return;
+  }
+
+  const results = [];
+
+  // Search residents (long stay)
+  data.residents.forEach(r => {
+    const name = normalize(r.name_last + ' ' + r.name_first);
+    const room = normalize(r.room_space || '');
+    const sublease = normalize(r.sublease_tenant || '');
+    if (name.includes(q) || room.includes(q) || sublease.includes(q)) {
+      results.push({ type: 'resident', score: name.includes(q) ? 2 : 1, data: r });
+    }
+  });
+
+  // Search short stays
+  data.short_stays.forEach(ss => {
+    const name = normalize(ss.entry_name || '');
+    const room = normalize(ss.room_space || '');
+    if (name.includes(q) || room.includes(q)) {
+      results.push({ type: 'shortstay', score: name.includes(q) ? 2 : 1, data: ss });
+    }
+  });
+
+  // Search parkings (by name + license plate)
+  data.parkings.forEach(p => {
+    const name = normalize((p.name_first || '') + ' ' + (p.name_last || ''));
+    const plate = normalize(p.license_plate || '');
+    const alt = normalize(p.alt_vehicle_info || '');
+    if (name.includes(q) || plate.includes(q) || alt.includes(q)) {
+      results.push({ type: 'parking', score: plate.includes(q) ? 3 : 1, data: p });
+    }
+  });
+
+  // Search fitness
+  data.fitness_passes.forEach(f => {
+    const name = normalize((f.name_first||'') + ' ' + (f.name_last||''));
+    const room = normalize(f.room_active || '');
+    if (name.includes(q) || room.includes(q)) {
+      results.push({ type: 'fitness', score: 1, data: f });
+    }
+  });
+
+  // Search lockers
+  data.lockers.forEach(l => {
+    const name = normalize(l.entry_name || '');
+    const locker = normalize(l.locker_number || '');
+    const room = normalize(l.room_active || '');
+    if (name.includes(q) || locker.includes(q) || room.includes(q)) {
+      results.push({ type: 'locker', score: locker.includes(q) ? 3 : 1, data: l });
+    }
+  });
+
+  if (results.length === 0) {
+    document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🤷</div><p>Aucun résultat pour <strong>« ${escHtml(document.getElementById('search-input').value)} »</strong></p><small>Essayez avec moins de lettres ou un autre champ</small></div>`;
+    return;
+  }
+
+  // Group by person / room to aggregate all accesses
+  const grouped = groupSearchResults(results, q);
+  renderSearchResults(grouped);
+}
+
+function groupSearchResults(results, q) {
+  // Try to merge by entry_id (same person across systems)
+  const map = new Map();
+
+  results.forEach(r => {
+    let key = '';
+    let entryId = '';
+
+    if (r.type === 'resident') {
+      key = 'res_' + (r.data.building||'') + '_' + (r.data.room_space||'') + '_' + (r.data.name_last||'');
+    } else if (r.type === 'shortstay') {
+      key = 'ss_' + r.data.entry_id + '_' + r.data.room_space;
+    } else if (r.type === 'parking') {
+      key = 'pk_' + r.data.entry_id + '_' + r.data.name_last;
+    } else if (r.type === 'fitness') {
+      key = 'fit_' + r.data.entry_id;
+    } else if (r.type === 'locker') {
+      key = 'lk_' + r.data.entry_id + '_' + r.data.locker_number;
+    }
+
+    if (!map.has(key)) map.set(key, { mainType: r.type, mainData: r.data, extras: [] });
+    else map.get(key).extras.push(r);
+  });
+
+  // Enrich residents with their accesses
+  const final = [];
+  map.forEach((val, key) => {
+    if (val.mainType === 'resident') {
+      const r = val.mainData;
+      const entryId = r.entry_id;
+      // Find matching parking by name
+      const parkings = data.parkings.filter(p =>
+        normalize((p.name_first||'')+(p.name_last||'')).includes(normalize(r.name_last||'')) ||
+        (entryId && p.entry_id === entryId));
+      // Find fitness
+      const fitness = data.fitness_passes.filter(f =>
+        normalize((f.name_first||'')+(f.name_last||'')).includes(normalize(r.name_last||'')));
+      // Find lockers
+      const lockers = data.lockers.filter(l =>
+        normalize(l.entry_name||'').includes(normalize(r.name_last||'')));
+      // Short stays same room
+      const shortStays = data.short_stays.filter(ss =>
+        r.room_space && ss.room_space && normalize(ss.room_space).includes(normalize(r.room_space)));
+      final.push({ type: 'resident', data: r, parkings, fitness, lockers, shortStays });
+    } else {
+      final.push({ type: val.mainType, data: val.mainData });
+    }
+  });
+
+  return final;
+}
+
+function renderSearchResults(grouped) {
+  const el = document.getElementById('search-results');
+  const q = normalize(document.getElementById('search-input').value);
+
+  if (grouped.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="ico">🤷</div><p>Aucun résultat.</p></div>`;
+    return;
+  }
+
+  const total = grouped.length;
+  let html = `<div style="font-size:12px;color:var(--rdz-gray);margin-bottom:14px">${total} résultat${total>1?'s':''} pour « <strong>${escHtml(document.getElementById('search-input').value)}</strong> »</div>`;
+
+  grouped.forEach(item => {
+    html += buildResultCard(item, q);
+  });
+
+  el.innerHTML = html;
+}
+
+function buildResultCard(item, q) {
+  const t = item.type;
+
+  if (t === 'resident') {
+    const r = item.data;
+    const name = ((r.name_first||'') + ' ' + (r.name_last||'')).trim();
+    const hasParking = item.parkings && item.parkings.length > 0;
+    const hasFitness = item.fitness && item.fitness.length > 0;
+    const hasLocker = item.lockers && item.lockers.length > 0;
+    const hasSublease = r.sublease_tenant;
+    const hasShortStay = item.shortStays && item.shortStays.length > 0;
+
+    let parkingHtml = '', fitnessHtml = '', lockerHtml = '';
+
+    if (hasParking) {
+      parkingHtml = `<div class="res-section">
+        <div class="res-section-title">🚗 Parking</div>
+        ${item.parkings.map(p => `
+          <div class="res-field"><div class="res-field-lbl">Place</div><div class="res-field-val">${p.parking_space}</div></div>
+          ${p.license_plate ? `<div class="res-field"><div class="res-field-lbl">Plaque</div><div class="res-field-val highlight">${p.license_plate}</div></div>` : ''}
+          ${p.vehicle_make ? `<div class="res-field"><div class="res-field-lbl">Véhicule</div><div class="res-field-val muted">${p.vehicle_make}${p.vehicle_details?' — '+p.vehicle_details:''}</div></div>` : ''}
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(p.date_start)} → ${fmt(p.date_end)}</div></div>
+        `).join('<hr style="border:none;border-top:1px dashed var(--rdz-border);margin:8px 0">')}
+      </div>`;
+    }
+    if (hasFitness) {
+      fitnessHtml = `<div class="res-section">
+        <div class="res-section-title">💪 Pass Fitness</div>
+        ${item.fitness.map(f => `
+          <div class="res-field"><div class="res-field-lbl">Type</div><div class="res-field-val">${f.description}</div></div>
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(f.start_date)} → ${fmt(f.end_date)}</div></div>
+        `).join('')}
+      </div>`;
+    }
+    if (hasLocker) {
+      lockerHtml = `<div class="res-section">
+        <div class="res-section-title">🔒 Casier</div>
+        ${item.lockers.map(l => `
+          <div class="res-field"><div class="res-field-lbl">Casier</div><div class="res-field-val highlight">${l.locker_number}</div></div>
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(l.date_start)} → ${fmt(l.date_end)}</div></div>
+        `).join('')}
+      </div>`;
+    }
+
+    const hasExtras = hasParking || hasFitness || hasLocker;
+
+    return `<div class="res-card" style="border-left-color:var(--rdz-red)">
+      <div class="res-card-header">
+        <div class="res-avatar">${initials(r.name_first, r.name_last)}</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(name)}</div>
+          <div class="res-room">${r.room_space ? '📍 ' + escHtml(r.room_space) : '<em style="color:#bbb">Chambre non précisée</em>'} · ${r.room_type || ''}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-building">${r.building}</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(r.contract_start)} → ${fmt(r.contract_end)}</span>
+            ${hasParking ? '<span class="rbadge rbadge-parking">🚗 Parking</span>' : ''}
+            ${hasFitness ? '<span class="rbadge rbadge-fitness">💪 Fitness</span>' : ''}
+            ${hasLocker ? '<span class="rbadge rbadge-locker">🔒 Locker</span>' : ''}
+            ${hasSublease ? `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(r.sublease_tenant)}</span>` : ''}
+            ${hasShortStay ? '<span class="rbadge rbadge-shortstay">🛎 Court séjour en cours</span>' : ''}
+          </div>
+        </div>
+      </div>
+      ${hasExtras ? `<div class="res-grid">${parkingHtml}${fitnessHtml}${lockerHtml}</div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'shortstay') {
+    const ss = item.data;
+    return `<div class="res-card" style="border-left-color:#7f1d1d">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#7f1d1d">🛎</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(ss.entry_name)}</div>
+          <div class="res-room">📍 ${escHtml(ss.room_space||'—')} · Court séjour · ${ss.building}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-shortstay">Court séjour</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(ss.checkin_date)} → ${fmt(ss.checkout_date)}</span>
+            <span class="rbadge rbadge-type">${ss.entry_status}</span>
+          </div>
+        </div>
+      </div>
+      ${(ss.key_code || ss.notes || ss.email || ss.mobile) ? `
+      <div class="res-grid">
+        <div class="res-section">
+          <div class="res-section-title">Informations accès</div>
+          ${ss.key_code ? `<div class="res-field"><div class="res-field-lbl">Code clé</div><div class="res-field-val highlight">${escHtml(ss.key_code)}</div></div>` : ''}
+          ${ss.nb_guests ? `<div class="res-field"><div class="res-field-lbl">Nb. occupants</div><div class="res-field-val">${ss.nb_guests}</div></div>` : ''}
+          ${ss.group ? `<div class="res-field"><div class="res-field-lbl">Groupe</div><div class="res-field-val muted">${escHtml(ss.group)}</div></div>` : ''}
+          ${ss.email ? `<div class="res-field"><div class="res-field-lbl">Email</div><div class="res-field-val muted">${escHtml(ss.email)}</div></div>` : ''}
+          ${ss.mobile ? `<div class="res-field"><div class="res-field-lbl">Mobile</div><div class="res-field-val">${escHtml(ss.mobile)}</div></div>` : ''}
+          ${ss.notes ? `<div class="res-field"><div class="res-field-lbl">Notes</div><div class="res-field-val muted" style="font-size:11px">${escHtml(ss.notes)}</div></div>` : ''}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'parking') {
+    const p = item.data;
+    const name = ((p.name_first||'') + ' ' + (p.name_last||'')).trim();
+    return `<div class="res-card" style="border-left-color:#1e3a8a">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#1e3a8a">🚗</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(name)}</div>
+          <div class="res-room">🅿 ${escHtml(p.parking_space)} · ${p.parking_type === 'assigned' ? 'Place assignée' : 'Réservation en cours'}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-parking">Parking</span>
+            ${p.license_plate ? `<span class="rbadge" style="background:#eff6ff;color:#1e3a8a;font-size:12px;padding:4px 10px">${escHtml(p.license_plate)}</span>` : ''}
+            <span class="rbadge rbadge-contract">📅 ${fmt(p.date_start)} → ${fmt(p.date_end)}</span>
+          </div>
+        </div>
+      </div>
+      ${(p.vehicle_make || p.vehicle_details || p.alt_vehicle_info) ? `
+      <div class="res-grid">
+        <div class="res-section">
+          <div class="res-section-title">Informations véhicule</div>
+          ${p.vehicle_make ? `<div class="res-field"><div class="res-field-lbl">Marque / modèle</div><div class="res-field-val">${escHtml(p.vehicle_make)}</div></div>` : ''}
+          ${p.vehicle_details ? `<div class="res-field"><div class="res-field-lbl">Détails</div><div class="res-field-val muted">${escHtml(p.vehicle_details)}</div></div>` : ''}
+          ${p.alt_vehicle_info ? `<div class="res-field"><div class="res-field-lbl">Infos alt.</div><div class="res-field-val muted" style="font-size:11px;white-space:pre-wrap">${escHtml(p.alt_vehicle_info)}</div></div>` : ''}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'locker') {
+    const l = item.data;
+    return `<div class="res-card" style="border-left-color:#713f12">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#713f12">🔒</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(l.entry_name)}</div>
+          <div class="res-room">🔒 ${escHtml(l.locker_number)} · ${escHtml(l.room_active||'—')}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-locker">Casier</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(l.date_start)} → ${fmt(l.date_end)}</span>
+            <span class="rbadge rbadge-type">${l.entry_status}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return '';
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🔍</div><p>Entrez un nom, un numéro de chambre, une plaque ou un numéro de casier.</p><small>La recherche est partielle — « dup » trouve « Dupont »</small></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUILDING VIEW
+// ══════════════════════════════════════════════════════════════
+let bldFilter = 'all';
+
+function setBldSeg(btn) {
+  document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  bldSegMode = btn.dataset.s;
+  renderBuilding();
+}
+
+function renderBuilding() {
+  bldFilter = document.getElementById('bld-filter').value;
+  const el = document.getElementById('building-content');
+
+  // Group residents by building then by room
+  let buildings = ['REGM','MDE','BARTON'];
+  if (bldFilter !== 'all') buildings = [bldFilter];
+
+  let html = '';
+
+  buildings.forEach(bld => {
+    // Long stay residents
+    const residents = data.residents.filter(r => r.building === bld);
+    // Short stays for this building
+    const ssBuilding = bld === 'BARTON' ? 'BARTON' : (bld === 'REGM' || bld === 'MDE') ? 'REGM_MDE' : null;
+    const shortStays = data.short_stays.filter(ss => ss.building === ssBuilding || ss.building === bld);
+
+    // Combine into rows by room
+    const roomMap = new Map();
+
+    if (bldSegMode !== 'shortstay') {
+      residents.forEach(r => {
+        const room = (r.room_space || '').trim();
+        const key = room || ('_noroom_' + r.name_last);
+        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
+        roomMap.get(key).longStay.push(r);
+      });
+    }
+
+    if (bldSegMode !== 'longstay') {
+      shortStays.forEach(ss => {
+        const room = (ss.room_space || '').trim();
+        const key = room || ('_noroom_ss_' + ss.entry_name);
+        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
+        roomMap.get(key).shortStay.push(ss);
+      });
+    }
+
+    if (roomMap.size === 0) return;
+
+    // Sort rooms naturally
+    const sortedRooms = [...roomMap.entries()].sort((a, b) => naturalSort(a[0], b[0]));
+
+    const totalRows = sortedRooms.reduce((n,[,v]) => n + v.longStay.length + v.shortStay.length, 0);
+
+    html += `<div class="bld-table-wrap">
+      <div class="bld-table-head">
+        <span class="bld-table-name">🏢 ${bld}</span>
+        <span class="bld-table-count">${totalRows} occupant${totalRows>1?'s':''} · ${sortedRooms.length} chambre${sortedRooms.length>1?'s':''}</span>
+      </div>
+      <table class="bld-tbl">
+        <thead><tr>
+          <th style="width:140px">Chambre</th>
+          <th>Occupant(s)</th>
+          <th style="width:120px">Type contrat</th>
+          <th style="width:110px">Fin contrat</th>
+          <th style="width:180px">Accès & extras</th>
+        </tr></thead>
+        <tbody>`;
+
+    sortedRooms.forEach(([key, val]) => {
+      const allOccupants = [...val.longStay, ...val.shortStay];
+      allOccupants.forEach((occ, idx) => {
+        const isLong = val.longStay.includes(occ);
+        const name = isLong
+          ? ((occ.name_first||'') + ' ' + (occ.name_last||'')).trim()
+          : (occ.entry_name||'');
+
+        // Find accesses
+        const parkings = data.parkings.filter(p =>
+          normalize((p.name_first||'')+(p.name_last||'')).includes(normalize(occ.name_last||'')) ||
+          (isLong && occ.room_space && normalize(p.alt_vehicle_info||'').includes(normalize(occ.name_last||''))));
+        const fitness = data.fitness_passes.filter(f =>
+          normalize((f.name_first||'')+(f.name_last||'')).includes(normalize((occ.name_last||occ.entry_name||'').split(',')[0])));
+        const lockers = isLong ? data.lockers.filter(l =>
+          normalize(l.entry_name||'').includes(normalize(occ.name_last||''))) : [];
+
+        let accessTags = '';
+        if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${p.parking_space}${p.license_plate?' · '+p.license_plate:''}</span>`).join('');
+        if (fitness.length) accessTags += `<span class="cell-tag tag-fitness">💪 Fitness</span>`;
+        if (lockers.length) accessTags += lockers.map(l => `<span class="cell-tag tag-locker">🔒 ${l.locker_number}</span>`).join('');
+        if (isLong && occ.sublease_tenant) accessTags += `<span class="cell-tag tag-sublease">🔄 ${occ.sublease_tenant}</span>`;
+        if (!isLong) accessTags += `<span class="cell-tag tag-shortstay">🛎 Court séjour</span>`;
+
+        const showRoom = idx === 0;
+        const rowspan = allOccupants.length;
+
+        html += `<tr>
+          ${showRoom ? `<td class="cell-room" rowspan="${rowspan}" style="border-right:2px solid var(--rdz-border)">${escHtml(val.room||'—')}</td>` : ''}
+          <td>
+            <div class="cell-name">${escHtml(name)}</div>
+            ${!isLong && occ.key_code ? `<div class="cell-sub">🔑 Code : ${escHtml(occ.key_code)}</div>` : ''}
+            ${!isLong && occ.checkin_date ? `<div class="cell-sub">📅 ${fmt(occ.checkin_date)} → ${fmt(occ.checkout_date)}</div>` : ''}
+          </td>
+          <td style="font-size:11px;color:var(--rdz-gray)">${isLong ? (occ.room_type||'—') : (occ.entry_status||'Court séjour')}</td>
+          <td style="font-size:12px;font-weight:600;${isLong && occ.contract_end && occ.contract_end < today() ? 'color:#dc2626' : ''}">${isLong ? fmt(occ.contract_end) : fmt(occ.checkout_date)}</td>
+          <td>${accessTags || '<span style="color:#bbb;font-size:11px">—</span>'}</td>
+        </tr>`;
+      });
+    });
+
+    html += `</tbody></table></div>`;
+  });
+
+  el.innerHTML = html || `<div class="state-msg"><div class="ico">🏢</div><p>Aucune donnée pour ce bâtiment.<br>Importez d'abord les fichiers CSV.</p></div>`;
+}
+
+function naturalSort(a, b) {
+  return a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PRINT BUILDING
+// ══════════════════════════════════════════════════════════════
+function printBuilding() {
+  const bld = document.getElementById('bld-filter').value;
+  const content = document.getElementById('building-content').innerHTML;
+  const title = bld === 'all' ? 'Tous les bâtiments' : 'Bâtiment ' + bld;
+  const ref = new Date().toLocaleDateString('fr-CH');
+
+  const html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
+    <table style="width:100%;margin-bottom:12px"><tr>
+      <td style="vertical-align:bottom">
+        <div style="font-size:16px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-top:4px">Résidents & Accès — ${title}</div>
+        <div style="font-size:11px;color:#6b6b6b;margin-top:2px">Date d'édition : ${ref}</div>
+      </td>
+      <td style="text-align:right;vertical-align:bottom">
+        <div style="font-size:10px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+      </td>
+    </tr></table>
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:16px"></div>
+    ${content}
+  </div>`;
+
+  document.getElementById('print-doc').innerHTML = html;
+  const orig = document.title;
+  document.title = `RDZ_Residents_${bld}_${today()}`;
+  setTimeout(() => { window.print(); document.title = orig; }, 150);
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODAL PRINT (depuis recherche)
+// ══════════════════════════════════════════════════════════════
+function closeModal() {
+  document.getElementById('modal-detail').classList.remove('open');
+}
+function printModal() {
+  const body = document.getElementById('modal-body').innerHTML;
+  const name = document.getElementById('modal-name').textContent;
+  const room = document.getElementById('modal-room').textContent;
+  const ref = new Date().toLocaleDateString('fr-CH');
+  const html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:12px">
+    <table style="width:100%;margin-bottom:12px"><tr>
+      <td style="vertical-align:bottom">
+        <div style="font-size:16px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+        <div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-top:4px">Fiche résident — ${name}</div>
+        <div style="font-size:12px;color:#6b6b6b;margin-top:2px">${room} · Édité le ${ref}</div>
+      </td>
+      <td style="text-align:right;vertical-align:bottom">
+        <div style="font-size:10px;color:#9a9a9a;text-transform:uppercase">Document confidentiel — usage interne</div>
+      </td>
+    </tr></table>
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:16px"></div>
+    ${body}
+  </div>`;
+  document.getElementById('print-doc').innerHTML = html;
+  const orig = document.title;
+  document.title = `RDZ_Fiche_${name.replace(/\s+/g,'_')}`;
+  setTimeout(() => { window.print(); document.title = orig; }, 150);
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+document.getElementById('modal-detail').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-detail')) closeModal();
+});
+
+loadAll();
+</script>
+</body>
+</html>
