@@ -296,6 +296,9 @@ function render() {
     if (viewMode === 'inactive') cons = cons.filter(c => !isActive(c, ref));
     const activeCount = consignes.filter(c => c.site_id === site.id && isActive(c, ref)).length;
 
+    // Masquer les sites sans consigne selon le filtre actif
+    if (cons.length === 0) return;
+
     html += `<div class="site-block">
       <div class="site-hdr">
         <div class="site-name">${site.nom}</div>
@@ -305,9 +308,7 @@ function render() {
         </div>
       </div>`;
 
-    if (cons.length === 0) {
-      html += `<div class="empty-site">Aucune consigne pour ce filtre.</div>`;
-    } else {
+    {
       cons.forEach((c, i) => {
         const active = isActive(c, ref);
         html += `<div class="card${active ? '' : ' inactive'}">
