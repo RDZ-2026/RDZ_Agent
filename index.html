@@ -41,18 +41,24 @@
     .module-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-border); border-radius: 2px; padding: 24px; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px; transition: border-top-color .15s, box-shadow .15s; cursor: pointer; }
     .module-card.active { border-top-color: var(--rdz-red); }
     .module-card.active:hover { box-shadow: 0 4px 16px rgba(139,26,26,.1); }
+    .module-card.admin { border-top-color: #1e3a5f; }
+    .module-card.admin:hover { box-shadow: 0 4px 16px rgba(30,58,95,.1); }
     .module-card.coming-soon { opacity: .6; cursor: default; }
     .module-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .module-icon { width: 44px; height: 44px; background: var(--rdz-red-light); border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .module-icon.blue { background: #e8edf5; }
     .module-icon svg { width: 22px; height: 22px; stroke: var(--rdz-red); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .module-icon.blue svg { stroke: #1e3a5f; }
     .module-badge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; }
     .badge-live { background: #dcfce7; color: #166534; }
     .badge-soon { background: #f3f4f6; color: #6b7280; }
     .badge-wip { background: #fef9c3; color: #854d0e; }
+    .badge-admin { background: #e8edf5; color: #1e3a5f; }
     .module-name { font-size: 15px; font-weight: 700; color: var(--rdz-black); letter-spacing: .02em; }
     .module-desc { font-size: 12.5px; color: var(--rdz-gray); line-height: 1.6; }
     .module-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rdz-border); display: flex; align-items: center; justify-content: space-between; }
     .module-link { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--rdz-red); text-decoration: none; display: flex; align-items: center; gap: 5px; }
+    .module-link.blue { color: #1e3a5f; }
     .module-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .module-card.coming-soon .module-link { color: #9a9a9a; }
 
@@ -105,6 +111,7 @@
       </div>
     </div>
 
+    <!-- ── MODULES OPÉRATIONNELS ── -->
     <div class="section-label">Modules actifs</div>
     <div class="modules-grid">
 
@@ -159,8 +166,49 @@
         </div>
       </a>
 
+      <!-- RÉSIDENTS -->
+      <a class="module-card active" href="residents.html">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span class="module-badge badge-live">En ligne</span>
+        </div>
+        <div>
+          <div class="module-name">Résidents &amp; Accès</div>
+          <div class="module-desc">Gestion des résidents par bâtiment avec recherche par nom, chambre, plaque ou casier. Import CSV et vue bâtiment imprimable.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
     </div>
 
+    <!-- ── ADMINISTRATION ── -->
+    <div class="section-label">Administration</div>
+    <div class="modules-grid">
+
+      <!-- PARAMÉTRAGE -->
+      <a class="module-card admin" href="parametrage.html">
+        <div class="module-card-header">
+          <div class="module-icon blue">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <span class="module-badge badge-admin">Administration</span>
+        </div>
+        <div>
+          <div class="module-name">Paramétrage des sites</div>
+          <div class="module-desc">Gestion de la liste des sites de surveillance. Ajout, renommage, activation et suppression des sites utilisés dans tous les modules.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- ── MODULES EN DÉVELOPPEMENT ── -->
     <div class="section-label">Modules en développement</div>
     <div class="modules-grid">
 
@@ -180,7 +228,6 @@
         </div>
       </div>
 
-
     </div>
 
   </main>
@@ -196,7 +243,7 @@
     }
     const now = new Date();
     document.getElementById('current-date').textContent = formatDate(now);
-    document.getElementById('footer-date').textContent = 'Version 1.2 — ' + now.getFullYear();
+    document.getElementById('footer-date').textContent = 'Version 1.3 — ' + now.getFullYear();
   </script>
 
 </body>
