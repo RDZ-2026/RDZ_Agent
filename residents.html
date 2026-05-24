@@ -932,6 +932,30 @@ function doSearch() {
   renderSearchResults(grouped);
 }
 
+// ── MATCHING ROBUSTE ──────────────────────────────────────────
+// Retourne true seulement si le nom matche de façon stricte :
+// les deux tokens (prénom + nom) doivent chacun être trouvés,
+// et le nom seul doit faire au moins 3 caractères.
+function nameMatch(first1, last1, first2, last2) {
+  const f1 = normalize(first1||''), l1 = normalize(last1||'');
+  const f2 = normalize(first2||''), l2 = normalize(last2||'');
+  if (!l1 || l1.length < 3 || !l2 || l2.length < 3) return false;
+  // Correspondance exacte prénom+nom dans les deux sens
+  const full1 = (f1 + ' ' + l1).trim();
+  const full2 = (f2 + ' ' + l2).trim();
+  // Les noms doivent se croiser : last1 dans full2 ET last2 dans full1
+  return full2.includes(l1) && full1.includes(l2);
+}
+
+// Pour les lockers : "Naito, Saki" → last="Naito", first="Saki"
+function parseEntryName(entryName) {
+  if (!entryName) return { first: '', last: '' };
+  const parts = entryName.split(',').map(s => s.trim());
+  return parts.length >= 2
+    ? { last: parts[0], first: parts[1] }
+    : { last: entryName, first: '' };
+}
+
 function groupSearchResults(results, q) {
   // Try to merge by entry_id (same person across systems)
   const map = new Map();
@@ -962,16 +986,17 @@ function groupSearchResults(results, q) {
     if (val.mainType === 'resident') {
       const r = val.mainData;
       const entryId = r.entry_id;
-      // Find matching parking by name
+      // Find matching parking by name (strict)
       const parkings = data.parkings.filter(p =>
-        normalize((p.name_first||'')+(p.name_last||'')).includes(normalize(r.name_last||'')) ||
-        (entryId && p.entry_id === entryId));
-      // Find fitness
+        nameMatch(r.name_first, r.name_last, p.name_first, p.name_last));
+      // Find fitness (strict)
       const fitness = data.fitness_passes.filter(f =>
-        normalize((f.name_first||'')+(f.name_last||'')).includes(normalize(r.name_last||'')));
-      // Find lockers
-      const lockers = data.lockers.filter(l =>
-        normalize(l.entry_name||'').includes(normalize(r.name_last||'')));
+        nameMatch(r.name_first, r.name_last, f.name_first, f.name_last));
+      // Find lockers (strict, format "Last, First")
+      const lockers = data.lockers.filter(l => {
+        const en = parseEntryName(l.entry_name);
+        return nameMatch(r.name_first, r.name_last, en.first, en.last);
+      });
       // Short stays same room
       const shortStays = data.short_stays.filter(ss =>
         r.room_space && ss.room_space && normalize(ss.room_space).includes(normalize(r.room_space)));
@@ -1234,14 +1259,17 @@ function renderBuilding() {
           ? ((occ.name_first||'') + ' ' + (occ.name_last||'')).trim()
           : (occ.entry_name||'');
 
-        // Find accesses
+        // Find accesses (strict matching)
+        const occLast = isLong ? (occ.name_last||'') : (parseEntryName(occ.entry_name).last);
+        const occFirst = isLong ? (occ.name_first||'') : (parseEntryName(occ.entry_name).first);
         const parkings = data.parkings.filter(p =>
-          normalize((p.name_first||'')+(p.name_last||'')).includes(normalize(occ.name_last||'')) ||
-          (isLong && occ.room_space && normalize(p.alt_vehicle_info||'').includes(normalize(occ.name_last||''))));
+          nameMatch(occFirst, occLast, p.name_first, p.name_last));
         const fitness = data.fitness_passes.filter(f =>
-          normalize((f.name_first||'')+(f.name_last||'')).includes(normalize((occ.name_last||occ.entry_name||'').split(',')[0])));
-        const lockers = isLong ? data.lockers.filter(l =>
-          normalize(l.entry_name||'').includes(normalize(occ.name_last||''))) : [];
+          nameMatch(occFirst, occLast, f.name_first, f.name_last));
+        const lockers = isLong ? data.lockers.filter(l => {
+          const en = parseEntryName(l.entry_name);
+          return nameMatch(occFirst, occLast, en.first, en.last);
+        }) : [];
 
         let accessTags = '';
         if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${p.parking_space}${p.license_plate?' · '+p.license_plate:''}</span>`).join('');
@@ -1363,12 +1391,16 @@ function printBuilding() {
       allOcc.forEach((occ, idx) => {
         const isLong = val.longStay.includes(occ);
         const name = isLong ? ((occ.name_first||'')+' '+(occ.name_last||'')).trim() : (occ.entry_name||'');
+        const occLast2 = isLong ? (occ.name_last||'') : (parseEntryName(occ.entry_name).last);
+        const occFirst2 = isLong ? (occ.name_first||'') : (parseEntryName(occ.entry_name).first);
         const parkings = data.parkings.filter(p =>
-          normalize((p.name_first||'')+(p.name_last||'')).includes(normalize(occ.name_last||'')));
+          nameMatch(occFirst2, occLast2, p.name_first, p.name_last));
         const fitness = data.fitness_passes.filter(f =>
-          normalize((f.name_first||'')+(f.name_last||'')).includes(normalize((occ.name_last||occ.entry_name||'').split(',')[0])));
-        const lockers = isLong ? data.lockers.filter(l =>
-          normalize(l.entry_name||'').includes(normalize(occ.name_last||''))) : [];
+          nameMatch(occFirst2, occLast2, f.name_first, f.name_last));
+        const lockers = isLong ? data.lockers.filter(l => {
+          const en = parseEntryName(l.entry_name);
+          return nameMatch(occFirst2, occLast2, en.first, en.last);
+        }) : [];
         let tags = '';
         if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${p.parking_space}${p.license_plate?' · '+p.license_plate:''}</span>`).join('');
         if (fitness.length) tags += `<span class="tag tag-f">💪 Fitness</span>`;
