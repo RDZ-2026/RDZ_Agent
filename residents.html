@@ -1180,6 +1180,40 @@ function clearSearch() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// BÂTIMENT PHYSIQUE — détection depuis le nom de chambre
+// Bat 3 → MDE | Bat 8, Bat 10 → REGM | Pav → BARTON
+// ══════════════════════════════════════════════════════════════
+const PHYSICAL_BUILDINGS = [
+  { key: 'MDE',    label: 'MDE (Bat 3)',         order: 1,
+    test: r => /bat\s*3\b/i.test(r) },
+  { key: 'REGM8',  label: 'REGM (Bat 8)',         order: 2,
+    test: r => /bat\s*8\b/i.test(r) },
+  { key: 'REGM10', label: 'REGM (Bat 10)',        order: 3,
+    test: r => /bat\s*10\b/i.test(r) },
+  { key: 'BARTON', label: 'Barton (Pavillons)',   order: 4,
+    test: r => /pav\b/i.test(r) },
+  { key: 'OTHER',  label: 'Autres / non classés', order: 5,
+    test: () => true },
+];
+
+function getPhysicalBuilding(roomSpace) {
+  const r = (roomSpace || '').trim();
+  for (const pb of PHYSICAL_BUILDINGS) {
+    if (pb.test(r)) return pb.key;
+  }
+  return 'OTHER';
+}
+
+// Extrait le numéro de chambre pour un tri purement numérique
+function roomSortKey(roomSpace) {
+  const r = (roomSpace || '').trim();
+  // Cherche tous les groupes de chiffres → tri sur le dernier bloc significatif
+  const nums = r.match(/\d+/g) || [];
+  // Pad chaque groupe à 6 chiffres pour tri lexicographique correct
+  return nums.map(n => n.padStart(6, '0')).join('-');
+}
+
+// ══════════════════════════════════════════════════════════════
 // BUILDING VIEW
 // ══════════════════════════════════════════════════════════════
 let bldFilter = 'all';
@@ -1191,114 +1225,137 @@ function setBldSeg(btn) {
   renderBuilding();
 }
 
+// Construit un roomMap regroupé par bâtiment physique
+function buildRoomMap(residents, shortStays) {
+  // Map : physicalBldKey → Map(roomKey → {room, longStay[], shortStay[]})
+  const bldMap = new Map();
+  PHYSICAL_BUILDINGS.forEach(pb => bldMap.set(pb.key, new Map()));
+
+  if (bldSegMode !== 'shortstay') {
+    residents.forEach(r => {
+      const room = (r.room_space || '').trim();
+      const pbKey = getPhysicalBuilding(room);
+      const rm = bldMap.get(pbKey);
+      const key = room || ('_noroom_' + r.name_last);
+      if (!rm.has(key)) rm.set(key, { room, longStay: [], shortStay: [] });
+      rm.get(key).longStay.push(r);
+    });
+  }
+
+  if (bldSegMode !== 'longstay') {
+    shortStays.forEach(ss => {
+      const room = (ss.room_space || '').trim();
+      const pbKey = getPhysicalBuilding(room);
+      const rm = bldMap.get(pbKey);
+      const key = room || ('_noroom_ss_' + ss.entry_name);
+      if (!rm.has(key)) rm.set(key, { room, longStay: [], shortStay: [] });
+      rm.get(key).shortStay.push(ss);
+    });
+  }
+
+  return bldMap;
+}
+
+function buildOccupantRows(sortedRooms) {
+  let html = '';
+  sortedRooms.forEach(([key, val]) => {
+    const allOccupants = [...val.longStay, ...val.shortStay];
+    allOccupants.forEach((occ, idx) => {
+      const isLong = val.longStay.includes(occ);
+      const name = isLong
+        ? ((occ.name_first||'') + ' ' + (occ.name_last||'')).trim()
+        : (occ.entry_name||'');
+
+      const occLast  = isLong ? (occ.name_last||'')  : parseEntryName(occ.entry_name).last;
+      const occFirst = isLong ? (occ.name_first||'') : parseEntryName(occ.entry_name).first;
+      const parkings = data.parkings.filter(p => nameMatch(occFirst, occLast, p.name_first, p.name_last));
+      const fitness  = data.fitness_passes.filter(f => nameMatch(occFirst, occLast, f.name_first, f.name_last));
+      const lockers  = isLong ? data.lockers.filter(l => {
+        const en = parseEntryName(l.entry_name);
+        return nameMatch(occFirst, occLast, en.first, en.last);
+      }) : [];
+
+      let accessTags = '';
+      if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
+      if (fitness.length)  accessTags += `<span class="cell-tag tag-fitness">💪 Fitness</span>`;
+      if (lockers.length)  accessTags += lockers.map(l => `<span class="cell-tag tag-locker">🔒 ${escHtml(l.locker_number)}</span>`).join('');
+      if (isLong && occ.sublease_tenant) accessTags += `<span class="cell-tag tag-sublease">🔄 ${escHtml(occ.sublease_tenant)}</span>`;
+      if (!isLong) accessTags += `<span class="cell-tag tag-shortstay">🛎 Court séjour</span>`;
+
+      const isExpired = isLong && occ.contract_end && occ.contract_end < today();
+
+      html += `<tr>
+        ${idx===0 ? `<td class="cell-room" rowspan="${allOccupants.length}" style="border-right:2px solid var(--rdz-border)">${escHtml(val.room||'—')}</td>` : ''}
+        <td>
+          <div class="cell-name">${escHtml(name)}</div>
+          ${!isLong && occ.key_code ? `<div class="cell-sub">🔑 Code : ${escHtml(occ.key_code)}</div>` : ''}
+          ${!isLong && occ.checkin_date ? `<div class="cell-sub">📅 ${fmt(occ.checkin_date)} → ${fmt(occ.checkout_date)}</div>` : ''}
+          ${isLong && occ.room_type ? `<div class="cell-sub">${escHtml(occ.room_type)}</div>` : ''}
+        </td>
+        <td style="font-size:12px;font-weight:600">${isLong ? fmt(occ.contract_start) : (occ.checkin_date ? fmt(occ.checkin_date) : '—')}</td>
+        <td style="font-size:12px;font-weight:600;${isExpired?'color:#dc2626':''}">${isLong ? fmt(occ.contract_end) : fmt(occ.checkout_date)}</td>
+        <td>${accessTags || '<span style="color:#bbb;font-size:11px">—</span>'}</td>
+      </tr>`;
+    });
+  });
+  return html;
+}
+
 function renderBuilding() {
   bldFilter = document.getElementById('bld-filter').value;
   const el = document.getElementById('building-content');
 
-  // Group residents by building then by room
-  let buildings = ['REGM','MDE','BARTON'];
-  if (bldFilter !== 'all') buildings = [bldFilter];
+  // Tous les résidents et courts séjours (pas de filtre building Supabase ici,
+  // on re-classe par bâtiment physique depuis le nom de chambre)
+  const allResidents  = bldFilter === 'all' ? data.residents
+    : data.residents.filter(r => r.building === bldFilter);
+  const allShortStays = bldFilter === 'all' ? data.short_stays
+    : data.short_stays.filter(ss =>
+        bldFilter === 'BARTON' ? ss.building === 'BARTON' : ss.building === 'REGM_MDE');
+
+  const bldMap = buildRoomMap(allResidents, allShortStays);
 
   let html = '';
 
-  buildings.forEach(bld => {
-    // Long stay residents
-    const residents = data.residents.filter(r => r.building === bld);
-    // Short stays for this building
-    const ssBuilding = bld === 'BARTON' ? 'BARTON' : (bld === 'REGM' || bld === 'MDE') ? 'REGM_MDE' : null;
-    const shortStays = data.short_stays.filter(ss => ss.building === ssBuilding || ss.building === bld);
-
-    // Combine into rows by room
-    const roomMap = new Map();
-
-    if (bldSegMode !== 'shortstay') {
-      residents.forEach(r => {
-        const room = (r.room_space || '').trim();
-        const key = room || ('_noroom_' + r.name_last);
-        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
-        roomMap.get(key).longStay.push(r);
-      });
+  PHYSICAL_BUILDINGS.forEach(pb => {
+    // Filtre par bâtiment sélectionné
+    if (bldFilter !== 'all') {
+      const isBarton = pb.key === 'BARTON' && bldFilter === 'BARTON';
+      const isMDE    = pb.key === 'MDE'    && bldFilter === 'MDE';
+      const isREGM   = (pb.key === 'REGM8' || pb.key === 'REGM10') && bldFilter === 'REGM';
+      if (!isBarton && !isMDE && !isREGM && bldFilter !== 'all') return;
     }
 
-    if (bldSegMode !== 'longstay') {
-      shortStays.forEach(ss => {
-        const room = (ss.room_space || '').trim();
-        const key = room || ('_noroom_ss_' + ss.entry_name);
-        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
-        roomMap.get(key).shortStay.push(ss);
-      });
-    }
+    const roomMap = bldMap.get(pb.key);
+    if (!roomMap || roomMap.size === 0) return;
 
-    if (roomMap.size === 0) return;
+    // Tri par numéro de chambre
+    const sortedRooms = [...roomMap.entries()].sort((a, b) =>
+      roomSortKey(a[1].room).localeCompare(roomSortKey(b[1].room)));
 
-    // Sort rooms naturally
-    const sortedRooms = [...roomMap.entries()].sort((a, b) => naturalSort(a[0], b[0]));
-
-    const totalRows = sortedRooms.reduce((n,[,v]) => n + v.longStay.length + v.shortStay.length, 0);
+    const totalOcc = sortedRooms.reduce((n,[,v]) => n + v.longStay.length + v.shortStay.length, 0);
 
     html += `<div class="bld-table-wrap">
       <div class="bld-table-head">
-        <span class="bld-table-name">🏢 ${bld}</span>
-        <span class="bld-table-count">${totalRows} occupant${totalRows>1?'s':''} · ${sortedRooms.length} chambre${sortedRooms.length>1?'s':''}</span>
+        <span class="bld-table-name">🏢 ${pb.label}</span>
+        <span class="bld-table-count">${totalOcc} occupant${totalOcc>1?'s':''} · ${sortedRooms.length} chambre${sortedRooms.length>1?'s':''}</span>
       </div>
       <table class="bld-tbl">
         <thead><tr>
-          <th style="width:140px">Chambre</th>
+          <th style="width:160px">Chambre</th>
           <th>Occupant(s)</th>
-          <th style="width:110px">Début contrat</th>
-          <th style="width:110px">Fin contrat</th>
-          <th style="width:180px">Accès & extras</th>
+          <th style="width:100px">Début</th>
+          <th style="width:100px">Fin</th>
+          <th style="width:200px">Accès & extras</th>
         </tr></thead>
-        <tbody>`;
-
-    sortedRooms.forEach(([key, val]) => {
-      const allOccupants = [...val.longStay, ...val.shortStay];
-      allOccupants.forEach((occ, idx) => {
-        const isLong = val.longStay.includes(occ);
-        const name = isLong
-          ? ((occ.name_first||'') + ' ' + (occ.name_last||'')).trim()
-          : (occ.entry_name||'');
-
-        // Find accesses (strict matching)
-        const occLast = isLong ? (occ.name_last||'') : (parseEntryName(occ.entry_name).last);
-        const occFirst = isLong ? (occ.name_first||'') : (parseEntryName(occ.entry_name).first);
-        const parkings = data.parkings.filter(p =>
-          nameMatch(occFirst, occLast, p.name_first, p.name_last));
-        const fitness = data.fitness_passes.filter(f =>
-          nameMatch(occFirst, occLast, f.name_first, f.name_last));
-        const lockers = isLong ? data.lockers.filter(l => {
-          const en = parseEntryName(l.entry_name);
-          return nameMatch(occFirst, occLast, en.first, en.last);
-        }) : [];
-
-        let accessTags = '';
-        if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${p.parking_space}${p.license_plate?' · '+p.license_plate:''}</span>`).join('');
-        if (fitness.length) accessTags += `<span class="cell-tag tag-fitness">💪 Fitness</span>`;
-        if (lockers.length) accessTags += lockers.map(l => `<span class="cell-tag tag-locker">🔒 ${l.locker_number}</span>`).join('');
-        if (isLong && occ.sublease_tenant) accessTags += `<span class="cell-tag tag-sublease">🔄 ${occ.sublease_tenant}</span>`;
-        if (!isLong) accessTags += `<span class="cell-tag tag-shortstay">🛎 Court séjour</span>`;
-
-        const showRoom = idx === 0;
-        const rowspan = allOccupants.length;
-
-        html += `<tr>
-          ${showRoom ? `<td class="cell-room" rowspan="${rowspan}" style="border-right:2px solid var(--rdz-border)">${escHtml(val.room||'—')}</td>` : ''}
-          <td>
-            <div class="cell-name">${escHtml(name)}</div>
-            ${!isLong && occ.key_code ? `<div class="cell-sub">🔑 Code : ${escHtml(occ.key_code)}</div>` : ''}
-            ${!isLong && occ.checkin_date ? `<div class="cell-sub">📅 ${fmt(occ.checkin_date)} → ${fmt(occ.checkout_date)}</div>` : ''}
-          </td>
-          <td style="font-size:12px;font-weight:600">${isLong ? fmt(occ.contract_start) : (occ.checkin_date ? fmt(occ.checkin_date) : '—')}</td>
-          <td style="font-size:12px;font-weight:600;${isLong && occ.contract_end && occ.contract_end < today() ? 'color:#dc2626' : ''}">${isLong ? fmt(occ.contract_end) : fmt(occ.checkout_date)}</td>
-          <td>${accessTags || '<span style="color:#bbb;font-size:11px">—</span>'}</td>
-        </tr>`;
-      });
-    });
-
-    html += `</tbody></table></div>`;
+        <tbody>
+        ${buildOccupantRows(sortedRooms)}
+        </tbody>
+      </table>
+    </div>`;
   });
 
-  el.innerHTML = html || `<div class="state-msg"><div class="ico">🏢</div><p>Aucune donnée pour ce bâtiment.<br>Importez d'abord les fichiers CSV.</p></div>`;
+  el.innerHTML = html || `<div class="state-msg"><div class="ico">🏢</div><p>Aucune donnée.<br>Importez d'abord les fichiers CSV.</p></div>`;
 }
 
 function naturalSort(a, b) {
@@ -1311,8 +1368,6 @@ function naturalSort(a, b) {
 function printBuilding() {
   const bldFilter = document.getElementById('bld-filter').value;
   const ref = new Date().toLocaleDateString('fr-CH');
-  let buildings = ['REGM','MDE','BARTON'];
-  if (bldFilter !== 'all') buildings = [bldFilter];
 
   const printStyle = `
     <style>
@@ -1358,31 +1413,27 @@ function printBuilding() {
 
   let blocksHtml = '';
 
-  buildings.forEach(bld => {
-    const residents = data.residents.filter(r => r.building === bld);
-    const ssBuilding = bld === 'BARTON' ? 'BARTON' : 'REGM_MDE';
-    const shortStays = data.short_stays.filter(ss => ss.building === ssBuilding || ss.building === bld);
+  const allResidents  = bldFilter === 'all' ? data.residents
+    : data.residents.filter(r => r.building === bldFilter);
+  const allShortStays = bldFilter === 'all' ? data.short_stays
+    : data.short_stays.filter(ss =>
+        bldFilter === 'BARTON' ? ss.building === 'BARTON' : ss.building === 'REGM_MDE');
 
-    const roomMap = new Map();
-    if (bldSegMode !== 'shortstay') {
-      residents.forEach(r => {
-        const room = (r.room_space||'').trim();
-        const key = room || ('_noroom_'+r.name_last);
-        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
-        roomMap.get(key).longStay.push(r);
-      });
-    }
-    if (bldSegMode !== 'longstay') {
-      shortStays.forEach(ss => {
-        const room = (ss.room_space||'').trim();
-        const key = room || ('_noroom_ss_'+ss.entry_name);
-        if (!roomMap.has(key)) roomMap.set(key, { room, longStay: [], shortStay: [] });
-        roomMap.get(key).shortStay.push(ss);
-      });
-    }
-    if (roomMap.size === 0) return;
+  const bldMap = buildRoomMap(allResidents, allShortStays);
 
-    const sortedRooms = [...roomMap.entries()].sort((a,b) => naturalSort(a[0],b[0]));
+  PHYSICAL_BUILDINGS.forEach(pb => {
+    if (bldFilter !== 'all') {
+      const isBarton = pb.key === 'BARTON' && bldFilter === 'BARTON';
+      const isMDE    = pb.key === 'MDE'    && bldFilter === 'MDE';
+      const isREGM   = (pb.key === 'REGM8' || pb.key === 'REGM10') && bldFilter === 'REGM';
+      if (!isBarton && !isMDE && !isREGM) return;
+    }
+
+    const roomMap = bldMap.get(pb.key);
+    if (!roomMap || roomMap.size === 0) return;
+
+    const sortedRooms = [...roomMap.entries()].sort((a,b) =>
+      roomSortKey(a[1].room).localeCompare(roomSortKey(b[1].room)));
     const totalOcc = sortedRooms.reduce((n,[,v]) => n + v.longStay.length + v.shortStay.length, 0);
 
     let rows = '';
@@ -1391,20 +1442,18 @@ function printBuilding() {
       allOcc.forEach((occ, idx) => {
         const isLong = val.longStay.includes(occ);
         const name = isLong ? ((occ.name_first||'')+' '+(occ.name_last||'')).trim() : (occ.entry_name||'');
-        const occLast2 = isLong ? (occ.name_last||'') : (parseEntryName(occ.entry_name).last);
-        const occFirst2 = isLong ? (occ.name_first||'') : (parseEntryName(occ.entry_name).first);
-        const parkings = data.parkings.filter(p =>
-          nameMatch(occFirst2, occLast2, p.name_first, p.name_last));
-        const fitness = data.fitness_passes.filter(f =>
-          nameMatch(occFirst2, occLast2, f.name_first, f.name_last));
-        const lockers = isLong ? data.lockers.filter(l => {
+        const occLast2  = isLong ? (occ.name_last||'')  : parseEntryName(occ.entry_name).last;
+        const occFirst2 = isLong ? (occ.name_first||'') : parseEntryName(occ.entry_name).first;
+        const parkings = data.parkings.filter(p => nameMatch(occFirst2, occLast2, p.name_first, p.name_last));
+        const fitness  = data.fitness_passes.filter(f => nameMatch(occFirst2, occLast2, f.name_first, f.name_last));
+        const lockers  = isLong ? data.lockers.filter(l => {
           const en = parseEntryName(l.entry_name);
           return nameMatch(occFirst2, occLast2, en.first, en.last);
         }) : [];
         let tags = '';
-        if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${p.parking_space}${p.license_plate?' · '+p.license_plate:''}</span>`).join('');
-        if (fitness.length) tags += `<span class="tag tag-f">💪 Fitness</span>`;
-        if (lockers.length) tags += lockers.map(l => `<span class="tag tag-l">🔒 ${l.locker_number}</span>`).join('');
+        if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
+        if (fitness.length)  tags += `<span class="tag tag-f">💪 Fitness</span>`;
+        if (lockers.length)  tags += lockers.map(l => `<span class="tag tag-l">🔒 ${escHtml(l.locker_number)}</span>`).join('');
         if (isLong && occ.sublease_tenant) tags += `<span class="tag tag-s">🔄 ${escHtml(occ.sublease_tenant)}</span>`;
         if (!isLong) tags += `<span class="tag tag-ss">🛎 Court séjour</span>`;
 
@@ -1428,7 +1477,7 @@ function printBuilding() {
         <table><tr>
           <td style="vertical-align:bottom">
             <div class="print-title">RDZ Security Management SA</div>
-            <div class="print-subtitle">Résidents & Accès — Bâtiment ${bld}</div>
+            <div class="print-subtitle">Résidents & Accès — ${pb.label}</div>
             <div class="print-date">Date d'édition : ${ref} · ${totalOcc} occupant${totalOcc>1?'s':''} · ${sortedRooms.length} chambre${sortedRooms.length>1?'s':''}</div>
           </td>
           <td class="print-conf">Document confidentiel — usage interne</td>
@@ -1437,11 +1486,11 @@ function printBuilding() {
       </div>
       <table class="rt">
         <thead><tr>
-          <th style="width:130px">Chambre</th>
+          <th style="width:150px">Chambre</th>
           <th>Occupant(s)</th>
-          <th style="width:95px">Début</th>
-          <th style="width:95px">Fin</th>
-          <th style="width:170px">Accès & extras</th>
+          <th style="width:90px">Début</th>
+          <th style="width:90px">Fin</th>
+          <th style="width:180px">Accès & extras</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
