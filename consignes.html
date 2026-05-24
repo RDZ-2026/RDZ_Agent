@@ -102,12 +102,7 @@
     .modal-sm { max-width: 400px; }
 
     /* PRINT */
-    @media print {
-      body > * { display: none !important; }
-      .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-    }
-    .print-doc { display: none; }
+
   </style>
 </head>
 <body>
@@ -213,7 +208,7 @@
   </div>
 </div>
 
-<div class="print-doc" id="print-doc"></div>
+
 
 <script>
 // ─── SUPABASE ───────────────────────────────────────────────────────────────
@@ -550,12 +545,27 @@ function closePrint() {
   document.getElementById('modal-print').classList.remove('open');
 }
 function doPrint() {
-  document.getElementById('print-doc').innerHTML = document.getElementById('print-inner').innerHTML;
-  // Fermer la modale avant d'imprimer pour qu'elle n'apparaisse pas
-  document.getElementById('modal-print').classList.remove('open');
-  setTimeout(() => {
-    window.print();
-  }, 150);
+  const html = document.getElementById('print-inner').innerHTML;
+  const win = window.open('', '_blank', 'width=900,height=700');
+  win.document.write(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>RDZ — Consignes particulières</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { font-family: Arial, Helvetica, sans-serif; padding: 24px 32px; background: #fff; color: #1a1a1a; }
+    @media print {
+      body { padding: 10mm 12mm; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 400);
 }
 
 // ─── CLOSE MODALS ON BACKDROP CLICK ─────────────────────────────────────────
