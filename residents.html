@@ -227,6 +227,7 @@
   <div class="tabs-inner">
     <button class="tab-btn active" onclick="switchTab('search', this)">🔍 Recherche</button>
     <button class="tab-btn" onclick="switchTab('building', this)">🏢 Par bâtiment</button>
+    <button class="tab-btn" onclick="switchTab('prints', this)">🖨 Impressions</button>
     <button class="tab-btn" onclick="switchTab('import', this)">📂 Import CSV</button>
   </div>
 </div>
@@ -256,7 +257,7 @@
       <div class="search-title">Rechercher un résident ou un occupant</div>
       <div class="search-row">
         <input type="text" class="search-input" id="search-input"
-          placeholder="Nom, prénom, chambre, plaque, n° casier…"
+          placeholder="Nom, prénom, chambre, plaque, n° place parking, n° casier…"
           onkeydown="if(event.key==='Enter') doSearch()">
         <button class="search-btn" onclick="doSearch()">Rechercher</button>
         <button class="search-clear" onclick="clearSearch()">Effacer</button>
@@ -265,6 +266,7 @@
         <span class="hint-chip">Nom partiel : « dupont »</span>
         <span class="hint-chip">Chambre : « 8001 » ou « Bat 8 »</span>
         <span class="hint-chip">Plaque : « GE 123 »</span>
+        <span class="hint-chip">Place parking : « car space 03 »</span>
         <span class="hint-chip">Casier : « 110 »</span>
       </div>
     </div>
@@ -305,7 +307,75 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     TAB 3 — IMPORT CSV
+     TAB 3 — IMPRESSIONS
+══════════════════════════════════════════════════════════════ -->
+<div class="panel" id="panel-prints">
+  <div class="content">
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--rdz-black);margin-bottom:4px">Impressions spécialisées</div>
+      <div style="font-size:12px;color:var(--rdz-gray);line-height:1.6">Chaque impression s'ouvre dans une nouvelle fenêtre prête à imprimer.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+
+      <!-- BÂTIMENT -->
+      <div class="import-card">
+        <div class="import-card-title">🏢 Par bâtiment</div>
+        <div class="import-card-desc">Tableau complet trié par bâtiment physique puis par numéro de chambre. Long séjour et courts séjours fusionnés.</div>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Bâtiment</label>
+            <select class="tsel" id="print-bld-filter" style="flex:1">
+              <option value="all">Tous</option>
+              <option value="MDE">MDE (Bat 3)</option>
+              <option value="REGM8">REGM (Bat 8)</option>
+              <option value="REGM10">REGM (Bat 10)</option>
+              <option value="BARTON">Barton</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Type</label>
+            <select class="tsel" id="print-bld-seg" style="flex:1">
+              <option value="all">Tous (long + court séjour)</option>
+              <option value="longstay">Long séjour uniquement</option>
+              <option value="shortstay">Courts séjours uniquement</option>
+            </select>
+          </div>
+          <button class="print-btn" style="margin:4px 0 0;width:100%;padding:10px" onclick="printBuildingFromPanel()">🖨 Imprimer par bâtiment</button>
+        </div>
+      </div>
+
+      <!-- PARKING -->
+      <div class="import-card">
+        <div class="import-card-title">🚗 Liste des parkings</div>
+        <div class="import-card-desc">Toutes les places de parking actives, triées par numéro de place. Inclut nom du titulaire, plaque d'immatriculation et validité.</div>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Type</label>
+            <select class="tsel" id="print-parking-type" style="flex:1">
+              <option value="all">Toutes les places</option>
+              <option value="inhouse">Résidents (In-house)</option>
+              <option value="assigned">Places assignées</option>
+            </select>
+          </div>
+          <button class="print-btn" style="margin:4px 0 0;width:100%;padding:10px" onclick="printParking()">🖨 Imprimer les parkings</button>
+        </div>
+      </div>
+
+      <!-- FITNESS -->
+      <div class="import-card">
+        <div class="import-card-title">💪 Pass Fitness</div>
+        <div class="import-card-desc">Tous les pass fitness actifs, triés par bâtiment physique puis par numéro de chambre.</div>
+        <div style="margin-top:14px">
+          <button class="print-btn" style="width:100%;padding:10px" onclick="printFitness()">🖨 Imprimer les pass fitness</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB 4 — IMPORT CSV
 ══════════════════════════════════════════════════════════════ -->
 <div class="panel" id="panel-import">
   <div class="content">
@@ -893,13 +963,14 @@ function doSearch() {
     }
   });
 
-  // Search parkings (by name + license plate)
+  // Search parkings (by name + license plate + parking space number)
   data.parkings.forEach(p => {
-    const name = normalize((p.name_first || '') + ' ' + (p.name_last || ''));
+    const name  = normalize((p.name_first || '') + ' ' + (p.name_last || ''));
     const plate = normalize(p.license_plate || '');
-    const alt = normalize(p.alt_vehicle_info || '');
-    if (name.includes(q) || plate.includes(q) || alt.includes(q)) {
-      results.push({ type: 'parking', score: plate.includes(q) ? 3 : 1, data: p });
+    const space = normalize(p.parking_space || '');
+    const alt   = normalize(p.alt_vehicle_info || '');
+    if (name.includes(q) || plate.includes(q) || space.includes(q) || alt.includes(q)) {
+      results.push({ type: 'parking', score: plate.includes(q) ? 3 : space.includes(q) ? 2 : 1, data: p });
     }
   });
 
@@ -1503,6 +1574,267 @@ function printBuilding() {
   w.document.close();
   w.focus();
   setTimeout(() => { w.print(); }, 400);
+}
+
+// ══════════════════════════════════════════════════════════════
+// IMPRESSION BÂTIMENT (depuis panel Impressions)
+// ══════════════════════════════════════════════════════════════
+function printBuildingFromPanel() {
+  // Synchronise les filtres du panel vers ceux de renderBuilding puis imprime
+  const pbFilter = document.getElementById('print-bld-filter').value;
+  const pbSeg    = document.getElementById('print-bld-seg').value;
+
+  // Temporairement on remplace bldSegMode et on appelle printBuilding
+  const prevSeg = bldSegMode;
+  bldSegMode = pbSeg;
+
+  // buildRoomMap utilise bldSegMode, on passe le filtre spécifique
+  const ref = new Date().toLocaleDateString('fr-CH');
+
+  // Déterminer les blocs physiques à inclure
+  let pbKeys = PHYSICAL_BUILDINGS.map(p => p.key);
+  if (pbFilter !== 'all') pbKeys = [pbFilter];
+
+  const allResidents  = data.residents;
+  const allShortStays = data.short_stays;
+  const bldMap = buildRoomMap(allResidents, allShortStays);
+
+  const printStyle = buildPrintStyle();
+  let blocksHtml = '';
+
+  PHYSICAL_BUILDINGS.forEach(pb => {
+    if (!pbKeys.includes(pb.key)) return;
+    const roomMap = bldMap.get(pb.key);
+    if (!roomMap || roomMap.size === 0) return;
+
+    const sortedRooms = [...roomMap.entries()].sort((a,b) =>
+      roomSortKey(a[1].room).localeCompare(roomSortKey(b[1].room)));
+    const totalOcc = sortedRooms.reduce((n,[,v]) => n + v.longStay.length + v.shortStay.length, 0);
+
+    blocksHtml += `<div class="print-bld-block">
+      ${buildPrintHeader('Résidents & Accès — ' + pb.label, ref, totalOcc + ' occupant' + (totalOcc>1?'s':'') + ' · ' + sortedRooms.length + ' chambre' + (sortedRooms.length>1?'s':''))}
+      <table class="rt">
+        <thead><tr>
+          <th style="width:150px">Chambre</th><th>Occupant(s)</th>
+          <th style="width:90px">Début</th><th style="width:90px">Fin</th>
+          <th style="width:180px">Accès & extras</th>
+        </tr></thead>
+        <tbody>${buildPrintRows(sortedRooms)}</tbody>
+      </table>
+    </div>`;
+  });
+
+  bldSegMode = prevSeg;
+  openPrintWindow(printStyle, blocksHtml);
+}
+
+// ── Helpers impression partagés ────────────────────────────────
+function buildPrintStyle() {
+  return `<style>
+    * { box-sizing:border-box;margin:0;padding:0; }
+    body { font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#1a1a1a; }
+    .print-bld-block { page-break-after:always; }
+    .print-bld-block:last-child { page-break-after:avoid; }
+    .ph { margin-bottom:14px; }
+    .ph table { width:100%;border-collapse:collapse; }
+    .ph-title { font-size:15px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase; }
+    .ph-sub { font-size:12px;font-weight:700;color:#1a1a1a;margin-top:4px; }
+    .ph-date { font-size:10px;color:#6b6b6b;margin-top:2px; }
+    .ph-conf { font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em;text-align:right;vertical-align:bottom; }
+    .ph-rule { border:none;border-top:3px solid #8B1A1A;margin-bottom:14px; }
+    table.rt { width:100%;border-collapse:collapse;font-size:10.5px; }
+    table.rt th { background:#f0efed;padding:6px 10px;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6b6b6b;border-bottom:1px solid #d0ccc5;text-align:left;white-space:nowrap; }
+    table.rt thead { display:table-header-group; }
+    table.rt td { padding:7px 10px;border-bottom:1px solid #ebebeb;vertical-align:top;line-height:1.4; }
+    table.rt tr { page-break-inside:avoid; }
+    table.rt tr:last-child td { border-bottom:none; }
+    .c-room,.c-space { font-weight:700;white-space:nowrap;font-size:11px; }
+    .c-name { font-weight:600; }
+    .c-sub { font-size:9px;color:#6b6b6b;margin-top:2px; }
+    .c-date { font-size:11px;font-weight:600; }
+    .c-plate { font-size:12px;font-weight:700;color:#1e3a8a;letter-spacing:.04em; }
+    .c-exp { color:#dc2626; }
+    .tag { display:inline-block;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 5px;border-radius:2px;margin:1px 2px 1px 0;white-space:nowrap; }
+    .tag-p { background:#dbeafe;color:#1e3a8a; }
+    .tag-f { background:#dcfce7;color:#14532d; }
+    .tag-l { background:#fef9c3;color:#713f12; }
+    .tag-s { background:#ede9fe;color:#3b0764; }
+    .tag-ss { background:#fee2e2;color:#7f1d1d; }
+    .tag-assigned { background:#e0e7ff;color:#3730a3; }
+    .tag-inhouse  { background:#dbeafe;color:#1e3a8a; }
+    @media print {
+      * { -webkit-print-color-adjust:exact !important;print-color-adjust:exact !important; }
+      .print-bld-block { page-break-after:always; }
+      .print-bld-block:last-child { page-break-after:avoid; }
+      table.rt thead { display:table-header-group; }
+      table.rt tr { page-break-inside:avoid; }
+    }
+  </style>`;
+}
+
+function buildPrintHeader(subtitle, ref, info) {
+  return `<div class="ph">
+    <table><tr>
+      <td style="vertical-align:bottom">
+        <div class="ph-title">RDZ Security Management SA</div>
+        <div class="ph-sub">${subtitle}</div>
+        <div class="ph-date">Date d'édition : ${ref}${info ? ' · ' + info : ''}</div>
+      </td>
+      <td class="ph-conf">Document confidentiel — usage interne</td>
+    </tr></table>
+    <hr class="ph-rule">
+  </div>`;
+}
+
+function buildPrintRows(sortedRooms) {
+  let rows = '';
+  sortedRooms.forEach(([key, val]) => {
+    const allOcc = [...val.longStay, ...val.shortStay];
+    allOcc.forEach((occ, idx) => {
+      const isLong = val.longStay.includes(occ);
+      const name = isLong ? ((occ.name_first||'')+' '+(occ.name_last||'')).trim() : (occ.entry_name||'');
+      const occLast  = isLong ? (occ.name_last||'')  : parseEntryName(occ.entry_name).last;
+      const occFirst = isLong ? (occ.name_first||'') : parseEntryName(occ.entry_name).first;
+      const parkings = data.parkings.filter(p => nameMatch(occFirst, occLast, p.name_first, p.name_last));
+      const fitness  = data.fitness_passes.filter(f => nameMatch(occFirst, occLast, f.name_first, f.name_last));
+      const lockers  = isLong ? data.lockers.filter(l => {
+        const en = parseEntryName(l.entry_name);
+        return nameMatch(occFirst, occLast, en.first, en.last);
+      }) : [];
+      let tags = '';
+      if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
+      if (fitness.length)  tags += `<span class="tag tag-f">💪 Fitness</span>`;
+      if (lockers.length)  tags += lockers.map(l => `<span class="tag tag-l">🔒 ${escHtml(l.locker_number)}</span>`).join('');
+      if (isLong && occ.sublease_tenant) tags += `<span class="tag tag-s">🔄 ${escHtml(occ.sublease_tenant)}</span>`;
+      if (!isLong) tags += `<span class="tag tag-ss">🛎 Court séjour</span>`;
+      const isExpired = isLong && occ.contract_end && occ.contract_end < today();
+      rows += `<tr>
+        ${idx===0 ? `<td class="c-room" rowspan="${allOcc.length}" style="border-right:2px solid #d0ccc5">${escHtml(val.room||'—')}</td>` : ''}
+        <td><div class="c-name">${escHtml(name)}</div>${isLong&&occ.room_type?`<div class="c-sub">${escHtml(occ.room_type)}</div>`:''}</td>
+        <td class="c-date">${isLong?fmt(occ.contract_start):(occ.checkin_date?fmt(occ.checkin_date):'—')}</td>
+        <td class="c-date ${isExpired?'c-exp':''}">${isLong?fmt(occ.contract_end):fmt(occ.checkout_date)}</td>
+        <td>${tags||'<span style="color:#bbb;font-size:9px">—</span>'}</td>
+      </tr>`;
+    });
+  });
+  return rows;
+}
+
+function openPrintWindow(style, body) {
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">${style}</head><body>${body}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
+}
+
+// ══════════════════════════════════════════════════════════════
+// IMPRESSION PARKING — trié par numéro de place
+// ══════════════════════════════════════════════════════════════
+function printParking() {
+  const typeFilter = document.getElementById('print-parking-type').value;
+  const ref = new Date().toLocaleDateString('fr-CH');
+
+  let parkings = data.parkings;
+  if (typeFilter !== 'all') parkings = parkings.filter(p => p.parking_type === typeFilter);
+
+  // Trier par numéro de place (extraction numérique)
+  parkings = [...parkings].sort((a, b) => {
+    const ka = parkingSortKey(a.parking_space||'');
+    const kb = parkingSortKey(b.parking_space||'');
+    return ka.localeCompare(kb);
+  });
+
+  const typeLabel = typeFilter === 'all' ? 'Toutes les places' :
+                    typeFilter === 'inhouse' ? 'Résidents (In-house)' : 'Places assignées';
+
+  const rows = parkings.map(p => {
+    const name = ((p.name_first||'') + ' ' + (p.name_last||'')).trim() || '—';
+    const isExpired = p.date_end && p.date_end < today();
+    return `<tr>
+      <td class="c-space">${escHtml(p.parking_space||'—')}</td>
+      <td><span class="tag ${p.parking_type==='assigned'?'tag-assigned':'tag-inhouse'}">${p.parking_type==='assigned'?'Assignée':'In-house'}</span></td>
+      <td class="c-name">${escHtml(name)}</td>
+      <td class="c-plate">${escHtml(p.license_plate||'—')}</td>
+      <td style="font-size:10px;color:#6b6b6b">${escHtml(p.vehicle_make||'')} ${escHtml(p.vehicle_details||'')}</td>
+      <td class="c-date">${fmt(p.date_start)}</td>
+      <td class="c-date ${isExpired?'c-exp':''}">${fmt(p.date_end)}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<div class="print-bld-block">
+    ${buildPrintHeader('Liste des parkings — ' + typeLabel, ref, parkings.length + ' place' + (parkings.length>1?'s':''))}
+    <table class="rt">
+      <thead><tr>
+        <th style="width:130px">Place</th>
+        <th style="width:80px">Type</th>
+        <th>Titulaire</th>
+        <th style="width:110px">Plaque</th>
+        <th>Véhicule</th>
+        <th style="width:85px">Début</th>
+        <th style="width:85px">Fin</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+
+  openPrintWindow(buildPrintStyle(), html);
+}
+
+function parkingSortKey(space) {
+  // Ex: "Car space 03" → "car-000003", "Moto space 11" → "moto-000011"
+  const lower = space.toLowerCase();
+  const prefix = lower.startsWith('moto') ? 'moto' : 'car';
+  const nums = space.match(/\d+/g) || ['0'];
+  return prefix + '-' + nums.map(n => n.padStart(6,'0')).join('-');
+}
+
+// ══════════════════════════════════════════════════════════════
+// IMPRESSION FITNESS — trié par bâtiment physique puis chambre
+// ══════════════════════════════════════════════════════════════
+function printFitness() {
+  const ref = new Date().toLocaleDateString('fr-CH');
+
+  // Trier les pass fitness par bâtiment physique (depuis room_active) puis chambre
+  const sorted = [...data.fitness_passes].sort((a, b) => {
+    const pbA = PHYSICAL_BUILDINGS.findIndex(pb => pb.test(a.room_active||''));
+    const pbB = PHYSICAL_BUILDINGS.findIndex(pb => pb.test(b.room_active||''));
+    if (pbA !== pbB) return pbA - pbB;
+    return roomSortKey(a.room_active||'').localeCompare(roomSortKey(b.room_active||''));
+  });
+
+  const rows = sorted.map(f => {
+    const name = ((f.name_first||'') + ' ' + (f.name_last||'')).trim() || '—';
+    const isExpired = f.end_date && f.end_date < today();
+    const pb = PHYSICAL_BUILDINGS.find(pb => pb.test(f.room_active||''));
+    return `<tr>
+      <td class="c-room">${escHtml(f.room_active||'—')}</td>
+      <td style="font-size:10px;color:#6b6b6b">${pb ? pb.label : '—'}</td>
+      <td class="c-name">${escHtml(name)}</td>
+      <td style="font-size:10px;color:#6b6b6b">${escHtml(f.description||'')}</td>
+      <td class="c-date">${fmt(f.start_date)}</td>
+      <td class="c-date ${isExpired?'c-exp':''}">${fmt(f.end_date)}</td>
+      <td><span class="tag ${f.entry_status==='In Room'?'tag-f':'tag-ss'}">${escHtml(f.entry_status||'')}</span></td>
+    </tr>`;
+  }).join('');
+
+  const html = `<div class="print-bld-block">
+    ${buildPrintHeader('Pass Fitness actifs', ref, sorted.length + ' pass')}
+    <table class="rt">
+      <thead><tr>
+        <th style="width:160px">Chambre</th>
+        <th style="width:120px">Bâtiment</th>
+        <th>Titulaire</th>
+        <th>Type de pass</th>
+        <th style="width:85px">Début</th>
+        <th style="width:85px">Fin</th>
+        <th style="width:80px">Statut</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+
+  openPrintWindow(buildPrintStyle(), html);
 }
 
 // ══════════════════════════════════════════════════════════════
