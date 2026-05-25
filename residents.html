@@ -1256,13 +1256,13 @@ function clearSearch() {
 // ══════════════════════════════════════════════════════════════
 const PHYSICAL_BUILDINGS = [
   { key: 'MDE',    label: 'MDE (Bat 3)',         order: 1,
-    test: r => /bat\s*3\b/i.test(r) },
+    test: r => /bat\s*3\s*[-\s]/i.test(r) || /bat\s*3$/i.test(r) },
   { key: 'REGM8',  label: 'REGM (Bat 8)',         order: 2,
-    test: r => /bat\s*8\b/i.test(r) },
+    test: r => /bat\s*8\s*[-\s]/i.test(r) || /bat\s*8$/i.test(r) },
   { key: 'REGM10', label: 'REGM (Bat 10)',        order: 3,
-    test: r => /bat\s*10\b/i.test(r) },
+    test: r => /bat\s*10\s*[-\s]/i.test(r) || /bat\s*10$/i.test(r) },
   { key: 'BARTON', label: 'Barton (Pavillons)',   order: 4,
-    test: r => /pav\b/i.test(r) },
+    test: r => /pav/i.test(r) },
   { key: 'OTHER',  label: 'Autres / non classés', order: 5,
     test: () => true },
 ];
@@ -1276,11 +1276,14 @@ function getPhysicalBuilding(roomSpace) {
 }
 
 // Extrait le numéro de chambre pour un tri purement numérique
+// Ex: "Bat 10 - Room 10601.1" → tri sur 10601 puis .1
+// Ex: "Bat10 - Studio 10107"  → tri sur 10107
 function roomSortKey(roomSpace) {
   const r = (roomSpace || '').trim();
-  // Cherche tous les groupes de chiffres → tri sur le dernier bloc significatif
-  const nums = r.match(/\d+/g) || [];
-  // Pad chaque groupe à 6 chiffres pour tri lexicographique correct
+  // Chercher tous les groupes de chiffres après le préfixe "Bat X"
+  // On ignore le numéro du bâtiment (8, 10, 3) et on prend le numéro de chambre
+  const withoutBat = r.replace(/bat\s*\d+\s*[-\s]*/i, '');
+  const nums = withoutBat.match(/\d+/g) || [];
   return nums.map(n => n.padStart(6, '0')).join('-');
 }
 
