@@ -68,6 +68,15 @@ button,input,select,textarea{font-family:inherit;}
 .sync-dot.error{background:var(--red);}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
+.tb-home-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;background:rgba(255,255,255,.1);
+  border-radius:var(--r-xs);font-size:16px;text-decoration:none;
+  transition:background .15s;flex-shrink:0;
+}
+.tb-home-btn:hover{background:rgba(255,255,255,.22);}
+.tb-home-btn:active{background:rgba(255,255,255,.3);}
+
 /* ══ SCROLLABLE BODY ══ */
 .screen-body{flex:1;overflow-y:auto;overflow-x:hidden;}
 
@@ -277,6 +286,7 @@ button,input,select,textarea{font-family:inherit;}
     </div>
     <div class="tb-spacer"></div>
     <div class="tb-agent" id="tb-agent" onclick="promptName()">👤 —</div>
+    <a class="tb-home-btn" href="https://rdz-2026.github.io/RDZ_Agent/index.html" title="Accueil">🏠</a>
     <div class="sync-dot" id="sync-dot"></div>
   </div>
   <div class="screen-body" id="home-body">
@@ -305,6 +315,7 @@ button,input,select,textarea{font-family:inherit;}
       <div><div class="tb-brand" id="det-tb-plate">—</div><div class="tb-sub">Fiche véhicule</div></div>
     </div>
     <div class="tb-spacer"></div>
+    <a class="tb-home-btn" href="https://rdz-2026.github.io/RDZ_Agent/index.html" title="Accueil">🏠</a>
     <div class="sync-dot" id="sync-dot-det"></div>
   </div>
   <div class="screen-body" id="det-body">
