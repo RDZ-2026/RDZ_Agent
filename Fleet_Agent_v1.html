@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fleet Agent — RDZ Security Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══ TOKENS ══ */
+:root{
+  --red:#c0272d;--red-d:#a31f24;--red-l:#fdf2f2;--red-m:#f8dada;
+  --anth:#2d2d2d;--anth2:#3a3a3a;--anth3:#4a4a4a;
+  --bg:#f2f2f4;--white:#fff;
+  --border:#e2e2e6;--border2:#d0d0d6;
+  --text:#2d2d2d;--text2:#4b5563;--text3:#9ca3af;--text4:#c4c4cc;
+  --green:#16a34a;--green-l:#f0fdf4;--green-d:#15803d;
+  --orange:#ea580c;--orange-l:#fff7ed;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --yellow:#ca8a04;--yellow-l:#fefce8;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 12px rgba(0,0,0,.05);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.14);
+  --radius:14px;--radius-sm:8px;--radius-xs:5px;
+  --tab-h:64px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;}
+input,select,textarea{font-family:'DM Sans',sans-serif;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ══ APP SHELL ══ */
+#app{flex:1;display:flex;flex-direction:column;height:100%;overflow:hidden;}
+
+/* ══ TOPBAR ══ */
+.topbar{
+  background:var(--anth2);color:white;height:52px;
+  display:flex;align-items:center;padding:0 16px;gap:10px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);border-bottom:3px solid var(--red);
+  flex-shrink:0;position:relative;z-index:50;
+}
+.tb-logo{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.tb-logo-box{width:30px;height:30px;background:var(--red);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.tb-brand{font-family:'DM Mono';font-size:13px;font-weight:600;color:white;line-height:1.1;}
+.tb-sub{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;}
+.tb-spacer{flex:1;}
+.tb-sync{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;transition:background .3s;}
+.tb-sync.loading{background:var(--yellow);animation:pulse 1s infinite;}
+.tb-sync.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ══ CONTENT ══ */
+.app-content{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:calc(var(--tab-h) + 8px);}
+
+/* ══ BOTTOM TAB BAR ══ */
+.tab-bar{
+  height:var(--tab-h);background:var(--white);border-top:1px solid var(--border);
+  display:flex;align-items:center;padding:0 4px;
+  box-shadow:0 -4px 16px rgba(0,0,0,.07);flex-shrink:0;position:relative;z-index:50;
+}
+.tab-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;padding:6px 4px;border:none;background:none;border-radius:12px;
+  transition:all .15s;cursor:pointer;color:var(--text3);position:relative;
+}
+.tab-btn:active{background:var(--bg);transform:scale(.93);}
+.tab-btn.active{color:var(--red);}
+.tab-icon{font-size:20px;line-height:1;transition:transform .15s;}
+.tab-btn.active .tab-icon{transform:scale(1.15);}
+.tab-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.tab-badge{
+  position:absolute;top:4px;right:calc(50% - 22px);
+  background:var(--red);color:white;font-size:9px;font-weight:700;
+  padding:1px 5px;border-radius:10px;min-width:16px;text-align:center;display:none;
+}
+.tab-badge.visible{display:block;}
+
+/* ══ VIEWS ══ */
+.view{display:none;padding:16px;}
+.view.active{display:block;}
+.view-header{margin-bottom:14px;}
+.vh-title{font-size:17px;font-weight:700;color:var(--anth);}
+.vh-sub{font-size:12px;color:var(--text3);margin-top:2px;}
+
+/* ══ VEHICLE CARDS ══ */
+.veh-card{background:var(--white);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:12px;}
+.vc-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.vc-plate-badge{background:var(--anth);color:white;font-family:'DM Mono';font-size:14px;font-weight:700;padding:6px 12px;border-radius:var(--radius-xs);letter-spacing:.5px;flex-shrink:0;}
+.vc-model{font-size:13px;font-weight:600;color:var(--text2);}
+.vc-km{font-size:12px;color:var(--text3);font-family:'DM Mono';margin-top:2px;}
+.vc-indicators{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.indicator{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.ind-green{background:var(--green-l);color:var(--green-d);}
+.ind-orange{background:var(--orange-l);color:#9a3412;}
+.ind-red{background:var(--red-l);color:var(--red-d);}
+.ind-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.ind-green .ind-dot{background:var(--green);}
+.ind-orange .ind-dot{background:var(--orange);}
+.ind-red .ind-dot{background:var(--red);animation:pulse 1.5s infinite;}
+
+.vc-travaux{margin-bottom:10px;}
+.vc-travaux-title{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+.travaux-item{display:flex;align-items:flex-start;gap:7px;padding:6px 10px;background:var(--yellow-l);border-radius:var(--radius-xs);margin-bottom:4px;font-size:12.5px;color:var(--anth);border-left:3px solid #ca8a04;}
+
+.vc-driver{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:var(--radius-xs);font-size:12.5px;margin-bottom:10px;}
+.vc-driver-label{color:var(--text3);font-size:11px;font-weight:600;}
+.vc-driver-val{color:var(--anth);font-weight:600;}
+
+.contacts-toggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:1px solid var(--border);border-radius:var(--radius-xs);padding:8px 12px;font-size:12.5px;color:var(--text2);font-weight:500;transition:all .15s;}
+.contacts-toggle:active{background:var(--bg);}
+.contacts-toggle .ct-arrow{margin-left:auto;transition:transform .2s;font-size:11px;}
+.contacts-toggle.open .ct-arrow{transform:rotate(180deg);}
+.contacts-panel{display:none;padding-top:10px;}
+.contacts-panel.open{display:block;}
+.contact-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:6px;}
+.contact-icon{font-size:20px;flex-shrink:0;}
+.contact-info{flex:1;min-width:0;}
+.contact-name{font-size:12.5px;font-weight:700;color:var(--anth);}
+.contact-detail{font-size:11.5px;color:var(--text2);margin-top:1px;}
+.contact-type{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;}
+.btn-call{display:flex;align-items:center;gap:5px;padding:7px 12px;background:var(--green);color:white;border:none;border-radius:var(--radius-xs);font-size:11.5px;font-weight:700;flex-shrink:0;text-decoration:none;}
+.btn-call:active{background:var(--green-d);}
+
+.vc-notes{padding:9px 11px;background:#f0f9ff;border-radius:var(--radius-xs);font-size:12px;color:#1e40af;line-height:1.5;white-space:pre-wrap;border-left:3px solid var(--blue);}
+
+/* ══ FORM ══ */
+.signal-card{background:var(--white);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block;}
+.form-input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 13px;font-size:14px;color:var(--text);transition:border-color .15s;appearance:none;-webkit-appearance:none;}
+.form-input:focus{outline:none;border-color:var(--red);background:var(--white);}
+.form-textarea{min-height:90px;resize:vertical;}
+.form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+.form-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+.km-group{display:none;}
+.km-group.visible{display:block;}
+
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px;}
+.type-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 8px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;text-align:center;}
+.type-btn:active{transform:scale(.95);}
+.type-btn.selected{background:var(--red-l);border-color:var(--red);}
+.type-icon{font-size:20px;line-height:1;}
+.type-label{font-size:11px;font-weight:600;color:var(--text2);}
+.type-btn.selected .type-label{color:var(--red-d);}
+
+.submit-btn{width:100%;padding:14px;background:var(--red);color:white;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:700;margin-top:6px;transition:all .15s;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.submit-btn:active{background:var(--red-d);transform:scale(.98);}
+.submit-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+
+/* ══ SUCCESS ══ */
+.success-card{display:none;text-align:center;padding:36px 20px;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);}
+.success-card.visible{display:block;}
+.success-icon{font-size:52px;margin-bottom:14px;}
+.success-title{font-size:18px;font-weight:700;color:var(--green-d);margin-bottom:6px;}
+.success-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;}
+.success-meta{background:var(--green-l);border-radius:var(--radius-sm);padding:12px 16px;text-align:left;margin-bottom:20px;}
+.sm-row{display:flex;gap:6px;margin-bottom:4px;font-size:12.5px;}
+.sm-row:last-child{margin-bottom:0;}
+.sm-key{color:var(--text3);min-width:80px;font-weight:600;}
+.sm-val{color:var(--anth);font-weight:500;}
+.btn-new{width:100%;padding:12px;background:var(--anth);color:white;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;}
+
+/* ══ REMONTÉES ══ */
+.remontees-filter{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;scrollbar-width:none;}
+.remontees-filter::-webkit-scrollbar{display:none;}
+.filter-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 13px;background:var(--white);border:1.5px solid var(--border);border-radius:20px;font-size:11.5px;font-weight:600;color:var(--text3);cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.filter-chip.active{background:var(--red);border-color:var(--red);color:white;}
+
+.rlog-item{display:flex;align-items:flex-start;gap:12px;background:var(--white);border-radius:var(--radius-sm);padding:13px 14px;box-shadow:var(--shadow);margin-bottom:8px;border-left:3px solid var(--border2);}
+.rlog-type-icon{font-size:22px;flex-shrink:0;margin-top:2px;}
+.rlog-body{flex:1;min-width:0;}
+.rlog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:3px;}
+.rlog-label{font-size:13px;font-weight:700;color:var(--anth);}
+.rlog-date{font-size:11px;color:var(--text3);font-family:'DM Mono';flex-shrink:0;}
+.rlog-plate{font-family:'DM Mono';font-size:10.5px;font-weight:700;color:var(--white);background:var(--anth3);padding:2px 7px;border-radius:4px;display:inline-block;margin-bottom:4px;}
+.rlog-desc{font-size:12.5px;color:var(--text2);line-height:1.45;}
+.rlog-km{font-size:11px;color:var(--text3);font-family:'DM Mono';margin-top:4px;}
+
+.empty-state{text-align:center;padding:48px 20px;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-title{font-size:14px;font-weight:700;color:var(--anth);margin-bottom:4px;}
+.empty-desc{font-size:12.5px;color:var(--text3);line-height:1.5;}
+
+/* ══ TOASTS ══ */
+#toasts{position:fixed;top:62px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:9990;width:calc(100% - 32px);max-width:380px;}
+.toast{background:var(--anth);color:white;padding:10px 14px;border-radius:10px;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-lg);animation:tin .2s ease;}
+.toast.ok{background:#15803d;}.toast.err{background:#991b1b;}.toast.warn{background:#92400e;}
+.toast.out{animation:tout .2s ease forwards;}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes tout{to{opacity:0;transform:translateY(-8px)}}
+
+/* ══ LOADING ══ */
+.loading-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;}
+.loading-spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;}
+.loading-spinner.sm{width:18px;height:18px;border-width:2px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:var(--text3);}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="tb-logo">
+      <div class="tb-logo-box">🚗</div>
+      <div>
+        <div class="tb-brand">Fleet_RDZ</div>
+        <div class="tb-sub">Remontées terrain</div>
+      </div>
+    </div>
+    <div class="tb-spacer"></div>
+    <div class="tb-sync" id="tb-sync" title="Statut sync"></div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="app-content" id="app-content">
+    <div class="loading-screen" id="loading-screen">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Chargement de la flotte…</div>
+    </div>
+
+    <!-- FLOTTE -->
+    <div class="view" id="view-fleet">
+      <div class="view-header">
+        <div class="vh-title">🚗 Véhicules de patrouille</div>
+        <div class="vh-sub" id="fleet-sub">Chargement…</div>
+      </div>
+      <div id="fleet-list"></div>
+    </div>
+
+    <!-- SIGNALER -->
+    <div class="view" id="view-signal">
+      <div id="signal-form-wrap">
+        <div class="view-header">
+          <div class="vh-title">📣 Signaler</div>
+          <div class="vh-sub">Remontée terrain sur un véhicule</div>
+        </div>
+        <div class="signal-card">
+          <!-- Type -->
+          <div class="form-group">
+            <label class="form-label">Type de signalement *</label>
+            <div class="type-grid" id="type-grid"></div>
+          </div>
+          <!-- Votre nom -->
+          <div class="form-group">
+            <label class="form-label">Votre nom *</label>
+            <input type="text" class="form-input" id="signal-author" placeholder="Prénom Nom" autocomplete="name">
+          </div>
+          <!-- Véhicule -->
+          <div class="form-group">
+            <label class="form-label">Véhicule *</label>
+            <select class="form-input form-select" id="signal-vehicle">
+              <option value="">— Sélectionner un véhicule —</option>
+            </select>
+          </div>
+          <!-- Description -->
+          <div class="form-group">
+            <label class="form-label">Description *</label>
+            <textarea class="form-input form-textarea" id="signal-desc" placeholder="Décrivez précisément ce que vous avez constaté…"></textarea>
+          </div>
+          <!-- Km -->
+          <div class="form-group km-group" id="km-group">
+            <label class="form-label">Kilométrage relevé *</label>
+            <input type="number" class="form-input" id="signal-km" placeholder="Ex : 88 500">
+            <div class="form-hint">Relevez le km affiché au compteur de bord.</div>
+          </div>
+          <!-- Date -->
+          <div class="form-group">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-input" id="signal-date">
+          </div>
+          <button class="submit-btn" id="submit-btn" onclick="submitSignal()">
+            <span>📣</span> Envoyer le signalement
+          </button>
+        </div>
+      </div>
+      <!-- Succès -->
+      <div class="success-card" id="signal-success">
+        <div class="success-icon">✅</div>
+        <div class="success-title">Signalement envoyé</div>
+        <div class="success-desc">Votre remontée terrain a été enregistrée et est visible par l'administration.</div>
+        <div class="success-meta" id="success-meta"></div>
+        <button class="btn-new" onclick="resetSignalForm()">+ Nouveau signalement</button>
+      </div>
+    </div>
+
+    <!-- REMONTÉES -->
+    <div class="view" id="view-remontees">
+      <div class="view-header">
+        <div class="vh-title">📋 Remontées récentes</div>
+        <div class="vh-sub" id="remontees-sub">—</div>
+      </div>
+      <div class="remontees-filter" id="remontees-filter"></div>
+      <div id="remontees-list"></div>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-fleet" onclick="switchView('fleet')">
+      <div class="tab-icon">🚗</div>
+      <div class="tab-label">Flotte</div>
+    </button>
+    <button class="tab-btn" id="tab-signal" onclick="switchView('signal')">
+      <div class="tab-icon">📣</div>
+      <div class="tab-label">Signaler</div>
+    </button>
+    <button class="tab-btn" id="tab-remontees" onclick="switchView('remontees')">
+      <div class="tab-icon">📋</div>
+      <div class="tab-label">Remontées</div>
+      <div class="tab-badge" id="badge-remontees"></div>
+    </button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════
+const SB_URL    = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const SB_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const CACHE_KEY = 'fleet_agent_cache_v1';
+const LOCAL_SIGNALS_KEY = 'fleet_agent_signals_v1'; // IDs des signalements envoyés depuis cet appareil
+
+// Types disponibles pour l'agent (pas d'assurance, pas de flocage)
+const AGENT_EVENT_TYPES = {
+  degradation : { icon:'⚠️', label:'Dégradation',    hint:'Dommage constaté sur le véhicule' },
+  anomalie    : { icon:'🚨', label:'Anomalie tech.',   hint:'Dysfonctionnement, warning tableau de bord…' },
+  reparation  : { icon:'🛠',  label:'Réparation',      hint:'Réparation effectuée ou à signaler' },
+  km          : { icon:'🛣',  label:'Relevé km',        hint:'Relevé du kilométrage au compteur' },
+  depot       : { icon:'🔑', label:'Dépôt clés',       hint:'Dépôt des clés du véhicule' },
+  reprise     : { icon:'🔑', label:'Reprise clés',     hint:'Reprise des clés du véhicule' },
+  conducteur  : { icon:'👤', label:'Conducteur',       hint:'Prise en charge ou changement de conducteur' },
+  message     : { icon:'💬', label:'Observation',      hint:'Remarque ou information générale' },
+};
+
+// Types visibles dans l'onglet Remontées (ce que l'agent peut consulter)
+const VISIBLE_TYPES_FOR_LOG = ['degradation','anomalie','reparation','km','depot','reprise','conducteur','message','revision','pneu','rdv'];
+
+const RLOG_LABELS = {
+  degradation:'Dégradation',anomalie:'Anomalie technique',reparation:'Réparation',
+  km:'Relevé km',depot:'Dépôt clés',reprise:'Reprise clés',
+  conducteur:'Conducteur',message:'Observation',revision:'Révision',pneu:'Pneu',rdv:'RDV',
+};
+const RLOG_ICONS = {
+  degradation:'⚠️',anomalie:'🚨',reparation:'🛠',km:'🛣',depot:'🔑',reprise:'🔑',
+  conducteur:'👤',message:'💬',revision:'🔧',pneu:'🔵',rdv:'📅',
+};
+const RLOG_BORDER = {
+  degradation:'#ef4444',anomalie:'#c0272d',reparation:'#ea580c',km:'#16a34a',
+  depot:'#ca8a04',reprise:'#ca8a04',conducteur:'#3b82f6',
+  message:'#94a3b8',revision:'#f59e0b',pneu:'#3b82f6',rdv:'#16a34a',
+};
+const RLOG_BG = {
+  degradation:'#fdf2f2',anomalie:'#fdf2f2',reparation:'#fff7ed',km:'#f0fdf4',
+  depot:'#fefce8',reprise:'#fefce8',conducteur:'#eff6ff',
+  message:'#f8fafc',revision:'#fef3c7',pneu:'#eff6ff',rdv:'#f0fdf4',
+};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let vehicles = [];
+let events = [];
+let suppliers = [];
+let localSignalIds = [];   // IDs envoyés depuis cet appareil
+let remonteeFilter = 'all';
+let selectedType = '';
+let currentView = 'fleet';
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+const todayISO = () => new Date().toISOString().slice(0,10);
+function formatDate(d){if(!d)return'—';const p=d.split('-');return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:d;}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function uuid(){if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});}
+function daysSince(iso){if(!iso)return null;return Math.floor((Date.now()-new Date(iso).getTime())/86400000);}
+function daysUntil(iso){if(!iso)return null;return Math.ceil((new Date(iso).getTime()-Date.now())/86400000);}
+
+function setSyncState(state){
+  const el=document.getElementById('tb-sync');
+  el.classList.remove('loading','error');
+  if(state==='loading')el.classList.add('loading');
+  else if(state==='error')el.classList.add('error');
+}
+
+function toast(msg,type='ok',dur=3000){
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span>${type==='ok'?'✓':type==='err'?'✗':'⚠'}</span><span>${esc(msg)}</span>`;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),250);},dur);
+}
+
+// ══════════════════════════════════════════
+//  SUPABASE (anon — pas d'auth requise)
+// ══════════════════════════════════════════
+async function sbFetch(path, opts={}){
+  const headers = {
+    'apikey': SB_KEY,
+    'Content-Type': 'application/json',
+    ...opts.headers,
+  };
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {...opts, headers});
+  if(!res.ok){const t=await res.text();throw new Error(t||`HTTP ${res.status}`);}
+  const ct = res.headers.get('content-type')||'';
+  if(res.status===204||!ct.includes('json'))return null;
+  const text = await res.text();
+  if(!text||!text.trim())return null;
+  return JSON.parse(text);
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('signal-date').value = todayISO();
+  buildTypeGrid();
+  // Restore saved author name
+  const savedName = localStorage.getItem('fleet_agent_author')||'';
+  if(savedName) document.getElementById('signal-author').value = savedName;
+  // Load local signal IDs
+  try{ localSignalIds = JSON.parse(localStorage.getItem(LOCAL_SIGNALS_KEY)||'[]'); }catch(_){ localSignalIds=[]; }
+  loadData();
+});
+
+// ══════════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════════
+async function loadData(){
+  document.getElementById('loading-screen').style.display='flex';
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  setSyncState('loading');
+  try{
+    const [vData, eData, sData] = await Promise.all([
+      sbFetch('fleet_vehicles?select=*&active=eq.true&category=eq.operational&order=plate.asc'),
+      sbFetch('fleet_events?select=*&order=date.desc&limit=500'),
+      sbFetch('fleet_suppliers?select=*'),
+    ]);
+    vehicles  = vData||[];
+    events    = (eData||[]).filter(e=>VISIBLE_TYPES_FOR_LOG.includes(e.type));
+    suppliers = sData||[];
+    localStorage.setItem(CACHE_KEY, JSON.stringify({vehicles,events,suppliers,ts:Date.now()}));
+    setSyncState('ok');
+  }catch(err){
+    console.warn('Offline:', err.message);
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(raw){
+      try{
+        const c=JSON.parse(raw);
+        vehicles=c.vehicles||[];
+        events=(c.events||[]).filter(e=>VISIBLE_TYPES_FOR_LOG.includes(e.type));
+        suppliers=c.suppliers||[];
+        toast('Mode hors-ligne — données en cache','warn');
+      }catch(_){ vehicles=DEFAULT_VEHICLES; suppliers=DEFAULT_SUPPLIERS; events=[]; }
+    }else{
+      vehicles=DEFAULT_VEHICLES; suppliers=DEFAULT_SUPPLIERS; events=[];
+      toast('Mode hors-ligne — données de démonstration','warn');
+    }
+    setSyncState('error');
+  }
+  updateRemonteeBadge();
+  document.getElementById('loading-screen').style.display='none';
+  switchView(currentView);
+}
+
+function updateRemonteeBadge(){
+  const myEvts = events.filter(e=>localSignalIds.includes(e.id));
+  const badge = document.getElementById('badge-remontees');
+  if(myEvts.length>0){badge.textContent=myEvts.length>99?'99+':myEvts.length;badge.classList.add('visible');}
+  else badge.classList.remove('visible');
+}
+
+// ══════════════════════════════════════════
+//  VIEW SWITCHING
+// ══════════════════════════════════════════
+function switchView(view){
+  currentView=view;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(`view-${view}`)?.classList.add('active');
+  document.getElementById(`tab-${view}`)?.classList.add('active');
+  document.getElementById('app-content').scrollTop=0;
+  if(view==='fleet')     renderFleet();
+  if(view==='signal')    renderSignalVehicles();
+  if(view==='remontees') renderRemontees();
+}
+
+// ══════════════════════════════════════════
+//  VIEW: FLOTTE
+// ══════════════════════════════════════════
+function renderFleet(){
+  document.getElementById('fleet-sub').textContent=`${vehicles.length} véhicule${vehicles.length>1?'s':''} de patrouille`;
+  const container=document.getElementById('fleet-list');
+  if(!vehicles.length){
+    container.innerHTML=`<div class="empty-state"><div class="empty-icon">🚗</div><div class="empty-title">Aucun véhicule</div><div class="empty-desc">Aucun véhicule opérationnel trouvé.</div></div>`;
+    return;
+  }
+  container.innerHTML=vehicles.map(renderVehicleCard).join('');
+}
+
+function getRevisionStatus(vehicleId){
+  const revEvs=events.filter(e=>e.vehicle_id===vehicleId&&e.type==='revision').sort((a,b)=>b.date.localeCompare(a.date));
+  if(!revEvs.length)return{level:'red',label:'Révision inconnue',days:null};
+  const days=daysSince(revEvs[0].date);
+  if(days===null)return{level:'red',label:'Révision inconnue',days:null};
+  if(days>365)return{level:'red',label:'Révision à prévoir',days};
+  if(days>300)return{level:'orange',label:'Révision bientôt',days};
+  return{level:'green',label:'Révision OK',days};
+}
+
+function getCTStatus(v){
+  if(!v.ct_date)return null;
+  const d=daysUntil(v.ct_date);
+  if(d===null)return null;
+  if(d<0)return{level:'red',label:'CT expiré'};
+  if(d<60)return{level:'orange',label:`CT dans ${d} j.`};
+  return null;
+}
+
+function getCurrentDriver(vehicleId){
+  return events.filter(e=>e.vehicle_id===vehicleId&&e.type==='conducteur').sort((a,b)=>b.date.localeCompare(a.date))[0]?.description||'';
+}
+
+function renderVehicleCard(v){
+  const rev=getRevisionStatus(v.id);
+  const ct=getCTStatus(v);
+  const driver=getCurrentDriver(v.id);
+
+  // Indicators
+  const revClass=rev.level==='red'?'ind-red':rev.level==='orange'?'ind-orange':'ind-green';
+  let indicators=`<span class="indicator ${revClass}"><span class="ind-dot"></span>${esc(rev.label)}${rev.days?` (${rev.days} j.)`:''}</span>`;
+  if(ct){
+    const ctClass=ct.level==='red'?'ind-red':'ind-orange';
+    indicators+=`<span class="indicator ${ctClass}"><span class="ind-dot"></span>🔍 ${esc(ct.label)}</span>`;
+  }
+
+  // Travaux
+  let travauxHtml='';
+  if(v.todo&&v.todo.trim()){
+    const lines=v.todo.trim().split('\n').filter(l=>l.trim()&&l.trim()!=='—');
+    if(lines.length){
+      travauxHtml=`<div class="vc-travaux">
+        <div class="vc-travaux-title">🔧 Travaux en attente (${lines.length})</div>
+        ${lines.map(l=>`<div class="travaux-item">${esc(l.replace(/^—\s*/,''))}</div>`).join('')}
+      </div>`;
+    }
+  }
+
+  // Driver
+  const driverHtml=driver?`<div class="vc-driver">
+    <span style="font-size:16px;">👤</span>
+    <div><div class="vc-driver-label">Conducteur actuel</div><div class="vc-driver-val">${esc(driver)}</div></div>
+  </div>`:'';
+
+  // Contacts utiles
+  const garageSup=suppliers.find(s=>s.name===v.garage_name);
+  const insSup=suppliers.find(s=>s.name===v.insurance_name);
+  const contactItems=[];
+
+  if(v.garage_name){
+    const phone=garageSup?.phone||'';
+    const addr=garageSup?.address||'';
+    const notes=garageSup?.notes?garageSup.notes.split('\n')[0]:'';
+    contactItems.push(`<div class="contact-row">
+      <div class="contact-icon">🏭</div>
+      <div class="contact-info">
+        <div class="contact-type">Garage</div>
+        <div class="contact-name">${esc(v.garage_name)}</div>
+        ${addr?`<div class="contact-detail">📍 ${esc(addr)}</div>`:''}
+        ${notes?`<div class="contact-detail">⏰ ${esc(notes)}</div>`:''}
+      </div>
+      ${phone?`<a class="btn-call" href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:''}
+    </div>`);
+  }
+
+  if(v.insurance_name){
+    // Nom assureur + téléphone urgence uniquement — pas de référence police
+    const insPhone=insSup?.phone||'';
+    const insContact=insSup?.contact||'';
+    contactItems.push(`<div class="contact-row">
+      <div class="contact-icon">🔒</div>
+      <div class="contact-info">
+        <div class="contact-type">Assureur — urgence sinistre</div>
+        <div class="contact-name">${esc(v.insurance_name)}</div>
+        ${insContact?`<div class="contact-detail">${esc(insContact)}</div>`:''}
+      </div>
+      ${insPhone?`<a class="btn-call" href="tel:${esc(insPhone)}">📞 ${esc(insPhone)}</a>`:''}
+    </div>`);
+  }
+
+  const tiresNote=[];
+  if(v.tires_winter)tiresNote.push(`❄️ Hiver : ${v.tires_winter}`);
+  if(v.tires_summer)tiresNote.push(`☀️ Été : ${v.tires_summer}`);
+  if(tiresNote.length){
+    contactItems.push(`<div class="contact-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+      <div style="display:flex;align-items:center;gap:6px;"><div class="contact-icon">🔵</div><div class="contact-type">Pneus</div></div>
+      ${tiresNote.map(t=>`<div class="contact-detail" style="font-size:12px;padding-left:6px;">${esc(t)}</div>`).join('')}
+    </div>`);
+  }
+
+  const contactsHtml=contactItems.length?`
+    <button class="contacts-toggle" id="ct-toggle-${v.id}" onclick="toggleContacts('${v.id}')">
+      <span>📞</span> Contacts &amp; infos utiles
+      <span class="ct-arrow">▾</span>
+    </button>
+    <div class="contacts-panel" id="ct-panel-${v.id}">${contactItems.join('')}</div>`:'';
+
+  // Notes opérationnelles (on masque les lignes financières)
+  const opNotes=(v.notes||'').split('\n')
+    .filter(l=>l.trim()&&!l.includes('CHF')&&!/contrat|loyer|leasing/i.test(l))
+    .join('\n');
+  const notesHtml=opNotes.trim()?`<div class="vc-notes" style="margin-top:10px;">${esc(opNotes)}</div>`:'';
+
+  return `<div class="veh-card">
+    <div class="vc-head">
+      <div class="vc-plate-badge">${esc(v.plate)}</div>
+      <div>
+        <div class="vc-model">${esc(v.brand)} ${esc(v.model)}</div>
+        <div class="vc-km">📍 ${v.km_current?(v.km_current.toLocaleString('fr-CH')+' km'):'Km non renseigné'}</div>
+      </div>
+    </div>
+    <div class="vc-indicators">${indicators}</div>
+    ${driverHtml}
+    ${travauxHtml}
+    ${contactsHtml}
+    ${notesHtml}
+  </div>`;
+}
+
+function toggleContacts(id){
+  document.getElementById(`ct-toggle-${id}`)?.classList.toggle('open');
+  document.getElementById(`ct-panel-${id}`)?.classList.toggle('open');
+}
+
+// ══════════════════════════════════════════
+//  VIEW: SIGNALER
+// ══════════════════════════════════════════
+function buildTypeGrid(){
+  document.getElementById('type-grid').innerHTML=Object.entries(AGENT_EVENT_TYPES).map(([k,t])=>`
+    <button class="type-btn" id="type-${k}" onclick="selectType('${k}')">
+      <div class="type-icon">${t.icon}</div>
+      <div class="type-label">${t.label}</div>
+    </button>`).join('');
+}
+
+function selectType(type){
+  selectedType=type;
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById(`type-${type}`)?.classList.add('selected');
+  document.getElementById('km-group').classList.toggle('visible',type==='km');
+  const hint=AGENT_EVENT_TYPES[type]?.hint||'';
+  document.getElementById('signal-desc').placeholder=hint?`Ex : ${hint}…`:'Décrivez votre observation…';
+}
+
+function renderSignalVehicles(){
+  const sel=document.getElementById('signal-vehicle');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Sélectionner un véhicule —</option>';
+  vehicles.forEach(v=>{
+    const opt=document.createElement('option');
+    opt.value=v.id;
+    opt.textContent=`${v.plate} — ${v.brand} ${v.model}`;
+    if(v.id===cur)opt.selected=true;
+    sel.appendChild(opt);
+  });
+}
+
+async function submitSignal(){
+  if(!selectedType){toast('Sélectionnez un type de signalement','err');return;}
+  const author=document.getElementById('signal-author').value.trim();
+  if(!author){toast('Indiquez votre nom','err');return;}
+  const vehicleId=document.getElementById('signal-vehicle').value;
+  if(!vehicleId){toast('Sélectionnez un véhicule','err');return;}
+  const desc=document.getElementById('signal-desc').value.trim();
+  if(!desc){toast('La description est obligatoire','err');return;}
+  const kmVal=document.getElementById('signal-km').value;
+  if(selectedType==='km'&&!kmVal){toast('Renseignez le kilométrage','err');return;}
+
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true;btn.innerHTML='<span class="loading-spinner sm"></span> Envoi en cours…';
+
+  // Persist author name for convenience
+  localStorage.setItem('fleet_agent_author',author);
+
+  const payload={
+    id:uuid(),
+    vehicle_id:vehicleId,
+    date:document.getElementById('signal-date').value||todayISO(),
+    type:selectedType,
+    description:desc,
+    km:kmVal?parseInt(kmVal):null,
+    provider:'',
+    invoice:'',
+    amount:null,
+    created_by:author,
+    agent_flag:true,
+  };
+
+  try{
+    await sbFetch('fleet_events',{
+      method:'POST',
+      headers:{'Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    // Update km locally if relevant
+    if(selectedType==='km'&&payload.km){
+      const v=vehicles.find(x=>x.id===vehicleId);
+      if(v&&(!v.km_current||payload.km>v.km_current)){
+        v.km_current=payload.km;
+        try{await sbFetch(`fleet_vehicles?id=eq.${vehicleId}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({km_current:payload.km})});}catch(_){}
+      }
+    }
+    // Track locally
+    events.unshift(payload);
+    localSignalIds.unshift(payload.id);
+    localStorage.setItem(LOCAL_SIGNALS_KEY,JSON.stringify(localSignalIds.slice(0,200)));
+    updateRemonteeBadge();
+    showSignalSuccess(payload,vehicleId);
+  }catch(e){
+    toast('Erreur : '+e.message,'err',6000);
+    btn.disabled=false;
+    btn.innerHTML='<span>📣</span> Envoyer le signalement';
+  }
+}
+
+function showSignalSuccess(payload,vehicleId){
+  const v=vehicles.find(x=>x.id===vehicleId);
+  const t=AGENT_EVENT_TYPES[payload.type]||{icon:'📌',label:payload.type};
+  document.getElementById('success-meta').innerHTML=`
+    <div class="sm-row"><span class="sm-key">Véhicule</span><span class="sm-val">${esc(v?.plate||'')} — ${esc(v?.brand||'')} ${esc(v?.model||'')}</span></div>
+    <div class="sm-row"><span class="sm-key">Type</span><span class="sm-val">${t.icon} ${t.label}</span></div>
+    <div class="sm-row"><span class="sm-key">Date</span><span class="sm-val">${formatDate(payload.date)}</span></div>
+    <div class="sm-row"><span class="sm-key">Par</span><span class="sm-val">${esc(payload.created_by)}</span></div>`;
+  document.getElementById('signal-form-wrap').style.display='none';
+  document.getElementById('signal-success').classList.add('visible');
+  btn_reset();
+}
+
+function btn_reset(){
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=false;
+  btn.innerHTML='<span>📣</span> Envoyer le signalement';
+}
+
+function resetSignalForm(){
+  selectedType='';
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('signal-vehicle').value='';
+  document.getElementById('signal-desc').value='';
+  document.getElementById('signal-km').value='';
+  document.getElementById('signal-date').value=todayISO();
+  document.getElementById('km-group').classList.remove('visible');
+  document.getElementById('signal-form-wrap').style.display='';
+  document.getElementById('signal-success').classList.remove('visible');
+}
+
+// ══════════════════════════════════════════
+//  VIEW: REMONTÉES
+// ══════════════════════════════════════════
+function renderRemontees(){
+  // Affiche les signalements envoyés depuis cet appareil + les événements terrain récents (agent_flag)
+  const myEvts=events.filter(e=>localSignalIds.includes(e.id)||e.agent_flag===true||e.agent_flag==='true')
+    .sort((a,b)=>b.date.localeCompare(a.date));
+
+  document.getElementById('remontees-sub').textContent=`${myEvts.length} remontée${myEvts.length>1?'s':''} terrain`;
+
+  // Filter chips
+  let filtered=myEvts;
+  if(remonteeFilter!=='all')filtered=filtered.filter(e=>e.type===remonteeFilter);
+  const usedTypes=[...new Set(myEvts.map(e=>e.type))];
+
+  document.getElementById('remontees-filter').innerHTML=`
+    <div class="filter-chip ${remonteeFilter==='all'?'active':''}" onclick="setRemonteeFilter('all')">Toutes (${myEvts.length})</div>
+    ${usedTypes.map(t=>`<div class="filter-chip ${remonteeFilter===t?'active':''}" onclick="setRemonteeFilter('${t}')">
+      ${RLOG_ICONS[t]||'📌'} ${RLOG_LABELS[t]||t} (${myEvts.filter(e=>e.type===t).length})
+    </div>`).join('')}`;
+
+  const container=document.getElementById('remontees-list');
+  if(!filtered.length){
+    container.innerHTML=`<div class="empty-state">
+      <div class="empty-icon">${myEvts.length===0?'📋':'🔍'}</div>
+      <div class="empty-title">${myEvts.length===0?'Aucune remontée':'Aucun résultat'}</div>
+      <div class="empty-desc">${myEvts.length===0?'Les signalements envoyés depuis cet appareil apparaîtront ici.':'Aucune remontée pour ce filtre.'}</div>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML=filtered.slice(0,60).map(e=>{
+    const v=vehicles.find(x=>x.id===e.vehicle_id);
+    const icon=RLOG_ICONS[e.type]||'📌';
+    const label=RLOG_LABELS[e.type]||e.type;
+    const bg=RLOG_BG[e.type]||'#fff';
+    const border=RLOG_BORDER[e.type]||'#e2e2e6';
+    return `<div class="rlog-item" style="background:${bg};border-left-color:${border};">
+      <div class="rlog-type-icon">${icon}</div>
+      <div class="rlog-body">
+        <div class="rlog-head">
+          <div class="rlog-label">${esc(label)}</div>
+          <div class="rlog-date">${formatDate(e.date)}</div>
+        </div>
+        ${v?`<div><span class="rlog-plate">${esc(v.plate)}</span></div>`:''}
+        <div class="rlog-desc">${esc(e.description)}</div>
+        ${e.km?`<div class="rlog-km">📍 ${Number(e.km).toLocaleString('fr-CH')} km</div>`:''}
+        ${e.created_by?`<div style="font-size:10.5px;color:var(--text4);margin-top:4px;">👤 ${esc(e.created_by)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setRemonteeFilter(type){remonteeFilter=type;renderRemontees();}
+
+// ══════════════════════════════════════════
+//  FALLBACK DATA (mode hors-ligne sans cache)
+// ══════════════════════════════════════════
+const DEFAULT_VEHICLES=[
+  {id:'89df32b0-6e0e-52df-8056-6a83519f2b15',plate:'GE 134 389',brand:'Renault',model:'Zoé',category:'operational',
+   km_current:88799,ct_date:null,insurance_name:'Allianz Suisse',
+   garage_name:'Garage Renault RRG Plan-les-Ouates',
+   tires_size:'195/55R/16',tires_summer:'2 pneus dans le stock à REGM',tires_winter:'4 pneus neufs (oct. 24) — Sur véhicule',
+   driver:'',
+   todo:'— Modification sérigraphie n° Tel (Decora)\n— Pare-choc arrière\n— Rayure pare-choc avant passager\n— Feu de recul arrière',
+   notes:'Assistance Zoé 24h/24h : +41 44 834 12 01',active:true},
+  {id:'a283cdf9-000c-5ffe-baef-7351ac0fbfa4',plate:'GE 306 576',brand:'Renault',model:'Zoé',category:'operational',
+   km_current:26390,ct_date:null,insurance_name:'Zurich',
+   garage_name:'Garage Renault RRG Plan-les-Ouates',
+   tires_size:'195/55R/16',tires_summer:'4 pneus en gardiennage chez RRG',tires_winter:'Sur véhicule',
+   driver:'',todo:'— Modification sérigraphie n° Tel (Decora)',notes:'',active:true},
+];
+const DEFAULT_SUPPLIERS=[
+  {id:'sup-001',name:'Garage Renault RRG Plan-les-Ouates',type:'garage',phone:'0844 774 774',address:'Rte de Saint-Julien 180, 1228 Plan-les-Ouates',contact:'Service atelier',notes:'Lun–Ven 7h30–17h30'},
+  {id:'sup-003',name:'Allianz Suisse',type:'assurance',phone:'0800 22 33 44',contact:'Service sinistres — 24h/24'},
+  {id:'sup-004',name:'Zurich Assurances',type:'assurance',phone:'0800 80 80 80',contact:''},
+];
+</script>
+</body>
+</html>
