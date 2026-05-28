@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RouteOps Supervision — RDZ Security Management SA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2f4;--surface:#ffffff;--surface2:#f7f7f9;--surface3:#ebebee;
+  --rdz-red:#c0272d;--rdz-dark:#2d2d2d;--rdz-anthracite:#3a3a3a;
+  --accent:#c0272d;--accent-hover:#a31f24;--accent-light:#fdf2f2;
+  --green:#16a34a;--green-light:#f0fdf4;--red:#dc2626;--red-light:#fef2f2;
+  --orange:#ea580c;--orange-light:#fff7ed;--amber:#d97706;
+  --text:#2d2d2d;--text2:#4b5563;--text3:#9ca3af;
+  --border:#e2e2e6;--border2:#c8c8cd;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);
+  --radius:8px;--radius-lg:12px;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── TOP BAR ── */
+.topbar{
+  background:var(--rdz-anthracite);color:white;height:56px;
+  display:flex;align-items:center;padding:0 16px;gap:10px;
+  position:sticky;top:0;z-index:200;
+  box-shadow:0 2px 12px rgba(0,0,0,.25);
+  border-bottom:3px solid var(--rdz-red);
+}
+.logo-rdz{display:flex;align-items:center;gap:9px;flex-shrink:0;text-decoration:none;border-right:1px solid rgba(255,255,255,.12);padding-right:14px;margin-right:2px;}
+.logo-rdz-text{display:flex;flex-direction:column;line-height:1.1}
+.logo-rdz-text .app-name{font-family:var(--mono);font-size:14px;font-weight:600;color:white;letter-spacing:.3px}
+.logo-rdz-text .app-sub{font-size:9.5px;color:var(--rdz-red);font-weight:500;text-transform:uppercase;letter-spacing:.6px}
+.tb-spacer{flex:1}
+.tb-badge-sup{
+  display:flex;align-items:center;gap:7px;
+  background:rgba(192,39,45,.2);border:1px solid rgba(192,39,45,.4);
+  border-radius:8px;padding:5px 10px;
+}
+.tb-badge-sup .sup-label{font-size:11px;font-weight:600;color:#fca5a5;text-transform:uppercase;letter-spacing:.5px}
+.tb-badge-sup .sup-eye{font-size:14px}
+.tb-date{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.45);margin-left:8px}
+
+/* ── SUPERVISION BANNER ── */
+.sup-banner{
+  background:linear-gradient(135deg,#1e3a5f 0%,#2d2d2d 100%);
+  border-bottom:2px solid var(--rdz-red);
+  padding:10px 24px;
+  display:flex;align-items:center;gap:12px;
+}
+.sup-banner-icon{font-size:18px}
+.sup-banner-text{font-size:12px;color:rgba(255,255,255,.7);font-style:italic}
+.sup-banner-text strong{color:#fca5a5;font-style:normal}
+
+/* ── LAYOUT ── */
+.main{padding:20px 24px;max-width:1320px;margin:0 auto}
+
+/* ── DATE NAV ── */
+.date-nav{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:14px 18px;margin-bottom:20px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  box-shadow:var(--shadow);
+}
+.date-nav-title{font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap}
+.date-nav-controls{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.btn-nav{
+  width:32px;height:32px;border-radius:var(--radius);border:1px solid var(--border2);
+  background:var(--surface2);cursor:pointer;font-size:16px;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;
+}
+.btn-nav:hover{background:var(--accent);border-color:var(--accent);color:white}
+.date-display{
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--rdz-anthracite);
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:5px 12px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.date-display:hover{border-color:var(--accent);background:var(--accent-light)}
+.date-display.today-active{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+input[type=date]#nav-date{
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:5px 9px;font-size:13px;font-family:var(--font);color:var(--text);cursor:pointer;
+}
+input[type=date]#nav-date:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(192,39,45,.12)}
+.btn-today{
+  padding:5px 12px;border-radius:var(--radius);border:1px solid var(--accent);
+  background:var(--accent-light);color:var(--accent);cursor:pointer;
+  font-size:12px;font-weight:600;font-family:var(--font);transition:all .15s;white-space:nowrap;
+}
+.btn-today:hover{background:var(--accent);color:white}
+.date-nav-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.btn-print-all{
+  padding:7px 14px;border-radius:var(--radius);border:none;
+  background:var(--rdz-anthracite);color:white;cursor:pointer;
+  font-size:12.5px;font-weight:600;font-family:var(--font);
+  display:inline-flex;align-items:center;gap:6px;transition:all .15s;
+}
+.btn-print-all:hover{background:#1a1a1a}
+.btn-print-all:disabled{opacity:.4;cursor:not-allowed}
+.sheets-count{font-size:12px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 10px}
+
+/* ── ÉTAT VIDE ── */
+.empty-day{
+  text-align:center;padding:64px 20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow);
+}
+.empty-day .empty-icon{font-size:40px;margin-bottom:12px}
+.empty-day .empty-title{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.empty-day .empty-sub{font-size:13px;color:var(--text3)}
+
+/* ── CARDS GRILLE ── */
+.sheets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:16px}
+@media(max-width:600px){.sheets-grid{grid-template-columns:1fr}}
+
+/* ── FEUILLE CARD ── */
+.sheet-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);overflow:hidden;
+  box-shadow:var(--shadow);transition:box-shadow .15s;
+}
+.sheet-card:hover{box-shadow:var(--shadow-md)}
+.sc-head{
+  background:var(--rdz-anthracite);color:white;
+  padding:12px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  border-bottom:2px solid var(--rdz-red);
+}
+.sc-head-left{flex:1;min-width:0}
+.sc-cat{font-size:9.5px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+.sc-title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-shift{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;font-family:var(--mono)}
+.sc-head-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.sc-status{
+  font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;
+  background:rgba(22,163,74,.25);color:#86efac;
+}
+.sc-status.paused{background:rgba(234,88,12,.25);color:#fdba74}
+.btn-print-sheet{
+  padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.1);color:white;cursor:pointer;
+  font-size:11px;font-weight:500;font-family:var(--font);
+  display:inline-flex;align-items:center;gap:5px;transition:all .15s;
+  white-space:nowrap;
+}
+.btn-print-sheet:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4)}
+
+/* ── SITES PILLS ── */
+.sc-sites{display:flex;gap:5px;flex-wrap:wrap;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.site-pill{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 8px;border-radius:20px;
+  font-size:10px;font-weight:700;color:white;
+}
+.site-pill .sc{opacity:.75;font-weight:400}
+
+/* ── TABLE MISSIONS ── */
+.sc-body{padding:0}
+.missions-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.missions-tbl th{
+  background:var(--surface2);color:var(--text2);
+  padding:6px 10px;text-align:left;
+  font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;
+  border-bottom:2px solid var(--border);
+  white-space:nowrap;
+}
+.missions-tbl td{
+  padding:5px 10px;border-bottom:1px solid var(--border);vertical-align:middle
+}
+.missions-tbl tr:last-child td{border-bottom:none}
+.missions-tbl tr:nth-child(even) td{background:#fafbfd}
+.missions-tbl tr.tr-fixed td{background:#fffbeb;border-left:3px solid var(--amber)}
+.missions-tbl tr.tr-pause td{background:#f9fafb;color:var(--text3);font-style:italic}
+.missions-tbl tr.tr-alert td{background:var(--red-light);border-left:3px solid var(--red)}
+.t-time{font-family:var(--mono);font-size:11px;color:var(--text2);white-space:nowrap}
+.t-time.start{color:var(--rdz-anthracite);font-weight:600}
+.t-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;flex-shrink:0}
+.t-name{font-weight:500}
+.t-desc{font-size:10.5px;color:var(--text3);line-height:1.4}
+.t-note{font-size:10px;color:var(--orange);font-style:italic}
+.badge-fixed{
+  display:inline-block;background:#fef3c7;color:#92400e;
+  font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;
+  margin-left:4px;vertical-align:middle;
+}
+.badge-alert{
+  display:inline-block;background:var(--red-light);color:var(--red);
+  font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;
+  margin-left:4px;
+}
+
+/* ── SC FOOTER ── */
+.sc-foot{
+  padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+}
+.sc-stat{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)}
+.sc-stat strong{font-family:var(--mono);font-size:12px;color:var(--rdz-anthracite)}
+.sc-obs{
+  margin:0 14px 10px;padding:7px 10px;
+  background:#fffbeb;border:1px solid #fde68a;border-radius:6px;
+  font-size:11px;color:#78350f;line-height:1.5;
+}
+.sc-obs-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#92400e;margin-bottom:2px}
+
+/* ── CHARGEMENT / SYNC ── */
+.sync-bar{
+  display:flex;align-items:center;gap:8px;padding:7px 18px;
+  background:#eff6ff;border-bottom:1px solid #bfdbfe;
+  font-size:12px;color:#1e40af;
+}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#93c5fd;flex-shrink:0;transition:background .3s}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.error{background:var(--red)}
+.sync-dot.loading{background:#93c5fd;animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── PRINT ── */
+@media print{
+  .topbar,.sup-banner,.date-nav,.sync-bar,.no-print{display:none!important}
+  .main{padding:0}
+  .sheet-card{box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+  .sheets-grid{display:block}
+  .sheet-card+.sheet-card{margin-top:16px}
+  @page{margin:1cm;size:A4}
+}
+
+/* ── RWD ── */
+@media(max-width:640px){
+  .main{padding:12px}
+  .date-nav{padding:10px 12px;gap:8px}
+  .sheets-grid{gap:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- SYNC BAR -->
+<div id="sync-bar" class="sync-bar" style="display:none">
+  <div id="sync-dot" class="sync-dot loading"></div>
+  <span id="sync-label">Chargement des données depuis Supabase…</span>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <a class="logo-rdz" href="https://rdz-2026.github.io/routeops/RDZ_index.html" title="Retour à la suite RDZ">
+    <div class="logo-rdz-text">
+      <span class="app-name">RouteOps</span>
+      <span class="app-sub">Supervision</span>
+    </div>
+  </a>
+  <div class="tb-spacer"></div>
+  <div class="tb-badge-sup">
+    <span class="sup-eye">👁</span>
+    <span class="sup-label">Lecture seule</span>
+  </div>
+  <div class="tb-date" id="tb-date"></div>
+</div>
+
+<!-- SUPERVISION BANNER -->
+<div class="sup-banner">
+  <span class="sup-banner-icon">📋</span>
+  <span class="sup-banner-text"><strong>Mode Supervision</strong> — Consultation des feuilles de route · Aucune modification possible</span>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- DATE NAVIGATION -->
+  <div class="date-nav">
+    <span class="date-nav-title">Journée :</span>
+    <div class="date-nav-controls">
+      <button class="btn-nav" onclick="changeDay(-7)" title="Semaine précédente">«</button>
+      <button class="btn-nav" onclick="changeDay(-1)" title="Jour précédent">‹</button>
+      <div class="date-display" id="date-display" onclick="toggleDatePicker()"></div>
+      <input type="date" id="nav-date" style="display:none" onchange="onDatePicked()">
+      <button class="btn-nav" onclick="changeDay(1)" title="Jour suivant">›</button>
+      <button class="btn-nav" onclick="changeDay(7)" title="Semaine suivante">»</button>
+      <button class="btn-today" onclick="goToday()">Aujourd'hui</button>
+      <span class="sheets-count" id="sheets-count">0 feuille</span>
+    </div>
+    <div class="date-nav-actions">
+      <button class="btn-print-all no-print" id="btn-print-all" onclick="printJournee()" disabled>
+        ⎙ Imprimer la journée
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENU JOURNÉE -->
+  <div id="jour-cards" class="sheets-grid"></div>
+  <div id="jour-empty" class="empty-day" style="display:none">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">Aucune feuille de route pour cette date</div>
+    <div class="empty-sub">Utilisez les flèches de navigation pour explorer d'autres journées.</div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIG SUPABASE (lecture seule — clé anon)
+// ═══════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://trdhtlcenmjlcvzuplid.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU'
+
+// ═══════════════════════════════════════════════════
+// STATE — même structure que RouteOps
+// ═══════════════════════════════════════════════════
+let S = {
+  sites: [], missions: [], sheets: [], travel: {}, ganttSectors: null
+}
+
+let currentDate = todayStr()
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function todayStr(){ return new Date().toISOString().slice(0,10) }
+
+function tMin(t){
+  if(!t||!t.includes(':')) return null
+  const[h,m]=t.split(':').map(Number)
+  return h*60+m
+}
+function minToT(m){
+  m=((m%1440)+1440)%1440
+  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')
+}
+function fmtDate(ds){
+  if(!ds) return ''
+  const d=new Date(ds+'T12:00')
+  return d.toLocaleDateString('fr-CH',{weekday:'long',year:'numeric',month:'long',day:'numeric'})
+}
+function fmtDateShort(ds){
+  if(!ds) return ''
+  const d=new Date(ds+'T12:00')
+  return d.toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})
+}
+function getMission(id){ return S.missions.find(m=>m.id===id) }
+function getSite(id){ return S.sites.find(s=>s.id===id) }
+function getTravelTime(a,b){
+  if(!a||!b||a===b) return 0
+  return S.travel[a]?.[b]??S.travel[b]?.[a]??15
+}
+function getInstancesForDate(date){
+  return S.sheets.filter(s=>!s.isTemplate&&s.date===date)
+}
+
+// ═══════════════════════════════════════════════════
+// CALCUL HORAIRES (identique RouteOps)
+// ═══════════════════════════════════════════════════
+function calcSheetTimes(sh){
+  let cur=tMin(sh.startTime)||0
+  let lastSite=null
+  return sh.tasks.map(task=>{
+    const m=getMission(task.mId)
+    if(!m) return {...task,startTime:'',endTime:'',travelMin:0,alert:false}
+    let travel=0,alert=false
+    if(task.fixedStart){
+      let ft=tMin(task.fixedStart)
+      if(ft!==null){
+        if(ft<cur-120) ft+=1440
+        if(ft<cur){alert=true}
+        else{cur=ft}
+      }
+    } else {
+      if(lastSite&&m.siteId&&lastSite!==m.siteId){
+        travel=getTravelTime(lastSite,m.siteId)
+        cur+=travel
+      }
+    }
+    const st=minToT(cur)
+    const[dh,dm]=(m.duree||'00:00').split(':').map(Number)
+    cur+=dh*60+dm
+    const et=minToT(cur)
+    if(m.siteId) lastSite=m.siteId
+    return {...task,startTime:st,endTime:et,travelMin:travel,alert}
+  })
+}
+
+// ═══════════════════════════════════════════════════
+// CHARGEMENT DONNÉES
+// ═══════════════════════════════════════════════════
+function loadState(){
+  try{
+    const d=localStorage.getItem('routeops_v6')
+    if(d){
+      const p=JSON.parse(d)
+      if(Array.isArray(p.sites)&&p.sites.length)        S.sites=p.sites
+      if(Array.isArray(p.missions)&&p.missions.length)  S.missions=p.missions
+      if(Array.isArray(p.sheets))                        S.sheets=p.sheets
+      if(p.travel&&typeof p.travel==='object')           S.travel=p.travel
+    }
+  }catch(e){ console.warn('loadState:',e) }
+}
+
+function loadFromDB(){
+  const h={'apikey':SUPABASE_ANON,'Authorization':'Bearer '+SUPABASE_ANON}
+  const base=SUPABASE_URL+'/rest/v1'
+  setSyncState('loading')
+  document.getElementById('sync-bar').style.display='flex'
+
+  Promise.all([
+    fetch(base+'/sites?active=eq.true&order=name',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/missions?active=eq.true',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/sheets?active=eq.true',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/travel?select=*',{headers:h}).then(r=>r.json()).catch(()=>[]),
+  ]).then(([sitesR,missionsR,sheetsR,travelR])=>{
+    if(Array.isArray(sitesR)&&sitesR.length){
+      S.sites=sitesR.map(r=>({
+        id:r.id,name:r.name,code:r.code,color:r.color,
+        note:r.note||'',minSem:r.min_sem||0,minWE:r.min_we||0,secteur:r.secteur||''
+      }))
+    }
+    if(Array.isArray(missionsR)&&missionsR.length){
+      S.missions=missionsR.map(r=>({
+        id:r.id,name:r.name,code:r.code||'',siteId:r.site_id,
+        type:r.type||'',duree:r.duree||'00:30',
+        fixed:r.fixed||false,desc:r.description||'',
+        cs:r.cs||'',cw:r.cw||'',
+        timeStart:r.time_start||'',timeEnd:r.time_end||'',color:r.color||''
+      }))
+    }
+    if(Array.isArray(sheetsR)){
+      S.sheets=sheetsR.map(r=>({
+        id:r.id,name:r.name,cat:r.cat,
+        isTemplate:r.is_template,date:r.date,
+        startTime:r.start_time,endTime:r.end_time||'',endService:r.end_time||'',
+        days:r.days||'lun-ven',status:r.status||'actif',
+        tasks:Array.isArray(r.tasks)?r.tasks:[],note:r.note||'',observations:r.observations||''
+      }))
+    }
+    if(Array.isArray(travelR)){
+      S.travel={}
+      travelR.forEach(t=>{
+        if(!S.travel[t.site_a]) S.travel[t.site_a]={}
+        S.travel[t.site_a][t.site_b]=t.minutes
+      })
+    }
+    localStorage.setItem('routeops_v6',JSON.stringify(S))
+    setSyncState('ok')
+    setTimeout(()=>{ document.getElementById('sync-bar').style.display='none' },2500)
+    buildJournee()
+  }).catch(err=>{
+    console.error('loadFromDB:',err)
+    setSyncState('error')
+    buildJournee()
+  })
+}
+
+function setSyncState(state){
+  const dot=document.getElementById('sync-dot')
+  const lbl=document.getElementById('sync-label')
+  if(state==='loading'){
+    dot.className='sync-dot loading'
+    lbl.textContent='Chargement des données depuis Supabase…'
+  } else if(state==='ok'){
+    dot.className='sync-dot ok'
+    lbl.textContent='Données synchronisées ✓'
+  } else {
+    dot.className='sync-dot error'
+    lbl.textContent='Impossible de synchroniser — affichage des données locales'
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION DATE
+// ═══════════════════════════════════════════════════
+function changeDay(delta){
+  const d=new Date(currentDate+'T12:00')
+  d.setDate(d.getDate()+delta)
+  currentDate=d.toISOString().slice(0,10)
+  buildJournee()
+}
+function goToday(){
+  currentDate=todayStr()
+  buildJournee()
+}
+function toggleDatePicker(){
+  const inp=document.getElementById('nav-date')
+  inp.style.display=inp.style.display==='none'?'':'none'
+  if(inp.style.display!=='none'){
+    inp.value=currentDate
+    inp.focus()
+  }
+}
+function onDatePicked(){
+  const v=document.getElementById('nav-date').value
+  if(v){ currentDate=v }
+  document.getElementById('nav-date').style.display='none'
+  buildJournee()
+}
+
+// ═══════════════════════════════════════════════════
+// RENDU JOURNÉE
+// ═══════════════════════════════════════════════════
+function buildJournee(){
+  // Mise à jour date display
+  const display=document.getElementById('date-display')
+  display.textContent=fmtDateShort(currentDate)
+  display.classList.toggle('today-active', currentDate===todayStr())
+
+  const sheets=getInstancesForDate(currentDate)
+
+  // Compteur
+  const cnt=document.getElementById('sheets-count')
+  cnt.textContent=sheets.length===0?'Aucune feuille':sheets.length===1?'1 feuille':`${sheets.length} feuilles`
+
+  // Bouton imprimer tout
+  document.getElementById('btn-print-all').disabled=sheets.length===0
+
+  const cardsEl=document.getElementById('jour-cards')
+  const emptyEl=document.getElementById('jour-empty')
+
+  if(sheets.length===0){
+    cardsEl.innerHTML=''
+    emptyEl.style.display='block'
+    return
+  }
+  emptyEl.style.display='none'
+  cardsEl.innerHTML=sheets.map(sh=>renderSheetCard(sh)).join('')
+}
+
+function renderSheetCard(sh){
+  const calc=calcSheetTimes(sh)
+  const catL={
+    'patrouille-semaine':'Patrouille · Semaine',
+    'patrouille-we':'Patrouille · WE',
+    'mdp-semaine':'MDP · Semaine',
+    'mdp-we':'MDP · WE',
+    'regm-semaine':'REGM · Semaine',
+    'regm-we':'REGM · WE',
+    'special':'Spécial'
+  }[sh.cat]||sh.cat
+
+  // Sites couverts avec nb passages
+  const siteCount={}
+  calc.forEach(r=>{
+    const m=getMission(r.mId)
+    if(m?.siteId) siteCount[m.siteId]=(siteCount[m.siteId]||0)+1
+  })
+  const sitePills=Object.entries(siteCount).map(([sid,n])=>{
+    const s=getSite(sid)
+    if(!s) return ''
+    return `<span class="site-pill" style="background:${s.color}">${s.code}<span class="sc"> ×${n}</span></span>`
+  }).join('')
+
+  // Fin de service
+  const lastEnd=calc.filter(r=>r.endTime).pop()?.endTime||'—'
+  const endService=sh.endService||lastEnd
+
+  // Durée totale
+  const totalMin=calc.reduce((a,r)=>{
+    const m=getMission(r.mId)
+    if(!m) return a
+    const[dh,dm]=(m.duree||'00:00').split(':').map(Number)
+    return a+dh*60+dm
+  },0)
+  const h=Math.floor(totalMin/60),mn=totalMin%60
+
+  // Statut
+  const statusHtml=sh.status==='actif'
+    ?'<span class="sc-status">● Actif</span>'
+    :'<span class="sc-status paused">● Suspendu</span>'
+
+  // Lignes missions
+  const rows=calc.map(r=>{
+    const m=getMission(r.mId)
+    if(!m) return ''
+    const site=getSite(m.siteId)
+    const cls=r.alert?'tr-alert':r.fixedStart?'tr-fixed':(m.type==='autre'?'tr-pause':'')
+    const fixedBadge=r.fixedStart&&!r.alert?'<span class="badge-fixed">🔒 Fixe</span>':''
+    const alertBadge=r.alert?'<span class="badge-alert">⚠ Impossible</span>':''
+    const dotHtml=site?`<span class="t-dot" style="background:${site.color}"></span>`:''
+    const descHtml=m.desc?`<div class="t-desc">${m.desc}</div>`:''
+    const noteHtml=r.note?`<div class="t-note">↳ ${r.note}</div>`:''
+    return `<tr class="${cls}">
+      <td><span class="t-time start">${r.startTime}</span></td>
+      <td><span class="t-time">${r.endTime}</span></td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--text3)">${m.duree}</td>
+      <td>
+        ${dotHtml}<span class="t-name">${m.name}</span>${fixedBadge}${alertBadge}
+        ${descHtml}${noteHtml}
+      </td>
+      <td style="font-family:var(--mono);font-size:10.5px;color:var(--text3)">${m.code||'—'}</td>
+    </tr>`
+  }).join('')
+
+  // Observations
+  const obsHtml=sh.observations?`
+    <div class="sc-obs">
+      <div class="sc-obs-label">📌 Consignes</div>
+      ${sh.observations.replace(/\n/g,'<br>')}
+    </div>`
+  :''
+
+  return `<div class="sheet-card">
+    <div class="sc-head">
+      <div class="sc-head-left">
+        <div class="sc-cat">${catL}</div>
+        <div class="sc-title">${sh.name}</div>
+        <div class="sc-shift">⏱ ${sh.startTime} → ${endService}</div>
+      </div>
+      <div class="sc-head-right">
+        ${statusHtml}
+        <button class="btn-print-sheet no-print" onclick="printSheet('${sh.id}')">⎙ Imprimer</button>
+      </div>
+    </div>
+    ${sitePills?`<div class="sc-sites">${sitePills}</div>`:''}
+    <div class="sc-body">
+      <table class="missions-tbl">
+        <thead><tr>
+          <th style="width:46px">Début</th>
+          <th style="width:40px">Fin</th>
+          <th style="width:38px">Durée</th>
+          <th>Mission</th>
+          <th style="width:58px">Code GT</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    ${obsHtml}
+    <div class="sc-foot">
+      <div class="sc-stat">Missions&nbsp;<strong>${calc.length}</strong></div>
+      <div class="sc-stat">Travail&nbsp;<strong>${h}h${String(mn).padStart(2,'0')}</strong></div>
+      <div class="sc-stat">FDS&nbsp;<strong>${endService}</strong></div>
+      ${sh.note?`<div class="sc-stat" style="margin-left:auto;font-style:italic;color:var(--text3);font-size:11px">${sh.note}</div>`:''}
+    </div>
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════
+// IMPRESSION — identique à RouteOps (même rendu PDF)
+// ═══════════════════════════════════════════════════
+function printSheet(id){
+  const sh=S.sheets.find(s=>s.id===id)
+  if(!sh) return
+  printSheets([sh],sh.date||currentDate)
+}
+
+function printJournee(){
+  const sheets=getInstancesForDate(currentDate)
+  if(!sheets.length){ alert('Aucune feuille pour cette date.'); return }
+  printSheets(sheets,currentDate)
+}
+
+function printSheets(sheets,date){
+  const w=window.open('','_blank')
+  const BACK_IMG='data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAyADIDASIAAhEBAxEB/8QAGwAAAwEBAQEBAAAAAAAAAAAABAUGAwIBAAf/xAArEAACAQMDAwQCAgMAAAAAAAABAgMABBEFEiExQVEiYXEGExSBoTJCkf/EABYBAQEBAAAAAAAAAAAAAAAAAAEAAv/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8A+wOJuDblLR2jtrS7kYqN+yLJYgccZ9xQvUtPuZrKZbqCR/MC5QxdWZgeuN2BVNxFoF9Pt2kjuZ7VViKsHU4PJ55461B0PUpLTQ7Ozn3Sy29wksbk5JKsox65IJ/NKFexkPWnHY/3RBjBcAD5eaodVRrTWrG8h3Ky3Ee4dRuBB/z6isi/vbhtYhijkK28Uofyz1Zj1J+lcbXdQjuNWsY1BCiZS5B6kgj+2lJXFqnDRTrdWFwGAyPUA/yaTtR5j1LQ7p+Ftp7lgfbOxR+SKb9bvJtPijmiIJDBSCOmQf6KrNQ1DT9TsWjjuVW5UHMLHBJ5xj0P/P8A2nLq00W6t1u7dBcW0u4xtjDD5hQf9Y4T2/NRH1C3jO2S5hjbuGkANZl7CbPUbu0dSrxSsp4+pOP5BrJ/x8arA4DZUMeeMjHPbinmJTdRXEMJVluA5BByAB07HuKGajaSRa7p1rJKrzB4/wDUrDK5Q/8AdWl/RaBa+JXVusLI0ysoKt+VGFbI71tHh1zFezQ+bCrx72LKQS2MAZPGOa5tL/ZMjXMCOIkVYAzY8rcAnnsM5/ijXhnWoNHLzWNlOSylJn2LuLYwuD7e9Ml6PV0nnDxS5hkQ7lK45U9D61tLVUurW3mgbIkiV1PIwQCKpb+81C8uRci0drYqFEeMFiO3P0rjNq0c1xZvFBKq2cqkb8/lbrtH6ij9EuL7ULKC8ureHTllXekXmbmIPGG2jj9nrXV7DaW8UUd5pAjQ8mVmXLe569D/AGKbr3X6Z1Gu7KW8kW6tG/2ZQFkyOD6H2NayS2tjFJPdW9lFG2yOSVVAY9cAn2yfypFa67AbsRtC4gZgolyMZ9R3pS1TTxJq8VrDIsFq0gklPUJHnJAHrWlsW1S7vYk1G/tkluHijkhJcIOAVyc//kVVXjJNeSbIpB5bZy42heO30oC8mls76BbTiK4WRSjkYyOevH7rVvtWnupVlMUTTICFkaMFgD6Z60DJpF+txJOtm8byAb1OfXpXLS7SZ7aFnjeGMtyGUjBqzm0CJRuV1Fcd3GaDIAqSPXoPamuxHIjWxfzBGpXcDkdjWMb60urWqZLW6t4Y0jW2uZFCmTqC2O2ep70A66Y47a3mSSMmRN0iRkZOMjqRyOMelKPhl7NqO4y28gNrCjxnIBxuPUepBP1H0ql1G5mvdSR1MnKlMqxGMYI/wCOtMF7ql0sscg06J5EIKsQxx2+v8VB1SyS4vJNPSKZ4ldWhknOAeM7SOM+/wDdavp2qQSH/wAi2W4Gd0bSmMD2IwfoaAMK3bO5JBPBbT5JDd/M7fjpXfQ7LW4YZ2uJrPyidnkiibLH3bJJP/R++/NaGrarbGV7e0unt5vLBJiAJAPXdkd+KLnvbqe2eFr6W3LRhW8kAZ+Qyv/Z'; 
+
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Feuilles du ${date}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:12px;background:white;color:#1a1a2e}
+    @page{margin:8mm 10mm;size:A4}
+    @media print{body{background:white}.no-print{display:none}}
+    .page-recto{width:100%;min-height:297mm;padding:0;page-break-after:always;position:relative;background:white}
+    .page-recto:last-of-type{page-break-after:auto}
+    .fh{display:flex;align-items:stretch;margin-bottom:9px;border-radius:7px;overflow:hidden;border:1.5px solid #1a2e45}
+    .fh-stripe{width:7px;background:#c0272d}
+    .fh-left{background:#1a2e45!important;color:white!important;padding:11px 15px;flex:1}
+    .fh-cat{font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+    .fh-title{font-size:17px;font-weight:700;letter-spacing:-.3px;color:white!important}
+    .fh-shift{font-size:10px;color:rgba(255,255,255,.65);margin-top:4px;font-family:monospace}
+    .fh-right{background:#dbeafe!important;padding:11px 15px;text-align:right;min-width:150px;display:flex;flex-direction:column;justify-content:center;gap:3px}
+    .fh-date{font-size:13px;font-weight:700;color:#1e3a5f!important}
+    .fh-rdz{font-size:10px;color:#c0272d!important;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    .sites-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+    .site-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;color:white!important;border:1px solid rgba(0,0,0,.15)}
+    .site-pill .cnt{opacity:.8;font-weight:400}
+    .missions-table{width:100%;border-collapse:collapse;font-size:11px;border:1.5px solid #1a2e45}
+    .missions-table th{background:#1a2e45!important;color:white!important;padding:7px 8px;text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-right:1px solid rgba(255,255,255,.15)}
+    .missions-table th:last-child{border-right:none}
+    .missions-table td{padding:5px 8px;border-bottom:1px solid #c8d0e0;border-right:1px solid #e4e8f0;vertical-align:middle}
+    .missions-table td:last-child{border-right:none}
+    .missions-table tbody tr:nth-child(even) td{background:#f0f4ff!important}
+    .missions-table tbody tr:nth-child(odd) td{background:#ffffff}
+    .missions-table tr.tr-fixed td{background:#fef3c7!important;border-left:4px solid #d97706!important}
+    .missions-table tr.tr-pause td{background:#f3f4f6!important;color:#6b7280;font-style:italic}
+    .missions-table tr.tr-alert td{background:#fee2e2!important;border-left:4px solid #dc2626!important}
+    .time-cell{font-family:'Courier New',monospace;font-weight:700;font-size:11px;color:#1a2e45;white-space:nowrap}
+    .time-end{font-family:'Courier New',monospace;font-size:11px;color:#374151;white-space:nowrap}
+    .site-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;vertical-align:middle}
+    .badge-fixed{background:#d97706!important;color:white!important;font-size:8px;padding:2px 5px;border-radius:3px;font-weight:700;vertical-align:middle}
+    .badge-alert{background:#dc2626!important;color:white!important;font-size:8px;padding:2px 5px;border-radius:3px;font-weight:700;vertical-align:middle}
+    .totaux{display:flex;gap:8px;margin-top:7px;font-size:10px}
+    .tot-item{flex:1;background:#dbeafe!important;border:1px solid #93c5fd;border-radius:5px;padding:5px 9px;display:flex;justify-content:space-between;align-items:center}
+    .tot-label{color:#1e3a5f;font-weight:500}
+    .tot-val{font-family:monospace;font-weight:700;color:#1a2e45;font-size:12px}
+    .ops-note{display:flex;gap:7px;margin-top:8px;font-size:10px}
+    .ops-note .bloc{flex:1;background:#f1f5ff!important;border:1px solid #c7d7f8;border-left:3px solid #2563eb;border-radius:5px;padding:6px 9px}
+    .ops-note .bloc strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#1d4ed8!important;margin-bottom:2px}
+    .sigs-row{display:flex;gap:10px;margin-top:10px}
+    .sig-box{flex:1;border:1.5px solid #93c5fd;border-radius:6px;padding:8px 10px;min-height:56px;background:#f8fbff!important}
+    .sig-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1d4ed8!important;margin-bottom:4px}
+    .sig-line{border-bottom:1.5px solid #93c5fd;margin-top:18px}
+  </style></head><body>`)
+
+  sheets.forEach(sh=>{
+    const calc=calcSheetTimes(sh)
+    const catL={'patrouille-semaine':'Patrouille · Semaine','patrouille-we':'Patrouille · WE','mdp-semaine':'MDP · Semaine','mdp-we':'MDP · WE','regm-semaine':'REGM · Semaine','regm-we':'REGM · WE','special':'Spécial'}[sh.cat]||sh.cat
+    const lastMissionEnd=calc.filter(r=>r.endTime).pop()?.endTime||'—'
+    const endService=sh.endService||lastMissionEnd
+    const totalMin=calc.reduce((a,r)=>{const m=getMission(r.mId);if(!m)return a;const[dh,dm]=(m.duree||'00:00').split(':').map(Number);return a+dh*60+dm},0)
+    const h2=Math.floor(totalMin/60),mn2=totalMin%60
+
+    const siteCount={}
+    calc.forEach(r=>{const m=getMission(r.mId);if(m?.siteId)siteCount[m.siteId]=(siteCount[m.siteId]||0)+1})
+    const sitesPills=Object.entries(siteCount).map(([sid,n])=>{const s=getSite(sid);if(!s)return '';return `<span class="site-pill" style="background:${s.color}">${s.code} <span class="cnt">×${n}</span></span>`}).join('')
+
+    const rows=calc.map(r=>{
+      const m=getMission(r.mId);if(!m)return ''
+      const cls=r.alert?'tr-alert':r.fixedStart?'tr-fixed':(m.type==='autre'?'tr-pause':'')
+      const badge=r.alert?'<span class="badge-alert">⚠ IMPOSSIBLE</span>':r.fixedStart?'<span class="badge-fixed">🔒</span>':''
+      const descHtml=m.desc?m.desc.replace(/\n/g,'<br>'):''
+      const noteHtml=r.note?`<em style="color:#999"> · ${r.note}</em>`:''
+      return `<tr class="${cls}">
+        <td style="font-family:'Courier New',monospace;font-size:10px;color:#555;white-space:nowrap">${m.code||'—'}</td>
+        <td style="font-weight:600;font-size:11px">${m.name}${badge?'<br>'+badge:''}</td>
+        <td class="time-cell">${r.startTime}</td>
+        <td class="time-end">${r.endTime}</td>
+        <td style="font-family:'Courier New',monospace;font-size:10px;color:#888;white-space:nowrap">${m.duree}</td>
+        <td style="font-size:10px;color:#333;line-height:1.45">${descHtml}${noteHtml}</td>
+        <td style="border-left:2px dashed #c0c8dc"></td>
+        <td style="border-left:2px dashed #c0c8dc"></td>
+        <td style="border-left:2px dashed #c0c8dc;text-align:center"></td>
+      </tr>`
+    }).join('')
+
+    w.document.write(`
+    <div class="page-recto">
+      <div class="fh">
+        <div class="fh-stripe"></div>
+        <div class="fh-left">
+          <div class="fh-cat">${catL}</div>
+          <div class="fh-title">${sh.name}</div>
+          <div class="fh-shift">⏱ ${sh.startTime} → ${endService}</div>
+        </div>
+        <div class="fh-right">
+          <div class="fh-date">${fmtDate(date)}</div>
+          <div class="fh-rdz">RDZ Security Mgmt SA</div>
+        </div>
+      </div>
+      <div class="sites-row">${sitesPills}</div>
+      <table class="missions-table">
+        <thead><tr>
+          <th style="width:52px">Code</th>
+          <th style="width:130px">Mission</th>
+          <th style="width:46px">Début</th>
+          <th style="width:40px">Fin</th>
+          <th style="width:38px">Durée</th>
+          <th>Description / Instructions</th>
+          <th style="width:50px;border-left:1px dashed #b0b8d0">H. Arrivée</th>
+          <th style="width:50px;border-left:1px dashed #b0b8d0">H. Départ</th>
+          <th style="width:28px;border-left:1px dashed #b0b8d0;text-align:center">Init.</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="totaux">
+        <div class="tot-item"><span class="tot-label">Missions</span><span class="tot-val">${calc.length}</span></div>
+        <div class="tot-item"><span class="tot-label">Travail effectif</span><span class="tot-val">${h2}h${String(mn2).padStart(2,'0')}</span></div>
+        <div class="tot-item"><span class="tot-label">Début service</span><span class="tot-val">${sh.startTime}</span></div>
+        <div class="tot-item"><span class="tot-label">Fin de service</span><span class="tot-val">${endService}</span></div>
+      </div>
+      <div class="ops-note">
+        <div class="bloc"><strong>PDS — Prise de service</strong>Saisie Guardteck obligatoire · Vérification véhicule et matériel</div>
+        <div class="bloc"><strong>FDS — Fin de service</strong>Retour clés / badge / GSM · Véhicule propre et garé</div>
+        <div class="bloc"><strong>🔒 Horaires fixes</strong>Non modifiables sur le terrain — contacter le REGM si problème</div>
+      </div>
+      ${sh.observations?`<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:7px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#92400e;margin-bottom:3px">📌 Observations / Consignes</div><div style="font-size:11px;color:#1a1a2e;line-height:1.5">${sh.observations.replace(/\n/g,'<br>')}</div></div>`:''}
+      <div class="sigs-row">
+        <div class="sig-box"><div class="sig-label">Agent</div><div class="sig-line"></div></div>
+        <div class="sig-box"><div class="sig-label">Contrôleur</div><div class="sig-line"></div></div>
+        <div class="sig-box" style="flex:2"><div class="sig-label">Observations terrain</div><div style="height:40px;border-bottom:1px solid #c0c4d0;margin-top:4px"></div></div>
+      </div>
+    </div>`)
+  })
+
+  w.document.write('</body></html>')
+  w.document.close()
+  setTimeout(()=>w.print(),600)
+}
+
+// ═══════════════════════════════════════════════════
+// TOPBAR DATE
+// ═══════════════════════════════════════════════════
+function updateTopbarDate(){
+  document.getElementById('tb-date').textContent=
+    new Date().toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'short',year:'numeric'})
+}
+
+// ═══════════════════════════════════════════════════
+// DÉMARRAGE
+// ═══════════════════════════════════════════════════
+loadState()
+buildJournee()
+updateTopbarDate()
+
+// Sync Supabase en arrière-plan
+loadFromDB()
+
+// Rafraîchissement auto toutes les 5 minutes
+setInterval(loadFromDB, 5*60*1000)
+</script>
+</body>
+</html>
