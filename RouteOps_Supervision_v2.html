@@ -54,6 +54,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
   margin-left:8px;
 }
 .btn-home:hover{background:var(--rdz-red);border-color:var(--rdz-red)}
+.btn-refresh{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 13px;border-radius:var(--radius);
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  color:white;font-size:12.5px;font-weight:600;cursor:pointer;
+  font-family:var(--font);transition:all .15s;white-space:nowrap;
+  margin-left:6px;
+}
+.btn-refresh:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4)}
+.btn-refresh.spinning #refresh-icon,.btn-refresh.spinning .refresh-icon{display:inline-block;animation:spin .7s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @media(max-width:480px){.btn-home-label{display:none}}
 
 /* ── SUPERVISION BANNER ── */
@@ -267,6 +278,9 @@ input[type=date]#nav-date:focus{outline:none;border-color:var(--accent);box-shad
   <a class="btn-home" href="https://rdz-2026.github.io/RDZ_Agent/index.html" title="Retour à l'accueil RDZ">
     🏠 <span class="btn-home-label">Accueil</span>
   </a>
+  <button class="btn-refresh" onclick="loadFromDB()" title="Recharger les données depuis Supabase" id="btn-refresh">
+    <span id="refresh-icon">↻</span> <span class="btn-home-label">Actualiser</span>
+  </button>
   <div class="tb-spacer"></div>
   <div class="tb-badge-sup">
     <span class="sup-eye">👁</span>
@@ -417,6 +431,9 @@ function loadFromDB(){
   const base=SUPABASE_URL+'/rest/v1'
   setSyncState('loading')
   document.getElementById('sync-bar').style.display='flex'
+  // Spinner sur le bouton actualiser
+  const btnR=document.getElementById('btn-refresh')
+  if(btnR){btnR.classList.add('spinning');btnR.disabled=true}
 
   Promise.all([
     fetch(base+'/sites?active=eq.true&order=name',{headers:h}).then(r=>r.json()).catch(()=>[]),
@@ -458,10 +475,23 @@ function loadFromDB(){
     localStorage.setItem('routeops_v6',JSON.stringify(S))
     setSyncState('ok')
     setTimeout(()=>{ document.getElementById('sync-bar').style.display='none' },2500)
+    if(btnR){btnR.classList.remove('spinning');btnR.disabled=false}
     buildJournee()
   }).catch(err=>{
     console.error('loadFromDB:',err)
     setSyncState('error')
+    if(btnR){btnR.classList.remove('spinning');btnR.disabled=false}
+    // Fallback : charger les données locales si disponibles
+    try{
+      const d=localStorage.getItem('routeops_v6')
+      if(d){
+        const p=JSON.parse(d)
+        if(Array.isArray(p.sites)&&p.sites.length)       S.sites=p.sites
+        if(Array.isArray(p.missions)&&p.missions.length) S.missions=p.missions
+        if(Array.isArray(p.sheets))                      S.sheets=p.sheets
+        if(p.travel&&typeof p.travel==='object')         S.travel=p.travel
+      }
+    }catch(e){}
     buildJournee()
   })
 }
@@ -488,11 +518,11 @@ function changeDay(delta){
   const d=new Date(currentDate+'T12:00')
   d.setDate(d.getDate()+delta)
   currentDate=d.toISOString().slice(0,10)
-  buildJournee()
+  loadFromDB()
 }
 function goToday(){
   currentDate=todayStr()
-  buildJournee()
+  loadFromDB()
 }
 function toggleDatePicker(){
   const inp=document.getElementById('nav-date')
@@ -506,7 +536,7 @@ function onDatePicked(){
   const v=document.getElementById('nav-date').value
   if(v){ currentDate=v }
   document.getElementById('nav-date').style.display='none'
-  buildJournee()
+  loadFromDB()
 }
 
 // ═══════════════════════════════════════════════════
@@ -818,15 +848,13 @@ function updateTopbarDate(){
 // ═══════════════════════════════════════════════════
 // DÉMARRAGE
 // ═══════════════════════════════════════════════════
-loadState()
-buildJournee()
 updateTopbarDate()
 
-// Sync Supabase en arrière-plan
+// Chargement Supabase EN PREMIER (fallback localStorage si hors ligne)
 loadFromDB()
 
-// Rafraîchissement auto toutes les 5 minutes
-setInterval(loadFromDB, 5*60*1000)
+// Rafraîchissement auto toutes les 2 minutes
+setInterval(loadFromDB, 2*60*1000)
 </script>
 </body>
 </html>
