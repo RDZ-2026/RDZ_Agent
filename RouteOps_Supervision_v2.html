@@ -402,11 +402,12 @@ function calcSheetTimes(sh){
       }
     }
     const st=minToT(cur)
-    const[dh,dm]=(m.duree||'00:00').split(':').map(Number)
+    const dureeUsed=task.overrideDuree||m.duree||'00:00'
+    const[dh,dm]=dureeUsed.split(':').map(Number)
     cur+=dh*60+dm
     const et=minToT(cur)
     if(m.siteId) lastSite=m.siteId
-    return {...task,startTime:st,endTime:et,travelMin:travel,alert}
+    return {...task,startTime:st,endTime:et,travelMin:travel,alert,dureeUsed}
   })
 }
 
@@ -601,7 +602,7 @@ function renderSheetCard(sh){
   const totalMin=calc.reduce((a,r)=>{
     const m=getMission(r.mId)
     if(!m) return a
-    const[dh,dm]=(m.duree||'00:00').split(':').map(Number)
+    const[dh,dm]=(r.dureeUsed||m.duree||'00:00').split(':').map(Number)
     return a+dh*60+dm
   },0)
   const h=Math.floor(totalMin/60),mn=totalMin%60
@@ -755,7 +756,7 @@ function printSheets(sheets,date){
     const catL={'patrouille-semaine':'Patrouille · Semaine','patrouille-we':'Patrouille · WE','mdp-semaine':'MDP · Semaine','mdp-we':'MDP · WE','regm-semaine':'REGM · Semaine','regm-we':'REGM · WE','special':'Spécial'}[sh.cat]||sh.cat
     const lastMissionEnd=calc.filter(r=>r.endTime).pop()?.endTime||'—'
     const endService=sh.endService||lastMissionEnd
-    const totalMin=calc.reduce((a,r)=>{const m=getMission(r.mId);if(!m)return a;const[dh,dm]=(m.duree||'00:00').split(':').map(Number);return a+dh*60+dm},0)
+    const totalMin=calc.reduce((a,r)=>{const m=getMission(r.mId);if(!m)return a;const[dh,dm]=(r.dureeUsed||m.duree||'00:00').split(':').map(Number);return a+dh*60+dm},0)
     const h2=Math.floor(totalMin/60),mn2=totalMin%60
 
     const siteCount={}
@@ -773,7 +774,7 @@ function printSheets(sheets,date){
         <td style="font-weight:600;font-size:11px">${m.name}${badge?'<br>'+badge:''}</td>
         <td class="time-cell">${r.startTime}</td>
         <td class="time-end">${r.endTime}</td>
-        <td style="font-family:'Courier New',monospace;font-size:10px;color:#888;white-space:nowrap">${m.duree}</td>
+        <td style="font-family:'Courier New',monospace;font-size:10px;color:${r.overrideDuree?'#ea580c':'#888'};white-space:nowrap${r.overrideDuree?';font-weight:700':''}">${r.dureeUsed||m.duree}</td>
         <td style="font-size:10px;color:#333;line-height:1.45">${descHtml}${noteHtml}</td>
         <td style="border-left:2px dashed #c0c8dc"></td>
         <td style="border-left:2px dashed #c0c8dc"></td>
