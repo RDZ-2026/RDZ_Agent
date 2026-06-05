@@ -595,10 +595,6 @@ function initials(first, last) {
   return (f + l).toUpperCase() || '?';
 }
 
-function normalize(s) {
-  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-}
-
 function switchTab(tab, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1021,19 +1017,93 @@ function doSearch() {
   renderSearchResults(grouped);
 }
 
-// ── MATCHING ROBUSTE ──────────────────────────────────────────
-// Retourne true seulement si le nom matche de façon stricte :
-// les deux tokens (prénom + nom) doivent chacun être trouvés,
-// et le nom seul doit faire au moins 3 caractères.
-function nameMatch(first1, last1, first2, last2) {
+// ══════════════════════════════════════════════════════════════
+// LIAISON RÉSIDENTS ↔ ACCÈS — stratégie à 3 niveaux
+// ══════════════════════════════════════════════════════════════
+
+// Normalise une chaîne : minuscules, sans accents, sans espaces multiples
+function normalize(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ');
+}
+
+// Normalise un numéro de chambre pour comparaison : retire espaces, tirets, points, casse
+function normRoom(r) {
+  return normalize(r||'').replace(/[\s\-\.]/g,'');
+}
+
+// Niveau 1 — liaison par chambre (fitness, locker ont room_active)
+function matchByRoom(room_space, room_active) {
+  if (!room_space || !room_active) return false;
+  const r1 = normRoom(room_space);
+  const r2 = normRoom(room_active);
+  return r1.length >= 4 && r1 === r2;
+}
+
+// Niveau 2 — liaison par nom exact normalisé (prénom + nom dans les deux sens)
+// Gère : casse différente, accents, prénom composé tronqué
+function matchByNameExact(first1, last1, first2, last2) {
   const f1 = normalize(first1||''), l1 = normalize(last1||'');
   const f2 = normalize(first2||''), l2 = normalize(last2||'');
-  if (!l1 || l1.length < 3 || !l2 || l2.length < 3) return false;
-  // Correspondance exacte prénom+nom dans les deux sens
-  const full1 = (f1 + ' ' + l1).trim();
-  const full2 = (f2 + ' ' + l2).trim();
-  // Les noms doivent se croiser : last1 dans full2 ET last2 dans full1
-  return full2.includes(l1) && full1.includes(l2);
+  if (l1.length < 3 || l2.length < 3) return false;
+  // Correspondance croisée prénom+nom (gère prénom/nom inversés entre systèmes)
+  const full1 = (f1+' '+l1).trim();
+  const full2 = (f2+' '+l2).trim();
+  return (full2.includes(l1) && full1.includes(l2)) ||
+         (full2.includes(f1) && f1.length >= 3 && full1.includes(f2) && f2.length >= 3);
+}
+
+// Niveau 3 — fallback par nom partiel (nom seul, min 4 caractères)
+// Utilisé uniquement si niveaux 1 et 2 ne donnent rien
+function matchByNamePartial(last1, last2) {
+  const l1 = normalize(last1||'');
+  const l2 = normalize(last2||'');
+  if (l1.length < 4 || l2.length < 4) return false;
+  return l1 === l2;
+}
+
+// Trouve les accès d'un résident avec la stratégie à 3 niveaux
+function findAccesses(resident) {
+  const room = resident.room_space || '';
+
+  // FITNESS — niveau 1 : chambre, niveau 2 : nom exact, niveau 3 : nom partiel
+  let fitness = data.fitness_passes.filter(f => matchByRoom(room, f.room_active));
+  if (!fitness.length) {
+    fitness = data.fitness_passes.filter(f =>
+      matchByNameExact(resident.name_first, resident.name_last, f.name_first, f.name_last));
+  }
+  if (!fitness.length) {
+    fitness = data.fitness_passes.filter(f =>
+      matchByNamePartial(resident.name_last, f.name_last));
+  }
+
+  // LOCKERS — niveau 1 : chambre, niveau 2 : nom exact, niveau 3 : nom partiel
+  let lockers = data.lockers.filter(l => matchByRoom(room, l.room_active));
+  if (!lockers.length) {
+    lockers = data.lockers.filter(l => {
+      const en = parseEntryName(l.entry_name);
+      return matchByNameExact(resident.name_first, resident.name_last, en.first, en.last);
+    });
+  }
+  if (!lockers.length) {
+    lockers = data.lockers.filter(l => {
+      const en = parseEntryName(l.entry_name);
+      return matchByNamePartial(resident.name_last, en.last);
+    });
+  }
+
+  // PARKING — pas de room_active, uniquement niveaux 2 et 3
+  let parkings = data.parkings.filter(p =>
+    matchByNameExact(resident.name_first, resident.name_last, p.name_first, p.name_last));
+  if (!parkings.length) {
+    parkings = data.parkings.filter(p =>
+      matchByNamePartial(resident.name_last, p.name_last));
+  }
+
+  // COURTS SÉJOURS — par chambre uniquement
+  const shortStays = room ? data.short_stays.filter(ss =>
+    ss.room_space && normRoom(ss.room_space) === normRoom(room)) : [];
+
+  return { parkings, fitness, lockers, shortStays };
 }
 
 // Pour les lockers : "Naito, Saki" → last="Naito", first="Saki"
@@ -1045,16 +1115,18 @@ function parseEntryName(entryName) {
     : { last: entryName, first: '' };
 }
 
+// nameMatch conservé pour compatibilité avec buildOccupantRows et printBuilding
+function nameMatch(first1, last1, first2, last2) {
+  return matchByNameExact(first1, last1, first2, last2);
+}
+
 function groupSearchResults(results, q) {
-  // Try to merge by entry_id (same person across systems)
   const map = new Map();
 
   results.forEach(r => {
     let key = '';
-    let entryId = '';
-
     if (r.type === 'resident') {
-      key = 'res_' + (r.data.building||'') + '_' + (r.data.room_space||'') + '_' + (r.data.name_last||'');
+      key = 'res_' + (r.data.room_space||'') + '_' + (r.data.name_last||'');
     } else if (r.type === 'shortstay') {
       key = 'ss_' + r.data.entry_id + '_' + r.data.room_space;
     } else if (r.type === 'parking') {
@@ -1064,32 +1136,15 @@ function groupSearchResults(results, q) {
     } else if (r.type === 'locker') {
       key = 'lk_' + r.data.entry_id + '_' + r.data.locker_number;
     }
-
     if (!map.has(key)) map.set(key, { mainType: r.type, mainData: r.data, extras: [] });
     else map.get(key).extras.push(r);
   });
 
-  // Enrich residents with their accesses
   const final = [];
-  map.forEach((val, key) => {
+  map.forEach((val) => {
     if (val.mainType === 'resident') {
-      const r = val.mainData;
-      const entryId = r.entry_id;
-      // Find matching parking by name (strict)
-      const parkings = data.parkings.filter(p =>
-        nameMatch(r.name_first, r.name_last, p.name_first, p.name_last));
-      // Find fitness (strict)
-      const fitness = data.fitness_passes.filter(f =>
-        nameMatch(r.name_first, r.name_last, f.name_first, f.name_last));
-      // Find lockers (strict, format "Last, First")
-      const lockers = data.lockers.filter(l => {
-        const en = parseEntryName(l.entry_name);
-        return nameMatch(r.name_first, r.name_last, en.first, en.last);
-      });
-      // Short stays same room
-      const shortStays = data.short_stays.filter(ss =>
-        r.room_space && ss.room_space && normalize(ss.room_space).includes(normalize(r.room_space)));
-      final.push({ type: 'resident', data: r, parkings, fitness, lockers, shortStays });
+      const accesses = findAccesses(val.mainData);
+      final.push({ type: 'resident', data: val.mainData, ...accesses });
     } else {
       final.push({ type: val.mainType, data: val.mainData });
     }
@@ -1360,12 +1415,15 @@ function buildOccupantRows(sortedRooms) {
 
       const occLast  = isLong ? (occ.name_last||'')  : parseEntryName(occ.entry_name).last;
       const occFirst = isLong ? (occ.name_first||'') : parseEntryName(occ.entry_name).first;
-      const parkings = data.parkings.filter(p => nameMatch(occFirst, occLast, p.name_first, p.name_last));
-      const fitness  = data.fitness_passes.filter(f => nameMatch(occFirst, occLast, f.name_first, f.name_last));
-      const lockers  = isLong ? data.lockers.filter(l => {
-        const en = parseEntryName(l.entry_name);
-        return nameMatch(occFirst, occLast, en.first, en.last);
-      }) : [];
+      let parkings, fitness, lockers;
+      if (isLong) {
+        const acc = findAccesses(occ);
+        parkings = acc.parkings; fitness = acc.fitness; lockers = acc.lockers;
+      } else {
+        parkings = data.parkings.filter(p => matchByNameExact(occFirst, occLast, p.name_first, p.name_last));
+        fitness  = data.fitness_passes.filter(f => matchByNameExact(occFirst, occLast, f.name_first, f.name_last));
+        lockers  = [];
+      }
 
       let accessTags = '';
       if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
@@ -1716,12 +1774,15 @@ function buildPrintRows(sortedRooms) {
       const name = isLong ? ((occ.name_first||'')+' '+(occ.name_last||'')).trim() : (occ.entry_name||'');
       const occLast  = isLong ? (occ.name_last||'')  : parseEntryName(occ.entry_name).last;
       const occFirst = isLong ? (occ.name_first||'') : parseEntryName(occ.entry_name).first;
-      const parkings = data.parkings.filter(p => nameMatch(occFirst, occLast, p.name_first, p.name_last));
-      const fitness  = data.fitness_passes.filter(f => nameMatch(occFirst, occLast, f.name_first, f.name_last));
-      const lockers  = isLong ? data.lockers.filter(l => {
-        const en = parseEntryName(l.entry_name);
-        return nameMatch(occFirst, occLast, en.first, en.last);
-      }) : [];
+      let parkings, fitness, lockers;
+      if (isLong) {
+        const acc = findAccesses(occ);
+        parkings = acc.parkings; fitness = acc.fitness; lockers = acc.lockers;
+      } else {
+        parkings = data.parkings.filter(p => matchByNameExact(occFirst, occLast, p.name_first, p.name_last));
+        fitness  = data.fitness_passes.filter(f => matchByNameExact(occFirst, occLast, f.name_first, f.name_last));
+        lockers  = [];
+      }
       let tags = '';
       if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
       if (fitness.length)  tags += `<span class="tag tag-f">💪 Fitness</span>`;
