@@ -1126,7 +1126,8 @@ function groupSearchResults(results, q) {
   results.forEach(r => {
     let key = '';
     if (r.type === 'resident') {
-      key = 'res_' + (r.data.room_space||'') + '_' + (r.data.name_last||'');
+      // Clé de déduplication : chambre + nom (même résident peut avoir N lignes pour N contrats)
+      key = 'res_' + normalize(r.data.room_space||'') + '_' + normalize(r.data.name_last||'') + '_' + normalize(r.data.name_first||'');
     } else if (r.type === 'shortstay') {
       key = 'ss_' + r.data.entry_id + '_' + r.data.room_space;
     } else if (r.type === 'parking') {
@@ -1136,17 +1137,29 @@ function groupSearchResults(results, q) {
     } else if (r.type === 'locker') {
       key = 'lk_' + r.data.entry_id + '_' + r.data.locker_number;
     }
-    if (!map.has(key)) map.set(key, { mainType: r.type, mainData: r.data, extras: [] });
-    else map.get(key).extras.push(r);
+    if (!map.has(key)) map.set(key, { mainType: r.type, rows: [r.data] });
+    else if (r.type === 'resident') map.get(key).rows.push(r.data);
   });
 
   const final = [];
   map.forEach((val) => {
     if (val.mainType === 'resident') {
-      const accesses = findAccesses(val.mainData);
-      final.push({ type: 'resident', data: val.mainData, ...accesses });
+      // Prendre la ligne avec le contrat le plus récent comme données principales
+      const rows = val.rows.sort((a, b) => (b.contract_start||'').localeCompare(a.contract_start||''));
+      const primary = rows[0];
+
+      // Agréger toutes les sous-locations distinctes de toutes les lignes
+      const subleases = [...new Set(
+        rows.map(r => (r.sublease_tenant||'').trim()).filter(s => s.length > 0)
+      )];
+
+      // Construire un objet résident enrichi
+      const enriched = { ...primary, sublease_tenants_all: subleases };
+
+      const accesses = findAccesses(primary);
+      final.push({ type: 'resident', data: enriched, ...accesses });
     } else {
-      final.push({ type: val.mainType, data: val.mainData });
+      final.push({ type: val.mainType, data: val.rows[0] });
     }
   });
 
@@ -1181,7 +1194,7 @@ function buildResultCard(item, q) {
     const hasParking = item.parkings && item.parkings.length > 0;
     const hasFitness = item.fitness && item.fitness.length > 0;
     const hasLocker = item.lockers && item.lockers.length > 0;
-    const hasSublease = r.sublease_tenant;
+    const hasSublease = (r.sublease_tenants_all && r.sublease_tenants_all.length > 0) || r.sublease_tenant;
     const hasShortStay = item.shortStays && item.shortStays.length > 0;
 
     let parkingHtml = '', fitnessHtml = '', lockerHtml = '';
@@ -1230,7 +1243,9 @@ function buildResultCard(item, q) {
             ${hasParking ? '<span class="rbadge rbadge-parking">🚗 Parking</span>' : ''}
             ${hasFitness ? '<span class="rbadge rbadge-fitness">💪 Fitness</span>' : ''}
             ${hasLocker ? '<span class="rbadge rbadge-locker">🔒 Locker</span>' : ''}
-            ${hasSublease ? `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(r.sublease_tenant)}</span>` : ''}
+            ${hasSublease ? (r.sublease_tenants_all && r.sublease_tenants_all.length > 0
+              ? r.sublease_tenants_all.map(s => `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(s)}</span>`).join('')
+              : `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(r.sublease_tenant)}</span>`) : ''}
             ${hasShortStay ? '<span class="rbadge rbadge-shortstay">🛎 Court séjour en cours</span>' : ''}
           </div>
         </div>
@@ -1379,7 +1394,29 @@ function buildRoomMap(residents, shortStays) {
   PHYSICAL_BUILDINGS.forEach(pb => bldMap.set(pb.key, new Map()));
 
   if (bldSegMode !== 'shortstay') {
+    // Dédupliquer : un résident peut avoir N lignes (N contrats successifs)
+    // On garde la ligne avec le contrat le plus récent et on agrège les sous-locations
+    const residentMap = new Map();
     residents.forEach(r => {
+      const room = (r.room_space || '').trim();
+      const key = normalize(room) + '_' + normalize(r.name_last||'') + '_' + normalize(r.name_first||'');
+      if (!residentMap.has(key)) {
+        residentMap.set(key, { ...r, sublease_tenants_all: (r.sublease_tenant||'').trim() ? [(r.sublease_tenant||'').trim()] : [] });
+      } else {
+        const existing = residentMap.get(key);
+        // Garder le contrat le plus récent
+        if ((r.contract_start||'') > (existing.contract_start||'')) {
+          residentMap.set(key, { ...r, sublease_tenants_all: existing.sublease_tenants_all });
+        }
+        // Agréger la sous-location si nouvelle
+        const sub = (r.sublease_tenant||'').trim();
+        if (sub && !existing.sublease_tenants_all.includes(sub)) {
+          existing.sublease_tenants_all.push(sub);
+        }
+      }
+    });
+
+    residentMap.forEach(r => {
       const room = (r.room_space || '').trim();
       const pbKey = getPhysicalBuilding(room);
       const rm = bldMap.get(pbKey);
@@ -1429,7 +1466,10 @@ function buildOccupantRows(sortedRooms) {
       if (parkings.length) accessTags += parkings.map(p => `<span class="cell-tag tag-parking">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
       if (fitness.length)  accessTags += `<span class="cell-tag tag-fitness">💪 Fitness</span>`;
       if (lockers.length)  accessTags += lockers.map(l => `<span class="cell-tag tag-locker">🔒 ${escHtml(l.locker_number)}</span>`).join('');
-      if (isLong && occ.sublease_tenant) accessTags += `<span class="cell-tag tag-sublease">🔄 ${escHtml(occ.sublease_tenant)}</span>`;
+      if (isLong && (occ.sublease_tenants_all?.length || occ.sublease_tenant)) {
+        const subs = occ.sublease_tenants_all?.length ? occ.sublease_tenants_all : [occ.sublease_tenant];
+        accessTags += subs.map(s => `<span class="cell-tag tag-sublease">🔄 ${escHtml(s)}</span>`).join('');
+      }
       if (!isLong) accessTags += `<span class="cell-tag tag-shortstay">🛎 Court séjour</span>`;
 
       const isExpired = isLong && occ.contract_end && occ.contract_end < today();
@@ -1604,7 +1644,10 @@ function printBuilding() {
         if (parkings.length) tags += parkings.map(p => `<span class="tag tag-p">🚗 ${escHtml(p.parking_space)}${p.license_plate?' · '+escHtml(p.license_plate):''}</span>`).join('');
         if (fitness.length)  tags += `<span class="tag tag-f">💪 Fitness</span>`;
         if (lockers.length)  tags += lockers.map(l => `<span class="tag tag-l">🔒 ${escHtml(l.locker_number)}</span>`).join('');
-        if (isLong && occ.sublease_tenant) tags += `<span class="tag tag-s">🔄 ${escHtml(occ.sublease_tenant)}</span>`;
+        if (isLong && (occ.sublease_tenants_all?.length || occ.sublease_tenant)) {
+          const subs = occ.sublease_tenants_all?.length ? occ.sublease_tenants_all : [occ.sublease_tenant];
+          tags += subs.map(s => `<span class="tag tag-s">🔄 ${escHtml(s)}</span>`).join('');
+        }
         if (!isLong) tags += `<span class="tag tag-ss">🛎 Court séjour</span>`;
 
         const isExpired = isLong && occ.contract_end && occ.contract_end < today();
