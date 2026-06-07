@@ -826,6 +826,48 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.getElementById('ref-date').value = today();
 loadAll();
+
+// ── AUTO-PRINT (déclenché depuis l'index) ────────────────────────────────────
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  const d = p.get('date');
+  const ap = p.get('autoprint');
+  if (!d && !ap) return;
+
+  // Attendre que les données soient chargées puis déclencher
+  function waitAndPrint() {
+    if (d) {
+      document.getElementById('ref-date').value = d;
+      document.getElementById('range-filter').value = 'day';
+      render();
+    }
+    if (ap === '1') {
+      // Attendre le chargement Supabase (max 8s)
+      let tries = 0;
+      const iv = setInterval(function() {
+        tries++;
+        // showPrintRecap ouvre la modale et remplit recap-inner
+        showPrintRecap();
+        const inner = document.getElementById('recap-inner');
+        if ((inner && inner.innerHTML.trim().length > 50) || tries > 40) {
+          clearInterval(iv);
+          setTimeout(function() {
+            doPrint('recap-inner', window._recapFilename || 'recap_events');
+          }, 400);
+        }
+      }, 200);
+    }
+  }
+
+  // S'assurer que loadAll() est terminé avant d'agir
+  const origLoadAll = window.loadAll;
+  window.loadAll = function() {
+    return origLoadAll.apply(this, arguments).then(function() {
+      waitAndPrint();
+    }).catch(function() { waitAndPrint(); });
+  };
+})();
+
 </script>
 </body>
 </html>

@@ -578,6 +578,42 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // ─── INIT ────────────────────────────────────────────────────────────────────
 document.getElementById('ref-date').value = today();
 loadAll();
+
+// ── AUTO-PRINT (déclenché depuis l'index) ────────────────────────────────────
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  const d = p.get('date');
+  const ap = p.get('autoprint');
+  if (!d && !ap) return;
+
+  function waitAndPrint() {
+    if (d) {
+      document.getElementById('ref-date').value = d;
+      render();
+    }
+    if (ap === '1') {
+      let tries = 0;
+      const iv = setInterval(function() {
+        tries++;
+        const btn = document.querySelector('.mbtn-save');
+        // La liste des consignes est rendue dans le DOM
+        const list = document.getElementById('list');
+        if ((list && list.innerHTML.trim().length > 50) || tries > 40) {
+          clearInterval(iv);
+          setTimeout(function() { doPrint(); }, 400);
+        }
+      }, 200);
+    }
+  }
+
+  const origLoadAll = window.loadAll;
+  window.loadAll = function() {
+    return origLoadAll.apply(this, arguments).then(function() {
+      waitAndPrint();
+    }).catch(function() { waitAndPrint(); });
+  };
+})();
+
 </script>
 
 </body>

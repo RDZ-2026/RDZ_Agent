@@ -890,6 +890,37 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 loadAll();
+
+// ── AUTO-PRINT (déclenché depuis l'index) ────────────────────────────────────
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  const d = p.get('date');
+  const ap = p.get('autoprint');
+  if (!d && !ap) return;
+
+  function waitAndPrint() {
+    if (ap === '1') {
+      let tries = 0;
+      const iv = setInterval(function() {
+        tries++;
+        // Le tableau des constats est dans #list
+        const list = document.getElementById('list');
+        if ((list && list.innerHTML.trim().length > 50) || tries > 40) {
+          clearInterval(iv);
+          setTimeout(function() { doPrint(); }, 400);
+        }
+      }, 200);
+    }
+  }
+
+  const origLoadAll = window.loadAll;
+  window.loadAll = function() {
+    return origLoadAll.apply(this, arguments).then(function() {
+      waitAndPrint();
+    }).catch(function() { waitAndPrint(); });
+  };
+})();
+
 </script>
 </body>
 </html>

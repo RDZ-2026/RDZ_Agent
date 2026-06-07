@@ -334,11 +334,12 @@
 
   function openAllModules() {
     const date = document.getElementById('print-date').value || todayStr;
+    const params = '?date=' + date + '&autoprint=1';
     const modules = [
-      'evenements.html',
-      'consignes.html',
-      'constats.html',
-      'RouteOps_Supervision_v2.html'
+      'evenements.html' + params,
+      'consignes.html' + params,
+      'constats.html' + params,
+      'RouteOps_Supervision_v2.html' + params
     ];
     modules.forEach(function(url) {
       window.open(url, '_blank');
