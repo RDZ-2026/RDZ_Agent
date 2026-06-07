@@ -116,6 +116,7 @@
     @page { margin: 14mm 12mm 14mm 12mm; }
     @media print {
       body > * { display: none !important; }
+      .modal-overlay { display: none !important; }
       .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
@@ -801,11 +802,20 @@ function showPrintODS() {
 
 // ── PRINT ────────────────────────────────────────────────────────────────────
 function doPrint(sourceId, filename) {
+  // Copier le contenu
   document.getElementById('print-doc').innerHTML = document.getElementById(sourceId).innerHTML;
+  // Fermer toutes les modales AVANT d'imprimer
   document.querySelectorAll('.modal-overlay').forEach(o => o.classList.remove('open'));
+  // Mettre à jour le titre (= nom du fichier PDF)
   const origTitle = document.title;
   if (filename) document.title = filename;
-  setTimeout(() => { window.print(); document.title = origTitle; }, 150);
+  // Laisser le temps au navigateur de masquer les modales, puis imprimer
+  setTimeout(() => {
+    window.print();
+    // Restaurer après impression
+    document.title = origTitle;
+    document.getElementById('print-doc').innerHTML = '';
+  }, 300);
 }
 
 // ── BACKDROP ─────────────────────────────────────────────────────────────────
