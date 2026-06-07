@@ -161,7 +161,7 @@
     /* PRINT */
     @media print {
       body > * { display: none !important; }
-      .print-doc { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+      .print-doc { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     }
     .print-doc { display: none; }
@@ -876,7 +876,11 @@ function doPrint() {
   document.querySelectorAll('.modal-overlay').forEach(o => o.classList.remove('open'));
   const orig = document.title;
   document.title = `RDZ_Constats_${today().replace(/-/g,'')}`;
-  setTimeout(() => { window.print(); document.title = orig; }, 150);
+  setTimeout(() => {
+    window.print();
+    document.title = orig;
+    document.getElementById('print-doc').innerHTML = '';
+  }, 300);
 }
 
 // ─── CLOSE ON BACKDROP ────────────────────────────────────────────────────────
