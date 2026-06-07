@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Impression du jour</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* ── HEADER ── */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 900px; margin: 0 auto; padding: 0 32px; display: flex; align-items: stretch; justify-content: space-between; gap: 24px; }
+    .header-brand { padding: 16px 0; }
+    .header-brand-name { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
+    .header-back { display: flex; align-items: center; }
+    .btn-back { color: rgba(255,255,255,.75); font-size: 12px; font-weight: 700; text-decoration: none; letter-spacing: .04em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.3); padding: 7px 14px; border-radius: 2px; transition: background .15s; }
+    .btn-back:hover { background: rgba(255,255,255,.1); }
+    .btn-back svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── MAIN ── */
+    .main { max-width: 900px; margin: 0 auto; padding: 32px 32px; }
+
+    /* ── CONTROL BAR ── */
+    .control-bar { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 20px 24px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    .control-left { display: flex; flex-direction: column; gap: 4px; }
+    .control-title { font-size: 15px; font-weight: 700; }
+    .control-sub { font-size: 12px; color: var(--rdz-gray); }
+    .control-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .date-input { padding: 9px 14px; border: 1px solid var(--rdz-border); border-radius: 2px; font-size: 13px; background: #fafafa; cursor: pointer; }
+    .date-input:focus { outline: none; border-color: var(--rdz-red); }
+    .btn-load { background: var(--rdz-red); color: #fff; border: none; padding: 10px 22px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background .15s; white-space: nowrap; }
+    .btn-load:hover { background: var(--rdz-red-dark); }
+    .btn-load:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-load svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn-print { background: var(--rdz-black); color: #fff; border: none; padding: 10px 22px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background .15s; white-space: nowrap; }
+    .btn-print:hover { background: #333; }
+    .btn-print:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-print svg { width: 15px; height: 15px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── STATUS ── */
+    .status { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 2px; font-size: 12.5px; margin-bottom: 20px; }
+    .status.loading { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+    .status.ready   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .status.error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .status.idle    { background: #f9fafb; border: 1px solid var(--rdz-border); color: var(--rdz-gray); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status.loading .status-dot { background: #3b82f6; animation: pulse 1s infinite; }
+    .status.ready   .status-dot { background: #22c55e; }
+    .status.error   .status-dot { background: #ef4444; }
+    .status.idle    .status-dot { background: #d1d5db; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── SECTION HEADER ── */
+    .section-wrap { margin-bottom: 24px; }
+    .section-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: var(--rdz-black); border-radius: 2px 2px 0 0; }
+    .section-num { width: 24px; height: 24px; background: var(--rdz-red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .section-title { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: .08em; text-transform: uppercase; }
+    .section-count { margin-left: auto; font-size: 11px; color: rgba(255,255,255,.5); }
+    .section-body { background: #fff; border: 1px solid var(--rdz-border); border-top: none; border-radius: 0 0 2px 2px; padding: 20px; min-height: 60px; }
+    .empty-msg { text-align: center; color: #9a9a9a; font-style: italic; font-size: 13px; padding: 16px 0; }
+
+    /* ── PRINT STYLES ── */
+    @media print {
+      body { background: #fff !important; }
+      .header, .main > .control-bar, .main > .status, .no-print { display: none !important; }
+      .main { padding: 0; max-width: 100%; }
+      .section-wrap { margin-bottom: 0; page-break-after: always; }
+      .section-wrap:last-child { page-break-after: avoid; }
+      .section-head { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      .section-body { border: none; padding: 12px 0 0 0; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      @page { size: A4; margin: 12mm 14mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="header-brand-name">RDZ Security Management SA</div>
+        <div class="header-brand-sub">Impression du jour — Tous documents</div>
+      </div>
+      <div class="header-back">
+        <a class="btn-back" href="index.html">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Retour
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <div class="control-bar no-print">
+      <div class="control-left">
+        <div class="control-title">Impression groupée du jour</div>
+        <div class="control-sub">Charge et imprime en une seule opération : Événements · Consignes · Constats</div>
+      </div>
+      <div class="control-right">
+        <input type="date" class="date-input" id="ref-date">
+        <button class="btn-load" id="btn-load" onclick="loadAll()">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+          Charger
+        </button>
+        <button class="btn-print" id="btn-print" onclick="window.print()" disabled>
+          <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimer tout
+        </button>
+      </div>
+    </div>
+
+    <div class="status idle no-print" id="status">
+      <div class="status-dot"></div>
+      <span id="status-text">Sélectionnez une date et cliquez sur Charger.</span>
+    </div>
+
+    <!-- ── SECTION 1 : ÉVÉNEMENTS ── -->
+    <div class="section-wrap" id="section-events">
+      <div class="section-head">
+        <div class="section-num">1</div>
+        <div class="section-title">Événements du jour</div>
+        <div class="section-count" id="count-events">—</div>
+      </div>
+      <div class="section-body" id="body-events">
+        <div class="empty-msg">Chargement en attente…</div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2 : CONSIGNES ── -->
+    <div class="section-wrap" id="section-consignes">
+      <div class="section-head">
+        <div class="section-num">2</div>
+        <div class="section-title">Consignes particulières actives</div>
+        <div class="section-count" id="count-consignes">—</div>
+      </div>
+      <div class="section-body" id="body-consignes">
+        <div class="empty-msg">Chargement en attente…</div>
+      </div>
+    </div>
+
+    <!-- ── SECTION 3 : CONSTATS ── -->
+    <div class="section-wrap" id="section-constats">
+      <div class="section-head">
+        <div class="section-num">3</div>
+        <div class="section-title">Registre des constats en cours</div>
+        <div class="section-count" id="count-constats">—</div>
+      </div>
+      <div class="section-body" id="body-constats">
+        <div class="empty-msg">Chargement en attente…</div>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+// ── CONFIG SUPABASE ───────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── UTILITAIRES ───────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmt(d) { if (!d) return ''; const [y,m,dd] = d.split('-'); return `${dd}.${m}.${y}`; }
+function fmtFull(d) {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+function isActive(c, ref) {
+  if (c.date_debut && c.date_debut > ref) return false;
+  if (c.date_fin && c.date_fin < ref) return false;
+  return true;
+}
+function typeIcon(t) {
+  const map = { 'note':'📝','reparation':'🔧','client':'📨','surveillance':'👁','cloture':'✅' };
+  return map[t] || '📝';
+}
+function escHtml(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML.split('\n').join('<br>');
+}
+
+function setStatus(type, msg) {
+  const el = document.getElementById('status');
+  el.className = 'status no-print ' + type;
+  document.getElementById('status-text').textContent = msg;
+}
+
+// ── HEADER COMMUN ─────────────────────────────────────────────────────────────
+function printHeader(ref, titre) {
+  return `
+    <table style="width:100%;margin-bottom:0"><tr>
+      <td style="padding-bottom:10px;vertical-align:bottom">
+        <div style="font-size:17px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+      </td>
+      <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
+        <div style="font-size:10px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+        <div style="font-size:10px;color:#9a9a9a;margin-top:2px">Édité le ${fmt(today())}</div>
+      </td>
+    </tr></table>
+    <div style="border-bottom:3px solid #8B1A1A;margin-bottom:16px"></div>
+    <div style="font-size:15px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px">${titre}</div>
+    <div style="font-size:11px;color:#5a5a5a;margin-bottom:16px">Date de référence : <strong>${fmtFull(ref)}</strong></div>`;
+}
+
+function signatureBlock() {
+  return `
+    <div style="margin-top:20px;border-top:2px solid #1a1a1a;padding-top:14px;page-break-inside:avoid">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:12px">Prise de connaissance — à compléter par l'agent</div>
+      <table style="width:100%;border-collapse:collapse"><tr>
+        <td style="width:40%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Nom et prénom</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+        <td style="width:20%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Date</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+        <td style="width:40%;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Signature</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+      </tr></table>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#9a9a9a">
+      <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+    </div>`;
+}
+
+// ── RENDU ÉVÉNEMENTS ──────────────────────────────────────────────────────────
+function renderEvents(events, sites, ref) {
+  const evDay = events.filter(e => e.date === ref)
+    .sort((a,b) => (a.heure_debut||'').localeCompare(b.heure_debut||''));
+
+  document.getElementById('count-events').textContent = evDay.length + ' événement' + (evDay.length !== 1 ? 's' : '');
+
+  if (evDay.length === 0) {
+    document.getElementById('body-events').innerHTML = '<div class="empty-msg">Aucun événement ce jour.</div>';
+    return;
+  }
+
+  const bySite = {};
+  evDay.forEach(e => {
+    const k = e.site_id || '__nosite__';
+    if (!bySite[k]) bySite[k] = [];
+    bySite[k].push(e);
+  });
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
+    ${printHeader(ref, 'Récapitulatif des événements du jour')}`;
+
+  Object.keys(bySite).forEach(siteKey => {
+    const site = sites.find(s => s.id === siteKey);
+    const evs = bySite[siteKey];
+    html += `<div style="margin-bottom:18px;page-break-inside:avoid">
+      <div style="background:#1a1a1a;color:#fff;padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+        <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <th style="padding:7px 8px;width:68px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center">Horaire</th>
+          <th style="padding:7px 8px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left">Événement</th>
+          <th style="padding:7px 8px;width:130px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:left">Lieu</th>
+          <th style="padding:7px 8px;width:52px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.05em;border-right:1px solid #d0ccc5;text-align:center">Agents</th>
+          <th style="padding:7px 8px;width:120px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.05em;text-align:left">Contact</th>
+        </tr></thead><tbody>`;
+    evs.forEach((e, i) => {
+      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+      html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact;page-break-inside:avoid">
+        <td style="padding:8px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;color:#4a4a4a;line-height:1.5">
+          ${e.heure_debut ? e.heure_debut.slice(0,5) : '?'}
+          ${e.heure_fin ? '<br><span style="font-size:10px;color:#9a9a9a;font-weight:400">→ ' + e.heure_fin.slice(0,5) + '</span>' : ''}
+          ${e.nb_agents > 0 && e.heure_service_debut ? `<br><span style="font-size:10px;color:#1e3a8a;font-weight:700">${e.heure_service_debut.slice(0,5)}${e.heure_service_fin ? ' → ' + e.heure_service_fin.slice(0,5) : ''}</span><br><span style="font-size:9px;color:#3b5bdb">surveillance</span>` : ''}
+        </td>
+        <td style="padding:8px 10px;border-right:1px solid #e5e2dd;vertical-align:top">
+          <div style="font-size:11px;font-weight:700;color:#1a1a1a;line-height:1.5">${e.titre}</div>
+          ${e.remarques ? `<div style="font-size:10px;color:#6b6b6b;margin-top:2px">${e.remarques}</div>` : ''}
+          ${e.consignes ? `<div style="font-size:10px;color:#7f1d1d;margin-top:3px;border-left:2px solid #8B1A1A;padding-left:5px">${e.consignes}</div>` : ''}
+        </td>
+        <td style="padding:8px;font-size:10px;color:#1a1a1a;border-right:1px solid #e5e2dd;vertical-align:top">${e.lieu || '<span style="color:#ccc">—</span>'}</td>
+        <td style="padding:8px;font-size:10px;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">
+          ${e.nb_agents > 0 ? `<span style="font-weight:700;color:#7f1d1d">${e.nb_agents}</span>` : `<span style="color:#0c4a6e;font-weight:700">Info</span>`}
+        </td>
+        <td style="padding:8px;font-size:10px;color:#4a4a4a;vertical-align:top;line-height:1.5">${e.contact || '<span style="color:#ccc">—</span>'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  html += `</div>`;
+  document.getElementById('body-events').innerHTML = html;
+}
+
+// ── RENDU CONSIGNES ───────────────────────────────────────────────────────────
+function renderConsignes(consignes, sites, ref) {
+  const activeBySite = [];
+  let total = 0;
+  sites.forEach(site => {
+    const cons = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
+    if (cons.length > 0) { activeBySite.push({ site, cons }); total += cons.length; }
+  });
+
+  document.getElementById('count-consignes').textContent = total + ' consigne' + (total !== 1 ? 's' : '');
+
+  if (total === 0) {
+    document.getElementById('body-consignes').innerHTML = '<div class="empty-msg">Aucune consigne active ce jour.</div>';
+    return;
+  }
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
+    ${printHeader(ref, 'Consignes particulières actives')}`;
+
+  activeBySite.forEach(({ site, cons }) => {
+    html += `<div style="margin-bottom:14px;page-break-inside:avoid">
+      <div style="background:#1a1a1a;color:#fff;padding:5px 10px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site.nom}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+        <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <th style="padding:5px 8px;width:26px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">N°</th>
+          <th style="padding:5px 10px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left">Consigne</th>
+          <th style="padding:5px 8px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">Début</th>
+          <th style="padding:5px 8px;width:60px;font-size:9px;font-weight:700;color:#6b6b6b;text-transform:uppercase;text-align:center">Fin</th>
+        </tr></thead><tbody>`;
+    cons.forEach((c, i) => {
+      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+      html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <td style="padding:6px 8px;font-size:9px;font-weight:700;color:#9a9a9a;border-right:1px solid #e5e2dd;text-align:center;vertical-align:top">${String(i+1).padStart(2,'0')}</td>
+        <td style="padding:6px 10px;font-size:10px;color:#1a1a1a;line-height:1.55;border-right:1px solid #e5e2dd">${escHtml(c.texte)}</td>
+        <td style="padding:6px 8px;font-size:9px;color:#5a5a5a;text-align:center;vertical-align:top;border-right:1px solid #e5e2dd;white-space:nowrap">${fmt(c.date_debut)}</td>
+        <td style="padding:6px 8px;font-size:9px;text-align:center;vertical-align:top;white-space:nowrap;${c.date_fin ? 'color:#5a5a5a' : 'color:#8B1A1A;font-weight:700'}">${c.date_fin ? fmt(c.date_fin) : '—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  html += signatureBlock() + `</div>`;
+  document.getElementById('body-consignes').innerHTML = html;
+}
+
+// ── RENDU CONSTATS ────────────────────────────────────────────────────────────
+function renderConstats(constats, journaux, sites, ref) {
+  const statColors = { 'En attente':'#b45309','En cours':'#1d4ed8','A surveiller':'#c2410c','Transmis au client':'#6d28d9' };
+  const actifs = constats.filter(c => c.statut !== 'Résolu')
+    .sort((a,b) => {
+      const order = { 'En attente':0,'En cours':1,'A surveiller':2,'Transmis au client':3 };
+      return (order[a.statut]||99) - (order[b.statut]||99);
+    });
+
+  document.getElementById('count-constats').textContent = actifs.length + ' constat' + (actifs.length !== 1 ? 's' : '') + ' actif' + (actifs.length !== 1 ? 's' : '');
+
+  if (actifs.length === 0) {
+    document.getElementById('body-constats').innerHTML = '<div class="empty-msg">Aucun constat actif en cours.</div>';
+    return;
+  }
+
+  const bySite = {};
+  actifs.forEach(c => {
+    const k = c.site_id || '__nosite__';
+    if (!bySite[k]) bySite[k] = [];
+    bySite[k].push(c);
+  });
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a;font-size:11px">
+    ${printHeader(ref, 'Registre des constats en cours')}`;
+
+  Object.keys(bySite).forEach(siteKey => {
+    const site = sites.find(s => s.id === siteKey);
+    const siteConstats = bySite[siteKey];
+    html += `<div style="margin-bottom:22px;page-break-inside:avoid">
+      <div style="background:#1a1a1a;color:#fff;padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">${site ? site.nom : 'Site non précisé'}</div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+        <thead><tr style="background:#f5f4f2;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+          <th style="padding:7px 8px;width:72px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">Rapport</th>
+          <th style="padding:7px 8px;width:76px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:center">Catégorie</th>
+          <th style="padding:7px 8px;width:96px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left">Localisation</th>
+          <th style="padding:7px 8px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;border-right:1px solid #d0ccc5;text-align:left">Constat &amp; Procédure</th>
+          <th style="padding:7px 8px;width:80px;font-size:9px;font-weight:700;color:#4a4a4a;text-transform:uppercase;text-align:center">Statut</th>
+        </tr></thead><tbody>`;
+    siteConstats.forEach((c, i) => {
+      const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
+      const color = statColors[c.statut] || '#4a4a4a';
+      const journal = journaux[c.id] || [];
+      const lastEntry = journal[0] || null;
+      html += `<tr style="background:${bg};page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <td style="padding:8px;font-size:10px;color:#4a4a4a;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top;line-height:1.5">
+          ${fmt(c.date_rapport)}
+          ${c.heure_rapport ? '<br><span style="font-size:9px;color:#9a9a9a">' + c.heure_rapport.slice(0,5) + '</span>' : ''}
+        </td>
+        <td style="padding:8px;font-size:10px;font-weight:700;text-align:center;border-right:1px solid #e5e2dd;vertical-align:top">${c.categorie || '—'}</td>
+        <td style="padding:8px;font-size:10px;color:#1a1a1a;border-right:1px solid #e5e2dd;vertical-align:top;line-height:1.5">${c.localisation || '—'}</td>
+        <td style="padding:8px 10px;border-right:1px solid #e5e2dd;vertical-align:top">
+          <div style="font-size:11px;color:#1a1a1a;line-height:1.6;margin-bottom:${c.procedure ? '6px' : '0'}">${c.description}</div>
+          ${c.procedure ? `<div style="font-size:10px;color:#92400e;background:#fffbeb;border-left:3px solid #f59e0b;padding:5px 8px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact"><strong>⚡ Procédure :</strong> ${c.procedure}</div>` : ''}
+          ${lastEntry ? `<div style="font-size:9px;color:#6b6b6b;margin-top:5px;font-style:italic;border-top:1px dashed #e5e2dd;padding-top:4px">${typeIcon(lastEntry.type_entree)} <strong>${fmt(lastEntry.date_entree)}</strong> : ${lastEntry.texte.slice(0,100)}${lastEntry.texte.length>100?'…':''}</div>` : ''}
+        </td>
+        <td style="padding:8px;text-align:center;vertical-align:top">
+          <span style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.03em">${c.statut}</span>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  html += signatureBlock() + `</div>`;
+  document.getElementById('body-constats').innerHTML = html;
+}
+
+// ── CHARGEMENT PRINCIPAL ──────────────────────────────────────────────────────
+async function loadAll() {
+  const ref = document.getElementById('ref-date').value;
+  if (!ref) { setStatus('error', 'Veuillez sélectionner une date.'); return; }
+
+  document.getElementById('btn-load').disabled = true;
+  document.getElementById('btn-print').disabled = true;
+  setStatus('loading', 'Connexion à Supabase et chargement des données…');
+
+  try {
+    const [
+      { data: sites,    error: e1 },
+      { data: events,   error: e2 },
+      { data: consignes,error: e3 },
+      { data: constats, error: e4 },
+      { data: journaux, error: e5 }
+    ] = await Promise.all([
+      sb.from('sites').select('*').eq('actif', true).order('nom'),
+      sb.from('evenements').select('*').order('date').order('heure_debut'),
+      sb.from('consignes').select('*').order('date_debut'),
+      sb.from('constats').select('*').order('date_rapport', { ascending: false }),
+      sb.from('constats_journal').select('*').order('date_entree', { ascending: false })
+    ]);
+
+    if (e1 || e2 || e3 || e4 || e5) throw e1 || e2 || e3 || e4 || e5;
+
+    // Construire le journal par constat
+    const journauxMap = {};
+    (journaux || []).forEach(e => {
+      if (!journauxMap[e.constat_id]) journauxMap[e.constat_id] = [];
+      journauxMap[e.constat_id].push(e);
+    });
+
+    renderEvents(events || [], sites || [], ref);
+    renderConsignes(consignes || [], sites || [], ref);
+    renderConstats(constats || [], journauxMap, sites || [], ref);
+
+    setStatus('ready', `Documents prêts pour le ${fmtFull(ref)} — cliquez sur « Imprimer tout »`);
+    document.getElementById('btn-print').disabled = false;
+
+  } catch (err) {
+    setStatus('error', 'Erreur de chargement : ' + (err.message || err));
+  } finally {
+    document.getElementById('btn-load').disabled = false;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.getElementById('ref-date').value = today();
+</script>
+
+</body>
+</html>
