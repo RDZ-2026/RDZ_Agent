@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Stock</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #0f0f1a; --bg2: #1a1a2e; --bg3: #2a2a45;
+  --text: #ffffff; --text2: #9090b0; --text3: #6b6b8a;
+  --border: #2a2a45; --border2: #3a3a55;
+  --blue: #185FA5; --blue-l: #0d2a45; --blue-t: #85B7EB;
+  --green: #0F6E56; --green-l: #E1F5EE; --green-t: #1D9E75;
+  --red: #A32D2D; --red-l: #FCEBEB; --red-t: #E24B4A;
+  --amber: #854F0B; --amber-l: #FAEEDA; --amber-t: #EF9F27;
+  --purple: #534AB7; --radius: 10px; --radius-sm: 6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; overflow: hidden; height: 100dvh; }
+input, button, select, textarea { font-family: inherit; }
+button { cursor: pointer; }
+
+/* LAYOUT */
+#app { height: 100dvh; display: flex; flex-direction: column; }
+.screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* LOGIN */
+#login-screen { align-items: center; justify-content: center; padding: 1rem; background: var(--bg); }
+.login-box { width: 100%; max-width: 400px; }
+.login-logo { text-align: center; margin-bottom: 2rem; }
+.login-logo-icon { width: 48px; height: 48px; background: linear-gradient(135deg, var(--blue), var(--purple)); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 8px; }
+.login-logo h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+.login-logo p { font-size: 13px; color: var(--text3); margin-top: 4px; }
+.login-card { background: var(--bg2); border-radius: 16px; border: 0.5px solid var(--border); padding: 1.5rem; }
+.login-card h2 { font-size: 17px; font-weight: 600; text-align: center; margin-bottom: 1.25rem; }
+.form-group { margin-bottom: 12px; }
+.form-label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+.form-input { width: 100%; padding: 10px 12px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; outline: none; transition: border-color .15s; }
+.form-input:focus { border-color: var(--blue); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: var(--radius-sm); border: none; font-size: 14px; font-weight: 600; transition: opacity .15s; }
+.btn:disabled { opacity: 0.6; }
+.btn-primary { background: var(--blue); color: #fff; width: 100%; }
+.btn-ghost { background: none; color: var(--text3); border: 0.5px solid var(--border); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-danger { background: var(--red-l); color: var(--red); border: 0.5px solid #f7c1c1; }
+.login-demo-btn { background: none; border: none; color: var(--text3); font-size: 13px; text-decoration: underline; display: block; margin: 12px auto 0; text-align: center; }
+.demo-roles { display: flex; flex-direction: column; gap: 8px; }
+.demo-role-btn { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; text-align: left; display: flex; align-items: center; gap: 12px; }
+.demo-role-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.demo-role-label { font-size: 14px; font-weight: 600; }
+.demo-role-desc { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.error-msg { color: #f09595; font-size: 12px; padding: 8px 12px; background: #2a1515; border-radius: var(--radius-sm); margin-bottom: 10px; }
+
+/* STATUS BAR */
+#status-bar { padding: 5px 14px; font-size: 12px; display: none; align-items: center; gap: 8px; flex-shrink: 0; }
+#status-bar.offline { display: flex; background: #1a0f00; border-bottom: 0.5px solid var(--amber); }
+#status-bar.conflict { display: flex; background: #1a0a0a; border-bottom: 0.5px solid var(--red); }
+#status-bar.syncing { display: flex; background: #0f1a10; border-bottom: 0.5px solid var(--green); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-text { flex: 1; }
+.status-sync-btn { background: none; border: 0.5px solid var(--green); color: var(--green-t); border-radius: 4px; padding: 2px 8px; font-size: 11px; }
+
+/* MOBILE LAYOUT */
+#mobile-screen { max-width: 480px; margin: 0 auto; width: 100%; }
+.mobile-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.mobile-nav { display: flex; border-top: 0.5px solid var(--border); background: var(--bg2); flex-shrink: 0; }
+.mobile-nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 10px; background: none; border: none; color: var(--text3); font-size: 10px; transition: color .15s; }
+.mobile-nav-btn.active { color: var(--blue-t); font-weight: 600; }
+.mobile-nav-icon { font-size: 20px; line-height: 1; }
+.mobile-tab { display: none; }
+.mobile-tab.active { display: block; }
+
+/* BUREAU LAYOUT */
+#bureau-screen { flex-direction: row; }
+.bureau-sidebar { width: 220px; background: var(--bg2); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; }
+.bureau-sidebar.collapsed { width: 52px; }
+.sidebar-logo { padding: 14px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.sidebar-logo-icon { width: 30px; height: 30px; background: linear-gradient(135deg, var(--blue), var(--purple)); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.sidebar-logo-text { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.sidebar-nav { flex: 1; padding: 6px 0; overflow-y: auto; }
+.sidebar-btn { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: none; border: none; border-left: 2px solid transparent; color: var(--text3); font-size: 13px; font-weight: 400; white-space: nowrap; transition: all .12s; }
+.sidebar-btn:hover { background: var(--bg); color: var(--text); }
+.sidebar-btn.active { background: var(--blue-l); color: var(--blue-t); border-left-color: var(--blue); font-weight: 600; }
+.sidebar-btn-icon { font-size: 16px; flex-shrink: 0; }
+.sidebar-footer { border-top: 0.5px solid var(--border); padding: 12px 14px; }
+.sidebar-user-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-user-role { font-size: 11px; color: var(--text3); text-transform: capitalize; margin-bottom: 6px; }
+.sidebar-signout { font-size: 12px; color: var(--text3); background: none; border: none; padding: 0; }
+.bureau-main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+.bureau-page { display: none; }
+.bureau-page.active { display: block; }
+
+/* COMPOSANTS COMMUNS */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+.page-title { font-size: 20px; font-weight: 700; }
+.page-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.kpi-label { font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.kpi-val { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.kpi-sub { font-size: 12px; color: var(--text3); }
+.table-wrap { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+.table-head { display: grid; padding: 10px 16px; font-size: 12px; color: var(--text3); font-weight: 600; border-bottom: 0.5px solid var(--border); }
+.table-row { display: grid; padding: 11px 16px; border-bottom: 0.5px solid var(--border); align-items: center; font-size: 13px; }
+.table-row:last-child { border-bottom: none; }
+.table-empty { padding: 32px; text-align: center; color: var(--text3); font-size: 14px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.badge-blue { background: var(--blue-l); color: var(--blue-t); }
+.badge-green { background: var(--green-l); color: var(--green); }
+.badge-red { background: var(--red-l); color: var(--red); }
+.badge-amber { background: var(--amber-l); color: var(--amber); }
+.badge-gray { background: var(--bg3); color: var(--text3); }
+.search-input { width: 100%; padding: 9px 12px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; margin-bottom: 14px; }
+.search-input:focus { border-color: var(--blue); }
+.filter-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; }
+.filter-btn { padding: 5px 12px; border-radius: 99px; font-size: 12px; font-weight: 400; border: none; cursor: pointer; background: var(--bg3); color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+.filter-btn.active { background: var(--blue); color: #fff; font-weight: 600; }
+
+/* MOBILE SECTIONS */
+.mobile-header { background: var(--bg2); border-bottom: 0.5px solid var(--border); padding: 14px 16px; flex-shrink: 0; }
+.mobile-header-title { font-size: 16px; font-weight: 600; }
+.mobile-header-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.mobile-header-row { display: flex; align-items: center; gap: 10px; }
+.back-btn { background: none; border: none; color: var(--text3); font-size: 20px; line-height: 1; padding: 0; }
+.mobile-list-item { padding: 12px 16px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.mobile-list-item:last-child { border-bottom: none; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+.qty-ctrl { display: flex; align-items: center; gap: 6px; }
+.qty-btn { width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--bg3); border: none; color: var(--text); font-size: 18px; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.qty-val { font-size: 16px; font-weight: 600; min-width: 24px; text-align: center; }
+.ecart-badge { font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 99px; min-width: 34px; text-align: center; }
+.eb-ok { background: var(--green-l); color: var(--green); }
+.eb-neg { background: var(--red-l); color: var(--red); }
+.eb-pos { background: #EAF3DE; color: #3B6D11; }
+.action-row { display: flex; gap: 6px; margin-top: 8px; }
+.mini-btn { flex: 1; padding: 6px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; }
+.mini-btn-green { background: #0a1f12; border: 0.5px solid var(--green); color: #9FE1CB; }
+.mini-btn-red { background: #1a0a0a; border: 0.5px solid var(--red); color: #F09595; }
+.step-bar { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.step-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.step-dot.done { background: var(--green-l); color: var(--green); }
+.step-dot.current { background: var(--blue); color: #fff; }
+.step-dot.todo { background: var(--bg3); color: var(--text3); }
+.step-line { flex: 1; height: 0.5px; background: var(--border); }
+.step-label { font-size: 11px; color: var(--text3); margin-left: 4px; }
+.bottom-bar { padding: 14px 16px; background: var(--bg); border-top: 0.5px solid var(--border); flex-shrink: 0; }
+.etat-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.etat-btn { padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 500; border: 0.5px solid var(--border); background: transparent; color: var(--text3); }
+.etat-btn.selected-bon { border-color: var(--green); background: var(--green-l); color: var(--green); }
+.etat-btn.selected-use { border-color: var(--amber); background: var(--amber-l); color: var(--amber); }
+.etat-btn.selected-rebus { border-color: var(--red); background: var(--red-l); color: var(--red); }
+.checkbox-item { padding: 12px 16px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.cb { width: 22px; height: 22px; border-radius: 5px; border: 0.5px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+.cb.checked { background: var(--blue); border-color: var(--blue); }
+.etat-zone { padding: 6px 16px 12px 50px; border-bottom: 0.5px solid var(--border); }
+.etat-zone label { font-size: 12px; color: var(--text3); display: block; margin-bottom: 6px; }
+.summary-card { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+.summary-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text3); padding: 3px 0; }
+.summary-row.total { font-weight: 600; color: var(--text); border-top: 0.5px solid var(--border); padding-top: 8px; margin-top: 4px; }
+.note-area { width: 100%; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; padding: 8px 10px; resize: none; outline: none; margin-bottom: 14px; }
+.success-screen { padding: 40px 24px; text-align: center; }
+.success-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--green-l); display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; }
+.success-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.success-sub { font-size: 13px; color: var(--text3); margin-bottom: 24px; }
+.alert-banner { background: #1a0f00; border: 0.5px solid var(--amber); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; }
+.alert-title { font-size: 13px; font-weight: 600; color: #FAC775; margin-bottom: 4px; }
+.alert-row { font-size: 12px; color: var(--amber-t); display: flex; justify-content: space-between; margin-bottom: 2px; }
+.online-banner { background: var(--bg2); border: 0.5px solid var(--green); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.online-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.online-text { font-size: 13px; font-weight: 500; flex: 1; }
+.quick-action { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; width: 100%; text-align: left; }
+.qa-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.qa-label { font-size: 14px; font-weight: 600; margin-bottom: 1px; }
+.qa-desc { font-size: 12px; color: var(--text3); }
+.qa-arrow { margin-left: auto; color: var(--text3); font-size: 18px; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal-sheet { background: var(--bg2); border-radius: 16px; padding: 22px; width: 100%; max-width: 480px; border: 0.5px solid var(--border); }
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.modal-bottom { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; z-index: 200; }
+.modal-bottom.open { display: flex; }
+.modal-bottom-content { background: var(--bg2); border-radius: 16px 16px 0 0; padding: 20px 16px; width: 100%; }
+.fg { margin-bottom: 12px; }
+.flabel { font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+.finp { width: 100%; padding: 9px 12px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; }
+.fsel { width: 100%; padding: 9px 12px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.fg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.motif-btns { display: flex; gap: 6px; }
+.motif-btn { flex: 1; padding: 8px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; color: var(--text3); font-size: 13px; }
+.motif-btn.active { border-color: var(--blue); background: var(--blue-l); color: var(--blue-t); }
+@media (max-width: 600px) {
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .bureau-sidebar { display: none; }
+  .bureau-main { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- STATUS BAR -->
+  <div id="status-bar">
+    <span class="status-dot" id="status-dot"></span>
+    <span class="status-text" id="status-text"></span>
+    <button class="status-sync-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">Sync</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="login-logo-icon">📦</div>
+        <h1>RDZ Stock</h1>
+        <p>Gestion stock vestiaire et matériel</p>
+      </div>
+      <div class="login-card" id="login-form-card">
+        <h2>Connexion</h2>
+        <div id="login-error" class="error-msg" style="display:none"></div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="login-email" placeholder="votre@email.fr">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mot de passe</label>
+          <input class="form-input" type="password" id="login-pwd" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Se connecter</button>
+        <button class="login-demo-btn" onclick="showDemo()">Mode démonstration →</button>
+      </div>
+      <div class="login-card" id="demo-card" style="display:none">
+        <h2>Choisir un profil</h2>
+        <div class="demo-roles">
+          <button class="demo-role-btn" onclick="setDemo('terrain')">
+            <div class="demo-role-icon" style="background:#E6F1FB">📱</div>
+            <div><div class="demo-role-label">Mobile terrain</div><div class="demo-role-desc">Inventaires · Prêts · Retours</div></div>
+          </button>
+          <button class="demo-role-btn" onclick="setDemo('agent')">
+            <div class="demo-role-icon" style="background:#E1F5EE">🖥</div>
+            <div><div class="demo-role-label">Bureau agents</div><div class="demo-role-desc">Gestion vestiaire · Catalogue</div></div>
+          </button>
+          <button class="demo-role-btn" onclick="setDemo('direction')">
+            <div class="demo-role-icon" style="background:#EEEDFE">👑</div>
+            <div><div class="demo-role-label">Direction</div><div class="demo-role-desc">Accès complet · Tableau de bord</div></div>
+          </button>
+        </div>
+        <button class="login-demo-btn" onclick="hideDemo()">← Retour connexion</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE TERRAIN -->
+  <div id="mobile-screen" class="screen">
+    <div class="mobile-content">
+      <!-- ACCUEIL -->
+      <div id="tab-accueil" class="mobile-tab active">
+        <div style="padding:18px 16px">
+          <div style="font-size:22px;font-weight:700;margin-bottom:2px" id="m-salut">Bonjour 👋</div>
+          <div style="font-size:13px;color:var(--text3)" id="m-date"></div>
+        </div>
+        <div style="padding:0 16px" id="m-online-banner"></div>
+        <div style="padding:0 16px" id="m-alertes"></div>
+        <div style="padding:0 16px 16px">
+          <div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Actions rapides</div>
+          <button class="quick-action" onclick="mobileNav('inventaire')"><div class="qa-icon" style="background:#E1F5EE">✓</div><div><div class="qa-label">Faire un inventaire</div><div class="qa-desc">Contrôle article par article</div></div><span class="qa-arrow">›</span></button>
+          <button class="quick-action" onclick="mobileNav('prets');showPretMode('new')"><div class="qa-icon" style="background:#E6F1FB">👤</div><div><div class="qa-label">Prêt à un agent</div><div class="qa-desc">Attribuer vêtements / matériel</div></div><span class="qa-arrow">›</span></button>
+          <button class="quick-action" onclick="mobileNav('prets');showPretMode('retour')"><div class="qa-icon" style="background:#FAEEDA">↩</div><div><div class="qa-label">Retour agent</div><div class="qa-desc">Retour + état à la réception</div></div><span class="qa-arrow">›</span></button>
+          <button class="quick-action" onclick="mobileNav('stock')"><div class="qa-icon" style="background:#EAF3DE">↑</div><div><div class="qa-label">Entrée de stock</div><div class="qa-desc">Achat ou réintégration</div></div><span class="qa-arrow">›</span></button>
+        </div>
+      </div>
+
+      <!-- STOCK MOBILE -->
+      <div id="tab-stock" class="mobile-tab">
+        <div class="mobile-header">
+          <div class="mobile-header-title">Stock vestiaire</div>
+          <div class="filter-bar" id="m-stock-cats" style="margin-top:10px;margin-bottom:0"></div>
+        </div>
+        <div id="m-stock-list"></div>
+      </div>
+
+      <!-- INVENTAIRE MOBILE -->
+      <div id="tab-inventaire" class="mobile-tab">
+        <div class="mobile-header">
+          <div class="mobile-header-title">Inventaire</div>
+          <div id="inv-date" style="font-size:12px;color:var(--text3);margin-top:2px"></div>
+          <div class="step-bar" id="inv-steps"></div>
+        </div>
+        <div id="inv-content"></div>
+      </div>
+
+      <!-- PRÊTS MOBILE -->
+      <div id="tab-prets" class="mobile-tab">
+        <div class="mobile-header" id="prets-header">
+          <div class="mobile-header-row">
+            <div style="font-size:16px;font-weight:600;flex:1" id="prets-title">Agents</div>
+            <div style="display:flex;gap:8px" id="prets-actions"></div>
+          </div>
+        </div>
+        <div id="prets-content"></div>
+      </div>
+    </div>
+    <div class="mobile-nav">
+      <button class="mobile-nav-btn active" id="mnav-accueil" onclick="mobileNav('accueil')"><span class="mobile-nav-icon">⌂</span>Accueil</button>
+      <button class="mobile-nav-btn" id="mnav-stock" onclick="mobileNav('stock')"><span class="mobile-nav-icon">📦</span>Stock</button>
+      <button class="mobile-nav-btn" id="mnav-inventaire" onclick="mobileNav('inventaire')"><span class="mobile-nav-icon">✓</span>Inventaire</button>
+      <button class="mobile-nav-btn" id="mnav-prets" onclick="mobileNav('prets')"><span class="mobile-nav-icon">👤</span>Agents</button>
+    </div>
+  </div>
+
+  <!-- BUREAU -->
+  <div id="bureau-screen" class="screen">
+    <div class="bureau-sidebar" id="sidebar">
+      <div class="sidebar-logo" onclick="toggleSidebar()">
+        <div class="sidebar-logo-icon">📦</div>
+        <span class="sidebar-logo-text">RDZ Stock</span>
+      </div>
+      <div class="sidebar-nav" id="sidebar-nav"></div>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-name" id="sb-user-name"></div>
+        <div class="sidebar-user-role" id="sb-user-role"></div>
+        <button class="sidebar-signout" onclick="doSignOut()">Déconnexion →</button>
+      </div>
+    </div>
+    <div class="bureau-main">
+      <div id="page-dashboard" class="bureau-page active"></div>
+      <div id="page-stock" class="bureau-page"></div>
+      <div id="page-articles" class="bureau-page"></div>
+      <div id="page-agents" class="bureau-page"></div>
+      <div id="page-inventaires" class="bureau-page"></div>
+      <div id="page-commandes" class="bureau-page"></div>
+      <div id="page-parametres" class="bureau-page"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTRÉE STOCK -->
+<div class="modal-bottom" id="modal-entree">
+  <div class="modal-bottom-content">
+    <div class="modal-title" id="modal-entree-title">Entrée de stock</div>
+    <div class="fg"><div class="flabel">Quantité</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <button class="qty-btn" onclick="adjEntreeQty(-1)" style="width:36px;height:36px;font-size:20px">−</button>
+        <span style="font-size:24px;font-weight:700;flex:1;text-align:center" id="entree-qty-val">1</span>
+        <button class="qty-btn" onclick="adjEntreeQty(1)" style="width:36px;height:36px;font-size:20px">+</button>
+      </div>
+    </div>
+    <div class="fg"><div class="flabel">Motif</div>
+      <div class="motif-btns" style="margin-top:6px">
+        <button class="motif-btn active" id="motif-achat" onclick="setMotif('achat')">Achat</button>
+        <button class="motif-btn" id="motif-reint" onclick="setMotif('reintegration')">Réintégration</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="confirmEntree()" style="margin-top:6px">Confirmer l'entrée</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-entree')" style="width:100%;margin-top:8px">Annuler</button>
+  </div>
+</div>
+
+<!-- MODAL ARTICLE -->
+<div class="modal-overlay" id="modal-article">
+  <div class="modal-sheet">
+    <div class="modal-title" id="modal-article-title">Article</div>
+    <div class="fg-row">
+      <div class="fg"><div class="flabel">Nom *</div><input class="finp" id="art-nom"></div>
+      <div class="fg"><div class="flabel">Référence</div><input class="finp" id="art-ref"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><div class="flabel">Catégorie</div>
+        <select class="fsel" id="art-cat">
+          <option>Polos</option><option>Pantalons</option><option>Vestes</option><option>Patchs</option><option>Matériel</option><option>Autre</option>
+        </select>
+      </div>
+      <div class="fg"><div class="flabel">Taille</div><input class="finp" id="art-taille"></div>
+    </div>
+    <div class="fg"><div class="flabel">Couleur</div><input class="finp" id="art-couleur"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-article')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveArticle()" style="width:auto">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGENT -->
+<div class="modal-overlay" id="modal-agent">
+  <div class="modal-sheet">
+    <div class="modal-title">Nouvel agent</div>
+    <div class="fg-row">
+      <div class="fg"><div class="flabel">Prénom *</div><input class="finp" id="ag-prenom"></div>
+      <div class="fg"><div class="flabel">Nom *</div><input class="finp" id="ag-nom"></div>
+    </div>
+    <div class="fg"><div class="flabel">Brigade / Fonction</div><input class="finp" id="ag-brigade"></div>
+    <div class="fg"><div class="flabel">Email</div><input class="finp" id="ag-email" type="email"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-agent')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveAgent()" style="width:auto">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════════════
+const SUPABASE_URL  = 'https://pdewmubikmotqzbxmyeq.supabase.co'
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao'
+const SUPABASE_RH_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co'
+const SUPABASE_RH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU'
+
+const { createClient } = supabase
+const db   = createClient(SUPABASE_URL, SUPABASE_KEY)
+const dbRH = createClient(SUPABASE_RH_URL, SUPABASE_RH_KEY, { auth: { persistSession: false } })
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let APP = {
+  user: null, role: null, isOnline: navigator.onLine,
+  articles: [], stock: [], agents: [], prets: [], inventaires: [],
+  offlineQueue: JSON.parse(localStorage.getItem('rdz_queue') || '[]'),
+  mobileTab: 'accueil',
+  pretMode: 'list', pretStep: 1, pretAgent: null, pretQtys: {},
+  retourAgent: null, retours: {},
+  invStep: 1, invComptes: {}, invNote: '',
+  editingArticle: null,
+  selectedAgent: null,
+  stockFilter: 'Tous',
+  entreeStock: null, entreeQty: 1, entreeMotif: 'achat',
+  bureauPage: 'dashboard'
+}
+
+// ═══════════════════════════════════════════════
+// OFFLINE QUEUE
+// ═══════════════════════════════════════════════
+function saveQueue() { localStorage.setItem('rdz_queue', JSON.stringify(APP.offlineQueue)) }
+
+function enqueue(table, op, data) {
+  APP.offlineQueue.push({ id: Date.now() + Math.random(), table, op, data, ts: new Date().toISOString() })
+  saveQueue()
+  updateStatusBar()
+}
+
+async function syncNow() {
+  if (!APP.isOnline || !APP.offlineQueue.length) return
+  updateStatusBar('syncing')
+  const queue = [...APP.offlineQueue]
+  const done = []
+  for (const item of queue) {
+    try {
+      if (item.op === 'insert') await db.from(item.table).insert(item.data)
+      else if (item.op === 'update') await db.from(item.table).update(item.data).eq('id', item.data.id)
+      else if (item.op === 'delete') await db.from(item.table).delete().eq('id', item.data.id)
+      else if (item.op === 'rpc') await db.rpc(item.table, item.data)
+      done.push(item.id)
+    } catch(e) { console.warn('Sync error', e) }
+  }
+  APP.offlineQueue = APP.offlineQueue.filter(x => !done.includes(x.id))
+  saveQueue()
+  await loadData()
+  updateStatusBar()
+}
+
+// ═══════════════════════════════════════════════
+// SUPABASE QUERIES
+// ═══════════════════════════════════════════════
+async function sbQuery(table, select='*', filters={}) {
+  if (!APP.isOnline) return JSON.parse(localStorage.getItem('rdz_cache_' + table) || '[]')
+  let q = db.from(table).select(select)
+  for (const [k,v] of Object.entries(filters)) q = q.eq(k, v)
+  const { data, error } = await q
+  if (error) { console.warn(table, error); return [] }
+  localStorage.setItem('rdz_cache_' + table, JSON.stringify(data))
+  return data || []
+}
+
+async function sbInsert(table, data) {
+  if (APP.isOnline) {
+    const { error } = await db.from(table).insert(data)
+    if (!error) { await loadData(); return }
+  }
+  enqueue(table, 'insert', data)
+  // Mise à jour locale optimiste
+  const key = 'rdz_cache_' + table
+  const cached = JSON.parse(localStorage.getItem(key) || '[]')
+  cached.unshift(data)
+  localStorage.setItem(key, JSON.stringify(cached))
+  await loadData()
+}
+
+async function sbUpdate(table, id, data) {
+  if (APP.isOnline) {
+    const { error } = await db.from(table).update(data).eq('id', id)
+    if (!error) { await loadData(); return }
+  }
+  enqueue(table, 'update', { id, ...data })
+  await loadData()
+}
+
+async function sbDelete(table, id) {
+  if (APP.isOnline) {
+    const { error } = await db.from(table).delete().eq('id', id)
+    if (!error) { await loadData(); return }
+  }
+  enqueue(table, 'delete', { id })
+  await loadData()
+}
+
+async function sbRPC(fn, params) {
+  if (APP.isOnline) {
+    await db.rpc(fn, params)
+  } else {
+    enqueue(fn, 'rpc', params)
+  }
+}
+
+// ═══════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════
+async function loadData() {
+  APP.articles    = await sbQuery('articles', '*')
+  APP.stock       = await sbQuery('stock', '*, articles(*)')
+  APP.agents      = await sbQuery('agents', '*')
+  APP.prets       = await sbQuery('prets', '*, agents(id,nom,prenom,brigade), stock(*, articles(*))', { actif: true })
+  APP.inventaires = await sbQuery('inventaires', '*, lignes_inventaire(*)')
+  render()
+}
+
+async function syncAgentsRH() {
+  if (!APP.isOnline) return
+  try {
+    const { data } = await dbRH.from('v_agents_stock').select('id,nom,prenom,fonction').order('nom')
+    if (!data?.length) return
+    for (const a of data) {
+      await db.from('agents').upsert({ rh_agent_id: a.id, nom: a.nom, prenom: a.prenom, brigade: a.fonction || '', updated_at: new Date().toISOString() }, { onConflict: 'rh_agent_id' })
+    }
+    APP.agents = await sbQuery('agents', '*')
+  } catch(e) { console.warn('RH sync unavailable') }
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('login-email').value
+  const pwd   = document.getElementById('login-pwd').value
+  if (!email || !pwd) return
+  document.getElementById('login-btn').textContent = 'Connexion…'
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pwd })
+  if (error) {
+    document.getElementById('login-error').textContent = error.message
+    document.getElementById('login-error').style.display = 'block'
+    document.getElementById('login-btn').textContent = 'Se connecter'
+    return
+  }
+  const role = data.user.user_metadata?.role || 'terrain'
+  const nom  = data.user.user_metadata?.nom || email
+  startApp(data.user, role, nom)
+}
+
+function showDemo() { document.getElementById('login-form-card').style.display = 'none'; document.getElementById('demo-card').style.display = 'block' }
+function hideDemo() { document.getElementById('demo-card').style.display = 'none'; document.getElementById('login-form-card').style.display = 'block' }
+
+function setDemo(role) {
+  const names = { terrain: 'Agent Terrain', agent: 'Gestionnaire', direction: 'Direction RDZ' }
+  startApp({ email: 'demo@rdz.fr', user_metadata: { role, nom: names[role] } }, role, names[role])
+}
+
+async function doSignOut() {
+  await db.auth.signOut()
+  APP.user = null; APP.role = null
+  showScreen('login-screen')
+}
+
+function startApp(user, role, nom) {
+  APP.user = user; APP.role = role
+  showScreen(role === 'terrain' ? 'mobile-screen' : 'bureau-screen')
+  if (role !== 'terrain') {
+    document.getElementById('sb-user-name').textContent = nom
+    document.getElementById('sb-user-role').textContent = role
+    buildSidebar()
+  }
+  loadData()
+  syncAgentsRH()
+  if (APP.isOnline && APP.offlineQueue.length) syncNow()
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+}
+
+function mobileNav(tab) {
+  APP.mobileTab = tab
+  document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'))
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('tab-' + tab).classList.add('active')
+  document.getElementById('mnav-' + tab).classList.add('active')
+  if (tab === 'accueil') renderAccueil()
+  else if (tab === 'stock') renderMobileStock()
+  else if (tab === 'inventaire') renderInventaire()
+  else if (tab === 'prets') renderPrets()
+}
+
+function bureauNav(page) {
+  APP.bureauPage = page
+  document.querySelectorAll('.bureau-page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-' + page).classList.add('active')
+  document.getElementById('sb-btn-' + page)?.classList.add('active')
+  if (page === 'dashboard')    renderDashboard()
+  else if (page === 'stock')   renderBureauStock()
+  else if (page === 'articles') renderArticles()
+  else if (page === 'agents')  renderAgents()
+  else if (page === 'inventaires') renderInventaires()
+  else if (page === 'commandes')   renderCommandes()
+  else if (page === 'parametres')  renderParametres()
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed')
+}
+
+// ═══════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════
+function updateStatusBar(state) {
+  const bar  = document.getElementById('status-bar')
+  const dot  = document.getElementById('status-dot')
+  const txt  = document.getElementById('status-text')
+  const sbtn = document.getElementById('sync-now-btn')
+  const n    = APP.offlineQueue.length
+  bar.className = ''
+  sbtn.style.display = 'none'
+  if (!APP.isOnline) {
+    bar.classList.add('offline')
+    dot.style.background = '#EF9F27'
+    txt.textContent = `Hors-ligne — ${n} opération${n>1?'s':''} en attente`
+  } else if (state === 'syncing') {
+    bar.classList.add('syncing')
+    dot.style.background = '#1D9E75'
+    txt.textContent = 'Synchronisation en cours…'
+  } else if (n > 0) {
+    bar.classList.add('syncing')
+    dot.style.background = '#1D9E75'
+    txt.textContent = `${n} opération${n>1?'s':''} à synchroniser`
+    sbtn.style.display = 'block'
+  }
+}
+
+// ═══════════════════════════════════════════════
+// RENDER GLOBAL
+// ═══════════════════════════════════════════════
+function render() {
+  if (APP.mobileTab === 'accueil') renderAccueil()
+  else if (APP.mobileTab === 'stock') renderMobileStock()
+  else if (APP.mobileTab === 'inventaire') renderInventaire()
+  else if (APP.mobileTab === 'prets') renderPrets()
+  if (APP.bureauPage === 'dashboard') renderDashboard()
+  else if (APP.bureauPage === 'stock') renderBureauStock()
+  else if (APP.bureauPage === 'articles') renderArticles()
+  else if (APP.bureauPage === 'agents') renderAgents()
+  else if (APP.bureauPage === 'inventaires') renderInventaires()
+  else if (APP.bureauPage === 'commandes') renderCommandes()
+}
+
+// ═══════════════════════════════════════════════
+// ACCUEIL MOBILE
+// ═══════════════════════════════════════════════
+function renderAccueil() {
+  const h = new Date().getHours()
+  const salut = h<12 ? 'Bonjour' : h<18 ? 'Bon après-midi' : 'Bonsoir'
+  const nom = (APP.user?.user_metadata?.nom || 'Agent').split(' ')[0]
+  document.getElementById('m-salut').textContent = salut + ', ' + nom + ' 👋'
+  document.getElementById('m-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long' })
+
+  const alertes = APP.stock.filter(s => (s.quantite||0) <= (s.seuil_alerte||3))
+  const bannerEl = document.getElementById('m-online-banner')
+  bannerEl.innerHTML = `<div class="online-banner">
+    <div class="online-dot" style="background:${APP.isOnline?'#1D9E75':'#EF9F27'}"></div>
+    <div class="online-text" style="color:${APP.isOnline?'#9FE1CB':'#FAC775'}">${APP.isOnline ? 'En ligne — données synchronisées' : 'Hors-ligne — saisie locale active'}</div>
+  </div>`
+
+  const alertEl = document.getElementById('m-alertes')
+  if (alertes.length) {
+    alertEl.innerHTML = `<div class="alert-banner">
+      <div class="alert-title">⚠ ${alertes.length} article${alertes.length>1?'s':''} en stock bas</div>
+      ${alertes.slice(0,3).map(s=>`<div class="alert-row"><span>${s.articles?.nom||'Article'}</span><span><b>${s.quantite}</b> restant${s.quantite>1?'s':''}</span></div>`).join('')}
+    </div>`
+  } else { alertEl.innerHTML = '' }
+}
+
+// ═══════════════════════════════════════════════
+// STOCK MOBILE
+// ═══════════════════════════════════════════════
+const CATS = ['Tous','Polos','Pantalons','Vestes','Patchs','Matériel','Autre']
+
+function renderMobileStock() {
+  const catsEl = document.getElementById('m-stock-cats')
+  catsEl.innerHTML = CATS.map(c => `<button class="filter-btn${APP.stockFilter===c?' active':''}" onclick="setStockCat('${c}')">${c}</button>`).join('')
+  const list = document.getElementById('m-stock-list')
+  const filtered = APP.stockFilter==='Tous' ? APP.stock : APP.stock.filter(s=>s.articles?.categorie===APP.stockFilter)
+  if (!filtered.length) { list.innerHTML = '<div class="table-empty">Aucun article</div>'; return }
+  list.innerHTML = filtered.map(s => {
+    const q = s.quantite||0
+    const alert = q <= (s.seuil_alerte||3)
+    return `<div class="mobile-list-item" style="background:${alert?'rgba(26,15,0,0.3)':'transparent'};flex-direction:column;align-items:stretch;gap:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="item-info">
+          <div class="item-name">${s.articles?.nom||'Article'} ${alert?'<span class="badge badge-amber" style="font-size:10px">Bas</span>':''}</div>
+          <div class="item-sub">${s.articles?.reference||''} ${s.articles?.taille?'· T.'+s.articles.taille:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:22px;font-weight:700;color:${alert?'#EF9F27':'#fff'};line-height:1">${q}</div>
+          <div style="font-size:10px;color:var(--text3)">en stock</div>
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="mini-btn mini-btn-green" onclick="openEntree('${s.id}','${(s.articles?.nom||'').replace(/'/g,"\\'")}')">↑ Entrée</button>
+        <button class="mini-btn mini-btn-red" onclick="doRebus('${s.id}','${(s.articles?.nom||'').replace(/'/g,"\\'")}')">↓ Rebus</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function setStockCat(cat) { APP.stockFilter = cat; renderMobileStock() }
+
+function openEntree(stockId, nom) {
+  APP.entreeStock = stockId; APP.entreeQty = 1; APP.entreeMotif = 'achat'
+  document.getElementById('modal-entree-title').textContent = 'Entrée — ' + nom
+  document.getElementById('entree-qty-val').textContent = 1
+  setMotif('achat')
+  document.getElementById('modal-entree').classList.add('open')
+}
+
+function adjEntreeQty(d) {
+  APP.entreeQty = Math.max(1, APP.entreeQty + d)
+  document.getElementById('entree-qty-val').textContent = APP.entreeQty
+}
+
+function setMotif(m) {
+  APP.entreeMotif = m
+  document.getElementById('motif-achat').classList.toggle('active', m==='achat')
+  document.getElementById('motif-reint').classList.toggle('active', m==='reintegration')
+}
+
+async function confirmEntree() {
+  await sbRPC('ajuster_stock', { p_stock_id: APP.entreeStock, p_delta: APP.entreeQty })
+  await sbInsert('mouvements', { id: uid(), stock_id: APP.entreeStock, delta: APP.entreeQty, type:'entree', motif: APP.entreeMotif, created_at: now(), updated_at: now() })
+  closeModal('modal-entree')
+  await loadData()
+}
+
+async function doRebus(stockId, nom) {
+  if (!confirm(`Mettre 1 unité de "${nom}" au rebus ?`)) return
+  await sbRPC('ajuster_stock', { p_stock_id: stockId, p_delta: -1 })
+  await sbInsert('mouvements', { id: uid(), stock_id: stockId, delta: -1, type:'rebus', motif:'rebus', created_at: now(), updated_at: now() })
+  await loadData()
+}
+
+// ═══════════════════════════════════════════════
+// INVENTAIRE MOBILE
+// ═══════════════════════════════════════════════
+function renderInventaire() {
+  document.getElementById('inv-date').textContent = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' })
+  renderInvSteps()
+  renderInvContent()
+}
+
+function renderInvSteps() {
+  const s = APP.invStep
+  document.getElementById('inv-steps').innerHTML = `
+    <div class="step-dot ${s>1?'done':s===1?'current':'todo'}">${s>1?'✓':'1'}</div>
+    <div class="step-line"></div>
+    <div class="step-dot ${s>2?'done':s===2?'current':'todo'}">${s>2?'✓':'2'}</div>
+    <div class="step-line"></div>
+    <div class="step-dot ${s===3?'current':'todo'}">3</div>
+    <span class="step-label">${['','Saisie','Récap','Confirmé'][s]}</span>`
+}
+
+function renderInvContent() {
+  const el = document.getElementById('inv-content')
+  if (APP.invStep === 1) {
+    const saisis = Object.keys(APP.invComptes).length
+    el.innerHTML = `
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--text3)">
+        <span>Théorique / Saisi / Écart</span><span>${saisis}/${APP.stock.length} saisis</span>
+      </div>
+      ${APP.stock.map(s => {
+        const compte = APP.invComptes[s.id] !== undefined ? APP.invComptes[s.id] : (s.quantite||0)
+        const e = APP.invComptes[s.id] !== undefined ? compte - (s.quantite||0) : null
+        const ebClass = e===null?'':e===0?'eb-ok':e<0?'eb-neg':'eb-pos'
+        const ebLabel = e===null?'':''+( e===0?'=':e>0?'+'+e:e)
+        return `<div class="mobile-list-item" style="cursor:default">
+          <div class="item-info">
+            <div class="item-name">${s.articles?.nom||'Article'}</div>
+            <div class="item-sub">${s.articles?.reference||''} · Théo: ${s.quantite||0}</div>
+          </div>
+          <div class="qty-ctrl">
+            <button class="qty-btn" onclick="adjInv('${s.id}',-1)">−</button>
+            <span class="qty-val" id="iv-${s.id}">${compte}</span>
+            <button class="qty-btn" onclick="adjInv('${s.id}',1)">+</button>
+          </div>
+          <span class="ecart-badge ${ebClass}" id="ie-${s.id}">${ebLabel}</span>
+        </div>`
+      }).join('')}
+      <div class="bottom-bar">
+        <button class="btn btn-primary" onclick="invNext()">Voir le récapitulatif →</button>
+      </div>`
+  } else if (APP.invStep === 2) {
+    const avecEcart = APP.stock.filter(s => APP.invComptes[s.id]!==undefined && APP.invComptes[s.id]!==(s.quantite||0))
+    const conformes = APP.stock.filter(s => APP.invComptes[s.id]!==undefined && APP.invComptes[s.id]===(s.quantite||0))
+    const total = Object.keys(APP.invComptes).length
+    const taux  = total ? Math.round(conformes.length/total*100) : 0
+    el.innerHTML = `<div style="padding:16px">
+      <div class="summary-card">
+        <div class="summary-row"><span>Articles contrôlés</span><span style="font-weight:600;color:var(--text)">${total}</span></div>
+        <div class="summary-row"><span>Sans écart</span><span style="font-weight:600;color:#1D9E75">${conformes.length}</span></div>
+        <div class="summary-row"><span>Avec écart</span><span style="font-weight:600;color:${avecEcart.length?'#E24B4A':'#1D9E75'}">${avecEcart.length}</span></div>
+        <div class="summary-row total"><span>Taux de conformité</span><span>${taux}%</span></div>
+      </div>
+      ${avecEcart.length ? `<div style="font-size:13px;font-weight:600;margin-bottom:10px">Écarts détectés</div>
+      ${avecEcart.map(s=>{const e=APP.invComptes[s.id]-(s.quantite||0);return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+        <div style="width:28px;height:28px;border-radius:6px;background:${e<0?'var(--red-l)':'#EAF3DE'};display:flex;align-items:center;justify-content:center">${e<0?'↓':'↑'}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${s.articles?.nom}</div><div style="font-size:11px;color:var(--text3)">Théo: ${s.quantite||0} · Compté: ${APP.invComptes[s.id]}</div></div>
+        <span class="ecart-badge ${e<0?'eb-neg':'eb-pos'}">${e>0?'+':''}${e}</span>
+      </div>`}).join('')}` : ''}
+      <div style="margin-top:14px">
+        <label class="flabel">Note / commentaire</label>
+        <textarea class="note-area" rows="2" placeholder="Observations…" id="inv-note" oninput="APP.invNote=this.value">${APP.invNote}</textarea>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" style="flex:1" onclick="APP.invStep=1;renderInvSteps();renderInvContent()">← Modifier</button>
+        <button class="btn btn-primary" style="flex:2" onclick="submitInventaire()">Soumettre ✓</button>
+      </div>
+    </div>`
+  } else {
+    el.innerHTML = `<div class="success-screen">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Inventaire enregistré</div>
+      <div class="success-sub">Disponible sur le bureau pour traitement</div>
+      <button class="btn btn-primary" onclick="resetInventaire()">Nouvel inventaire</button>
+    </div>`
+  }
+}
+
+function adjInv(stockId, d) {
+  const s = APP.stock.find(x=>x.id===stockId)
+  const current = APP.invComptes[stockId] !== undefined ? APP.invComptes[stockId] : (s?.quantite||0)
+  APP.invComptes[stockId] = Math.max(0, current + d)
+  const e = APP.invComptes[stockId] - (s?.quantite||0)
+  const valEl = document.getElementById('iv-'+stockId)
+  const eEl   = document.getElementById('ie-'+stockId)
+  if (valEl) valEl.textContent = APP.invComptes[stockId]
+  if (eEl) {
+    eEl.textContent = e===0?'=':e>0?'+'+e:''+e
+    eEl.className = 'ecart-badge ' + (e===0?'eb-ok':e<0?'eb-neg':'eb-pos')
+  }
+}
+
+function invNext() { APP.invStep = 2; renderInvSteps(); renderInvContent() }
+
+async function submitInventaire() {
+  const invId = uid()
+  await sbInsert('inventaires', { id: invId, note: APP.invNote, statut:'soumis', created_at: now(), updated_at: now() })
+  const lignes = APP.stock.filter(s=>APP.invComptes[s.id]!==undefined).map(s=>({
+    id: uid(), inventaire_id: invId, stock_id: s.id,
+    quantite_theorique: s.quantite||0, quantite_comptee: APP.invComptes[s.id], created_at: now()
+  }))
+  for (const l of lignes) await sbInsert('lignes_inventaire', l)
+  APP.invStep = 3; renderInvSteps(); renderInvContent()
+}
+
+function resetInventaire() { APP.invStep=1; APP.invComptes={}; APP.invNote=''; renderInvSteps(); renderInvContent() }
+
+// ═══════════════════════════════════════════════
+// PRÊTS MOBILE
+// ═══════════════════════════════════════════════
+const AV_COLORS = ['#E6F1FB','#E1F5EE','#EEEDFE','#FAEEDA','#FAECE7']
+const ini = (n,p) => ((p?.[0]||'')+(n?.[0]||'')).toUpperCase()||'?'
+
+function agentPrets(id) { return APP.prets.filter(p=>p.agent_id===id) }
+
+function showPretMode(mode) { APP.pretMode=mode; APP.pretStep=1; APP.pretAgent=null; APP.pretQtys={}; APP.retourAgent=null; APP.retours={}; renderPrets() }
+
+function renderPrets() {
+  const title  = document.getElementById('prets-title')
+  const actions= document.getElementById('prets-actions')
+  const content= document.getElementById('prets-content')
+
+  if (APP.pretMode === 'list') {
+    title.textContent = 'Agents'
+    actions.innerHTML = `<button class="btn btn-primary btn-sm" onclick="showPretMode('new')">+ Prêt</button><button class="btn btn-ghost btn-sm" onclick="showPretMode('retour')">↩ Retour</button>`
+    content.innerHTML = APP.agents.length
+      ? APP.agents.map((a,i)=>{const nb=agentPrets(a.id).length;return`<div class="mobile-list-item">
+          <div class="avatar" style="background:${AV_COLORS[i%AV_COLORS.length]};color:#185FA5">${ini(a.nom,a.prenom)}</div>
+          <div class="item-info"><div class="item-name">${a.prenom} ${a.nom}</div><div class="item-sub">${a.brigade||'—'}</div></div>
+          <span class="badge ${nb>0?'badge-blue':'badge-gray'}">${nb} art.</span>
+        </div>`}).join('')
+      : '<div class="table-empty">Aucun agent</div>'
+
+  } else if (APP.pretMode === 'new' && APP.pretStep === 1) {
+    title.textContent = 'Nouveau prêt'
+    actions.innerHTML = `<button class="back-btn" onclick="showPretMode('list')">←</button>`
+    content.innerHTML = `<div style="font-size:12px;color:var(--text3);padding:10px 16px">Choisir un agent</div>` +
+      APP.agents.map((a,i)=>`<div class="mobile-list-item" onclick="pretSelectAgent('${a.id}')">
+        <div class="avatar" style="background:${AV_COLORS[i%AV_COLORS.length]};color:#185FA5">${ini(a.nom,a.prenom)}</div>
+        <div class="item-info"><div class="item-name">${a.prenom} ${a.nom}</div><div class="item-sub">${a.brigade||'—'}</div></div>
+        <span style="color:var(--text3)">›</span>
+      </div>`).join('')
+
+  } else if (APP.pretMode === 'new' && APP.pretStep === 2) {
+    const a = APP.pretAgent
+    title.textContent = `${a.prenom} ${a.nom}`
+    actions.innerHTML = `<button class="back-btn" onclick="APP.pretStep=1;renderPrets()">←</button>`
+    const dispo = APP.stock.filter(s=>(s.quantite||0)>0)
+    content.innerHTML = dispo.map(s=>`<div class="mobile-list-item" style="cursor:default">
+      <div class="item-info">
+        <div class="item-name">${s.articles?.nom||'Article'}</div>
+        <div class="item-sub">${s.articles?.taille?'T.'+s.articles.taille+' · ':''} Dispo: ${s.quantite}</div>
+      </div>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="adjPretQty('${s.id}',-1,${s.quantite})">−</button>
+        <span class="qty-val" id="pq-${s.id}">${APP.pretQtys[s.id]||0}</span>
+        <button class="qty-btn" onclick="adjPretQty('${s.id}',1,${s.quantite})">+</button>
+      </div>
+    </div>`).join('') +
+    `<div class="bottom-bar"><button class="btn btn-primary" onclick="confirmPret()">Confirmer le prêt ✓</button></div>`
+
+  } else if (APP.pretMode === 'retour' && !APP.retourAgent) {
+    title.textContent = 'Retour'
+    actions.innerHTML = `<button class="back-btn" onclick="showPretMode('list')">←</button>`
+    const avecPrets = APP.agents.filter(a=>agentPrets(a.id).length>0)
+    content.innerHTML = avecPrets.length
+      ? avecPrets.map((a,i)=>`<div class="mobile-list-item" onclick="retourSelectAgent('${a.id}')">
+          <div class="avatar" style="background:${AV_COLORS[i%AV_COLORS.length]};color:#185FA5">${ini(a.nom,a.prenom)}</div>
+          <div class="item-info"><div class="item-name">${a.prenom} ${a.nom}</div><div class="item-sub">${agentPrets(a.id).length} article${agentPrets(a.id).length>1?'s':''} en dotation</div></div>
+          <span style="color:var(--text3)">›</span>
+        </div>`).join('')
+      : '<div class="table-empty">Aucun prêt actif</div>'
+
+  } else if (APP.pretMode === 'retour' && APP.retourAgent) {
+    const a = APP.retourAgent
+    title.textContent = `Retour — ${a.prenom} ${a.nom}`
+    actions.innerHTML = `<button class="back-btn" onclick="APP.retourAgent=null;renderPrets()">←</button>`
+    const ap = agentPrets(a.id)
+    content.innerHTML = ap.map(p=>{
+      const r = APP.retours[p.id]||{}
+      return `<div class="checkbox-item" onclick="toggleRetour('${p.id}')">
+        <div class="cb${r.checked?' checked':''}"><span style="color:#fff;font-size:13px">${r.checked?'✓':''}</span></div>
+        <div class="item-info">
+          <div class="item-name">${p.stock?.articles?.nom||'Article'} × ${p.quantite}</div>
+          <div class="item-sub">Prêté le ${new Date(p.date_pret).toLocaleDateString('fr-FR')}</div>
+        </div>
+      </div>
+      ${r.checked ? `<div class="etat-zone"><label>État au retour :</label>
+        <div class="etat-btns">
+          <button class="etat-btn ${r.etat==='bon'?'selected-bon':''}" onclick="setRetourEtat('${p.id}','bon')">Bon état</button>
+          <button class="etat-btn ${r.etat==='use'?'selected-use':''}" onclick="setRetourEtat('${p.id}','use')">Usé</button>
+          <button class="etat-btn ${r.etat==='rebus'?'selected-rebus':''}" onclick="setRetourEtat('${p.id}','rebus')">Détérioré → rebus</button>
+        </div>
+      </div>` : ''}` }).join('') +
+      `<div class="bottom-bar"><button class="btn btn-primary" onclick="confirmRetour()" ${Object.values(APP.retours).some(r=>r.checked)?'':'disabled style="opacity:.5"'}>Valider le retour ✓</button></div>`
+  }
+}
+
+function pretSelectAgent(id) { APP.pretAgent = APP.agents.find(a=>a.id===id); APP.pretStep=2; renderPrets() }
+function retourSelectAgent(id) { APP.retourAgent = APP.agents.find(a=>a.id===id); renderPrets() }
+function adjPretQty(sid, d, max) {
+  APP.pretQtys[sid] = Math.min(max, Math.max(0, (APP.pretQtys[sid]||0)+d))
+  const el = document.getElementById('pq-'+sid)
+  if (el) el.textContent = APP.pretQtys[sid]
+}
+function toggleRetour(pid) {
+  if (!APP.retours[pid]) APP.retours[pid] = { checked: false, etat:'bon' }
+  APP.retours[pid].checked = !APP.retours[pid].checked
+  renderPrets()
+}
+function setRetourEtat(pid, etat) { if (!APP.retours[pid]) APP.retours[pid]={checked:true}; APP.retours[pid].etat=etat; renderPrets() }
+
+async function confirmPret() {
+  for (const [sid, qty] of Object.entries(APP.pretQtys)) {
+    if (qty <= 0) continue
+    await sbInsert('prets', { id:uid(), agent_id:APP.pretAgent.id, stock_id:sid, quantite:qty, actif:true, date_pret:now(), created_at:now(), updated_at:now() })
+    await sbRPC('ajuster_stock', { p_stock_id:sid, p_delta:-qty })
+  }
+  showPretMode('list')
+  await loadData()
+}
+
+async function confirmRetour() {
+  for (const [pid, info] of Object.entries(APP.retours)) {
+    if (!info.checked) continue
+    const pret = APP.prets.find(p=>p.id===pid)
+    await sbUpdate('prets', pid, { actif:false, date_retour:now(), etat_retour:info.etat, motif_retour:'', updated_at:now() })
+    if (pret && info.etat !== 'rebus') {
+      await sbRPC('ajuster_stock', { p_stock_id:pret.stock_id, p_delta:pret.quantite })
+    }
+  }
+  showPretMode('list')
+  await loadData()
+}
+
+// ═══════════════════════════════════════════════
+// BUREAU — SIDEBAR
+// ═══════════════════════════════════════════════
+function buildSidebar() {
+  const NAV = [
+    { id:'dashboard',   label:'Tableau de bord', icon:'⊞', roles:['agent','direction'] },
+    { id:'stock',       label:'Stock',            icon:'📦', roles:['agent','direction'] },
+    { id:'articles',    label:'Articles',          icon:'✏', roles:['agent','direction'] },
+    { id:'agents',      label:'Agents & prêts',   icon:'👥', roles:['agent','direction'] },
+    { id:'inventaires', label:'Inventaires',       icon:'✓', roles:['agent','direction'] },
+    { id:'commandes',   label:'Commandes',         icon:'🛒', roles:['direction'] },
+    { id:'parametres',  label:'Paramètres',        icon:'⚙', roles:['direction'] },
+  ]
+  const nav = NAV.filter(n=>n.roles.includes(APP.role))
+  document.getElementById('sidebar-nav').innerHTML = nav.map(n=>
+    `<button class="sidebar-btn${APP.bureauPage===n.id?' active':''}" id="sb-btn-${n.id}" onclick="bureauNav('${n.id}')">
+      <span class="sidebar-btn-icon">${n.icon}</span><span>${n.label}</span>
+    </button>`).join('')
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════
+function renderDashboard() {
+  const totalStock = APP.stock.reduce((s,i)=>s+(i.quantite||0),0)
+  const alertes    = APP.stock.filter(s=>(s.quantite||0)<=(s.seuil_alerte||3))
+  const totalPrets = APP.prets.reduce((s,p)=>s+(p.quantite||0),0)
+  document.getElementById('page-dashboard').innerHTML = `
+    <div class="page-header"><div><div class="page-title">Tableau de bord</div><div class="page-sub">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div></div>
+    <div class="grid-4">
+      <div class="card"><div class="kpi-label">Stock total</div><div class="kpi-val">${totalStock}</div><div class="kpi-sub">${APP.stock.length} références</div></div>
+      <div class="card"><div class="kpi-label">Alertes</div><div class="kpi-val" style="color:${alertes.length?'#EF9F27':'#1D9E75'}">${alertes.length}</div><div class="kpi-sub">sous le seuil</div></div>
+      <div class="card"><div class="kpi-label">Articles prêtés</div><div class="kpi-val" style="color:#85B7EB">${totalPrets}</div><div class="kpi-sub">${APP.prets.length} prêts actifs</div></div>
+      <div class="card"><div class="kpi-label">Agents</div><div class="kpi-val">${APP.agents.length}</div><div class="kpi-sub">enregistrés</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><div class="card-title">⚠ Stock bas</div>
+        ${alertes.length ? alertes.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+          <div><div style="font-weight:500">${s.articles?.nom}</div><div style="font-size:11px;color:var(--text3)">${s.articles?.categorie}</div></div>
+          <span style="font-weight:700;color:${s.quantite===0?'#E24B4A':'#EF9F27'}">${s.quantite}</span>
+        </div>`).join('') : '<div style="color:#1D9E75;font-size:13px">✓ Tous les stocks sont corrects</div>'}
+      </div>
+      <div class="card"><div class="card-title">Prêts récents</div>
+        ${APP.prets.length ? APP.prets.slice(0,5).map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+          <div><div style="font-weight:500">${p.agents?.prenom} ${p.agents?.nom}</div><div style="font-size:11px;color:var(--text3)">${p.stock?.articles?.nom} × ${p.quantite}</div></div>
+          <span style="font-size:11px;color:var(--text3)">${new Date(p.date_pret).toLocaleDateString('fr-FR')}</span>
+        </div>`).join('') : '<div style="color:var(--text3);font-size:13px">Aucun prêt actif</div>'}
+      </div>
+    </div>`
+}
+
+// ═══════════════════════════════════════════════
+// BUREAU STOCK
+// ═══════════════════════════════════════════════
+function renderBureauStock() {
+  const el = document.getElementById('page-stock')
+  const total   = APP.stock.reduce((s,i)=>s+(i.quantite||0),0)
+  const alertes = APP.stock.filter(s=>(s.quantite||0)<=(s.seuil_alerte||3)).length
+  el.innerHTML = `
+    <div class="page-header"><div><div class="page-title">Stock vestiaire</div><div class="page-sub">${total} articles · ${alertes} alerte${alertes!==1?'s':''}</div></div></div>
+    <input class="search-input" placeholder="Rechercher…" oninput="filterBureauStock(this.value)" id="stock-search">
+    <div class="table-wrap" id="stock-table">
+      <div class="table-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr auto">
+        <span>Article</span><span>Catégorie</span><span>Taille</span><span>Quantité</span><span>Seuil</span><span>Actions</span>
+      </div>
+      <div id="stock-rows"></div>
+    </div>`
+  renderBureauStockRows(APP.stock)
+}
+
+function filterBureauStock(q) {
+  const f = APP.stock.filter(s=>`${s.articles?.nom} ${s.articles?.reference}`.toLowerCase().includes(q.toLowerCase()))
+  renderBureauStockRows(f)
+}
+
+function renderBureauStockRows(items) {
+  document.getElementById('stock-rows').innerHTML = items.length
+    ? items.map(s=>{const q=s.quantite||0;const al=q<=(s.seuil_alerte||3);return`<div class="table-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;background:${al?'rgba(26,15,0,0.2)':'transparent'}">
+        <span style="font-weight:500">${s.articles?.nom}</span>
+        <span style="color:var(--text3)">${s.articles?.categorie}</span>
+        <span style="color:var(--text3)">${s.articles?.taille||'—'}</span>
+        <span style="font-weight:700;color:${al?'#EF9F27':'#fff'}">${q} ${al?'⚠':''}</span>
+        <span style="color:var(--text3)">${s.seuil_alerte||3}</span>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm" style="background:#0a1f12;border:0.5px solid #0F6E56;color:#9FE1CB" onclick="bureauAjuster('${s.id}',1)">+1</button>
+          <button class="btn btn-sm" style="background:#1a0a0a;border:0.5px solid #A32D2D;color:#F09595" onclick="bureauAjuster('${s.id}',-1)">−1</button>
+        </div>
+      </div>`}).join('')
+    : '<div class="table-empty">Aucun article</div>'
+}
+
+async function bureauAjuster(sid, d) {
+  const s = APP.stock.find(x=>x.id===sid)
+  if (!s) return
+  if (d<0 && (s.quantite||0)<=0) return
+  await sbRPC('ajuster_stock', { p_stock_id:sid, p_delta:d })
+  await loadData()
+}
+
+// ═══════════════════════════════════════════════
+// ARTICLES
+// ═══════════════════════════════════════════════
+function renderArticles() {
+  document.getElementById('page-articles').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Catalogue articles</div>
+      <button class="btn btn-primary" onclick="openArticle(null)">+ Nouvel article</button>
+    </div>
+    <input class="search-input" placeholder="Rechercher…" oninput="filterArticles(this.value)">
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr auto">
+        <span>Nom</span><span>Référence</span><span>Catégorie</span><span>Taille</span><span>Couleur</span><span></span>
+      </div>
+      <div id="art-rows"></div>
+    </div>`
+  renderArticleRows(APP.articles)
+}
+
+function filterArticles(q) {
+  renderArticleRows(APP.articles.filter(a=>`${a.nom} ${a.reference}`.toLowerCase().includes(q.toLowerCase())))
+}
+
+function renderArticleRows(items) {
+  document.getElementById('art-rows').innerHTML = items.length
+    ? items.map(a=>`<div class="table-row" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr auto">
+        <span style="font-weight:500">${a.nom}</span>
+        <span style="color:var(--text3);font-family:monospace;font-size:12px">${a.reference||'—'}</span>
+        <span><span class="badge badge-gray">${a.categorie}</span></span>
+        <span style="color:var(--text3)">${a.taille||'—'}</span>
+        <span style="color:var(--text3)">${a.couleur||'—'}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="openArticle('${a.id}')">Modifier</button>
+          <button class="btn btn-danger btn-sm" onclick="delArticle('${a.id}')">Suppr.</button>
+        </div>
+      </div>`).join('')
+    : '<div class="table-empty">Aucun article</div>'
+}
+
+function openArticle(id) {
+  APP.editingArticle = id
+  const a = id ? APP.articles.find(x=>x.id===id) : null
+  document.getElementById('modal-article-title').textContent = id ? 'Modifier l\'article' : 'Nouvel article'
+  document.getElementById('art-nom').value    = a?.nom||''
+  document.getElementById('art-ref').value    = a?.reference||''
+  document.getElementById('art-cat').value    = a?.categorie||'Polos'
+  document.getElementById('art-taille').value = a?.taille||''
+  document.getElementById('art-couleur').value= a?.couleur||''
+  document.getElementById('modal-article').classList.add('open')
+}
+
+async function saveArticle() {
+  const data = {
+    nom: document.getElementById('art-nom').value,
+    reference: document.getElementById('art-ref').value,
+    categorie: document.getElementById('art-cat').value,
+    taille: document.getElementById('art-taille').value,
+    couleur: document.getElementById('art-couleur').value,
+    updated_at: now()
+  }
+  if (!data.nom) return alert('Le nom est obligatoire')
+  if (APP.editingArticle) {
+    await sbUpdate('articles', APP.editingArticle, data)
+  } else {
+    await sbInsert('articles', { id:uid(), ...data, created_at:now() })
+  }
+  closeModal('modal-article')
+  await loadData()
+  renderArticles()
+}
+
+async function delArticle(id) {
+  const a = APP.articles.find(x=>x.id===id)
+  if (!confirm(`Supprimer "${a?.nom}" ?`)) return
+  await sbDelete('articles', id)
+  await loadData()
+  renderArticles()
+}
+
+// ═══════════════════════════════════════════════
+// AGENTS BUREAU
+// ═══════════════════════════════════════════════
+function renderAgents() {
+  document.getElementById('page-agents').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Agents & prêts</div>
+      <button class="btn btn-primary" onclick="openAgent()">+ Agent</button>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="table-wrap" id="agents-list">
+          ${APP.agents.map((a,i)=>{const nb=agentPrets(a.id).length;return`<div class="mobile-list-item" onclick="selectAgent('${a.id}')" style="cursor:pointer;background:${APP.selectedAgent?.id===a.id?'var(--blue-l)':'transparent'};border-left:2px solid ${APP.selectedAgent?.id===a.id?'var(--blue)':'transparent'}">
+            <div class="avatar" style="background:${AV_COLORS[i%AV_COLORS.length]};color:#185FA5">${ini(a.nom,a.prenom)}</div>
+            <div class="item-info"><div class="item-name">${a.prenom} ${a.nom}</div><div class="item-sub">${a.brigade||'—'}</div></div>
+            <span class="badge ${nb>0?'badge-blue':'badge-gray'}">${nb} art.</span>
+          </div>`}).join('')||'<div class="table-empty">Aucun agent</div>'}
+        </div>
+      </div>
+      <div id="agent-fiche"></div>
+    </div>`
+  if (APP.selectedAgent) renderAgentFiche()
+}
+
+function selectAgent(id) { APP.selectedAgent = APP.agents.find(a=>a.id===id); renderAgents() }
+
+function renderAgentFiche() {
+  const a  = APP.selectedAgent
+  const ap = agentPrets(a.id)
+  document.getElementById('agent-fiche').innerHTML = `
+    <h2 style="font-size:17px;font-weight:700;margin-bottom:14px">Fiche — ${a.prenom} ${a.nom}</h2>
+    <div class="card" style="margin-bottom:14px">
+      <div class="grid-2" style="gap:10px">
+        <div><div style="font-size:12px;color:var(--text3)">Brigade</div><div style="font-size:13px;margin-top:2px">${a.brigade||'—'}</div></div>
+        <div><div style="font-size:12px;color:var(--text3)">Email</div><div style="font-size:13px;margin-top:2px">${a.email||'—'}</div></div>
+        <div><div style="font-size:12px;color:var(--text3)">Créé le</div><div style="font-size:13px;margin-top:2px">${new Date(a.created_at).toLocaleDateString('fr-FR')}</div></div>
+      </div>
+    </div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:10px">Dotation actuelle (${ap.length})</div>
+    <div class="table-wrap">
+      ${ap.length ? ap.map(p=>`<div class="table-row" style="grid-template-columns:2fr 1fr 1fr 1fr">
+        <span style="font-weight:500">${p.stock?.articles?.nom||'Article'}</span>
+        <span style="color:var(--text3)">× ${p.quantite}</span>
+        <span style="color:var(--text3);font-size:12px">${new Date(p.date_pret).toLocaleDateString('fr-FR')}</span>
+        <span><span class="badge badge-green">Actif</span></span>
+      </div>`).join('') : '<div class="table-empty">Aucun article en dotation</div>'}
+    </div>`
+}
+
+function openAgent() {
+  document.getElementById('ag-nom').value = document.getElementById('ag-prenom').value = document.getElementById('ag-brigade').value = document.getElementById('ag-email').value = ''
+  document.getElementById('modal-agent').classList.add('open')
+}
+
+async function saveAgent() {
+  const nom    = document.getElementById('ag-nom').value
+  const prenom = document.getElementById('ag-prenom').value
+  if (!nom || !prenom) return alert('Nom et prénom obligatoires')
+  await sbInsert('agents', { id:uid(), nom, prenom, brigade:document.getElementById('ag-brigade').value, email:document.getElementById('ag-email').value, actif:true, created_at:now(), updated_at:now() })
+  closeModal('modal-agent')
+  await loadData()
+  renderAgents()
+}
+
+// ═══════════════════════════════════════════════
+// INVENTAIRES BUREAU
+// ═══════════════════════════════════════════════
+function renderInventaires() {
+  document.getElementById('page-inventaires').innerHTML = `
+    <div class="page-header"><div class="page-title">Inventaires</div></div>
+    <div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <span>Date</span><span>Articles</span><span>Statut</span><span>Note</span>
+      </div>
+      ${APP.inventaires.length ? APP.inventaires.map(inv=>`<div class="table-row" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <span>${new Date(inv.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})}</span>
+        <span style="color:var(--text3)">${inv.lignes_inventaire?.length||0}</span>
+        <span><span class="badge badge-green">${inv.statut}</span></span>
+        <span style="color:var(--text3);font-size:12px">${inv.note||'—'}</span>
+      </div>`).join('') : '<div class="table-empty">Aucun inventaire enregistré</div>'}
+    </div>`
+}
+
+// ═══════════════════════════════════════════════
+// COMMANDES
+// ═══════════════════════════════════════════════
+function renderCommandes() {
+  const alertes = APP.stock.filter(s=>(s.quantite||0)<=(s.seuil_alerte||3))
+  document.getElementById('page-commandes').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Bon de commande</div>
+      <button class="btn btn-primary" onclick="window.print()">Imprimer</button>
+    </div>
+    ${!alertes.length ? '<div class="card" style="color:#1D9E75;text-align:center;padding:32px">✓ Aucun article à commander</div>' :
+    `<div class="table-wrap">
+      <div class="table-head" style="grid-template-columns:2fr 1fr 1fr 1fr">
+        <span>Article</span><span>Référence</span><span>Stock actuel</span><span>À commander</span>
+      </div>
+      ${alertes.map(s=>`<div class="table-row" style="grid-template-columns:2fr 1fr 1fr 1fr">
+        <span style="font-weight:500">${s.articles?.nom}</span>
+        <span style="color:var(--text3);font-family:monospace;font-size:12px">${s.articles?.reference||'—'}</span>
+        <span style="color:#EF9F27;font-weight:700">${s.quantite||0}</span>
+        <input type="number" value="${Math.max(1,(s.seuil_alerte||3)*3-(s.quantite||0))}" min="1" style="width:70px;padding:4px 8px;background:var(--bg);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:13px">
+      </div>`).join('')}
+    </div>`}`
+}
+
+// ═══════════════════════════════════════════════
+// PARAMÈTRES
+// ═══════════════════════════════════════════════
+function renderParametres() {
+  document.getElementById('page-parametres').innerHTML = `
+    <div class="page-header"><div class="page-title">Paramètres</div></div>
+    <div style="max-width:540px">
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Base de données Stock</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;flex-shrink:0"></span>
+          <span style="font-size:13px;color:#9FE1CB">pdewmubikmotqzbxmyeq.supabase.co</span>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">Liaison module RH (lecture seule)</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#1D9E75;flex-shrink:0"></span>
+          <span style="font-size:13px;color:#9FE1CB">trdhtlcenmjlcvzuplid.supabase.co</span>
+        </div>
+        <p style="font-size:12px;color:var(--text3);margin-top:6px">Accès limité à v_agents_stock uniquement. Aucune donnée sensible accessible.</p>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-title">File d'attente hors-ligne</div>
+        <div style="font-size:13px">${APP.offlineQueue.length} opération${APP.offlineQueue.length!==1?'s':''} en attente</div>
+        ${APP.offlineQueue.length ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="syncNow()">Synchroniser maintenant</button>` : ''}
+      </div>
+      <button class="btn btn-ghost" onclick="doSignOut()">Se déconnecter</button>
+    </div>`
+}
+
+// ═══════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function uid() { return crypto.randomUUID() }
+function now() { return new Date().toISOString() }
+
+// ═══════════════════════════════════════════════
+// CONNEXION RÉSEAU
+// ═══════════════════════════════════════════════
+window.addEventListener('online',  () => { APP.isOnline=true;  updateStatusBar(); syncNow() })
+window.addEventListener('offline', () => { APP.isOnline=false; updateStatusBar() })
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+;(async function init() {
+  updateStatusBar()
+  document.getElementById('inv-date').textContent = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' })
+
+  // Vérifier session existante
+  const { data: { session } } = await db.auth.getSession()
+  if (session?.user) {
+    const role = session.user.user_metadata?.role || 'terrain'
+    const nom  = session.user.user_metadata?.nom || session.user.email
+    startApp(session.user, role, nom)
+  }
+
+  // Login sur Enter
+  document.getElementById('login-pwd').addEventListener('keydown', e => { if(e.key==='Enter') doLogin() })
+})()
+</script>
+</body>
+</html>
