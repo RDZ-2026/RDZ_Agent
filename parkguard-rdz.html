@@ -345,7 +345,12 @@ function toast(msg, ms=2500) {
   setTimeout(() => t.classList.remove('show'), ms);
 }
 function nowStr() { return new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function uid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
 
 // ═══ ONLINE/OFFLINE ═══
 function updateOnlineStatus() {
