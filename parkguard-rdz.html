@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ParkGuard RDZ">
+<meta name="theme-color" content="#D0021B">
+<title>ParkGuard RDZ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --red: #D0021B; --red-dark: #A80016; --red-light: #FFF0F1;
+  --black: #111111; --gray-dark: #444444; --gray-mid: #888888;
+  --gray-light: #F4F4F4; --gray-border: #E2E2E2; --white: #FFFFFF;
+  --green: #1A7A4A; --green-light: #EDF7F2;
+  --amber: #B45309; --amber-light: #FFFBEB;
+  --radius: 12px; --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-light); color: var(--black); }
+#app { height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; background: var(--white); position: relative; overflow: hidden; }
+.screen { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* TOPBAR */
+.topbar { background: var(--white); border-bottom: 1px solid var(--gray-border); padding: 0 16px; height: 56px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topbar-logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; color: var(--black); }
+.topbar-logo span { color: var(--red); }
+.topbar-title { font-size: 15px; font-weight: 600; flex: 1; }
+.topbar-sub { font-size: 11px; color: var(--gray-mid); margin-top: 1px; }
+.back-btn { background: none; border: none; cursor: pointer; padding: 8px; margin-left: -8px; color: var(--red); font-size: 26px; line-height: 1; display: flex; align-items: center; }
+
+/* SYNC BANNER */
+.sync-banner { padding: 7px 16px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sync-banner.offline { background: var(--amber-light); color: var(--amber); }
+.sync-banner.online { background: var(--green-light); color: var(--green); }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.sync-banner.offline .sync-dot { background: var(--amber); }
+.sync-banner.online .sync-dot { background: var(--green); }
+
+/* CONTENT */
+.content { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+.bottom-bar { padding: 12px 16px; background: var(--white); border-top: 1px solid var(--gray-border); flex-shrink: 0; }
+
+/* CARDS */
+.card { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: border-color 0.15s; }
+.card:active { border-color: var(--gray-mid); }
+.card-icon { width: 42px; height: 42px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background: var(--gray-light); }
+.card-icon.red { background: var(--red-light); }
+.card-name { font-size: 14px; font-weight: 600; }
+.card-meta { font-size: 12px; color: var(--gray-mid); margin-top: 2px; }
+.card-arrow { color: var(--gray-mid); font-size: 20px; margin-left: auto; flex-shrink: 0; }
+
+/* BADGES */
+.badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
+.badge-red { background: var(--red-light); color: var(--red-dark); }
+.badge-green { background: var(--green-light); color: var(--green); }
+.badge-amber { background: var(--amber-light); color: var(--amber); }
+.badge-gray { background: var(--gray-light); color: var(--gray-dark); }
+
+/* SECTION LABEL */
+.section-label { font-size: 11px; font-weight: 700; color: var(--gray-mid); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; margin-top: 20px; }
+.section-label:first-child { margin-top: 0; }
+
+/* ACTION BUTTONS */
+.action-btn { border: none; border-radius: var(--radius); padding: 18px 20px; width: 100%; display: flex; align-items: center; gap: 16px; cursor: pointer; font-family: inherit; transition: opacity 0.15s; margin-bottom: 10px; text-align: left; }
+.action-btn:active { opacity: 0.82; }
+.action-btn-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.action-btn-label { font-size: 17px; font-weight: 700; }
+.action-btn-sub { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+.btn-inf { background: var(--red); color: var(--white); }
+.btn-aut { background: var(--green); color: var(--white); }
+
+/* PROGRESS */
+.progress-wrap { height: 3px; background: var(--gray-light); border-radius: 3px; margin-bottom: 20px; }
+.progress-fill { height: 3px; background: var(--red); border-radius: 3px; transition: width 0.3s; }
+.progress-fill.green { background: var(--green); }
+
+/* STEP HEADER */
+.step-eyebrow { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+.step-eyebrow.green { color: var(--green); }
+.step-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+.step-sub { font-size: 14px; color: var(--gray-dark); line-height: 1.5; margin-bottom: 20px; }
+
+/* PHOTO ZONES */
+.photo-zone { border: 2px dashed var(--gray-border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; margin-bottom: 14px; transition: all 0.2s; position: relative; overflow: hidden; }
+.photo-zone:active { border-color: var(--red); }
+.photo-zone.taken { border-style: solid; border-color: var(--green); padding: 0; }
+.photo-zone.taken img { width: 100%; height: 160px; object-fit: cover; border-radius: 10px; display: block; }
+.photo-zone-inner { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.photo-zone-icon { font-size: 36px; }
+.photo-zone-label { font-size: 14px; font-weight: 600; }
+.photo-zone-sub { font-size: 12px; color: var(--gray-mid); }
+.photo-taken-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(26,122,74,0.88); padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: white; }
+.photo-retake { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); color: white; border: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+
+/* FIELDS */
+.field-group { margin-bottom: 14px; }
+.field-label { font-size: 11px; font-weight: 700; color: var(--gray-dark); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
+.field-input { width: 100%; padding: 12px 14px; font-size: 16px; border: 1.5px solid var(--gray-border); border-radius: var(--radius-sm); background: var(--white); color: var(--black); font-family: inherit; transition: border-color 0.15s; }
+.field-input:focus { outline: none; border-color: var(--red); }
+.field-select { width: 100%; padding: 12px 14px; font-size: 15px; border: 1.5px solid var(--gray-border); border-radius: var(--radius-sm); background: var(--white); color: var(--black); font-family: inherit; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+
+/* BUTTONS */
+.primary-btn { width: 100%; padding: 15px; font-size: 16px; font-weight: 700; background: var(--red); color: var(--white); border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
+.primary-btn:disabled { background: var(--gray-border); color: var(--gray-mid); cursor: not-allowed; }
+.primary-btn:not(:disabled):active { opacity: 0.85; }
+.primary-btn.green { background: var(--green); }
+
+/* VEHICLE LIST */
+.vehicle-row { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius-sm); padding: 11px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.vehicle-plate { font-size: 14px; font-weight: 700; font-family: 'Courier New', monospace; flex: 1; letter-spacing: 0.05em; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat-box { background: var(--gray-light); border-radius: var(--radius-sm); padding: 14px; }
+.stat-val { font-size: 28px; font-weight: 800; }
+.stat-val.red { color: var(--red); }
+.stat-val.green { color: var(--green); }
+.stat-lbl { font-size: 12px; color: var(--gray-mid); margin-top: 2px; }
+
+/* RECAP */
+.recap-check { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--gray-light); font-size: 14px; }
+.recap-icon { font-size: 20px; flex-shrink: 0; }
+
+/* AGENT SELECTOR */
+.agent-chip { background: var(--gray-light); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; color: var(--black); }
+.agent-chip.active { background: var(--red); color: var(--white); }
+
+/* TOAST */
+.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--black); color: var(--white); padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; white-space: nowrap; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+input[type="file"] { display: none; }
+
+.rdz-bar { background: var(--black); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.rdz-bar-logo { font-size: 16px; font-weight: 900; color: var(--white); letter-spacing: 0.05em; }
+.rdz-bar-logo span { color: var(--red); }
+.rdz-bar-sub { font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════════ HOME ══════════════════ -->
+<div id="s-home" class="screen active">
+  <div class="rdz-bar">
+    <div>
+      <div class="rdz-bar-logo">PARK<span>GUARD</span></div>
+      <div class="rdz-bar-sub">RDZ Security</div>
+    </div>
+    <div id="home-sync-badge" class="badge badge-amber">● Hors ligne</div>
+  </div>
+  <div id="home-sync-banner" class="sync-banner offline">
+    <div class="sync-dot"></div>
+    <span id="home-sync-text">Hors ligne — données sauvegardées localement</span>
+  </div>
+  <div class="content">
+    <div class="section-label">Agent</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px" id="agent-chips"></div>
+
+    <div class="section-label" style="margin-top:20px">Choisir un site</div>
+    <div class="card" onclick="selectSite('Grange Canal')">
+      <div class="card-icon">🏢</div>
+      <div>
+        <div class="card-name">Grange Canal</div>
+        <div class="card-meta">Résidence privée</div>
+      </div>
+      <div class="card-arrow">›</div>
+    </div>
+    <div class="card" onclick="selectSite('Clair Matin')">
+      <div class="card-icon">🏘</div>
+      <div>
+        <div class="card-name">Clair Matin</div>
+        <div class="card-meta">Résidence privée</div>
+      </div>
+      <div class="card-arrow">›</div>
+    </div>
+
+    <div id="active-round-wrap" style="display:none">
+      <div class="section-label">Ronde en cours</div>
+      <div class="card card-icon red" id="active-round-card" onclick="showScreen('s-round')">
+        <div class="card-icon red">🅿️</div>
+        <div>
+          <div class="card-name" id="active-round-name">—</div>
+          <div class="card-meta" id="active-round-meta">Ronde en cours</div>
+        </div>
+        <div class="card-arrow">›</div>
+      </div>
+    </div>
+
+    <div id="pending-info" style="font-size:12px;color:var(--gray-mid);text-align:center;margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ RONDE ══════════════════ -->
+<div id="s-round" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="confirmEndRound()">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title" id="round-site-name">—</div>
+      <div class="topbar-sub" id="round-sub">Ronde en cours</div>
+    </div>
+    <button onclick="confirmEndRound()" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;font-weight:700">FIN</button>
+  </div>
+  <div class="content">
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-val red" id="r-inf">0</div><div class="stat-lbl">Infractions</div></div>
+      <div class="stat-box"><div class="stat-val green" id="r-aut">0</div><div class="stat-lbl">Autorisés</div></div>
+    </div>
+    <p style="font-size:14px;color:var(--gray-dark);margin-bottom:16px;font-weight:500">Statut du prochain véhicule :</p>
+    <button class="action-btn btn-inf" onclick="startFlow('infraction')">
+      <div class="action-btn-icon">⚠️</div>
+      <div><div class="action-btn-label">Infraction</div><div class="action-btn-sub">B31A · B37A · Sans macaron</div></div>
+    </button>
+    <button class="action-btn btn-aut" onclick="startFlow('autorise')">
+      <div class="action-btn-icon">✅</div>
+      <div><div class="action-btn-label">Autorisé</div><div class="action-btn-sub">Macaron valide</div></div>
+    </button>
+    <div class="section-label" style="margin-top:20px">Véhicules traités</div>
+    <div id="vehicle-list"><p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════ FLOW SCREEN ══════════════════ -->
+<div id="s-flow" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title" id="flow-title">—</div>
+      <div class="topbar-sub" id="flow-step-label">Étape 1</div>
+    </div>
+    <div class="badge" id="flow-badge">—</div>
+  </div>
+  <div class="content" id="flow-content"></div>
+  <div class="bottom-bar" id="flow-bottom"></div>
+</div>
+
+<!-- ══════════════════ RECAP ══════════════════ -->
+<div id="s-recap" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge" id="recap-sync-badge" style="margin-left:auto">⏳ Sync</div>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px" id="recap-icon">📋</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px" id="recap-title">—</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-meta">—</div>
+    </div>
+    <div id="recap-checks"></div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
+      🤖 <strong>Extraction IA :</strong> Plaque, N° dénonciation et N° macaron seront extraits automatiquement lors de la synchronisation.
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" id="recap-next-btn" onclick="showScreen('s-round')">Véhicule suivant</button>
+  </div>
+</div>
+
+</div>
+<div id="toast" class="toast"></div>
+<input type="file" id="file-input" accept="image/*" capture="environment">
+
+<script>
+const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ═══ AGENTS (sans login — sélection simple) ═══
+const AGENTS = ['Agent 1', 'Agent 2', 'Agent 3', 'Agent RDZ'];
+let currentAgent = AGENTS[0];
+let currentSite = null;
+let currentRoundId = null;
+let roundVehicles = [];
+let isOnline = navigator.onLine;
+let pendingFileCallback = null;
+
+// Flow state
+let flowType = null; // 'infraction' | 'autorise'
+let flowStep = 0;
+let flowPhotos = {};  // key -> dataUrl
+let flowBlobs = {};   // key -> File
+let flowFields = {};
+
+// ═══ STEP DEFINITIONS ═══
+const STEPS = {
+  infraction: [
+    { key: 'vehicule',     label: 'Véhicule',       sub: 'Photographiez le véhicule. Plaque et couleur visibles.',           photo: { key: 'vehicule', hint: 'Plaque + couleur visibles' } },
+    { key: 'motif',        label: 'Infraction',      sub: 'Sélectionnez le motif et ajoutez une remarque si nécessaire.',    fields: [
+      { key: 'motif', label: 'Motif', type: 'select', opts: ['B31A - Stationner sans vignette', 'B37A - Interdiction de circuler', 'Macaron expiré', 'Mauvaise zone', 'Autre'] },
+      { key: 'remarque', label: 'Remarque (optionnel)', type: 'text', placeholder: 'Ex: présent depuis 3 jours...' }
+    ]},
+    { key: 'denonciation', label: 'Dénonciation',    sub: 'Remplissez la dénonciation papier, puis photographiez-la.',       photo: { key: 'denonciation', hint: 'Texte entièrement lisible' } },
+    { key: 'parebrise',    label: 'Pare-brise',      sub: 'Photographiez le pare-brise — 4 coins visibles, aucun macaron.',  photo: { key: 'parebrise', hint: '4 coins visibles' } }
+  ],
+  autorise: [
+    { key: 'vehicule', label: 'Véhicule', sub: 'Photographiez le véhicule. La plaque doit être lisible.', photo: { key: 'vehicule', hint: 'Plaque entière visible' } },
+    { key: 'macaron',  label: 'Macaron',  sub: 'Photographiez le macaron. L\'IA extraira le numéro.',    photo: { key: 'macaron', hint: 'Numéro lisible' } }
+  ]
+};
+
+// ═══ UTILS ═══
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function toast(msg, ms = 2500) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), ms); }
+function nowStr() { return new Date().toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' }); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ═══ ONLINE/OFFLINE ═══
+function updateOnlineStatus() {
+  isOnline = navigator.onLine;
+  const banner = document.getElementById('home-sync-banner');
+  const text = document.getElementById('home-sync-text');
+  const badge = document.getElementById('home-sync-badge');
+  if (isOnline) {
+    banner.className = 'sync-banner online';
+    text.textContent = 'En ligne — synchronisation automatique active';
+    badge.className = 'badge badge-green'; badge.textContent = '● En ligne';
+    syncPending();
+  } else {
+    banner.className = 'sync-banner offline';
+    text.textContent = 'Hors ligne — données sauvegardées localement';
+    badge.className = 'badge badge-amber'; badge.textContent = '● Hors ligne';
+  }
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// ═══ PENDING LOCAL STORAGE ═══
+function savePending(entry) {
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  p.push(entry); localStorage.setItem('pg_pending', JSON.stringify(p));
+  updatePendingInfo();
+}
+function updatePendingInfo() {
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  const el = document.getElementById('pending-info');
+  if (el) el.textContent = p.length > 0 ? `${p.length} entrée(s) en attente de synchronisation` : '';
+}
+async function syncPending() {
+  if (!isOnline) return;
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  if (!p.length) return;
+  const remaining = [];
+  for (const entry of p) {
+    try { const { error } = await db.from('vehicles').insert(entry); if (error) remaining.push(entry); }
+    catch(e) { remaining.push(entry); }
+  }
+  localStorage.setItem('pg_pending', JSON.stringify(remaining));
+  if (remaining.length < p.length) toast(`☁️ ${p.length - remaining.length} entrée(s) synchronisée(s)`);
+  updatePendingInfo();
+}
+
+// ═══ AGENT CHIPS ═══
+function renderAgentChips() {
+  document.getElementById('agent-chips').innerHTML = AGENTS.map(a =>
+    `<button class="agent-chip${a === currentAgent ? ' active' : ''}" onclick="selectAgent('${a}')">${a}</button>`
+  ).join('');
+}
+function selectAgent(name) { currentAgent = name; renderAgentChips(); }
+
+// ═══ SITE & ROUND ═══
+function selectSite(site) {
+  if (!currentAgent) { toast('Sélectionnez un agent'); return; }
+  currentSite = site;
+  currentRoundId = uid();
+  roundVehicles = [];
+  document.getElementById('round-site-name').textContent = site;
+  document.getElementById('round-sub').textContent = `Démarré à ${nowStr()} · ${currentAgent}`;
+  document.getElementById('active-round-wrap').style.display = 'block';
+  document.getElementById('active-round-name').textContent = site;
+  updateRoundStats();
+  showScreen('s-round');
+}
+function confirmEndRound() {
+  if (!roundVehicles.length || confirm(`Terminer la ronde sur ${currentSite} ?`)) {
+    const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+    const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+    toast(`Ronde terminée — ${inf} infraction(s), ${aut} autorisé(s)`);
+    currentSite = null; currentRoundId = null; roundVehicles = [];
+    document.getElementById('active-round-wrap').style.display = 'none';
+    showScreen('s-home');
+  }
+}
+function updateRoundStats() {
+  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('r-inf').textContent = inf;
+  document.getElementById('r-aut').textContent = aut;
+  document.getElementById('round-sub').textContent = `${roundVehicles.length} véhicule(s) · ${currentAgent}`;
+  document.getElementById('active-round-meta').textContent = `${roundVehicles.length} véhicule(s) traité(s)`;
+  const list = document.getElementById('vehicle-list');
+  if (!roundVehicles.length) { list.innerHTML = '<p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p>'; return; }
+  list.innerHTML = [...roundVehicles].reverse().map(v =>
+    `<div class="vehicle-row">
+      <div class="badge ${v.statut === 'infraction' ? 'badge-red' : 'badge-green'}">${v.statut === 'infraction' ? 'INF' : 'AUT'}</div>
+      <div class="vehicle-plate">${v.plaque || '— IA'}</div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:11px;color:var(--gray-mid)">${v.time}</div>
+        <div style="font-size:10px;color:${v.synced ? 'var(--green)' : 'var(--amber)'}">${v.synced ? '☁️ sync' : '📱 local'}</div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+// ═══ PHOTO INPUT ═══
+document.getElementById('file-input').addEventListener('change', function() {
+  if (this.files[0] && pendingFileCallback) {
+    const file = this.files[0];
+    const reader = new FileReader();
+    reader.onload = e => { pendingFileCallback(e.target.result, file); this.value = ''; };
+    reader.readAsDataURL(file);
+  }
+});
+function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
+
+// ═══ FLOW ═══
+function startFlow(type) {
+  flowType = type; flowStep = 0; flowPhotos = {}; flowBlobs = {}; flowFields = {};
+  if (type === 'infraction') { flowFields.motif = STEPS.infraction[1].fields[0].opts[0]; }
+  renderFlowStep();
+  showScreen('s-flow');
+}
+
+function renderFlowStep() {
+  const steps = STEPS[flowType];
+  const s = steps[flowStep];
+  const pct = Math.round(((flowStep + 1) / steps.length) * 100);
+  const isInf = flowType === 'infraction';
+  const color = isInf ? 'var(--red)' : 'var(--green)';
+
+  document.getElementById('flow-title').textContent = s.label;
+  document.getElementById('flow-step-label').textContent = `Étape ${flowStep + 1} / ${steps.length}`;
+  const badge = document.getElementById('flow-badge');
+  badge.textContent = isInf ? 'INFRACTION' : 'AUTORISÉ';
+  badge.className = `badge ${isInf ? 'badge-red' : 'badge-green'}`;
+
+  let html = `<div class="progress-wrap"><div class="progress-fill${isInf ? '' : ' green'}" style="width:${pct}%"></div></div>
+    <div class="step-eyebrow${isInf ? '' : ' green'}">Étape ${flowStep + 1} / ${steps.length}</div>
+    <div class="step-title">${s.label}</div>
+    <div class="step-sub">${s.sub}</div>`;
+
+  let canNext = true;
+
+  if (s.photo) {
+    const taken = flowPhotos[s.photo.key];
+    canNext = !!taken;
+    if (taken) {
+      html += `<div class="photo-zone taken" onclick="triggerCamera(cb => { flowPhotos['${s.photo.key}']=cb; renderFlowStep(); })">
+        <img src="${taken}">
+        <button class="photo-retake" onclick="event.stopPropagation();triggerCamera(function(d){flowPhotos['${s.photo.key}']=d;renderFlowStep();})">Reprendre</button>
+        <div class="photo-taken-bar">✅ Photo enregistrée</div>
+      </div>`;
+    } else {
+      html += `<div class="photo-zone" onclick="takeFlowPhoto('${s.photo.key}')">
+        <div class="photo-zone-inner">
+          <div class="photo-zone-icon">📷</div>
+          <div class="photo-zone-label">${s.label}</div>
+          <div class="photo-zone-sub">${s.photo.hint}</div>
+        </div>
+      </div>`;
+    }
+  }
+
+  if (s.fields) {
+    s.fields.forEach(f => {
+      html += `<div class="field-group"><label class="field-label">${f.label}</label>`;
+      if (f.type === 'select') {
+        html += `<select class="field-select" onchange="flowFields['${f.key}']=this.value">`;
+        f.opts.forEach(o => html += `<option${flowFields[f.key]===o?' selected':''}>${o}</option>`);
+        html += `</select>`;
+      } else {
+        html += `<input class="field-input" type="text" placeholder="${f.placeholder||''}" value="${flowFields[f.key]||''}" oninput="flowFields['${f.key}']=this.value">`;
+      }
+      html += `</div>`;
+    });
+  }
+
+  document.getElementById('flow-content').innerHTML = html;
+  const isLast = flowStep === steps.length - 1;
+  const btnLabel = isLast ? (flowType === 'infraction' ? 'Enregistrer l\'infraction' : 'Enregistrer') : 'Continuer';
+  document.getElementById('flow-bottom').innerHTML =
+    `<button class="primary-btn${isInf ? '' : ' green'}" ${canNext ? '' : 'disabled'} onclick="nextFlowStep()">${btnLabel}</button>`;
+}
+
+function takeFlowPhoto(key) {
+  triggerCamera((dataUrl, file) => {
+    flowPhotos[key] = dataUrl;
+    if (file) flowBlobs[key] = file;
+    renderFlowStep();
+  });
+}
+
+async function nextFlowStep() {
+  const steps = STEPS[flowType];
+  if (flowStep < steps.length - 1) {
+    flowStep++;
+    renderFlowStep();
+  } else {
+    await saveEntry();
+  }
+}
+
+// ═══ SAVE ═══
+async function saveEntry() {
+  const now = new Date().toISOString();
+  const time = nowStr();
+  const entry = {
+    round_id: currentRoundId,
+    site: currentSite,
+    agent_name: currentAgent,
+    statut: flowType,
+    motif: flowFields.motif || null,
+    remarque: flowFields.remarque || null,
+    plaque: null,
+    num_denonciation: null,
+    num_macaron: null,
+    photos_count: Object.keys(flowPhotos).length,
+    ia_pending: true,
+    created_at: now
+  };
+
+  let synced = false;
+  if (isOnline) {
+    try {
+      const { error } = await db.from('vehicles').insert(entry);
+      if (!error) synced = true;
+    } catch(e) {}
+  }
+  if (!synced) savePending(entry);
+
+  roundVehicles.push({ ...entry, time, synced });
+  updateRoundStats();
+
+  // RECAP
+  const isInf = flowType === 'infraction';
+  document.getElementById('recap-icon').textContent = isInf ? '📋' : '✅';
+  document.getElementById('recap-title').textContent = isInf ? 'Dénonciation enregistrée' : 'Véhicule autorisé enregistré';
+  document.getElementById('recap-meta').textContent = `${Object.keys(flowPhotos).length} photos · ${time}`;
+  const badge = document.getElementById('recap-sync-badge');
+  badge.textContent = synced ? '☁️ Synchronisé' : '⏳ En attente sync';
+  badge.className = `badge ${synced ? 'badge-green' : 'badge-amber'}`;
+  const btn = document.getElementById('recap-next-btn');
+  btn.className = `primary-btn${isInf ? '' : ' green'}`;
+
+  let checks = '';
+  if (isInf) {
+    checks = `
+      <div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>
+      <div class="recap-check"><div class="recap-icon">📋</div>Dénonciation photographiée</div>
+      <div class="recap-check"><div class="recap-icon">🪟</div>Pare-brise (4 coins) photographié</div>
+      <div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° dénonciation : extraction IA à la sync</div>`;
+  } else {
+    checks = `
+      <div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>
+      <div class="recap-check"><div class="recap-icon">🏷️</div>Photo du macaron enregistrée</div>
+      <div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° macaron : extraction IA à la sync</div>`;
+  }
+  document.getElementById('recap-checks').innerHTML = checks;
+  showScreen('s-recap');
+}
+
+// ═══ INIT ═══
+renderAgentChips();
+updateOnlineStatus();
+updatePendingInfo();
+</script>
+</body>
+</html>
