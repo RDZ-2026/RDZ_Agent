@@ -734,17 +734,68 @@ async function nextFlowStep() {
   else await saveEntry();
 }
 
+// ═══ UPLOAD PHOTO ═══
+async function uploadPhoto(blob, filename) {
+  try {
+    const { data, error } = await db.storage
+      .from('parkguard-photos')
+      .upload(filename, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+    if (error) throw error;
+    const { data: urlData } = db.storage.from('parkguard-photos').getPublicUrl(filename);
+    return urlData.publicUrl;
+  } catch(e) {
+    console.warn('Upload photo failed:', e.message);
+    return null;
+  }
+}
+
+async function uploadAllPhotos(entryId) {
+  const urls = {};
+  const photoMap = {
+    vehicule:     'photo_vehicule_url',
+    denonciation: 'photo_denonciation_url',
+    parebrise:    'photo_parebrise_url',
+    macaron:      'photo_macaron_url'
+  };
+  for (const [key, col] of Object.entries(photoMap)) {
+    if (!flowBlobs[key] && !flowPhotos[key]) continue;
+    const filename = entryId + '_' + key + '.jpg';
+    let url = null;
+    if (flowBlobs[key]) {
+      url = await uploadPhoto(flowBlobs[key], filename);
+    } else if (flowPhotos[key]) {
+      // Convertir dataUrl en blob
+      const res  = await fetch(flowPhotos[key]);
+      const blob = await res.blob();
+      url = await uploadPhoto(blob, filename);
+    }
+    if (url) urls[col] = url;
+  }
+  return urls;
+}
+
 // ═══ SAVE ENTRY ═══
 async function saveEntry() {
   const now  = new Date().toISOString();
   const time = nowStr();
+  const entryId = uid();
+
+  // Upload photos si en ligne
+  let photoUrls = {};
+  if (isOnline) {
+    toast('📸 Upload photos en cours...', 5000);
+    photoUrls = await uploadAllPhotos(entryId);
+  }
+
   const entry = {
+    id: entryId,
     round_id: currentRoundId, site: currentSite, agent_name: currentAgent,
     statut: flowType,
     motif: flowFields.motif || null, remarque: flowFields.remarque || null,
     plaque: null, num_denonciation: null, num_macaron: null,
     photos_count: Object.keys(flowPhotos).length,
-    ia_pending: true, created_at: now
+    ia_pending: true, created_at: now,
+    ...photoUrls
   };
 
   let synced = false;

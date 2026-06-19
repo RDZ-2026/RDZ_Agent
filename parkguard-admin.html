@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkGuard RDZ — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --red:#D0021B;--red-light:#FFF0F1;--red-dark:#A80016;
+  --black:#111;--gray-dark:#444;--gray-mid:#888;
+  --gray-light:#F4F4F4;--gray-border:#E2E2E2;--white:#FFF;
+  --green:#1A7A4A;--green-light:#EDF7F2;
+  --amber:#B45309;--amber-light:#FFFBEB;
+  --blue:#1A56A4;--blue-light:#EFF4FF;
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-light);color:var(--black);min-height:100vh}
+
+.topbar{background:var(--black);padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+.topbar-logo{font-size:18px;font-weight:900;color:var(--white);letter-spacing:-.5px}
+.topbar-logo span{color:var(--red)}
+.topbar-sub{font-size:12px;color:#666;margin-left:4px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+
+.container{max-width:1100px;margin:0 auto;padding:24px}
+
+.card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.card-sub{font-size:13px;color:var(--gray-mid);margin-bottom:16px}
+
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.badge-red{background:var(--red-light);color:var(--red-dark)}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-gray{background:var(--gray-light);color:var(--gray-dark)}
+
+.btn{padding:10px 18px;font-size:14px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:8px}
+.btn:active{opacity:.82}
+.btn-primary{background:var(--red);color:var(--white)}
+.btn-black{background:var(--black);color:var(--white)}
+.btn-outline{background:var(--white);color:var(--black);border:1.5px solid var(--gray-border)}
+.btn-green{background:var(--green);color:var(--white)}
+.btn-blue{background:var(--blue);color:var(--white)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-box{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:16px}
+.stat-val{font-size:28px;font-weight:800}
+.stat-val.red{color:var(--red)}
+.stat-val.green{color:var(--green)}
+.stat-val.amber{color:var(--amber)}
+.stat-val.blue{color:var(--blue)}
+.stat-lbl{font-size:12px;color:var(--gray-mid);margin-top:2px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--gray-border);background:var(--gray-light)}
+td{padding:10px 12px;border-bottom:1px solid var(--gray-light);vertical-align:middle}
+tr:hover td{background:#fafafa}
+.plate{font-family:'Courier New',monospace;font-weight:700;font-size:14px;letter-spacing:.05em}
+
+.photo-thumb{width:48px;height:36px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--gray-border)}
+.photo-thumb:hover{opacity:.8}
+.photos-cell{display:flex;gap:4px;flex-wrap:wrap}
+
+.ia-prompt-box{background:#1a1a2e;border-radius:var(--radius-sm);padding:16px;font-family:'Courier New',monospace;font-size:12px;color:#a0c4ff;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-bottom:12px;line-height:1.6}
+
+.result-input{width:100%;padding:10px 12px;font-size:13px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:'Courier New',monospace;min-height:120px;resize:vertical}
+.result-input:focus{outline:none;border-color:var(--blue)}
+
+.filter-row{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.filter-select{padding:8px 12px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:inherit}
+
+.progress-bar{height:4px;background:var(--gray-light);border-radius:4px;margin-top:8px;overflow:hidden}
+.progress-fill{height:4px;background:var(--red);border-radius:4px;transition:width .3s}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:var(--white);border-radius:var(--radius);padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
+
+.section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:20px}
+.section-label:first-child{margin-top:0}
+
+.inline-edit{display:flex;gap:8px;align-items:center}
+.inline-input{padding:6px 10px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;font-weight:700;width:140px}
+.inline-btn{padding:6px 12px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;background:var(--green);color:var(--white)}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">PARK<span>GUARD</span> <span class="topbar-sub">Admin</span></div>
+  <div class="topbar-right">
+    <div id="online-badge" class="badge badge-gray">⏳ Connexion...</div>
+    <span style="font-size:12px;color:#666" id="last-refresh"></span>
+    <button class="btn btn-outline" onclick="loadData()" style="padding:7px 14px;font-size:13px">🔄 Actualiser</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- STATS -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-box"><div class="stat-val red" id="s-inf">—</div><div class="stat-lbl">Infractions</div></div>
+    <div class="stat-box"><div class="stat-val green" id="s-aut">—</div><div class="stat-lbl">Autorisés</div></div>
+    <div class="stat-box"><div class="stat-val amber" id="s-ia">—</div><div class="stat-lbl">En attente IA</div></div>
+    <div class="stat-box"><div class="stat-val blue" id="s-total">—</div><div class="stat-lbl">Total véhicules</div></div>
+  </div>
+
+  <!-- ANALYSE IA -->
+  <div class="card">
+    <div class="card-title">🤖 Analyse IA — Extraction automatique</div>
+    <div class="card-sub">Génère un message prêt à coller dans Claude.ai. Claude analysera toutes les photos et retournera un JSON à coller ici pour mettre à jour la base.</div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-black" onclick="generateClaudePrompt()" id="btn-generate">✨ Générer le message pour Claude.ai</button>
+      <button class="btn btn-outline" onclick="document.getElementById('result-section').style.display='block'" id="btn-paste">📋 Coller le résultat de Claude</button>
+    </div>
+
+    <div id="prompt-section" style="display:none">
+      <div class="section-label">Message à copier et coller dans Claude.ai</div>
+      <div class="ia-prompt-box" id="ia-prompt-content"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-black" onclick="copyPrompt()">📋 Copier le message</button>
+        <a href="https://claude.ai" target="_blank" class="btn btn-outline">↗ Ouvrir Claude.ai</a>
+      </div>
+      <div style="font-size:12px;color:var(--gray-mid);margin-top:10px;line-height:1.6">
+        1. Copie le message ci-dessus · 2. Ouvre Claude.ai · 3. Colle le message et envoie · 4. Copie la réponse JSON de Claude · 5. Colle-la dans le champ ci-dessous
+      </div>
+    </div>
+
+    <div id="result-section" style="display:none;margin-top:16px">
+      <div class="section-label">Réponse JSON de Claude — à coller ici</div>
+      <textarea class="result-input" id="claude-result" placeholder='Colle ici le JSON retourné par Claude.ai...'></textarea>
+      <div style="margin-top:10px;display:flex;gap:10px">
+        <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
+        <button class="btn btn-outline" onclick="document.getElementById('result-section').style.display='none'">Annuler</button>
+      </div>
+      <div id="apply-progress" style="display:none;margin-top:10px">
+        <div style="font-size:13px;color:var(--gray-mid)" id="apply-status">Application en cours...</div>
+        <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTRES + TABLE -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Véhicules</div>
+      <button class="btn btn-outline" onclick="exportCSV()" style="padding:7px 14px;font-size:13px">📥 Export CSV</button>
+    </div>
+    <div class="filter-row">
+      <select class="filter-select" id="f-statut" onchange="renderTable()">
+        <option value="">Tous les statuts</option>
+        <option value="infraction">Infractions</option>
+        <option value="autorise">Autorisés</option>
+      </select>
+      <select class="filter-select" id="f-site" onchange="renderTable()">
+        <option value="">Tous les sites</option>
+        <option value="Grange Canal">Grange Canal</option>
+        <option value="Clair Matin">Clair Matin</option>
+      </select>
+      <select class="filter-select" id="f-ia" onchange="renderTable()">
+        <option value="">Tous</option>
+        <option value="true">IA en attente</option>
+        <option value="false">IA traitée</option>
+      </select>
+      <input type="date" class="filter-select" id="f-date" onchange="renderTable()">
+      <span style="font-size:12px;color:var(--gray-mid)" id="filter-count"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="main-table">
+        <thead>
+          <tr>
+            <th>Heure</th><th>Site</th><th>Statut</th><th>Plaque</th>
+            <th>Motif / Macaron</th><th>Photos</th><th>IA</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL PHOTO -->
+<div id="photo-modal" class="modal-overlay" style="display:none" onclick="closePhotoModal(event)">
+  <div class="modal" style="padding:0;overflow:hidden;max-width:800px">
+    <img id="photo-modal-img" src="" style="width:100%;display:block;border-radius:var(--radius)">
+  </div>
+</div>
+
+<!-- MODAL EDIT -->
+<div id="edit-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Modifier le véhicule</div>
+    <div id="edit-modal-content"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-green" onclick="saveEdit()">✅ Enregistrer</button>
+      <button class="btn btn-outline" onclick="document.getElementById('edit-modal').style.display='none'">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let allVehicles = [];
+let editingId   = null;
+
+function toast(msg, ms=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ═══ LOAD DATA ═══
+async function loadData() {
+  try {
+    const { data, error } = await db
+      .from('vehicles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    allVehicles = data || [];
+    updateStats();
+    renderTable();
+    document.getElementById('online-badge').className = 'badge badge-green';
+    document.getElementById('online-badge').textContent = '● En ligne';
+    document.getElementById('last-refresh').textContent = 'Actualisé à ' + new Date().toLocaleTimeString('fr-CH', {hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    document.getElementById('online-badge').className = 'badge badge-red';
+    document.getElementById('online-badge').textContent = '● Erreur';
+    toast('❌ ' + e.message);
+  }
+}
+
+function updateStats() {
+  const inf   = allVehicles.filter(v => v.statut === 'infraction').length;
+  const aut   = allVehicles.filter(v => v.statut === 'autorise').length;
+  const ia    = allVehicles.filter(v => v.ia_pending).length;
+  document.getElementById('s-inf').textContent   = inf;
+  document.getElementById('s-aut').textContent   = aut;
+  document.getElementById('s-ia').textContent    = ia;
+  document.getElementById('s-total').textContent = allVehicles.length;
+}
+
+// ═══ TABLE ═══
+function renderTable() {
+  const fStatut = document.getElementById('f-statut').value;
+  const fSite   = document.getElementById('f-site').value;
+  const fIa     = document.getElementById('f-ia').value;
+  const fDate   = document.getElementById('f-date').value;
+
+  let filtered = allVehicles.filter(v => {
+    if (fStatut && v.statut !== fStatut) return false;
+    if (fSite   && v.site   !== fSite)   return false;
+    if (fIa === 'true'  && !v.ia_pending)  return false;
+    if (fIa === 'false' &&  v.ia_pending)  return false;
+    if (fDate && !v.created_at.startsWith(fDate)) return false;
+    return true;
+  });
+
+  document.getElementById('filter-count').textContent = filtered.length + ' résultat(s)';
+
+  const tbody = document.getElementById('table-body');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun véhicule trouvé.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(v => {
+    const isInf = v.statut === 'infraction';
+    const dt    = new Date(v.created_at);
+    const heure = dt.toLocaleDateString('fr-CH', {day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+
+    const photos = [
+      v.photo_vehicule_url     ? '<img class="photo-thumb" src="' + v.photo_vehicule_url     + '" onclick="openPhoto(\'' + v.photo_vehicule_url     + '\')" title="Véhicule">' : '',
+      v.photo_denonciation_url ? '<img class="photo-thumb" src="' + v.photo_denonciation_url + '" onclick="openPhoto(\'' + v.photo_denonciation_url + '\')" title="Dénonciation">' : '',
+      v.photo_parebrise_url    ? '<img class="photo-thumb" src="' + v.photo_parebrise_url    + '" onclick="openPhoto(\'' + v.photo_parebrise_url    + '\')" title="Pare-brise">' : '',
+      v.photo_macaron_url      ? '<img class="photo-thumb" src="' + v.photo_macaron_url      + '" onclick="openPhoto(\'' + v.photo_macaron_url      + '\')" title="Macaron">' : ''
+    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:12px">—</span>';
+
+    const plaque = v.plaque
+      ? '<span class="plate">' + v.plaque + '</span>'
+      : '<span style="color:var(--gray-mid);font-size:12px">— en attente IA</span>';
+
+    const motif = isInf
+      ? (v.motif || '—') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N° ' + v.num_denonciation + '</span>' : '')
+      : (v.num_macaron ? 'Macaron: ' + v.num_macaron : '—');
+
+    const iaBadge = v.ia_pending
+      ? '<span class="badge badge-amber">⏳ En attente</span>'
+      : '<span class="badge badge-green">✅ Traité</span>';
+
+    return '<tr>' +
+      '<td style="white-space:nowrap">' + heure + '<br><span style="font-size:11px;color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
+      '<td>' + (v.site||'—') + '</td>' +
+      '<td><span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'Infraction' : 'Autorisé') + '</span></td>' +
+      '<td>' + plaque + '</td>' +
+      '<td style="font-size:12px">' + motif + '</td>' +
+      '<td><div class="photos-cell">' + photos + '</div></td>' +
+      '<td>' + iaBadge + '</td>' +
+      '<td><button class="btn btn-outline" onclick="openEdit(\'' + v.id + '\')" style="padding:5px 10px;font-size:12px">✏️</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ═══ PHOTOS ═══
+function openPhoto(url) {
+  document.getElementById('photo-modal-img').src = url;
+  document.getElementById('photo-modal').style.display = 'flex';
+}
+function closePhotoModal(e) {
+  if (e.target === document.getElementById('photo-modal')) {
+    document.getElementById('photo-modal').style.display = 'none';
+  }
+}
+
+// ═══ EDIT ═══
+function openEdit(id) {
+  editingId = id;
+  const v   = allVehicles.find(v => v.id === id);
+  if (!v) return;
+  document.getElementById('edit-modal-content').innerHTML =
+    field('Plaque', 'e-plaque', v.plaque || '') +
+    field('N° Dénonciation', 'e-denonciation', v.num_denonciation || '') +
+    field('N° Macaron', 'e-macaron', v.num_macaron || '') +
+    field('Remarque', 'e-remarque', v.remarque || '');
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+function field(label, id, val) {
+  return '<div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:var(--gray-dark);display:block;margin-bottom:5px;text-transform:uppercase">' + label + '</label>' +
+    '<input id="' + id + '" style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-family:\'Courier New\',monospace" value="' + val + '"></div>';
+}
+async function saveEdit() {
+  const update = {
+    plaque:           document.getElementById('e-plaque').value || null,
+    num_denonciation: document.getElementById('e-denonciation').value || null,
+    num_macaron:      document.getElementById('e-macaron').value || null,
+    remarque:         document.getElementById('e-remarque').value || null,
+    ia_pending:       false,
+    ia_processed_at:  new Date().toISOString()
+  };
+  try {
+    const { error } = await db.from('vehicles').update(update).eq('id', editingId);
+    if (error) throw error;
+    toast('✅ Véhicule mis à jour');
+    document.getElementById('edit-modal').style.display = 'none';
+    await loadData();
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+// ═══ GENERATE CLAUDE PROMPT ═══
+function generateClaudePrompt() {
+  const pending = allVehicles.filter(v => v.ia_pending && (v.photo_vehicule_url || v.photo_denonciation_url || v.photo_macaron_url));
+  if (!pending.length) {
+    toast('ℹ️ Aucun véhicule en attente avec des photos');
+    return;
+  }
+
+  const vehiclesList = pending.map((v, i) => {
+    const photos = [];
+    if (v.photo_vehicule_url)     photos.push('- Véhicule: ' + v.photo_vehicule_url);
+    if (v.photo_denonciation_url) photos.push('- Dénonciation: ' + v.photo_denonciation_url);
+    if (v.photo_parebrise_url)    photos.push('- Pare-brise: ' + v.photo_parebrise_url);
+    if (v.photo_macaron_url)      photos.push('- Macaron: ' + v.photo_macaron_url);
+    return 'VÉHICULE ' + (i+1) + ' (id: ' + v.id + ')\nStatut: ' + v.statut + (v.motif ? ' | Motif: ' + v.motif : '') + '\nPhotos:\n' + photos.join('\n');
+  }).join('\n\n');
+
+  const prompt = `Tu es un assistant de RDZ Security (Suisse) spécialisé dans la surveillance de parking.
+
+Analyse les photos ci-dessous et extrait les informations demandées pour chaque véhicule.
+
+INSTRUCTIONS:
+- Format plaque suisse: XX 000 000 (ex: GE 123 456, VD 987 654)
+- N° dénonciation: numéro visible sur le formulaire papier photographié
+- N° macaron: numéro visible sur la vignette de stationnement
+- Si une information est illisible, mets null
+- Réponds UNIQUEMENT avec un JSON valide, sans texte avant ou après
+
+FORMAT DE RÉPONSE ATTENDU:
+{
+  "resultats": [
+    {
+      "id": "uuid-du-vehicule",
+      "plaque": "GE 123 456",
+      "num_denonciation": "2026-001234",
+      "num_macaron": null,
+      "couleur": "blanc",
+      "confiance": "haute"
+    }
+  ]
+}
+
+VÉHICULES À ANALYSER (${pending.length} véhicule(s)):
+
+${vehiclesList}
+
+Analyse chaque photo accessible via les URLs ci-dessus et retourne le JSON complet.`;
+
+  document.getElementById('ia-prompt-content').textContent = prompt;
+  document.getElementById('prompt-section').style.display = 'block';
+  document.getElementById('result-section').style.display = 'block';
+  toast('✅ Message généré — ' + pending.length + ' véhicule(s) à analyser');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('ia-prompt-content').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('📋 Copié dans le presse-papiers'));
+}
+
+// ═══ APPLY CLAUDE RESULT ═══
+async function applyClaudeResult() {
+  const raw = document.getElementById('claude-result').value.trim();
+  if (!raw) { toast('⚠️ Colle le JSON de Claude d\'abord'); return; }
+
+  let parsed;
+  try {
+    const clean = raw.replace(/```json|```/g, '').trim();
+    parsed = JSON.parse(clean);
+  } catch(e) { toast('❌ JSON invalide — vérifie le format'); return; }
+
+  const resultats = parsed.resultats || [];
+  if (!resultats.length) { toast('⚠️ Aucun résultat dans le JSON'); return; }
+
+  const progress = document.getElementById('apply-progress');
+  const status   = document.getElementById('apply-status');
+  const bar      = document.getElementById('apply-bar');
+  progress.style.display = 'block';
+
+  let done = 0, errors = 0;
+  for (const r of resultats) {
+    if (!r.id) continue;
+    try {
+      const { error } = await db.from('vehicles').update({
+        plaque:           r.plaque || null,
+        num_denonciation: r.num_denonciation || null,
+        num_macaron:      r.num_macaron || null,
+        ia_pending:       false,
+        ia_processed_at:  new Date().toISOString()
+      }).eq('id', r.id);
+      if (error) throw error;
+      done++;
+    } catch(e) { errors++; }
+    const pct = Math.round(((done + errors) / resultats.length) * 100);
+    bar.style.width = pct + '%';
+    status.textContent = 'Mise à jour ' + (done + errors) + ' / ' + resultats.length + '...';
+  }
+
+  progress.style.display = 'none';
+  toast('✅ ' + done + ' véhicule(s) mis à jour' + (errors ? ' · ⚠️ ' + errors + ' erreur(s)' : ''));
+  document.getElementById('result-section').style.display = 'none';
+  document.getElementById('claude-result').value = '';
+  await loadData();
+}
+
+// ═══ EXPORT CSV ═══
+function exportCSV() {
+  const headers = ['Date','Site','Agent','Statut','Plaque','Motif','N° Dénonciation','N° Macaron','Remarque','Photos','IA traitée'];
+  const rows = allVehicles.map(v => [
+    new Date(v.created_at).toLocaleString('fr-CH'),
+    v.site || '',
+    v.agent_name || '',
+    v.statut,
+    v.plaque || '',
+    v.motif || '',
+    v.num_denonciation || '',
+    v.num_macaron || '',
+    v.remarque || '',
+    v.photos_count || 0,
+    v.ia_pending ? 'Non' : 'Oui'
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'parkguard-' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast('📥 CSV exporté');
+}
+
+// ═══ INIT ═══
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>
