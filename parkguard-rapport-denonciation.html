@@ -92,7 +92,7 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
     <div class="meta-cell"><label>Date</label><div class="meta-val" id="m-date">—</div></div>
     <div class="meta-cell"><label>Heure</label><div class="meta-val" id="m-heure">—</div></div>
     <div class="meta-cell"><label>Agent</label><div class="meta-val" id="m-agent">—</div></div>
-    <div class="meta-cell"><label>N° Dénonciation</label><div class="meta-val" id="m-deno" style="color:#C8102E;font-weight:700">—</div></div>
+    <div class="meta-cell"><label>Statut</label><div class="meta-val" style="color:#C8102E;font-weight:700">Infraction</div></div>
   </div>
 
   <div class="body">
@@ -103,10 +103,9 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
         <div class="field-row full" style="margin-bottom:14px">
           <div class="field"><label>Plaque d'immatriculation</label><div class="field-val plate" id="v-plaque">—</div></div>
         </div>
-        <div class="field-row three">
+        <div class="field-row">
           <div class="field"><label>Motif d'infraction</label><div class="field-val" id="v-motif">—</div></div>
-          <div class="field"><label>N° Dénonciation</label><div class="field-val" id="v-deno-body" style="font-weight:700;color:#C8102E">—</div></div>
-          <div class="field"><label>Statut</label><div class="field-val"><span class="statut-badge">Infraction</span></div></div>
+          <div class="field"><label>N° Dénonciation</label><div class="field-val" id="v-deno-body" style="font-weight:700;color:#C8102E;font-size:16px">—</div></div>
         </div>
         <div class="field-row full" style="margin-top:10px">
           <div class="field"><label>Remarques</label><div class="field-val" id="v-remarque" style="min-height:36px">—</div></div>
@@ -158,7 +157,7 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
 function pad(v){ return String(v).padStart(2,'0'); }
 
 function setPhoto(id, url) {
-  if (!url) return;
+  if (!url || url === 'null' || url === 'undefined') return;
   var box = document.getElementById(id);
   box.className = 'photo-box';
   box.innerHTML = '<img src="' + url + '" alt="photo" onerror="this.parentNode.innerHTML=\'<div style=\'padding:20px;color:#bbb;font-size:12px;text-align:center\'>Photo inaccessible</div>\'">';
@@ -178,7 +177,8 @@ function loadData() {
     ['id','site','agent_name','agent','plaque','motif','remarque',
      'num_denonciation','created_at',
      'photo_vehicule_url','photo_denonciation_url',
-     'photo_parebrise_url','photo_macaron_url'].forEach(function(k) {
+     'photo_parebrise_url','photo_macaron_url',
+     'photo_extra_url'].forEach(function(k) {
       if (params.has(k)) data[k] = params.get(k);
     });
   }
@@ -200,11 +200,14 @@ function loadData() {
       pad(dt.getHours()) + 'h' + pad(dt.getMinutes());
   }
   document.getElementById('m-agent').textContent   = data.agent_name || data.agent || '—';
-  document.getElementById('m-deno').textContent    = data.num_denonciation || '— (extraction IA en attente)';
+  // DEBUG: forcer affichage données
+  var hasData2 = !!(data.motif || data.photo_vehicule_url || data.num_denonciation);
   document.getElementById('rpt-site').textContent  = data.site || 'Site';
   document.getElementById('v-plaque').textContent  = data.plaque || '— (extraction IA en attente)';
   document.getElementById('v-site').textContent    = data.site || '—';
-  document.getElementById('v-motif').textContent   = data.motif || '—';
+  var motifVal = data.motif || '—';
+  if (motifVal.startsWith('PARKING_VIDE')) motifVal = '—';
+  document.getElementById('v-motif').textContent   = motifVal;
   document.getElementById('v-remarque').textContent = data.remarque && data.remarque !== 'null' ? data.remarque : '—';
   var denoBody = document.getElementById('v-deno-body');
   if (denoBody) denoBody.textContent = data.num_denonciation || '— (extraction IA en attente)';

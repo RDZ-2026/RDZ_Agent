@@ -736,8 +736,8 @@ async function saveVideRonde() {
     site: currentSite,
     agent_name: currentAgent,
     statut: 'autorise',  // parking vide stocké comme autorisé avec motif spécial
-    motif: 'PARKING_VIDE - Aucun véhicule constaté',
-    remarque: remarque || null,
+    motif: null,
+    remarque: 'PARKING_VIDE' + (remarque ? ' — ' + remarque : ''),
     plaque: null,
     photos_count: videPhotos.length,
     ia_pending: false,
