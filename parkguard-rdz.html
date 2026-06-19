@@ -133,6 +133,23 @@ html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMa
 .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--black); color: var(--white); padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; white-space: nowrap; pointer-events: none; }
 .toast.show { opacity: 1; }
 
+/* IA RESULT CARDS */
+.ia-vehicle-card { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; }
+.ia-vehicle-card.inf { border-left: 3px solid var(--red); }
+.ia-vehicle-card.aut { border-left: 3px solid var(--green); }
+.ia-plate { font-size: 18px; font-weight: 800; font-family: 'Courier New', monospace; letter-spacing: 0.08em; }
+.ia-details { font-size: 12px; color: var(--gray-mid); margin-top: 4px; }
+.ia-confidence { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; margin-left: 6px; }
+.ia-confidence.high { background: var(--green-light); color: var(--green); }
+.ia-confidence.low { background: var(--amber-light); color: var(--amber); }
+
+/* DB CONFIRM BOX */
+.db-ok { background: var(--green-light); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.db-err { background: var(--red-light); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.db-icon { font-size: 24px; flex-shrink: 0; }
+.db-label { font-size: 14px; font-weight: 700; }
+.db-sub { font-size: 12px; margin-top: 2px; }
+
 input[type="file"] { display: none; }
 
 .rdz-bar { background: var(--black); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
@@ -238,7 +255,7 @@ input[type="file"] { display: none; }
   <div class="bottom-bar" id="flow-bottom"></div>
 </div>
 
-<!-- ══════════════════ RECAP ══════════════════ -->
+<!-- ══════════════════ RECAP VÉHICULE ══════════════════ -->
 <div id="s-recap" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
@@ -252,11 +269,71 @@ input[type="file"] { display: none; }
     </div>
     <div id="recap-checks"></div>
     <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
-      🤖 <strong>Extraction IA :</strong> Plaque, N° dénonciation et N° macaron seront extraits automatiquement lors de la synchronisation.
+      🤖 <strong>Extraction IA :</strong> Plaque, N° dénonciation et N° macaron extraits automatiquement en fin de ronde.
     </div>
   </div>
   <div class="bottom-bar">
     <button class="primary-btn" id="recap-next-btn" onclick="showScreen('s-round')">Véhicule suivant</button>
+  </div>
+</div>
+
+<!-- ══════════════════ FIN DE RONDE ══════════════════ -->
+<div id="s-end-round" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge badge-gray" style="margin-left:auto" id="end-round-site">—</div>
+  </div>
+  <div class="content">
+
+    <!-- STATS FINALES -->
+    <div style="text-align:center;padding:16px 0 20px">
+      <div style="font-size:44px">🏁</div>
+      <div style="font-size:20px;font-weight:800;margin-top:8px">Ronde terminée</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="end-round-meta">—</div>
+    </div>
+    <div class="stats-grid" id="end-stats-grid"></div>
+
+    <!-- SECTION 1 : SYNC -->
+    <div class="section-label">1 · Synchronisation</div>
+    <div id="db-confirm-box" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)">
+        <span style="font-size:20px">⏳</span> Vérification en cours...
+      </div>
+    </div>
+    <button id="btn-force-sync" onclick="forceSync()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font-size:16px">🔄</span> Forcer la synchronisation
+    </button>
+
+    <!-- SECTION 2 : EXPORT JSON WHATSAPP -->
+    <div class="section-label">2 · Export pour analyse IA</div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;font-size:13px;color:var(--gray-dark);line-height:1.6">
+      Génère un fichier JSON de la ronde à envoyer par WhatsApp ou email. Colle-le dans Claude avec les photos pour obtenir l'extraction automatique des plaques.
+    </div>
+    <button onclick="exportJSON()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font-size:16px">📤</span> Télécharger le JSON de la ronde
+    </button>
+    <div id="json-export-info" style="display:none;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);margin-bottom:16px;line-height:1.6"></div>
+
+    <!-- SECTION 3 : IA AUTOMATIQUE -->
+    <div class="section-label">3 · Extraction IA automatique</div>
+    <div id="ia-box" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)">
+        <span style="font-size:20px">⏳</span> En attente de la sync...
+      </div>
+    </div>
+    <button id="btn-force-ia" onclick="runIAPipeline()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font-size:16px">🤖</span> Lancer l'extraction IA manuellement
+    </button>
+
+    <!-- RÉSULTATS IA -->
+    <div id="ia-results" style="display:none">
+      <div class="section-label">Données extraites par l'IA</div>
+      <div id="ia-results-list"></div>
+    </div>
+
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" onclick="closeRound()">Nouvelle ronde</button>
   </div>
 </div>
 
@@ -376,13 +453,334 @@ function selectSite(site) {
 }
 function confirmEndRound() {
   if (!roundVehicles.length || confirm(`Terminer la ronde sur ${currentSite} ?`)) {
-    const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
-    const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
-    toast(`Ronde terminée — ${inf} infraction(s), ${aut} autorisé(s)`);
-    currentSite = null; currentRoundId = null; roundVehicles = [];
-    document.getElementById('active-round-wrap').style.display = 'none';
-    showScreen('s-home');
+    showEndRound();
   }
+}
+
+async function showEndRound() {
+  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('end-round-site').textContent = currentSite;
+  document.getElementById('end-round-meta').textContent =
+    `${nowStr()} · ${currentAgent} · ${roundVehicles.length} véhicule(s)`;
+  document.getElementById('end-stats-grid').innerHTML = `
+    <div class="stat-box"><div class="stat-val red">${inf}</div><div class="stat-lbl">Infractions</div></div>
+    <div class="stat-box"><div class="stat-val green">${aut}</div><div class="stat-lbl">Autorisés</div></div>`;
+  document.getElementById('ia-results').style.display = 'none';
+  showScreen('s-end-round');
+
+  // Étape 1 — vérifier que tout est dans Supabase
+  await confirmSupabaseSync();
+}
+
+// ═══ FORCE SYNC ═══
+async function forceSync() {
+  const btn = document.getElementById('btn-force-sync');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="font-size:16px">⏳</span> Synchronisation en cours...';
+
+  if (!navigator.onLine) {
+    toast('❌ Pas de réseau — impossible de synchroniser');
+    btn.disabled = false;
+    btn.innerHTML = '<span style="font-size:16px">🔄</span> Forcer la synchronisation';
+    return;
+  }
+
+  isOnline = true;
+  await syncPending();
+  await confirmSupabaseSync();
+
+  btn.disabled = false;
+  btn.innerHTML = '<span style="font-size:16px">🔄</span> Forcer la synchronisation';
+}
+
+// ═══ EXPORT JSON WHATSAPP ═══
+function exportJSON() {
+  const payload = {
+    meta: {
+      app: 'ParkGuard RDZ',
+      version: '1.0',
+      export_at: new Date().toISOString(),
+      site: currentSite,
+      agent: currentAgent,
+      round_id: currentRoundId,
+      total: roundVehicles.length,
+      infractions: roundVehicles.filter(v => v.statut === 'infraction').length,
+      autorises: roundVehicles.filter(v => v.statut === 'autorise').length
+    },
+    instructions_ia: `Tu es un assistant d'analyse pour RDZ Security (Suisse). 
+Voici les données d'une ronde de surveillance parking sur le site "${currentSite}".
+Pour chaque véhicule, les photos ont été prises sur le terrain.
+Analyse les données et génère un rapport JSON enrichi avec :
+- Confirmation des motifs d'infraction
+- Suggestions de suivi pour les véhicules récurrents
+- Résumé de la ronde pour le client
+Réponds avec un JSON structuré.`,
+    vehicules: roundVehicles.map((v, i) => ({
+      numero: i + 1,
+      statut: v.statut,
+      heure: v.time,
+      site: v.site,
+      agent: v.agent_name,
+      motif: v.motif || null,
+      remarque: v.remarque || null,
+      plaque: v.plaque || 'À extraire des photos',
+      num_denonciation: v.num_denonciation || (v.statut === 'infraction' ? 'À extraire photo dénonciation' : null),
+      num_macaron: v.num_macaron || (v.statut === 'autorise' ? 'À extraire photo macaron' : null),
+      photos_count: v.photos_count || 0,
+      synced: v.synced || false
+    }))
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const siteName = (currentSite || 'ronde').replace(/\s+/g, '-').toLowerCase();
+  const filename = `parkguard-${siteName}-${date}.json`;
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  const info = document.getElementById('json-export-info');
+  info.style.display = 'block';
+  info.innerHTML = `✅ <strong>${filename}</strong> téléchargé.<br>
+Envoie ce fichier par WhatsApp ou email à l'administratif.<br>
+Dans Claude.ai : colle le JSON + les photos → demande l'extraction des plaques.`;
+}
+  const box = document.getElementById('db-confirm-box');
+  box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)"><span style="font-size:20px">⏳</span> Vérification dans Supabase...</div>`;
+
+  if (!isOnline) {
+    box.innerHTML = `<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Les données seront synchronisées dès retour réseau.</div></div></div>`;
+    document.getElementById('ia-box').innerHTML = `<div style="font-size:13px;color:var(--gray-mid)">⚠️ IA disponible uniquement en ligne.</div>`;
+    return;
+  }
+
+  // Sync les pending d'abord
+  await syncPending();
+
+  try {
+    const { data, error } = await db
+      .from('vehicles')
+      .select('id, statut, plaque, created_at')
+      .eq('round_id', currentRoundId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const found = data?.length || 0;
+    const expected = roundVehicles.length;
+    const allOk = found >= expected;
+
+    if (allOk) {
+      box.innerHTML = `<div class="db-ok">
+        <div class="db-icon">✅</div>
+        <div>
+          <div class="db-label" style="color:var(--green)">${found} / ${expected} entrées confirmées</div>
+          <div class="db-sub" style="color:var(--green)">Toutes les données sont dans Supabase.</div>
+        </div>
+      </div>`;
+      // Étape 2 — lancer l'IA
+      await runIAPipeline();
+    } else {
+      box.innerHTML = `<div class="db-err">
+        <div class="db-icon">⚠️</div>
+        <div>
+          <div class="db-label" style="color:var(--red-dark)">${found} / ${expected} entrées trouvées</div>
+          <div class="db-sub" style="color:var(--red-dark)">${expected - found} entrée(s) manquante(s). Vérifiez la connexion.</div>
+        </div>
+      </div>`;
+    }
+  } catch(e) {
+    box.innerHTML = `<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur de vérification</div><div class="db-sub" style="color:var(--red-dark)">${e.message}</div></div></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// PIPELINE IA — GPT-4o Vision
+// ═══════════════════════════════════════════════════
+const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI'; // ← remplacer par sk-proj-...
+
+async function runIAPipeline() {
+  const iaBox = document.getElementById('ia-box');
+
+  if (!OPENAI_KEY || OPENAI_KEY.startsWith('VOTRE')) {
+    iaBox.innerHTML = `<div style="background:var(--amber-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--amber);line-height:1.6">
+      ⚠️ <strong>Clé API non configurée.</strong><br>Remplacez <code>VOTRE_CLE_API_OPENAI_ICI</code> par votre clé OpenAI dans le code.
+    </div>`;
+    return;
+  }
+
+  // Uniquement les véhicules avec photos (donc ceux de cette session)
+  const vehiclesWithPhotos = roundVehicles.filter(v => v.round_id === currentRoundId);
+  if (!vehiclesWithPhotos.length) {
+    iaBox.innerHTML = `<div style="font-size:13px;color:var(--gray-mid)">Aucune photo à analyser.</div>`;
+    return;
+  }
+
+  iaBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-dark)">
+    <span style="font-size:20px">🤖</span>
+    <div>
+      <div style="font-weight:600">Analyse IA en cours...</div>
+      <div style="font-size:12px;color:var(--gray-mid);margin-top:2px">GPT-4o analyse les photos</div>
+    </div>
+  </div>`;
+
+  const results = [];
+
+  for (const [i, vehicle] of vehiclesWithPhotos.entries()) {
+    iaBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-dark)">
+      <span style="font-size:20px">🤖</span>
+      <div>
+        <div style="font-weight:600">Analyse ${i + 1} / ${vehiclesWithPhotos.length}</div>
+        <div style="font-size:12px;color:var(--gray-mid);margin-top:2px">${vehicle.statut === 'infraction' ? 'Infraction · ' + (vehicle.motif || '') : 'Véhicule autorisé'}</div>
+      </div>
+    </div>
+    <div class="progress-wrap" style="margin-top:12px;margin-bottom:0">
+      <div class="progress-fill" style="width:${Math.round(((i+1)/vehiclesWithPhotos.length)*100)}%"></div>
+    </div>`;
+
+    // Récupère les photos locales (flowPhotos stockées par round)
+    const photos = vehicle._photos || {};
+    const imageKeys = Object.keys(photos);
+    if (!imageKeys.length) { results.push({ vehicle, plaque: null, num_denonciation: null, num_macaron: null, error: 'Pas de photos' }); continue; }
+
+    try {
+      const extracted = await analyzeWithGPT(vehicle, photos);
+      results.push({ vehicle, ...extracted });
+
+      // Mettre à jour Supabase avec les données extraites
+      if (extracted.plaque || extracted.num_denonciation || extracted.num_macaron) {
+        await db.from('vehicles').update({
+          plaque: extracted.plaque,
+          num_denonciation: extracted.num_denonciation,
+          num_macaron: extracted.num_macaron,
+          ia_pending: false,
+          ia_processed_at: new Date().toISOString()
+        }).eq('round_id', currentRoundId).eq('created_at', vehicle.created_at);
+      }
+    } catch(e) {
+      results.push({ vehicle, plaque: null, error: e.message });
+    }
+  }
+
+  // Afficher résultats
+  iaBox.innerHTML = `<div class="db-ok">
+    <div class="db-icon">🤖</div>
+    <div>
+      <div class="db-label" style="color:var(--green)">Analyse terminée</div>
+      <div class="db-sub" style="color:var(--green)">${results.filter(r => r.plaque).length} / ${results.length} plaque(s) extraite(s)</div>
+    </div>
+  </div>`;
+
+  // Afficher les cartes résultats
+  const resultDiv = document.getElementById('ia-results');
+  const resultList = document.getElementById('ia-results-list');
+  resultList.innerHTML = results.map(r => {
+    const isInf = r.vehicle.statut === 'infraction';
+    const conf = r.plaque ? 'high' : 'low';
+    return `<div class="ia-vehicle-card ${isInf ? 'inf' : 'aut'}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="badge ${isInf ? 'badge-red' : 'badge-green'}">${isInf ? 'INF' : 'AUT'}</div>
+        <div class="ia-plate">${r.plaque || '— non détectée'}</div>
+        <span class="ia-confidence ${conf}">${r.plaque ? 'OK' : '?'}</span>
+      </div>
+      <div class="ia-details">
+        ${r.num_denonciation ? '📋 Dénon. N°: ' + r.num_denonciation + ' · ' : ''}
+        ${r.num_macaron ? '🏷️ Macaron: ' + r.num_macaron + ' · ' : ''}
+        ${isInf ? (r.vehicle.motif || '') : 'Autorisé'}
+        ${r.error ? ' · ⚠️ ' + r.error : ''}
+      </div>
+    </div>`;
+  }).join('');
+  resultDiv.style.display = 'block';
+}
+
+async function analyzeWithGPT(vehicle, photos) {
+  const isInf = vehicle.statut === 'infraction';
+
+  // Prépare les images à envoyer
+  const imageContents = Object.entries(photos)
+    .filter(([k, v]) => v && v.startsWith('data:'))
+    .map(([key, dataUrl]) => {
+      const [meta, b64] = dataUrl.split(',');
+      const mime = meta.match(/:(.*?);/)[1];
+      return {
+        type: 'image_url',
+        image_url: { url: `data:${mime};base64,${b64}`, detail: 'high' }
+      };
+    });
+
+  if (!imageContents.length) throw new Error('Aucune image valide');
+
+  const prompt = isInf
+    ? `Tu analyses des photos d'un véhicule en infraction de stationnement pour la société RDZ Security en Suisse.
+
+Extrais UNIQUEMENT ces informations en JSON :
+{
+  "plaque": "GE 123 456",
+  "pays": "CH",
+  "couleur": "blanc",
+  "num_denonciation": "2024-001234",
+  "confiance_plaque": "haute"
+}
+
+Règles :
+- Format plaque suisse : XX 000 000 (canton + espace + chiffres)
+- num_denonciation : numéro visible sur le formulaire papier photographié
+- Si tu ne peux pas lire quelque chose, mets null
+- Réponds UNIQUEMENT avec le JSON, rien d'autre`
+    : `Tu analyses des photos d'un véhicule autorisé dans un parking surveillé par RDZ Security en Suisse.
+
+Extrais UNIQUEMENT ces informations en JSON :
+{
+  "plaque": "GE 123 456",
+  "pays": "CH",
+  "couleur": "blanc",
+  "num_macaron": "A-1234",
+  "confiance_plaque": "haute"
+}
+
+Règles :
+- Format plaque suisse : XX 000 000 (canton + espace + chiffres)
+- num_macaron : numéro visible sur le macaron/vignette de stationnement
+- Si tu ne peux pas lire quelque chose, mets null
+- Réponds UNIQUEMENT avec le JSON, rien d'autre`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      max_tokens: 200,
+      messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: prompt }] }]
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error?.message || `Erreur API ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.choices[0].message.content.trim().replace(/```json|```/g, '');
+  const parsed = JSON.parse(text);
+  return {
+    plaque: parsed.plaque || null,
+    num_denonciation: parsed.num_denonciation || null,
+    num_macaron: parsed.num_macaron || null,
+    confiance: parsed.confiance_plaque || null
+  };
+}
+
+function closeRound() {
+  currentSite = null; currentRoundId = null; roundVehicles = [];
+  document.getElementById('active-round-wrap').style.display = 'none';
+  showScreen('s-home');
 }
 function updateRoundStats() {
   const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
@@ -531,7 +929,7 @@ async function saveEntry() {
   }
   if (!synced) savePending(entry);
 
-  roundVehicles.push({ ...entry, time, synced });
+  roundVehicles.push({ ...entry, time, synced, _photos: { ...flowPhotos } });
   updateRoundStats();
 
   // RECAP
