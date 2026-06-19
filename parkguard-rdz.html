@@ -301,13 +301,11 @@ input[type="file"]{display:none}
 // ═══ CONFIG ═══
 const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
-const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI'; // ← remplacer par sk-proj-...
+const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
-const AGENTS = [];
-let currentAgent = 'Agent RDZ';
 
 // ═══ STATE ═══
-let currentAgent = AGENTS[0];
+let currentAgent = 'Agent RDZ';
 let currentSite = null;
 let currentRoundId = null;
 let roundVehicles = [];
