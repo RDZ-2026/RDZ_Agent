@@ -464,8 +464,10 @@ async function showEndRound() {
   document.getElementById('end-stats-grid').innerHTML =
     '<div class="stat-box"><div class="stat-val red">' + inf + '</div><div class="stat-lbl">Infractions</div></div>' +
     '<div class="stat-box"><div class="stat-val green">' + aut + '</div><div class="stat-lbl">Autorisés</div></div>';
-  document.getElementById('ia-results').style.display = 'none';
-  document.getElementById('json-export-info').style.display = 'none';
+  var iaR = document.getElementById('ia-results');
+  if (iaR) iaR.style.display = 'none';
+  var jei = document.getElementById('json-export-info');
+  if (jei) jei.style.display = 'none';
   showScreen('s-end-round');
   await confirmSupabaseSync();
 }
