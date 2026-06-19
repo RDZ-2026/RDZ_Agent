@@ -218,27 +218,32 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
     </div>
 
     <!-- ÉTAPES -->
-    <div class="step-box active" id="step1-box">
-      <strong>Étape 1</strong> — Télécharge les photos ci-dessous, puis ouvre Claude.ai.
+    <div class="step-box active">
+      <strong>Étape 1</strong> — Clique "Télécharger le pack" — tu reçois un ZIP avec toutes les photos + le message prêt.
     </div>
-    <div class="step-box" id="step2-box">
-      <strong>Étape 2</strong> — Dans Claude.ai : glisse les photos + colle le message texte. Envoie.
+    <div class="step-box">
+      <strong>Étape 2</strong> — Ouvre Claude.ai, extrait le ZIP, glisse toutes les photos + le fichier message.txt. Envoie.
     </div>
-    <div class="step-box" id="step3-box">
-      <strong>Étape 3</strong> — Copie le JSON retourné par Claude et colle-le dans le champ ci-dessous.
+    <div class="step-box">
+      <strong>Étape 3</strong> — Copie le JSON retourné par Claude, colle-le ci-dessous, clique Appliquer.
     </div>
 
-    <!-- TÉLÉCHARGEMENT PHOTOS -->
-    <div class="section-label" style="margin-top:16px">Photos à télécharger</div>
-    <div id="photos-download-list" style="margin-bottom:12px"></div>
-
-    <!-- MESSAGE TEXTE -->
-    <div class="section-label">Message à copier dans Claude.ai</div>
-    <div class="ia-prompt-box" id="ia-prompt-content">Génération en cours...</div>
-    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-black btn-sm" onclick="copyPrompt()">📋 Copier le message</button>
-      <a href="https://claude.ai" target="_blank" class="btn btn-outline btn-sm">↗ Ouvrir Claude.ai</a>
-      <span style="font-size:12px;color:var(--gray-mid);align-self:center" id="ia-photo-info"></span>
+    <!-- UN SEUL BOUTON -->
+    <div style="margin:20px 0;text-align:center">
+      <button class="btn btn-black" id="btn-zip" onclick="downloadPack()" style="padding:14px 28px;font-size:15px">
+        📦 Télécharger le pack (photos + message)
+      </button>
+      <div id="zip-progress" style="display:none;margin-top:12px">
+        <div style="font-size:13px;color:var(--gray-mid)" id="zip-status">Préparation...</div>
+        <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" id="zip-bar" style="width:0%"></div></div>
+      </div>
+      <div id="zip-done" style="display:none;margin-top:12px;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);line-height:1.7">
+        ✅ Pack téléchargé !<br>
+        Extrait le ZIP → glisse <strong>toutes les photos + message.txt</strong> dans Claude.ai → envoie.
+      </div>
+      <div style="margin-top:10px">
+        <a href="https://claude.ai" target="_blank" class="btn btn-outline btn-sm">↗ Ouvrir Claude.ai</a>
+      </div>
     </div>
 
     <div class="section-label">Réponse JSON de Claude — colle-la ici</div>
@@ -478,10 +483,134 @@ async function saveEdit() {
 async function openIAModal() {
   const ids = Array.from(selectedIds);
   if (!ids.length) { toast('Sélectionnez au moins un véhicule'); return; }
-  const vehicles = allVehicles.filter(v => ids.includes(v.id));
+  window._iaIds = ids;
   document.getElementById('ia-modal').style.display = 'flex';
   document.getElementById('claude-result').value = '';
   document.getElementById('apply-progress').style.display = 'none';
+  document.getElementById('zip-progress').style.display = 'none';
+  document.getElementById('zip-done').style.display = 'none';
+  const btn = document.getElementById('btn-zip');
+  btn.disabled = false;
+  btn.textContent = '📦 Télécharger le pack (photos + message)';
+}
+
+async function downloadPack() {
+  const ids      = window._iaIds || [];
+  const vehicles = allVehicles.filter(v => ids.includes(v.id));
+  if (!vehicles.length) { toast('Aucun véhicule'); return; }
+
+  const btn = document.getElementById('btn-zip');
+  btn.disabled = true;
+  document.getElementById('zip-progress').style.display = 'block';
+  document.getElementById('zip-done').style.display = 'none';
+
+  const statusEl = document.getElementById('zip-status');
+  const barEl    = document.getElementById('zip-bar');
+
+  if (!window.JSZip) {
+    statusEl.textContent = 'Chargement JSZip...';
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  }
+
+  const zip = new window.JSZip();
+  const photoFields = [
+    { col:'photo_vehicule_url',     label:'Vehicule' },
+    { col:'photo_denonciation_url', label:'Denonciation' },
+    { col:'photo_parebrise_url',    label:'Parebrise' },
+    { col:'photo_macaron_url',      label:'Macaron' }
+  ];
+
+  let totalPhotos = 0;
+  vehicles.forEach(v => photoFields.forEach(pf => { if (v[pf.col]) totalPhotos++; }));
+
+  let done = 0;
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    for (const pf of photoFields) {
+      const url = v[pf.col];
+      if (!url) continue;
+      statusEl.textContent = 'Photo ' + (done+1) + ' / ' + totalPhotos + '...';
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          zip.file('V' + (i+1) + '_' + pf.label + '.jpg', await resp.blob());
+        }
+      } catch(e) { console.warn('Photo non récupérable:', url); }
+      done++;
+      barEl.style.width = Math.round((done / totalPhotos) * 90) + '%';
+    }
+  }
+
+  // Message texte
+  zip.file('MESSAGE_POUR_CLAUDE.txt', buildPromptLines(vehicles).join('\n'));
+
+  statusEl.textContent = 'Création du ZIP...';
+  barEl.style.width = '95%';
+  const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE' });
+  const date = new Date().toISOString().slice(0,10);
+  const a    = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'parkguard-analyse-' + date + '.zip';
+  a.click();
+
+  barEl.style.width = '100%';
+  document.getElementById('zip-progress').style.display = 'none';
+  document.getElementById('zip-done').style.display = 'block';
+  btn.disabled = false;
+  btn.textContent = '📦 Télécharger à nouveau';
+  toast('✅ Pack téléchargé — ' + totalPhotos + ' photo(s) + MESSAGE_POUR_CLAUDE.txt');
+}
+
+function buildPromptLines(vehicles) {
+  const lines = [
+    'Tu es un assistant de RDZ Security (Suisse) — surveillance parking.',
+    'J\'ai joint les photos à ce message (nommées V1_Vehicule.jpg, V1_Denonciation.jpg, etc.).',
+    'Analyse chaque photo et extrais les informations demandées.',
+    '',
+    'RÉPONDS UNIQUEMENT avec ce JSON, sans texte avant ou après :',
+    '{',
+    '  "resultats": [',
+    '    {',
+    '      "id": "uuid-exact-du-vehicule",',
+    '      "plaque": "GE 123 456",',
+    '      "num_denonciation": "2026-001",',
+    '      "num_macaron": null,',
+    '      "couleur": "blanc",',
+    '      "confiance": "haute"',
+    '    }',
+    '  ]',
+    '}',
+    '',
+    'RÈGLES :',
+    '- Format plaque suisse : XX 000 000 (2 lettres canton + espace + chiffres)',
+    '- num_denonciation : numéro sur le formulaire papier (photo Denonciation)',
+    '- num_macaron : numéro sur la vignette (photo Macaron)',
+    '- Ne jamais inventer — mettre null si illisible',
+    '- Conserver les IDs exacts ci-dessous',
+    '',
+    'VÉHICULES À ANALYSER (' + vehicles.length + ') :',
+    ''
+  ];
+  vehicles.forEach((v, i) => {
+    lines.push('Véhicule ' + (i+1) + ' — ID: ' + v.id);
+    lines.push('  Statut: ' + v.statut + (v.motif ? ' (' + v.motif + ')' : ''));
+    lines.push('  Site: ' + v.site + ' | ' + new Date(v.created_at).toLocaleString('fr-CH'));
+    lines.push('  Fichiers: V'+(i+1)+'_Vehicule.jpg' +
+      (v.photo_denonciation_url ? ', V'+(i+1)+'_Denonciation.jpg' : '') +
+      (v.photo_parebrise_url    ? ', V'+(i+1)+'_Parebrise.jpg'    : '') +
+      (v.photo_macaron_url      ? ', V'+(i+1)+'_Macaron.jpg'      : ''));
+    lines.push('');
+  });
+  return lines;
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
 
   // Construire la liste des photos à télécharger
   const photoFields = [
@@ -528,68 +657,6 @@ async function openIAModal() {
   }
 
   document.getElementById('photos-download-list').innerHTML = photosHtml;
-  document.getElementById('ia-photo-info').textContent = totalPhotos + ' photo(s) à joindre dans Claude.ai';
-
-  // Construire le prompt texte
-  const prompt = buildPrompt(vehicles, allPhotoUrls, totalPhotos);
-  document.getElementById('ia-prompt-content').textContent = prompt;
-  window._iaPrompt = prompt;
-}
-
-function buildPrompt(vehicles, allPhotoUrls, totalPhotos) {
-  const lines = [
-    'Tu es un assistant de RDZ Security (Suisse) — surveillance parking.',
-    'J\'ai joint ' + totalPhotos + ' photo(s) à ce message (nommées V1_Vehicule.jpg, V1_Denonciation.jpg, etc.).',
-    'Analyse chaque photo et extrais les informations demandées.',
-    '',
-    'RÉPONDS UNIQUEMENT avec ce JSON, sans texte avant ou après :',
-    '{',
-    '  "resultats": [',
-    '    {',
-    '      "id": "uuid-exact-du-vehicule",',
-    '      "plaque": "GE 123 456",',
-    '      "num_denonciation": "2026-001",',
-    '      "num_macaron": null,',
-    '      "couleur": "blanc",',
-    '      "confiance": "haute"',
-    '    }',
-    '  ]',
-    '}',
-    '',
-    'RÈGLES :',
-    '- Format plaque suisse : XX 000 000 (2 lettres canton + espace + chiffres)',
-    '- num_denonciation : numéro sur le formulaire papier (photo Dénonciation)',
-    '- num_macaron : numéro sur la vignette (photo Macaron)',
-    '- Ne jamais inventer — mettre null si illisible',
-    '- Respecter les IDs exacts ci-dessous',
-    '',
-    'VÉHICULES À ANALYSER :'
-  ];
-
-  vehicles.forEach((v, i) => {
-    const isInf = v.statut === 'infraction';
-    const photos = allPhotoUrls.filter(p => p.vehicleId === v.id);
-    lines.push('');
-    lines.push('Véhicule ' + (i+1) + ' — ID: ' + v.id);
-    lines.push('  Statut: ' + v.statut + (v.motif ? ' (' + v.motif + ')' : ''));
-    lines.push('  Site: ' + v.site + ' | ' + new Date(v.created_at).toLocaleString('fr-CH'));
-    if (photos.length) lines.push('  Photos jointes: ' + photos.map(p => p.filename).join(', '));
-  });
-
-  return lines.join('\n');
-}
-
-async function copyPrompt() {
-  const prompt = window._iaPrompt;
-  if (!prompt) { toast('⚠️ Génère d\'abord le message'); return; }
-  try {
-    await navigator.clipboard.writeText(prompt);
-    toast('📋 Message copié — joins maintenant les photos dans Claude.ai');
-  } catch(e) {
-    toast('❌ Impossible de copier automatiquement — sélectionne le texte manuellement');
-  }
-}
-
 // ═══ APPLY RÉSULTAT IA ═══
 async function applyClaudeResult() {
   const raw = document.getElementById('claude-result').value.trim();
