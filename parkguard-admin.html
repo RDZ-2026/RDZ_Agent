@@ -219,16 +219,21 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 
     <!-- ÉTAPES -->
     <div class="step-box active" id="step1-box">
-      <strong>Étape 1</strong> — Copie le message ci-dessous et colle-le dans Claude.ai avec les photos en pièce jointe.
+      <strong>Étape 1</strong> — Télécharge les photos ci-dessous, puis ouvre Claude.ai.
     </div>
     <div class="step-box" id="step2-box">
-      <strong>Étape 2</strong> — Claude analyse les photos et retourne un JSON. Copie ce JSON et colle-le dans le champ ci-dessous.
+      <strong>Étape 2</strong> — Dans Claude.ai : glisse les photos + colle le message texte. Envoie.
     </div>
     <div class="step-box" id="step3-box">
-      <strong>Étape 3</strong> — Clique "Appliquer" pour mettre à jour Supabase automatiquement.
+      <strong>Étape 3</strong> — Copie le JSON retourné par Claude et colle-le dans le champ ci-dessous.
     </div>
 
-    <div class="section-label" style="margin-top:16px">Message pour Claude.ai</div>
+    <!-- TÉLÉCHARGEMENT PHOTOS -->
+    <div class="section-label" style="margin-top:16px">Photos à télécharger</div>
+    <div id="photos-download-list" style="margin-bottom:12px"></div>
+
+    <!-- MESSAGE TEXTE -->
+    <div class="section-label">Message à copier dans Claude.ai</div>
     <div class="ia-prompt-box" id="ia-prompt-content">Génération en cours...</div>
     <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-black btn-sm" onclick="copyPrompt()">📋 Copier le message</button>
@@ -469,73 +474,79 @@ async function saveEdit() {
   } catch(e) { toast('❌ ' + e.message); }
 }
 
-// ═══ IA MODAL — GÉNÉRATION AVEC BASE64 ═══
+// ═══ IA MODAL ═══
 async function openIAModal() {
   const ids = Array.from(selectedIds);
   if (!ids.length) { toast('Sélectionnez au moins un véhicule'); return; }
-
   const vehicles = allVehicles.filter(v => ids.includes(v.id));
   document.getElementById('ia-modal').style.display = 'flex';
-  document.getElementById('ia-prompt-content').textContent = '⏳ Chargement des photos en base64...';
-  document.getElementById('ia-photo-info').textContent = '';
   document.getElementById('claude-result').value = '';
+  document.getElementById('apply-progress').style.display = 'none';
 
-  // Charger les photos en base64 depuis Supabase
-  const vehiclesList = [];
+  // Construire la liste des photos à télécharger
+  const photoFields = [
+    { col:'photo_vehicule_url',     label:'Véhicule' },
+    { col:'photo_denonciation_url', label:'Dénonciation' },
+    { col:'photo_parebrise_url',    label:'Pare-brise' },
+    { col:'photo_macaron_url',      label:'Macaron' }
+  ];
+
+  let photosHtml = '';
   let totalPhotos = 0;
+  const allPhotoUrls = []; // pour le prompt
 
-  for (let i = 0; i < vehicles.length; i++) {
-    const v = vehicles[i];
-    const photoFields = [
-      { col: 'photo_vehicule_url',     label: 'Véhicule (plaque visible)' },
-      { col: 'photo_denonciation_url', label: 'Dénonciation (formulaire)' },
-      { col: 'photo_parebrise_url',    label: 'Pare-brise (4 coins)' },
-      { col: 'photo_macaron_url',      label: 'Macaron' }
-    ];
+  vehicles.forEach((v, i) => {
+    const isInf = v.statut === 'infraction';
+    const dt = new Date(v.created_at).toLocaleString('fr-CH');
+    const hasSomePhoto = photoFields.some(pf => v[pf.col]);
+    if (!hasSomePhoto) return;
 
-    const photosBase64 = [];
-    for (const pf of photoFields) {
+    photosHtml += '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">';
+    photosHtml += '<div style="font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">';
+    photosHtml += '<span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'INF' : 'AUT') + '</span>';
+    photosHtml += 'Véhicule ' + (i+1) + ' · ' + v.site + ' · ' + dt;
+    photosHtml += '</div>';
+    photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+
+    photoFields.forEach((pf, pi) => {
       const url = v[pf.col];
-      if (!url) continue;
-      try {
-        const b64 = await urlToBase64(url);
-        if (b64) { photosBase64.push({ label: pf.label, base64: b64 }); totalPhotos++; }
-      } catch(e) { console.warn('Photo non chargeable:', url); }
-    }
-
-    vehiclesList.push({
-      numero: i + 1,
-      id: v.id,
-      statut: v.statut,
-      motif: v.motif || null,
-      heure: new Date(v.created_at).toLocaleString('fr-CH'),
-      site: v.site,
-      photos: photosBase64
+      if (!url) return;
+      const filename = 'V' + (i+1) + '_' + pf.label.replace(/\s/g,'') + '.jpg';
+      totalPhotos++;
+      allPhotoUrls.push({ vehicleNum: i+1, vehicleId: v.id, label: pf.label, url, filename });
+      photosHtml += '<div style="text-align:center">';
+      photosHtml += '<img src="' + url + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-border);display:block;cursor:pointer" onclick="openPhoto(\'' + url + '\')">';
+      photosHtml += '<a href="' + url + '" download="' + filename + '" target="_blank" style="font-size:10px;color:var(--blue);display:block;margin-top:3px;text-decoration:none">⬇ ' + pf.label + '</a>';
+      photosHtml += '</div>';
     });
 
-    document.getElementById('ia-prompt-content').textContent =
-      '⏳ Photos chargées : ' + totalPhotos + ' (' + (i+1) + '/' + vehicles.length + ' véhicules)...';
+    photosHtml += '</div></div>';
+  });
+
+  if (!photosHtml) {
+    photosHtml = '<div style="color:var(--gray-mid);font-size:13px;padding:8px">Aucune photo disponible pour ces véhicules.</div>';
   }
 
-  // Construire le prompt texte (sans les base64 qui sont trop longs à afficher)
-  const promptDisplay = buildPromptDisplay(vehiclesList, totalPhotos);
-  document.getElementById('ia-prompt-content').textContent = promptDisplay;
-  document.getElementById('ia-photo-info').textContent = totalPhotos + ' photo(s) incluse(s) en base64';
+  document.getElementById('photos-download-list').innerHTML = photosHtml;
+  document.getElementById('ia-photo-info').textContent = totalPhotos + ' photo(s) à joindre dans Claude.ai';
 
-  // Stocker pour la copie avec base64
-  window._iaVehicles = vehiclesList;
+  // Construire le prompt texte
+  const prompt = buildPrompt(vehicles, allPhotoUrls, totalPhotos);
+  document.getElementById('ia-prompt-content').textContent = prompt;
+  window._iaPrompt = prompt;
 }
 
-function buildPromptDisplay(vehiclesList, totalPhotos) {
+function buildPrompt(vehicles, allPhotoUrls, totalPhotos) {
   const lines = [
     'Tu es un assistant de RDZ Security (Suisse) — surveillance parking.',
-    'Analyse les ' + totalPhotos + ' photo(s) jointes et extrais les informations demandées.',
+    'J\'ai joint ' + totalPhotos + ' photo(s) à ce message (nommées V1_Vehicule.jpg, V1_Denonciation.jpg, etc.).',
+    'Analyse chaque photo et extrais les informations demandées.',
     '',
-    'FORMAT DE RÉPONSE — JSON uniquement, sans texte avant ou après :',
+    'RÉPONDS UNIQUEMENT avec ce JSON, sans texte avant ou après :',
     '{',
     '  "resultats": [',
     '    {',
-    '      "id": "uuid-exact",',
+    '      "id": "uuid-exact-du-vehicule",',
     '      "plaque": "GE 123 456",',
     '      "num_denonciation": "2026-001",',
     '      "num_macaron": null,',
@@ -546,72 +557,37 @@ function buildPromptDisplay(vehiclesList, totalPhotos) {
     '}',
     '',
     'RÈGLES :',
-    '- Format plaque CH : XX 000 000 (canton 2 lettres + chiffres)',
-    '- num_denonciation : numéro sur le formulaire papier photographié',
-    '- num_macaron : numéro sur la vignette de stationnement',
-    '- null si illisible — ne jamais inventer',
+    '- Format plaque suisse : XX 000 000 (2 lettres canton + espace + chiffres)',
+    '- num_denonciation : numéro sur le formulaire papier (photo Dénonciation)',
+    '- num_macaron : numéro sur la vignette (photo Macaron)',
+    '- Ne jamais inventer — mettre null si illisible',
+    '- Respecter les IDs exacts ci-dessous',
     '',
-    'VÉHICULES (' + vehiclesList.length + ') :',
-    ''
+    'VÉHICULES À ANALYSER :'
   ];
 
-  vehiclesList.forEach(v => {
-    lines.push('Véhicule ' + v.numero + ' — id: ' + v.id);
-    lines.push('  Statut: ' + v.statut + (v.motif ? ' | ' + v.motif : ''));
-    lines.push('  Site: ' + v.site + ' | ' + v.heure);
-    lines.push('  Photos jointes: ' + v.photos.map(p => p.label).join(', '));
+  vehicles.forEach((v, i) => {
+    const isInf = v.statut === 'infraction';
+    const photos = allPhotoUrls.filter(p => p.vehicleId === v.id);
     lines.push('');
+    lines.push('Véhicule ' + (i+1) + ' — ID: ' + v.id);
+    lines.push('  Statut: ' + v.statut + (v.motif ? ' (' + v.motif + ')' : ''));
+    lines.push('  Site: ' + v.site + ' | ' + new Date(v.created_at).toLocaleString('fr-CH'));
+    if (photos.length) lines.push('  Photos jointes: ' + photos.map(p => p.filename).join(', '));
   });
 
-  lines.push('[Les photos sont jointes à ce message en base64]');
   return lines.join('\n');
 }
 
 async function copyPrompt() {
-  const vehicles = window._iaVehicles;
-  if (!vehicles) { toast('⚠️ Génère d\'abord le message'); return; }
-
-  // Message complet avec base64 pour le presse-papiers
-  const promptText = buildPromptDisplay(vehicles, vehicles.reduce((s,v) => s + v.photos.length, 0));
-
-  // On construit le contenu complet avec photos
-  let fullContent = promptText + '\n\n=== PHOTOS EN BASE64 ===\n';
-  vehicles.forEach(v => {
-    v.photos.forEach(p => {
-      fullContent += '\n[Véhicule ' + v.numero + ' — ' + p.label + ']\n';
-      fullContent += p.base64.substring(0, 100) + '... [base64 tronqué pour affichage]\n';
-    });
-  });
-
-  // Note: les base64 complets sont dans window._iaVehicles
-  // On copie le prompt texte + informe l'admin de joindre les photos manuellement
+  const prompt = window._iaPrompt;
+  if (!prompt) { toast('⚠️ Génère d\'abord le message'); return; }
   try {
-    await navigator.clipboard.writeText(promptText);
-    toast('📋 Message copié — joins les photos depuis Supabase Storage dans Claude.ai');
+    await navigator.clipboard.writeText(prompt);
+    toast('📋 Message copié — joins maintenant les photos dans Claude.ai');
   } catch(e) {
-    toast('❌ Impossible de copier');
+    toast('❌ Impossible de copier automatiquement — sélectionne le texte manuellement');
   }
-}
-
-async function urlToBase64(url) {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const blob   = await resp.blob();
-  // Compresser via canvas
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = function() {
-      const maxW = 1024;
-      const scale = Math.min(1, maxW / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width  = Math.round(img.width  * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.75));
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(blob);
-  });
 }
 
 // ═══ APPLY RÉSULTAT IA ═══
