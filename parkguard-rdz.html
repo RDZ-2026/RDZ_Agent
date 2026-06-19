@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ParkGuard RDZ">
 <meta name="theme-color" content="#D0021B">
@@ -11,208 +11,175 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --red: #D0021B; --red-dark: #A80016; --red-light: #FFF0F1;
-  --black: #111111; --gray-dark: #444444; --gray-mid: #888888;
-  --gray-light: #F4F4F4; --gray-border: #E2E2E2; --white: #FFFFFF;
-  --green: #1A7A4A; --green-light: #EDF7F2;
-  --amber: #B45309; --amber-light: #FFFBEB;
-  --radius: 12px; --radius-sm: 8px;
+  --red:#D0021B;--red-dark:#A80016;--red-light:#FFF0F1;
+  --black:#111;--gray-dark:#444;--gray-mid:#888;
+  --gray-light:#F4F4F4;--gray-border:#E2E2E2;--white:#FFF;
+  --green:#1A7A4A;--green-light:#EDF7F2;
+  --amber:#B45309;--amber-light:#FFFBEB;
+  --radius:12px;--radius-sm:8px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-light); color: var(--black); }
-#app { height: 100vh; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; background: var(--white); position: relative; overflow: hidden; }
-.screen { display: none; flex-direction: column; height: 100%; overflow: hidden; }
-.screen.active { display: flex; }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-light);color:var(--black)}
+#app{height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;background:var(--white);overflow:hidden}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
 
-/* TOPBAR */
-.topbar { background: var(--white); border-bottom: 1px solid var(--gray-border); padding: 0 16px; height: 56px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.topbar-logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; color: var(--black); }
-.topbar-logo span { color: var(--red); }
-.topbar-title { font-size: 15px; font-weight: 600; flex: 1; }
-.topbar-sub { font-size: 11px; color: var(--gray-mid); margin-top: 1px; }
-.back-btn { background: none; border: none; cursor: pointer; padding: 8px; margin-left: -8px; color: var(--red); font-size: 26px; line-height: 1; display: flex; align-items: center; }
+.topbar{background:var(--white);border-bottom:1px solid var(--gray-border);padding:0 16px;height:56px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-logo{font-size:18px;font-weight:900;letter-spacing:-.5px;color:var(--black)}
+.topbar-logo span{color:var(--red)}
+.topbar-title{font-size:15px;font-weight:600;flex:1}
+.topbar-sub{font-size:11px;color:var(--gray-mid);margin-top:1px}
+.back-btn{background:none;border:none;cursor:pointer;padding:8px;margin-left:-8px;color:var(--red);font-size:26px;line-height:1;display:flex;align-items:center}
 
-/* SYNC BANNER */
-.sync-banner { padding: 7px 16px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.sync-banner.offline { background: var(--amber-light); color: var(--amber); }
-.sync-banner.online { background: var(--green-light); color: var(--green); }
-.sync-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.sync-banner.offline .sync-dot { background: var(--amber); }
-.sync-banner.online .sync-dot { background: var(--green); }
+.sync-banner{padding:7px 16px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sync-banner.offline{background:var(--amber-light);color:var(--amber)}
+.sync-banner.online{background:var(--green-light);color:var(--green)}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-banner.offline .sync-dot{background:var(--amber)}
+.sync-banner.online .sync-dot{background:var(--green)}
 
-/* CONTENT */
-.content { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
-.bottom-bar { padding: 12px 16px; background: var(--white); border-top: 1px solid var(--gray-border); flex-shrink: 0; }
+.content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.bottom-bar{padding:12px 16px;background:var(--white);border-top:1px solid var(--gray-border);flex-shrink:0}
 
-/* CARDS */
-.card { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: border-color 0.15s; }
-.card:active { border-color: var(--gray-mid); }
-.card-icon { width: 42px; height: 42px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background: var(--gray-light); }
-.card-icon.red { background: var(--red-light); }
-.card-name { font-size: 14px; font-weight: 600; }
-.card-meta { font-size: 12px; color: var(--gray-mid); margin-top: 2px; }
-.card-arrow { color: var(--gray-mid); font-size: 20px; margin-left: auto; flex-shrink: 0; }
+.card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s}
+.card:active{border-color:var(--gray-mid)}
+.card-icon{width:42px;height:42px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:var(--gray-light)}
+.card-icon.red{background:var(--red-light)}
+.card-name{font-size:14px;font-weight:600}
+.card-meta{font-size:12px;color:var(--gray-mid);margin-top:2px}
+.card-arrow{color:var(--gray-mid);font-size:20px;margin-left:auto;flex-shrink:0}
 
-/* BADGES */
-.badge { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
-.badge-red { background: var(--red-light); color: var(--red-dark); }
-.badge-green { background: var(--green-light); color: var(--green); }
-.badge-amber { background: var(--amber-light); color: var(--amber); }
-.badge-gray { background: var(--gray-light); color: var(--gray-dark); }
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.badge-red{background:var(--red-light);color:var(--red-dark)}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-gray{background:var(--gray-light);color:var(--gray-dark)}
 
-/* SECTION LABEL */
-.section-label { font-size: 11px; font-weight: 700; color: var(--gray-mid); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; margin-top: 20px; }
-.section-label:first-child { margin-top: 0; }
+.section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:20px}
+.section-label:first-child{margin-top:0}
 
-/* ACTION BUTTONS */
-.action-btn { border: none; border-radius: var(--radius); padding: 18px 20px; width: 100%; display: flex; align-items: center; gap: 16px; cursor: pointer; font-family: inherit; transition: opacity 0.15s; margin-bottom: 10px; text-align: left; }
-.action-btn:active { opacity: 0.82; }
-.action-btn-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
-.action-btn-label { font-size: 17px; font-weight: 700; }
-.action-btn-sub { font-size: 12px; opacity: 0.8; margin-top: 3px; }
-.btn-inf { background: var(--red); color: var(--white); }
-.btn-aut { background: var(--green); color: var(--white); }
+.action-btn{border:none;border-radius:var(--radius);padding:18px 20px;width:100%;display:flex;align-items:center;gap:16px;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;text-align:left}
+.action-btn:active{opacity:.82}
+.action-btn-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.action-btn-label{font-size:17px;font-weight:700}
+.action-btn-sub{font-size:12px;opacity:.8;margin-top:3px}
+.btn-inf{background:var(--red);color:var(--white)}
+.btn-aut{background:var(--green);color:var(--white)}
 
-/* PROGRESS */
-.progress-wrap { height: 3px; background: var(--gray-light); border-radius: 3px; margin-bottom: 20px; }
-.progress-fill { height: 3px; background: var(--red); border-radius: 3px; transition: width 0.3s; }
-.progress-fill.green { background: var(--green); }
+.progress-wrap{height:3px;background:var(--gray-light);border-radius:3px;margin-bottom:20px}
+.progress-fill{height:3px;background:var(--red);border-radius:3px;transition:width .3s}
+.progress-fill.green{background:var(--green)}
 
-/* STEP HEADER */
-.step-eyebrow { font-size: 11px; font-weight: 700; color: var(--red); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-.step-eyebrow.green { color: var(--green); }
-.step-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
-.step-sub { font-size: 14px; color: var(--gray-dark); line-height: 1.5; margin-bottom: 20px; }
+.step-eyebrow{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.step-eyebrow.green{color:var(--green)}
+.step-title{font-size:20px;font-weight:800;margin-bottom:6px}
+.step-sub{font-size:14px;color:var(--gray-dark);line-height:1.5;margin-bottom:20px}
 
-/* PHOTO ZONES */
-.photo-zone { border: 2px dashed var(--gray-border); border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; margin-bottom: 14px; transition: all 0.2s; position: relative; overflow: hidden; }
-.photo-zone:active { border-color: var(--red); }
-.photo-zone.taken { border-style: solid; border-color: var(--green); padding: 0; }
-.photo-zone.taken img { width: 100%; height: 160px; object-fit: cover; border-radius: 10px; display: block; }
-.photo-zone-inner { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.photo-zone-icon { font-size: 36px; }
-.photo-zone-label { font-size: 14px; font-weight: 600; }
-.photo-zone-sub { font-size: 12px; color: var(--gray-mid); }
-.photo-taken-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(26,122,74,0.88); padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: white; }
-.photo-retake { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); color: white; border: none; padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; }
+.photo-zone{border:2px dashed var(--gray-border);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;margin-bottom:14px;position:relative;overflow:hidden}
+.photo-zone:active{border-color:var(--red)}
+.photo-zone.taken{border-style:solid;border-color:var(--green);padding:0}
+.photo-zone.taken img{width:100%;height:160px;object-fit:cover;border-radius:10px;display:block}
+.photo-zone-inner{display:flex;flex-direction:column;align-items:center;gap:8px}
+.photo-zone-icon{font-size:36px}
+.photo-zone-label{font-size:14px;font-weight:600}
+.photo-zone-sub{font-size:12px;color:var(--gray-mid)}
+.photo-taken-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(26,122,74,.88);padding:8px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:white}
+.photo-retake{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer}
 
-/* FIELDS */
-.field-group { margin-bottom: 14px; }
-.field-label { font-size: 11px; font-weight: 700; color: var(--gray-dark); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.05em; }
-.field-input { width: 100%; padding: 12px 14px; font-size: 16px; border: 1.5px solid var(--gray-border); border-radius: var(--radius-sm); background: var(--white); color: var(--black); font-family: inherit; transition: border-color 0.15s; }
-.field-input:focus { outline: none; border-color: var(--red); }
-.field-select { width: 100%; padding: 12px 14px; font-size: 15px; border: 1.5px solid var(--gray-border); border-radius: var(--radius-sm); background: var(--white); color: var(--black); font-family: inherit; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.field-group{margin-bottom:14px}
+.field-label{font-size:11px;font-weight:700;color:var(--gray-dark);margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.05em}
+.field-input{width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);color:var(--black);font-family:inherit;transition:border-color .15s}
+.field-input:focus{outline:none;border-color:var(--red)}
+.field-select{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);color:var(--black);font-family:inherit;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
 
-/* BUTTONS */
-.primary-btn { width: 100%; padding: 15px; font-size: 16px; font-weight: 700; background: var(--red); color: var(--white); border: none; border-radius: var(--radius); cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
-.primary-btn:disabled { background: var(--gray-border); color: var(--gray-mid); cursor: not-allowed; }
-.primary-btn:not(:disabled):active { opacity: 0.85; }
-.primary-btn.green { background: var(--green); }
+.primary-btn{width:100%;padding:15px;font-size:16px;font-weight:700;background:var(--red);color:var(--white);border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;transition:opacity .15s}
+.primary-btn:disabled{background:var(--gray-border);color:var(--gray-mid);cursor:not-allowed}
+.primary-btn:not(:disabled):active{opacity:.85}
+.primary-btn.green{background:var(--green)}
 
-/* VEHICLE LIST */
-.vehicle-row { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius-sm); padding: 11px 14px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.vehicle-plate { font-size: 14px; font-weight: 700; font-family: 'Courier New', monospace; flex: 1; letter-spacing: 0.05em; }
+.outline-btn{width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:border-color .15s}
+.outline-btn:active{border-color:var(--gray-mid)}
+.outline-btn:disabled{opacity:.4;cursor:not-allowed}
 
-/* STATS */
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-.stat-box { background: var(--gray-light); border-radius: var(--radius-sm); padding: 14px; }
-.stat-val { font-size: 28px; font-weight: 800; }
-.stat-val.red { color: var(--red); }
-.stat-val.green { color: var(--green); }
-.stat-lbl { font-size: 12px; color: var(--gray-mid); margin-top: 2px; }
+.vehicle-row{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.vehicle-plate{font-size:14px;font-weight:700;font-family:'Courier New',monospace;flex:1;letter-spacing:.05em}
 
-/* RECAP */
-.recap-check { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--gray-light); font-size: 14px; }
-.recap-icon { font-size: 20px; flex-shrink: 0; }
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-box{background:var(--gray-light);border-radius:var(--radius-sm);padding:14px}
+.stat-val{font-size:28px;font-weight:800}
+.stat-val.red{color:var(--red)}
+.stat-val.green{color:var(--green)}
+.stat-lbl{font-size:12px;color:var(--gray-mid);margin-top:2px}
 
-/* AGENT SELECTOR */
-.agent-chip { background: var(--gray-light); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; font-family: inherit; color: var(--black); }
-.agent-chip.active { background: var(--red); color: var(--white); }
+.recap-check{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-light);font-size:14px}
+.recap-icon{font-size:20px;flex-shrink:0}
 
-/* TOAST */
-.toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--black); color: var(--white); padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: opacity 0.3s; white-space: nowrap; pointer-events: none; }
-.toast.show { opacity: 1; }
+.agent-chip{background:var(--gray-light);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;color:var(--black)}
+.agent-chip.active{background:var(--red);color:var(--white)}
 
-/* IA RESULT CARDS */
-.ia-vehicle-card { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; }
-.ia-vehicle-card.inf { border-left: 3px solid var(--red); }
-.ia-vehicle-card.aut { border-left: 3px solid var(--green); }
-.ia-plate { font-size: 18px; font-weight: 800; font-family: 'Courier New', monospace; letter-spacing: 0.08em; }
-.ia-details { font-size: 12px; color: var(--gray-mid); margin-top: 4px; }
-.ia-confidence { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; margin-left: 6px; }
-.ia-confidence.high { background: var(--green-light); color: var(--green); }
-.ia-confidence.low { background: var(--amber-light); color: var(--amber); }
+.db-ok{background:var(--green-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-err{background:var(--red-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-warn{background:var(--amber-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-icon{font-size:24px;flex-shrink:0}
+.db-label{font-size:14px;font-weight:700}
+.db-sub{font-size:12px;margin-top:2px}
 
-/* DB CONFIRM BOX */
-.db-ok { background: var(--green-light); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
-.db-err { background: var(--red-light); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
-.db-icon { font-size: 24px; flex-shrink: 0; }
-.db-label { font-size: 14px; font-weight: 700; }
-.db-sub { font-size: 12px; margin-top: 2px; }
+.ia-vehicle-card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px}
+.ia-vehicle-card.inf{border-left:3px solid var(--red)}
+.ia-vehicle-card.aut{border-left:3px solid var(--green)}
+.ia-plate{font-size:18px;font-weight:800;font-family:'Courier New',monospace;letter-spacing:.08em}
+.ia-details{font-size:12px;color:var(--gray-mid);margin-top:4px}
+.ia-conf{font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px}
+.ia-conf.ok{background:var(--green-light);color:var(--green)}
+.ia-conf.nok{background:var(--amber-light);color:var(--amber)}
 
-input[type="file"] { display: none; }
+.rdz-bar{background:var(--black);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.rdz-bar-logo{font-size:16px;font-weight:900;color:var(--white);letter-spacing:.05em}
+.rdz-bar-logo span{color:var(--red)}
+.rdz-bar-sub{font-size:11px;color:#666}
 
-.rdz-bar { background: var(--black); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.rdz-bar-logo { font-size: 16px; font-weight: 900; color: var(--white); letter-spacing: 0.05em; }
-.rdz-bar-logo span { color: var(--red); }
-.rdz-bar-sub { font-size: 11px; color: #666; }
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--black);color:var(--white);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+input[type="file"]{display:none}
 </style>
 </head>
 <body>
 <div id="app">
 
-<!-- ══════════════════ HOME ══════════════════ -->
+<!-- ══════ HOME ══════ -->
 <div id="s-home" class="screen active">
   <div class="rdz-bar">
-    <div>
-      <div class="rdz-bar-logo">PARK<span>GUARD</span></div>
-      <div class="rdz-bar-sub">RDZ Security</div>
-    </div>
+    <div><div class="rdz-bar-logo">PARK<span>GUARD</span></div><div class="rdz-bar-sub">RDZ Security</div></div>
     <div id="home-sync-badge" class="badge badge-amber">● Hors ligne</div>
   </div>
   <div id="home-sync-banner" class="sync-banner offline">
-    <div class="sync-dot"></div>
-    <span id="home-sync-text">Hors ligne — données sauvegardées localement</span>
+    <div class="sync-dot"></div><span id="home-sync-text">Hors ligne — données sauvegardées localement</span>
   </div>
   <div class="content">
-    <div class="section-label">Agent</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px" id="agent-chips"></div>
-
-    <div class="section-label" style="margin-top:20px">Choisir un site</div>
+    <div class="section-label">Choisir un site</div>
     <div class="card" onclick="selectSite('Grange Canal')">
       <div class="card-icon">🏢</div>
-      <div>
-        <div class="card-name">Grange Canal</div>
-        <div class="card-meta">Résidence privée</div>
-      </div>
+      <div><div class="card-name">Grange Canal</div><div class="card-meta">Résidence privée</div></div>
       <div class="card-arrow">›</div>
     </div>
     <div class="card" onclick="selectSite('Clair Matin')">
       <div class="card-icon">🏘</div>
-      <div>
-        <div class="card-name">Clair Matin</div>
-        <div class="card-meta">Résidence privée</div>
-      </div>
+      <div><div class="card-name">Clair Matin</div><div class="card-meta">Résidence privée</div></div>
       <div class="card-arrow">›</div>
     </div>
-
     <div id="active-round-wrap" style="display:none">
       <div class="section-label">Ronde en cours</div>
-      <div class="card card-icon red" id="active-round-card" onclick="showScreen('s-round')">
+      <div class="card" onclick="showScreen('s-round')">
         <div class="card-icon red">🅿️</div>
-        <div>
-          <div class="card-name" id="active-round-name">—</div>
-          <div class="card-meta" id="active-round-meta">Ronde en cours</div>
-        </div>
+        <div><div class="card-name" id="active-round-name">—</div><div class="card-meta" id="active-round-meta">Ronde en cours</div></div>
         <div class="card-arrow">›</div>
       </div>
     </div>
-
     <div id="pending-info" style="font-size:12px;color:var(--gray-mid);text-align:center;margin-top:16px"></div>
   </div>
 </div>
 
-<!-- ══════════════════ RONDE ══════════════════ -->
+<!-- ══════ RONDE ══════ -->
 <div id="s-round" class="screen">
   <div class="topbar">
     <button class="back-btn" onclick="confirmEndRound()">‹</button>
@@ -241,7 +208,7 @@ input[type="file"] { display: none; }
   </div>
 </div>
 
-<!-- ══════════════════ FLOW SCREEN ══════════════════ -->
+<!-- ══════ FLOW ══════ -->
 <div id="s-flow" class="screen">
   <div class="topbar">
     <button class="back-btn" onclick="showScreen('s-round')">‹</button>
@@ -255,7 +222,7 @@ input[type="file"] { display: none; }
   <div class="bottom-bar" id="flow-bottom"></div>
 </div>
 
-<!-- ══════════════════ RECAP VÉHICULE ══════════════════ -->
+<!-- ══════ RECAP VÉHICULE ══════ -->
 <div id="s-recap" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
@@ -269,7 +236,7 @@ input[type="file"] { display: none; }
     </div>
     <div id="recap-checks"></div>
     <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
-      🤖 <strong>Extraction IA :</strong> Plaque, N° dénonciation et N° macaron extraits automatiquement en fin de ronde.
+      🤖 <strong>Extraction IA</strong> en fin de ronde — plaque, N° dénonciation, N° macaron.
     </div>
   </div>
   <div class="bottom-bar">
@@ -277,15 +244,13 @@ input[type="file"] { display: none; }
   </div>
 </div>
 
-<!-- ══════════════════ FIN DE RONDE ══════════════════ -->
+<!-- ══════ FIN DE RONDE ══════ -->
 <div id="s-end-round" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
     <div class="badge badge-gray" style="margin-left:auto" id="end-round-site">—</div>
   </div>
   <div class="content">
-
-    <!-- STATS FINALES -->
     <div style="text-align:center;padding:16px 0 20px">
       <div style="font-size:44px">🏁</div>
       <div style="font-size:20px;font-weight:800;margin-top:8px">Ronde terminée</div>
@@ -293,44 +258,35 @@ input[type="file"] { display: none; }
     </div>
     <div class="stats-grid" id="end-stats-grid"></div>
 
-    <!-- SECTION 1 : SYNC -->
+    <!-- 1. SYNC -->
     <div class="section-label">1 · Synchronisation</div>
-    <div id="db-confirm-box" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)">
-        <span style="font-size:20px">⏳</span> Vérification en cours...
-      </div>
+    <div id="db-confirm-box" style="margin-bottom:8px">
+      <div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification en cours...</div></div></div>
     </div>
-    <button id="btn-force-sync" onclick="forceSync()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px">
-      <span style="font-size:16px">🔄</span> Forcer la synchronisation
+    <button class="outline-btn" id="btn-force-sync" onclick="forceSync()">
+      🔄 Forcer la synchronisation
     </button>
 
-    <!-- SECTION 2 : EXPORT JSON WHATSAPP -->
+    <!-- 2. EXPORT JSON -->
     <div class="section-label">2 · Export pour analyse IA</div>
-    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px;font-size:13px;color:var(--gray-dark);line-height:1.6">
-      Génère un fichier JSON de la ronde à envoyer par WhatsApp ou email. Colle-le dans Claude avec les photos pour obtenir l'extraction automatique des plaques.
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-dark);line-height:1.6">
+      Télécharge le fichier JSON de la ronde. Envoie-le par WhatsApp avec les photos à l'administratif, ou colle-le directement dans Claude.ai pour l'extraction des plaques.
     </div>
-    <button onclick="exportJSON()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:8px">
-      <span style="font-size:16px">📤</span> Télécharger le JSON de la ronde
-    </button>
-    <div id="json-export-info" style="display:none;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);margin-bottom:16px;line-height:1.6"></div>
+    <button class="outline-btn" onclick="exportJSON()">📤 Télécharger le JSON de la ronde</button>
+    <div id="json-export-info" style="display:none;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);margin-bottom:8px;line-height:1.6"></div>
 
-    <!-- SECTION 3 : IA AUTOMATIQUE -->
+    <!-- 3. IA AUTO -->
     <div class="section-label">3 · Extraction IA automatique</div>
-    <div id="ia-box" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)">
-        <span style="font-size:20px">⏳</span> En attente de la sync...
-      </div>
+    <div id="ia-box" style="margin-bottom:8px">
+      <div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">En attente de la sync...</div></div></div>
     </div>
-    <button id="btn-force-ia" onclick="runIAPipeline()" style="width:100%;padding:11px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px">
-      <span style="font-size:16px">🤖</span> Lancer l'extraction IA manuellement
-    </button>
+    <button class="outline-btn" id="btn-force-ia" onclick="runIAPipeline()">🤖 Lancer l'IA manuellement</button>
 
     <!-- RÉSULTATS IA -->
     <div id="ia-results" style="display:none">
       <div class="section-label">Données extraites par l'IA</div>
       <div id="ia-results-list"></div>
     </div>
-
   </div>
   <div class="bottom-bar">
     <button class="primary-btn" onclick="closeRound()">Nouvelle ronde</button>
@@ -342,55 +298,63 @@ input[type="file"] { display: none; }
 <input type="file" id="file-input" accept="image/*" capture="environment">
 
 <script>
+// ═══ CONFIG ═══
 const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI'; // ← remplacer par sk-proj-...
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+const AGENTS = [];
+let currentAgent = 'Agent RDZ';
 
-// ═══ AGENTS (sans login — sélection simple) ═══
-const AGENTS = ['Agent 1', 'Agent 2', 'Agent 3', 'Agent RDZ'];
+// ═══ STATE ═══
 let currentAgent = AGENTS[0];
 let currentSite = null;
 let currentRoundId = null;
 let roundVehicles = [];
 let isOnline = navigator.onLine;
 let pendingFileCallback = null;
-
-// Flow state
-let flowType = null; // 'infraction' | 'autorise'
+let flowType = null;
 let flowStep = 0;
-let flowPhotos = {};  // key -> dataUrl
-let flowBlobs = {};   // key -> File
+let flowPhotos = {};
+let flowBlobs = {};
 let flowFields = {};
 
 // ═══ STEP DEFINITIONS ═══
 const STEPS = {
   infraction: [
-    { key: 'vehicule',     label: 'Véhicule',       sub: 'Photographiez le véhicule. Plaque et couleur visibles.',           photo: { key: 'vehicule', hint: 'Plaque + couleur visibles' } },
-    { key: 'motif',        label: 'Infraction',      sub: 'Sélectionnez le motif et ajoutez une remarque si nécessaire.',    fields: [
-      { key: 'motif', label: 'Motif', type: 'select', opts: ['B31A - Stationner sans vignette', 'B37A - Interdiction de circuler', 'Macaron expiré', 'Mauvaise zone', 'Autre'] },
-      { key: 'remarque', label: 'Remarque (optionnel)', type: 'text', placeholder: 'Ex: présent depuis 3 jours...' }
+    { key:'vehicule',     label:'Véhicule',     sub:'Photographiez le véhicule. Plaque et couleur visibles.',         photo:{key:'vehicule',    hint:'Plaque + couleur visibles'} },
+    { key:'motif',        label:'Infraction',   sub:'Sélectionnez le motif et ajoutez une remarque si nécessaire.',   fields:[
+      {key:'motif',    label:'Motif',              type:'select', opts:['B31A - Stationner sans vignette','B37A - Interdiction de circuler','Macaron expiré','Mauvaise zone','Autre']},
+      {key:'remarque', label:'Remarque (optionnel)',type:'text',   placeholder:'Ex: présent depuis 3 jours...'}
     ]},
-    { key: 'denonciation', label: 'Dénonciation',    sub: 'Remplissez la dénonciation papier, puis photographiez-la.',       photo: { key: 'denonciation', hint: 'Texte entièrement lisible' } },
-    { key: 'parebrise',    label: 'Pare-brise',      sub: 'Photographiez le pare-brise — 4 coins visibles, aucun macaron.',  photo: { key: 'parebrise', hint: '4 coins visibles' } }
+    { key:'denonciation', label:'Dénonciation',  sub:'Remplissez la dénonciation papier, puis photographiez-la.',     photo:{key:'denonciation', hint:'Texte entièrement lisible'} },
+    { key:'parebrise',    label:'Pare-brise',    sub:'Photographiez le pare-brise — 4 coins visibles, aucun macaron.',photo:{key:'parebrise',    hint:'4 coins visibles'} }
   ],
   autorise: [
-    { key: 'vehicule', label: 'Véhicule', sub: 'Photographiez le véhicule. La plaque doit être lisible.', photo: { key: 'vehicule', hint: 'Plaque entière visible' } },
-    { key: 'macaron',  label: 'Macaron',  sub: 'Photographiez le macaron. L\'IA extraira le numéro.',    photo: { key: 'macaron', hint: 'Numéro lisible' } }
+    { key:'vehicule', label:'Véhicule', sub:'Photographiez le véhicule. La plaque doit être lisible.', photo:{key:'vehicule', hint:'Plaque entière visible'} },
+    { key:'macaron',  label:'Macaron',  sub:"Photographiez le macaron. L'IA extraira le numéro.",     photo:{key:'macaron',  hint:'Numéro lisible'} }
   ]
 };
 
 // ═══ UTILS ═══
-function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function toast(msg, ms = 2500) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), ms); }
-function nowStr() { return new Date().toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' }); }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function toast(msg, ms=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+function nowStr() { return new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
 // ═══ ONLINE/OFFLINE ═══
 function updateOnlineStatus() {
   isOnline = navigator.onLine;
   const banner = document.getElementById('home-sync-banner');
-  const text = document.getElementById('home-sync-text');
-  const badge = document.getElementById('home-sync-badge');
+  const text   = document.getElementById('home-sync-text');
+  const badge  = document.getElementById('home-sync-badge');
   if (isOnline) {
     banner.className = 'sync-banner online';
     text.textContent = 'En ligne — synchronisation automatique active';
@@ -405,16 +369,17 @@ function updateOnlineStatus() {
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 
-// ═══ PENDING LOCAL STORAGE ═══
+// ═══ LOCAL STORAGE ═══
 function savePending(entry) {
   const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
-  p.push(entry); localStorage.setItem('pg_pending', JSON.stringify(p));
+  p.push(entry);
+  localStorage.setItem('pg_pending', JSON.stringify(p));
   updatePendingInfo();
 }
 function updatePendingInfo() {
   const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
   const el = document.getElementById('pending-info');
-  if (el) el.textContent = p.length > 0 ? `${p.length} entrée(s) en attente de synchronisation` : '';
+  if (el) el.textContent = p.length > 0 ? p.length + ' entrée(s) en attente de synchronisation' : '';
 }
 async function syncPending() {
   if (!isOnline) return;
@@ -422,37 +387,31 @@ async function syncPending() {
   if (!p.length) return;
   const remaining = [];
   for (const entry of p) {
-    try { const { error } = await db.from('vehicles').insert(entry); if (error) remaining.push(entry); }
-    catch(e) { remaining.push(entry); }
+    try {
+      const { error } = await db.from('vehicles').insert(entry);
+      if (error) remaining.push(entry);
+    } catch(e) { remaining.push(entry); }
   }
   localStorage.setItem('pg_pending', JSON.stringify(remaining));
-  if (remaining.length < p.length) toast(`☁️ ${p.length - remaining.length} entrée(s) synchronisée(s)`);
+  if (remaining.length < p.length) toast('☁️ ' + (p.length - remaining.length) + ' entrée(s) synchronisée(s)');
   updatePendingInfo();
 }
 
-// ═══ AGENT CHIPS ═══
-function renderAgentChips() {
-  document.getElementById('agent-chips').innerHTML = AGENTS.map(a =>
-    `<button class="agent-chip${a === currentAgent ? ' active' : ''}" onclick="selectAgent('${a}')">${a}</button>`
-  ).join('');
-}
-function selectAgent(name) { currentAgent = name; renderAgentChips(); }
-
 // ═══ SITE & ROUND ═══
 function selectSite(site) {
-  if (!currentAgent) { toast('Sélectionnez un agent'); return; }
   currentSite = site;
   currentRoundId = uid();
   roundVehicles = [];
   document.getElementById('round-site-name').textContent = site;
-  document.getElementById('round-sub').textContent = `Démarré à ${nowStr()} · ${currentAgent}`;
+  document.getElementById('round-sub').textContent = 'Démarré à ' + nowStr() + ' · ' + currentAgent;
   document.getElementById('active-round-wrap').style.display = 'block';
   document.getElementById('active-round-name').textContent = site;
   updateRoundStats();
   showScreen('s-round');
 }
+
 function confirmEndRound() {
-  if (!roundVehicles.length || confirm(`Terminer la ronde sur ${currentSite} ?`)) {
+  if (!roundVehicles.length || confirm('Terminer la ronde sur ' + currentSite + ' ?')) {
     showEndRound();
   }
 }
@@ -461,106 +420,45 @@ async function showEndRound() {
   const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
   const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
   document.getElementById('end-round-site').textContent = currentSite;
-  document.getElementById('end-round-meta').textContent =
-    `${nowStr()} · ${currentAgent} · ${roundVehicles.length} véhicule(s)`;
-  document.getElementById('end-stats-grid').innerHTML = `
-    <div class="stat-box"><div class="stat-val red">${inf}</div><div class="stat-lbl">Infractions</div></div>
-    <div class="stat-box"><div class="stat-val green">${aut}</div><div class="stat-lbl">Autorisés</div></div>`;
+  document.getElementById('end-round-meta').textContent = nowStr() + ' · ' + currentAgent + ' · ' + roundVehicles.length + ' véhicule(s)';
+  document.getElementById('end-stats-grid').innerHTML =
+    '<div class="stat-box"><div class="stat-val red">' + inf + '</div><div class="stat-lbl">Infractions</div></div>' +
+    '<div class="stat-box"><div class="stat-val green">' + aut + '</div><div class="stat-lbl">Autorisés</div></div>';
   document.getElementById('ia-results').style.display = 'none';
+  document.getElementById('json-export-info').style.display = 'none';
   showScreen('s-end-round');
-
-  // Étape 1 — vérifier que tout est dans Supabase
   await confirmSupabaseSync();
 }
 
-// ═══ FORCE SYNC ═══
+// ═══ SYNC FORCÉE ═══
 async function forceSync() {
   const btn = document.getElementById('btn-force-sync');
   btn.disabled = true;
-  btn.innerHTML = '<span style="font-size:16px">⏳</span> Synchronisation en cours...';
-
+  btn.textContent = '⏳ Synchronisation en cours...';
   if (!navigator.onLine) {
-    toast('❌ Pas de réseau — impossible de synchroniser');
+    toast('❌ Pas de réseau disponible');
     btn.disabled = false;
-    btn.innerHTML = '<span style="font-size:16px">🔄</span> Forcer la synchronisation';
+    btn.textContent = '🔄 Forcer la synchronisation';
     return;
   }
-
   isOnline = true;
   await syncPending();
   await confirmSupabaseSync();
-
   btn.disabled = false;
-  btn.innerHTML = '<span style="font-size:16px">🔄</span> Forcer la synchronisation';
+  btn.textContent = '🔄 Forcer la synchronisation';
 }
 
-// ═══ EXPORT JSON WHATSAPP ═══
-function exportJSON() {
-  const payload = {
-    meta: {
-      app: 'ParkGuard RDZ',
-      version: '1.0',
-      export_at: new Date().toISOString(),
-      site: currentSite,
-      agent: currentAgent,
-      round_id: currentRoundId,
-      total: roundVehicles.length,
-      infractions: roundVehicles.filter(v => v.statut === 'infraction').length,
-      autorises: roundVehicles.filter(v => v.statut === 'autorise').length
-    },
-    instructions_ia: `Tu es un assistant d'analyse pour RDZ Security (Suisse). 
-Voici les données d'une ronde de surveillance parking sur le site "${currentSite}".
-Pour chaque véhicule, les photos ont été prises sur le terrain.
-Analyse les données et génère un rapport JSON enrichi avec :
-- Confirmation des motifs d'infraction
-- Suggestions de suivi pour les véhicules récurrents
-- Résumé de la ronde pour le client
-Réponds avec un JSON structuré.`,
-    vehicules: roundVehicles.map((v, i) => ({
-      numero: i + 1,
-      statut: v.statut,
-      heure: v.time,
-      site: v.site,
-      agent: v.agent_name,
-      motif: v.motif || null,
-      remarque: v.remarque || null,
-      plaque: v.plaque || 'À extraire des photos',
-      num_denonciation: v.num_denonciation || (v.statut === 'infraction' ? 'À extraire photo dénonciation' : null),
-      num_macaron: v.num_macaron || (v.statut === 'autorise' ? 'À extraire photo macaron' : null),
-      photos_count: v.photos_count || 0,
-      synced: v.synced || false
-    }))
-  };
-
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const date = new Date().toISOString().slice(0, 10);
-  const siteName = (currentSite || 'ronde').replace(/\s+/g, '-').toLowerCase();
-  const filename = `parkguard-${siteName}-${date}.json`;
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-
-  const info = document.getElementById('json-export-info');
-  info.style.display = 'block';
-  info.innerHTML = `✅ <strong>${filename}</strong> téléchargé.<br>
-Envoie ce fichier par WhatsApp ou email à l'administratif.<br>
-Dans Claude.ai : colle le JSON + les photos → demande l'extraction des plaques.`;
-}
+// ═══ CONFIRMATION SUPABASE ═══
+async function confirmSupabaseSync() {
   const box = document.getElementById('db-confirm-box');
-  box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-mid)"><span style="font-size:20px">⏳</span> Vérification dans Supabase...</div>`;
+  box.innerHTML = '<div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification dans Supabase...</div></div></div>';
 
-  if (!isOnline) {
-    box.innerHTML = `<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Les données seront synchronisées dès retour réseau.</div></div></div>`;
-    document.getElementById('ia-box').innerHTML = `<div style="font-size:13px;color:var(--gray-mid)">⚠️ IA disponible uniquement en ligne.</div>`;
+  if (!navigator.onLine) {
+    box.innerHTML = '<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Sync impossible — retentez avec le réseau.</div></div></div>';
+    document.getElementById('ia-box').innerHTML = '<div class="db-warn"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--amber)">IA disponible en ligne uniquement</div></div></div>';
     return;
   }
 
-  // Sync les pending d'abord
   await syncPending();
 
   try {
@@ -572,88 +470,86 @@ Dans Claude.ai : colle le JSON + les photos → demande l'extraction des plaques
 
     if (error) throw error;
 
-    const found = data?.length || 0;
+    const found    = data ? data.length : 0;
     const expected = roundVehicles.length;
-    const allOk = found >= expected;
 
-    if (allOk) {
-      box.innerHTML = `<div class="db-ok">
-        <div class="db-icon">✅</div>
-        <div>
-          <div class="db-label" style="color:var(--green)">${found} / ${expected} entrées confirmées</div>
-          <div class="db-sub" style="color:var(--green)">Toutes les données sont dans Supabase.</div>
-        </div>
-      </div>`;
-      // Étape 2 — lancer l'IA
+    if (found >= expected) {
+      box.innerHTML = '<div class="db-ok"><div class="db-icon">✅</div><div><div class="db-label" style="color:var(--green)">' + found + ' / ' + expected + ' entrées confirmées</div><div class="db-sub" style="color:var(--green)">Toutes les données sont dans Supabase.</div></div></div>';
       await runIAPipeline();
     } else {
-      box.innerHTML = `<div class="db-err">
-        <div class="db-icon">⚠️</div>
-        <div>
-          <div class="db-label" style="color:var(--red-dark)">${found} / ${expected} entrées trouvées</div>
-          <div class="db-sub" style="color:var(--red-dark)">${expected - found} entrée(s) manquante(s). Vérifiez la connexion.</div>
-        </div>
-      </div>`;
+      box.innerHTML = '<div class="db-err"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--red-dark)">' + found + ' / ' + expected + ' entrées trouvées</div><div class="db-sub" style="color:var(--red-dark)">' + (expected - found) + ' manquante(s) — forcez la sync.</div></div></div>';
     }
   } catch(e) {
-    box.innerHTML = `<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur de vérification</div><div class="db-sub" style="color:var(--red-dark)">${e.message}</div></div></div>`;
+    box.innerHTML = '<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur</div><div class="db-sub" style="color:var(--red-dark)">' + e.message + '</div></div></div>';
   }
 }
 
-// ═══════════════════════════════════════════════════
-// PIPELINE IA — GPT-4o Vision
-// ═══════════════════════════════════════════════════
-const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI'; // ← remplacer par sk-proj-...
+// ═══ EXPORT JSON ═══
+function exportJSON() {
+  const payload = {
+    meta: {
+      app: 'ParkGuard RDZ', version: '1.0',
+      export_at: new Date().toISOString(),
+      site: currentSite, agent: currentAgent,
+      round_id: currentRoundId,
+      total: roundVehicles.length,
+      infractions: roundVehicles.filter(v => v.statut === 'infraction').length,
+      autorises: roundVehicles.filter(v => v.statut === 'autorise').length
+    },
+    instructions_ia: 'Tu es un assistant RDZ Security (Suisse). Analyse cette ronde de surveillance parking sur "' + currentSite + '". Pour chaque véhicule, les photos ont été prises sur le terrain. Extrais les plaques, N° de dénonciation et N° de macaron. Génère un rapport JSON enrichi.',
+    vehicules: roundVehicles.map(function(v, i) {
+      return {
+        numero: i + 1,
+        statut: v.statut,
+        heure: v.time,
+        site: v.site,
+        agent: v.agent_name,
+        motif: v.motif || null,
+        remarque: v.remarque || null,
+        plaque: v.plaque || 'À extraire des photos',
+        num_denonciation: v.statut === 'infraction' ? (v.num_denonciation || 'À extraire photo dénonciation') : null,
+        num_macaron: v.statut === 'autorise' ? (v.num_macaron || 'À extraire photo macaron') : null,
+        photos_count: v.photos_count || 0,
+        synced: v.synced || false
+      };
+    })
+  };
 
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const name = 'parkguard-' + (currentSite || 'ronde').toLowerCase().replace(/\s+/g, '-') + '-' + date + '.json';
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+
+  const info = document.getElementById('json-export-info');
+  info.style.display = 'block';
+  info.innerHTML = '✅ <strong>' + name + '</strong> téléchargé.<br>Envoie ce fichier + les photos par WhatsApp à l\'administratif.<br>Dans Claude.ai : colle le JSON + photos → extraction automatique des plaques.';
+}
+
+// ═══ PIPELINE IA GPT-4o ═══
 async function runIAPipeline() {
   const iaBox = document.getElementById('ia-box');
 
   if (!OPENAI_KEY || OPENAI_KEY.startsWith('VOTRE')) {
-    iaBox.innerHTML = `<div style="background:var(--amber-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--amber);line-height:1.6">
-      ⚠️ <strong>Clé API non configurée.</strong><br>Remplacez <code>VOTRE_CLE_API_OPENAI_ICI</code> par votre clé OpenAI dans le code.
-    </div>`;
+    iaBox.innerHTML = '<div class="db-warn"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--amber)">Clé API non configurée</div><div class="db-sub" style="color:var(--amber)">Remplacez VOTRE_CLE_API_OPENAI_ICI dans le code.</div></div></div>';
     return;
   }
 
-  // Uniquement les véhicules avec photos (donc ceux de cette session)
-  const vehiclesWithPhotos = roundVehicles.filter(v => v.round_id === currentRoundId);
+  const vehiclesWithPhotos = roundVehicles.filter(v => v._photos && Object.keys(v._photos).length);
   if (!vehiclesWithPhotos.length) {
-    iaBox.innerHTML = `<div style="font-size:13px;color:var(--gray-mid)">Aucune photo à analyser.</div>`;
+    iaBox.innerHTML = '<div class="db-warn"><div class="db-icon">ℹ️</div><div><div class="db-label" style="color:var(--amber)">Aucune photo en mémoire</div><div class="db-sub" style="color:var(--amber)">Photos disponibles uniquement dans la même session.</div></div></div>';
     return;
   }
-
-  iaBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-dark)">
-    <span style="font-size:20px">🤖</span>
-    <div>
-      <div style="font-weight:600">Analyse IA en cours...</div>
-      <div style="font-size:12px;color:var(--gray-mid);margin-top:2px">GPT-4o analyse les photos</div>
-    </div>
-  </div>`;
 
   const results = [];
-
-  for (const [i, vehicle] of vehiclesWithPhotos.entries()) {
-    iaBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray-dark)">
-      <span style="font-size:20px">🤖</span>
-      <div>
-        <div style="font-weight:600">Analyse ${i + 1} / ${vehiclesWithPhotos.length}</div>
-        <div style="font-size:12px;color:var(--gray-mid);margin-top:2px">${vehicle.statut === 'infraction' ? 'Infraction · ' + (vehicle.motif || '') : 'Véhicule autorisé'}</div>
-      </div>
-    </div>
-    <div class="progress-wrap" style="margin-top:12px;margin-bottom:0">
-      <div class="progress-fill" style="width:${Math.round(((i+1)/vehiclesWithPhotos.length)*100)}%"></div>
-    </div>`;
-
-    // Récupère les photos locales (flowPhotos stockées par round)
-    const photos = vehicle._photos || {};
-    const imageKeys = Object.keys(photos);
-    if (!imageKeys.length) { results.push({ vehicle, plaque: null, num_denonciation: null, num_macaron: null, error: 'Pas de photos' }); continue; }
-
+  for (let i = 0; i < vehiclesWithPhotos.length; i++) {
+    const vehicle = vehiclesWithPhotos[i];
+    iaBox.innerHTML = '<div style="padding:4px 0"><div style="font-weight:600;font-size:14px">🤖 Analyse ' + (i+1) + ' / ' + vehiclesWithPhotos.length + '</div><div style="font-size:12px;color:var(--gray-mid);margin-top:4px">' + (vehicle.statut === 'infraction' ? vehicle.motif || 'Infraction' : 'Autorisé') + '</div><div class="progress-wrap" style="margin-top:10px;margin-bottom:0"><div class="progress-fill" style="width:' + Math.round(((i+1)/vehiclesWithPhotos.length)*100) + '%"></div></div></div>';
     try {
-      const extracted = await analyzeWithGPT(vehicle, photos);
+      const extracted = await analyzeWithGPT(vehicle, vehicle._photos);
       results.push({ vehicle, ...extracted });
-
-      // Mettre à jour Supabase avec les données extraites
       if (extracted.plaque || extracted.num_denonciation || extracted.num_macaron) {
         await db.from('vehicles').update({
           plaque: extracted.plaque,
@@ -668,113 +564,74 @@ async function runIAPipeline() {
     }
   }
 
-  // Afficher résultats
-  iaBox.innerHTML = `<div class="db-ok">
-    <div class="db-icon">🤖</div>
-    <div>
-      <div class="db-label" style="color:var(--green)">Analyse terminée</div>
-      <div class="db-sub" style="color:var(--green)">${results.filter(r => r.plaque).length} / ${results.length} plaque(s) extraite(s)</div>
-    </div>
-  </div>`;
+  const ok = results.filter(r => r.plaque).length;
+  iaBox.innerHTML = '<div class="db-ok"><div class="db-icon">🤖</div><div><div class="db-label" style="color:var(--green)">Analyse terminée</div><div class="db-sub" style="color:var(--green)">' + ok + ' / ' + results.length + ' plaque(s) extraite(s)</div></div></div>';
 
-  // Afficher les cartes résultats
-  const resultDiv = document.getElementById('ia-results');
-  const resultList = document.getElementById('ia-results-list');
-  resultList.innerHTML = results.map(r => {
+  document.getElementById('ia-results-list').innerHTML = results.map(function(r) {
     const isInf = r.vehicle.statut === 'infraction';
-    const conf = r.plaque ? 'high' : 'low';
-    return `<div class="ia-vehicle-card ${isInf ? 'inf' : 'aut'}">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="badge ${isInf ? 'badge-red' : 'badge-green'}">${isInf ? 'INF' : 'AUT'}</div>
-        <div class="ia-plate">${r.plaque || '— non détectée'}</div>
-        <span class="ia-confidence ${conf}">${r.plaque ? 'OK' : '?'}</span>
-      </div>
-      <div class="ia-details">
-        ${r.num_denonciation ? '📋 Dénon. N°: ' + r.num_denonciation + ' · ' : ''}
-        ${r.num_macaron ? '🏷️ Macaron: ' + r.num_macaron + ' · ' : ''}
-        ${isInf ? (r.vehicle.motif || '') : 'Autorisé'}
-        ${r.error ? ' · ⚠️ ' + r.error : ''}
-      </div>
-    </div>`;
+    return '<div class="ia-vehicle-card ' + (isInf ? 'inf' : 'aut') + '">' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+      '<div class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'INF' : 'AUT') + '</div>' +
+      '<div class="ia-plate">' + (r.plaque || '— non détectée') + '</div>' +
+      '<span class="ia-conf ' + (r.plaque ? 'ok' : 'nok') + '">' + (r.plaque ? 'OK' : '?') + '</span>' +
+      '</div><div class="ia-details">' +
+      (r.num_denonciation ? '📋 ' + r.num_denonciation + ' · ' : '') +
+      (r.num_macaron ? '🏷️ ' + r.num_macaron + ' · ' : '') +
+      (isInf ? (r.vehicle.motif || '') : 'Autorisé') +
+      (r.error ? ' · ⚠️ ' + r.error : '') +
+      '</div></div>';
   }).join('');
-  resultDiv.style.display = 'block';
+  document.getElementById('ia-results').style.display = 'block';
 }
 
 async function analyzeWithGPT(vehicle, photos) {
   const isInf = vehicle.statut === 'infraction';
-
-  // Prépare les images à envoyer
-  const imageContents = Object.entries(photos)
-    .filter(([k, v]) => v && v.startsWith('data:'))
-    .map(([key, dataUrl]) => {
-      const [meta, b64] = dataUrl.split(',');
-      const mime = meta.match(/:(.*?);/)[1];
-      return {
-        type: 'image_url',
-        image_url: { url: `data:${mime};base64,${b64}`, detail: 'high' }
-      };
+  const imageContents = Object.values(photos)
+    .filter(v => v && v.startsWith('data:'))
+    .map(function(dataUrl) {
+      const parts = dataUrl.split(',');
+      const mime  = parts[0].match(/:(.*?);/)[1];
+      return { type: 'image_url', image_url: { url: 'data:' + mime + ';base64,' + parts[1], detail: 'high' } };
     });
-
   if (!imageContents.length) throw new Error('Aucune image valide');
 
   const prompt = isInf
-    ? `Tu analyses des photos d'un véhicule en infraction de stationnement pour la société RDZ Security en Suisse.
+    ? 'Tu analyses des photos d\'un véhicule en infraction pour RDZ Security (Suisse). Réponds UNIQUEMENT avec ce JSON:\n{"plaque":"GE 123 456","num_denonciation":"2024-001234","couleur":"blanc","confiance":"haute"}\nFormat plaque CH: XX 000 000. null si illisible.'
+    : 'Tu analyses des photos d\'un véhicule autorisé pour RDZ Security (Suisse). Réponds UNIQUEMENT avec ce JSON:\n{"plaque":"GE 123 456","num_macaron":"A-1234","couleur":"blanc","confiance":"haute"}\nFormat plaque CH: XX 000 000. null si illisible.';
 
-Extrais UNIQUEMENT ces informations en JSON :
-{
-  "plaque": "GE 123 456",
-  "pays": "CH",
-  "couleur": "blanc",
-  "num_denonciation": "2024-001234",
-  "confiance_plaque": "haute"
-}
-
-Règles :
-- Format plaque suisse : XX 000 000 (canton + espace + chiffres)
-- num_denonciation : numéro visible sur le formulaire papier photographié
-- Si tu ne peux pas lire quelque chose, mets null
-- Réponds UNIQUEMENT avec le JSON, rien d'autre`
-    : `Tu analyses des photos d'un véhicule autorisé dans un parking surveillé par RDZ Security en Suisse.
-
-Extrais UNIQUEMENT ces informations en JSON :
-{
-  "plaque": "GE 123 456",
-  "pays": "CH",
-  "couleur": "blanc",
-  "num_macaron": "A-1234",
-  "confiance_plaque": "haute"
-}
-
-Règles :
-- Format plaque suisse : XX 000 000 (canton + espace + chiffres)
-- num_macaron : numéro visible sur le macaron/vignette de stationnement
-- Si tu ne peux pas lire quelque chose, mets null
-- Réponds UNIQUEMENT avec le JSON, rien d'autre`;
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 200,
+      model: 'gpt-4o', max_tokens: 200,
       messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: prompt }] }]
     })
   });
+  if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || 'Erreur API ' + resp.status); }
+  const data = await resp.json();
+  const parsed = JSON.parse(data.choices[0].message.content.trim().replace(/```json|```/g,''));
+  return { plaque: parsed.plaque || null, num_denonciation: parsed.num_denonciation || null, num_macaron: parsed.num_macaron || null };
+}
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error?.message || `Erreur API ${response.status}`);
-  }
-
-  const data = await response.json();
-  const text = data.choices[0].message.content.trim().replace(/```json|```/g, '');
-  const parsed = JSON.parse(text);
-  return {
-    plaque: parsed.plaque || null,
-    num_denonciation: parsed.num_denonciation || null,
-    num_macaron: parsed.num_macaron || null,
-    confiance: parsed.confiance_plaque || null
-  };
+// ═══ ROUND STATS ═══
+function updateRoundStats() {
+  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('r-inf').textContent = inf;
+  document.getElementById('r-aut').textContent = aut;
+  document.getElementById('round-sub').textContent = roundVehicles.length + ' véhicule(s) · ' + currentAgent;
+  document.getElementById('active-round-meta').textContent = roundVehicles.length + ' véhicule(s) traité(s)';
+  const list = document.getElementById('vehicle-list');
+  if (!roundVehicles.length) { list.innerHTML = '<p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p>'; return; }
+  list.innerHTML = roundVehicles.slice().reverse().map(function(v) {
+    return '<div class="vehicle-row">' +
+      '<div class="badge ' + (v.statut === 'infraction' ? 'badge-red' : 'badge-green') + '">' + (v.statut === 'infraction' ? 'INF' : 'AUT') + '</div>' +
+      '<div class="vehicle-plate">' + (v.plaque || '— IA') + '</div>' +
+      '<div style="margin-left:auto;text-align:right">' +
+      '<div style="font-size:11px;color:var(--gray-mid)">' + v.time + '</div>' +
+      '<div style="font-size:10px;color:' + (v.synced ? 'var(--green)' : 'var(--amber)') + '">' + (v.synced ? '☁️ sync' : '📱 local') + '</div>' +
+      '</div></div>';
+  }).join('');
 }
 
 function closeRound() {
@@ -782,34 +639,15 @@ function closeRound() {
   document.getElementById('active-round-wrap').style.display = 'none';
   showScreen('s-home');
 }
-function updateRoundStats() {
-  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
-  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
-  document.getElementById('r-inf').textContent = inf;
-  document.getElementById('r-aut').textContent = aut;
-  document.getElementById('round-sub').textContent = `${roundVehicles.length} véhicule(s) · ${currentAgent}`;
-  document.getElementById('active-round-meta').textContent = `${roundVehicles.length} véhicule(s) traité(s)`;
-  const list = document.getElementById('vehicle-list');
-  if (!roundVehicles.length) { list.innerHTML = '<p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p>'; return; }
-  list.innerHTML = [...roundVehicles].reverse().map(v =>
-    `<div class="vehicle-row">
-      <div class="badge ${v.statut === 'infraction' ? 'badge-red' : 'badge-green'}">${v.statut === 'infraction' ? 'INF' : 'AUT'}</div>
-      <div class="vehicle-plate">${v.plaque || '— IA'}</div>
-      <div style="margin-left:auto;text-align:right">
-        <div style="font-size:11px;color:var(--gray-mid)">${v.time}</div>
-        <div style="font-size:10px;color:${v.synced ? 'var(--green)' : 'var(--amber)'}">${v.synced ? '☁️ sync' : '📱 local'}</div>
-      </div>
-    </div>`
-  ).join('');
-}
 
 // ═══ PHOTO INPUT ═══
 document.getElementById('file-input').addEventListener('change', function() {
   if (this.files[0] && pendingFileCallback) {
     const file = this.files[0];
     const reader = new FileReader();
-    reader.onload = e => { pendingFileCallback(e.target.result, file); this.value = ''; };
+    reader.onload = function(e) { pendingFileCallback(e.target.result, file); };
     reader.readAsDataURL(file);
+    this.value = '';
   }
 });
 function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
@@ -817,28 +655,27 @@ function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('
 // ═══ FLOW ═══
 function startFlow(type) {
   flowType = type; flowStep = 0; flowPhotos = {}; flowBlobs = {}; flowFields = {};
-  if (type === 'infraction') { flowFields.motif = STEPS.infraction[1].fields[0].opts[0]; }
+  if (type === 'infraction') flowFields.motif = STEPS.infraction[1].fields[0].opts[0];
   renderFlowStep();
   showScreen('s-flow');
 }
 
 function renderFlowStep() {
   const steps = STEPS[flowType];
-  const s = steps[flowStep];
-  const pct = Math.round(((flowStep + 1) / steps.length) * 100);
+  const s     = steps[flowStep];
+  const pct   = Math.round(((flowStep + 1) / steps.length) * 100);
   const isInf = flowType === 'infraction';
-  const color = isInf ? 'var(--red)' : 'var(--green)';
 
-  document.getElementById('flow-title').textContent = s.label;
-  document.getElementById('flow-step-label').textContent = `Étape ${flowStep + 1} / ${steps.length}`;
+  document.getElementById('flow-title').textContent     = s.label;
+  document.getElementById('flow-step-label').textContent = 'Étape ' + (flowStep+1) + ' / ' + steps.length;
   const badge = document.getElementById('flow-badge');
   badge.textContent = isInf ? 'INFRACTION' : 'AUTORISÉ';
-  badge.className = `badge ${isInf ? 'badge-red' : 'badge-green'}`;
+  badge.className   = 'badge ' + (isInf ? 'badge-red' : 'badge-green');
 
-  let html = `<div class="progress-wrap"><div class="progress-fill${isInf ? '' : ' green'}" style="width:${pct}%"></div></div>
-    <div class="step-eyebrow${isInf ? '' : ' green'}">Étape ${flowStep + 1} / ${steps.length}</div>
-    <div class="step-title">${s.label}</div>
-    <div class="step-sub">${s.sub}</div>`;
+  let html = '<div class="progress-wrap"><div class="progress-fill' + (isInf ? '' : ' green') + '" style="width:' + pct + '%"></div></div>' +
+    '<div class="step-eyebrow' + (isInf ? '' : ' green') + '">Étape ' + (flowStep+1) + ' / ' + steps.length + '</div>' +
+    '<div class="step-title">' + s.label + '</div>' +
+    '<div class="step-sub">' + s.sub + '</div>';
 
   let canNext = true;
 
@@ -846,45 +683,43 @@ function renderFlowStep() {
     const taken = flowPhotos[s.photo.key];
     canNext = !!taken;
     if (taken) {
-      html += `<div class="photo-zone taken" onclick="triggerCamera(cb => { flowPhotos['${s.photo.key}']=cb; renderFlowStep(); })">
-        <img src="${taken}">
-        <button class="photo-retake" onclick="event.stopPropagation();triggerCamera(function(d){flowPhotos['${s.photo.key}']=d;renderFlowStep();})">Reprendre</button>
-        <div class="photo-taken-bar">✅ Photo enregistrée</div>
-      </div>`;
+      html += '<div class="photo-zone taken" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
+        '<img src="' + taken + '">' +
+        '<button class="photo-retake" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\')">Reprendre</button>' +
+        '<div class="photo-taken-bar">✅ Photo enregistrée</div></div>';
     } else {
-      html += `<div class="photo-zone" onclick="takeFlowPhoto('${s.photo.key}')">
-        <div class="photo-zone-inner">
-          <div class="photo-zone-icon">📷</div>
-          <div class="photo-zone-label">${s.label}</div>
-          <div class="photo-zone-sub">${s.photo.hint}</div>
-        </div>
-      </div>`;
+      html += '<div class="photo-zone" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
+        '<div class="photo-zone-inner">' +
+        '<div class="photo-zone-icon">📷</div>' +
+        '<div class="photo-zone-label">' + s.label + '</div>' +
+        '<div class="photo-zone-sub">' + s.photo.hint + '</div>' +
+        '</div></div>';
     }
   }
 
   if (s.fields) {
-    s.fields.forEach(f => {
-      html += `<div class="field-group"><label class="field-label">${f.label}</label>`;
+    s.fields.forEach(function(f) {
+      html += '<div class="field-group"><label class="field-label">' + f.label + '</label>';
       if (f.type === 'select') {
-        html += `<select class="field-select" onchange="flowFields['${f.key}']=this.value">`;
-        f.opts.forEach(o => html += `<option${flowFields[f.key]===o?' selected':''}>${o}</option>`);
-        html += `</select>`;
+        html += '<select class="field-select" onchange="flowFields[\'' + f.key + '\']=this.value">';
+        f.opts.forEach(function(o) { html += '<option' + (flowFields[f.key]===o?' selected':'') + '>' + o + '</option>'; });
+        html += '</select>';
       } else {
-        html += `<input class="field-input" type="text" placeholder="${f.placeholder||''}" value="${flowFields[f.key]||''}" oninput="flowFields['${f.key}']=this.value">`;
+        html += '<input class="field-input" type="text" placeholder="' + (f.placeholder||'') + '" value="' + (flowFields[f.key]||'') + '" oninput="flowFields[\'' + f.key + '\']=this.value">';
       }
-      html += `</div>`;
+      html += '</div>';
     });
   }
 
   document.getElementById('flow-content').innerHTML = html;
   const isLast = flowStep === steps.length - 1;
-  const btnLabel = isLast ? (flowType === 'infraction' ? 'Enregistrer l\'infraction' : 'Enregistrer') : 'Continuer';
+  const label  = isLast ? (flowType === 'infraction' ? "Enregistrer l'infraction" : 'Enregistrer') : 'Continuer';
   document.getElementById('flow-bottom').innerHTML =
-    `<button class="primary-btn${isInf ? '' : ' green'}" ${canNext ? '' : 'disabled'} onclick="nextFlowStep()">${btnLabel}</button>`;
+    '<button class="primary-btn' + (isInf ? '' : ' green') + '" ' + (canNext ? '' : 'disabled') + ' onclick="nextFlowStep()">' + label + '</button>';
 }
 
 function takeFlowPhoto(key) {
-  triggerCamera((dataUrl, file) => {
+  triggerCamera(function(dataUrl, file) {
     flowPhotos[key] = dataUrl;
     if (file) flowBlobs[key] = file;
     renderFlowStep();
@@ -892,76 +727,54 @@ function takeFlowPhoto(key) {
 }
 
 async function nextFlowStep() {
-  const steps = STEPS[flowType];
-  if (flowStep < steps.length - 1) {
-    flowStep++;
-    renderFlowStep();
-  } else {
-    await saveEntry();
-  }
+  if (flowStep < STEPS[flowType].length - 1) { flowStep++; renderFlowStep(); }
+  else await saveEntry();
 }
 
-// ═══ SAVE ═══
+// ═══ SAVE ENTRY ═══
 async function saveEntry() {
-  const now = new Date().toISOString();
+  const now  = new Date().toISOString();
   const time = nowStr();
   const entry = {
-    round_id: currentRoundId,
-    site: currentSite,
-    agent_name: currentAgent,
+    round_id: currentRoundId, site: currentSite, agent_name: currentAgent,
     statut: flowType,
-    motif: flowFields.motif || null,
-    remarque: flowFields.remarque || null,
-    plaque: null,
-    num_denonciation: null,
-    num_macaron: null,
+    motif: flowFields.motif || null, remarque: flowFields.remarque || null,
+    plaque: null, num_denonciation: null, num_macaron: null,
     photos_count: Object.keys(flowPhotos).length,
-    ia_pending: true,
-    created_at: now
+    ia_pending: true, created_at: now
   };
 
   let synced = false;
   if (isOnline) {
-    try {
-      const { error } = await db.from('vehicles').insert(entry);
-      if (!error) synced = true;
-    } catch(e) {}
+    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
   }
   if (!synced) savePending(entry);
 
-  roundVehicles.push({ ...entry, time, synced, _photos: { ...flowPhotos } });
+  roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: Object.assign({}, flowPhotos) }));
   updateRoundStats();
 
-  // RECAP
   const isInf = flowType === 'infraction';
-  document.getElementById('recap-icon').textContent = isInf ? '📋' : '✅';
+  document.getElementById('recap-icon').textContent  = isInf ? '📋' : '✅';
   document.getElementById('recap-title').textContent = isInf ? 'Dénonciation enregistrée' : 'Véhicule autorisé enregistré';
-  document.getElementById('recap-meta').textContent = `${Object.keys(flowPhotos).length} photos · ${time}`;
+  document.getElementById('recap-meta').textContent  = Object.keys(flowPhotos).length + ' photos · ' + time;
   const badge = document.getElementById('recap-sync-badge');
   badge.textContent = synced ? '☁️ Synchronisé' : '⏳ En attente sync';
-  badge.className = `badge ${synced ? 'badge-green' : 'badge-amber'}`;
-  const btn = document.getElementById('recap-next-btn');
-  btn.className = `primary-btn${isInf ? '' : ' green'}`;
+  badge.className   = 'badge ' + (synced ? 'badge-green' : 'badge-amber');
+  document.getElementById('recap-next-btn').className = 'primary-btn' + (isInf ? '' : ' green');
 
-  let checks = '';
-  if (isInf) {
-    checks = `
-      <div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>
-      <div class="recap-check"><div class="recap-icon">📋</div>Dénonciation photographiée</div>
-      <div class="recap-check"><div class="recap-icon">🪟</div>Pare-brise (4 coins) photographié</div>
-      <div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° dénonciation : extraction IA à la sync</div>`;
-  } else {
-    checks = `
-      <div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>
-      <div class="recap-check"><div class="recap-icon">🏷️</div>Photo du macaron enregistrée</div>
-      <div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° macaron : extraction IA à la sync</div>`;
-  }
+  let checks = isInf
+    ? '<div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">📋</div>Dénonciation photographiée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🪟</div>Pare-brise (4 coins) photographié</div>' +
+      '<div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° dénonciation : extraction IA en fin de ronde</div>'
+    : '<div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🏷️</div>Photo du macaron enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° macaron : extraction IA en fin de ronde</div>';
   document.getElementById('recap-checks').innerHTML = checks;
   showScreen('s-recap');
 }
 
 // ═══ INIT ═══
-renderAgentChips();
 updateOnlineStatus();
 updatePendingInfo();
 </script>
