@@ -21,10 +21,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar{background:var(--black);padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
 .topbar-logo{font-size:18px;font-weight:900;color:var(--white);letter-spacing:-.5px}
 .topbar-logo span{color:var(--red)}
-.topbar-sub{font-size:12px;color:#666;margin-left:4px}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 
-.container{max-width:1100px;margin:0 auto;padding:24px}
+.container{max-width:1200px;margin:0 auto;padding:24px}
 
 .card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
 .card-title{font-size:15px;font-weight:700;margin-bottom:4px}
@@ -39,12 +38,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 .btn{padding:10px 18px;font-size:14px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:8px}
 .btn:active{opacity:.82}
-.btn-primary{background:var(--red);color:var(--white)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-red{background:var(--red);color:var(--white)}
 .btn-black{background:var(--black);color:var(--white)}
 .btn-outline{background:var(--white);color:var(--black);border:1.5px solid var(--gray-border)}
 .btn-green{background:var(--green);color:var(--white)}
-.btn-blue{background:var(--blue);color:var(--white)}
-.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-sm{padding:6px 12px;font-size:12px}
 
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
 .stat-box{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:16px}
@@ -55,105 +54,86 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .stat-val.blue{color:var(--blue)}
 .stat-lbl{font-size:12px;color:var(--gray-mid);margin-top:2px}
 
+/* SELECTION TOOLBAR */
+.sel-toolbar{background:var(--black);color:var(--white);padding:10px 16px;border-radius:var(--radius-sm);margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+.sel-toolbar.visible{display:flex}
+.sel-count{font-size:14px;font-weight:700;flex:1}
+
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:10px 12px;font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--gray-border);background:var(--gray-light)}
 td{padding:10px 12px;border-bottom:1px solid var(--gray-light);vertical-align:middle}
 tr:hover td{background:#fafafa}
+tr.selected td{background:#f0f4ff}
 .plate{font-family:'Courier New',monospace;font-weight:700;font-size:14px;letter-spacing:.05em}
 
 .photo-thumb{width:48px;height:36px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--gray-border)}
 .photo-thumb:hover{opacity:.8}
 .photos-cell{display:flex;gap:4px;flex-wrap:wrap}
 
-.ia-prompt-box{background:#1a1a2e;border-radius:var(--radius-sm);padding:16px;font-family:'Courier New',monospace;font-size:12px;color:#a0c4ff;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-bottom:12px;line-height:1.6}
+/* CHECKBOX */
+input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--red)}
 
-.result-input{width:100%;padding:10px 12px;font-size:13px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:'Courier New',monospace;min-height:120px;resize:vertical}
-.result-input:focus{outline:none;border-color:var(--blue)}
-
-.filter-row{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.filter-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .filter-select{padding:8px 12px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:inherit}
 
-.progress-bar{height:4px;background:var(--gray-light);border-radius:4px;margin-top:8px;overflow:hidden}
+.progress-bar{height:4px;background:var(--gray-light);border-radius:4px;overflow:hidden;margin-top:8px}
 .progress-fill{height:4px;background:var(--red);border-radius:4px;transition:width .3s}
 
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
-.modal{background:var(--white);border-radius:var(--radius);padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto}
-.modal-title{font-size:17px;font-weight:700;margin-bottom:16px}
+/* IA SECTION */
+.ia-prompt-box{background:#0f0f23;border-radius:var(--radius-sm);padding:16px;font-family:'Courier New',monospace;font-size:12px;color:#7dd3fc;white-space:pre-wrap;max-height:240px;overflow-y:auto;margin-bottom:12px;line-height:1.6;border:1px solid #1e3a5f}
+.result-input{width:100%;padding:10px 12px;font-size:13px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:'Courier New',monospace;min-height:100px;resize:vertical}
+.result-input:focus{outline:none;border-color:var(--blue)}
 
-.section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:20px}
+.section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;margin-top:16px}
 .section-label:first-child{margin-top:0}
 
-.inline-edit{display:flex;gap:8px;align-items:center}
-.inline-input{padding:6px 10px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;font-weight:700;width:140px}
-.inline-btn{padding:6px 12px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;background:var(--green);color:var(--white)}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:var(--white);border-radius:var(--radius);padding:24px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:var(--gray-mid)}
 
-.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:360px}
 .toast.show{opacity:1}
+
+.field-label{font-size:11px;font-weight:700;color:var(--gray-dark);display:block;margin-bottom:5px;text-transform:uppercase}
+.field-input{width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;margin-bottom:12px}
+.field-input:focus{outline:none;border-color:var(--red)}
+
+.step-box{background:var(--gray-light);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;font-size:13px;line-height:1.6;border-left:3px solid var(--gray-border)}
+.step-box.active{border-left-color:var(--red);background:var(--red-light)}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="topbar-logo">PARK<span>GUARD</span> <span class="topbar-sub">Admin</span></div>
+  <div class="topbar-logo">PARK<span>GUARD</span></div>
+  <span style="font-size:12px;color:#666">Admin</span>
   <div class="topbar-right">
     <div id="online-badge" class="badge badge-gray">⏳ Connexion...</div>
     <span style="font-size:12px;color:#666" id="last-refresh"></span>
-    <button class="btn btn-outline" onclick="loadData()" style="padding:7px 14px;font-size:13px">🔄 Actualiser</button>
+    <button class="btn btn-outline btn-sm" onclick="loadData()">🔄 Actualiser</button>
   </div>
 </div>
 
 <div class="container">
 
   <!-- STATS -->
-  <div class="stats-row" id="stats-row">
+  <div class="stats-row">
     <div class="stat-box"><div class="stat-val red" id="s-inf">—</div><div class="stat-lbl">Infractions</div></div>
     <div class="stat-box"><div class="stat-val green" id="s-aut">—</div><div class="stat-lbl">Autorisés</div></div>
     <div class="stat-box"><div class="stat-val amber" id="s-ia">—</div><div class="stat-lbl">En attente IA</div></div>
-    <div class="stat-box"><div class="stat-val blue" id="s-total">—</div><div class="stat-lbl">Total véhicules</div></div>
+    <div class="stat-box"><div class="stat-val blue" id="s-total">—</div><div class="stat-lbl">Total</div></div>
   </div>
 
-  <!-- ANALYSE IA -->
-  <div class="card">
-    <div class="card-title">🤖 Analyse IA — Extraction automatique</div>
-    <div class="card-sub">Génère un message prêt à coller dans Claude.ai. Claude analysera toutes les photos et retournera un JSON à coller ici pour mettre à jour la base.</div>
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <button class="btn btn-black" onclick="generateClaudePrompt()" id="btn-generate">✨ Générer le message pour Claude.ai</button>
-      <button class="btn btn-outline" onclick="document.getElementById('result-section').style.display='block'" id="btn-paste">📋 Coller le résultat de Claude</button>
-    </div>
-
-    <div id="prompt-section" style="display:none">
-      <div class="section-label">Message à copier et coller dans Claude.ai</div>
-      <div class="ia-prompt-box" id="ia-prompt-content"></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-black" onclick="copyPrompt()">📋 Copier le message</button>
-        <a href="https://claude.ai" target="_blank" class="btn btn-outline">↗ Ouvrir Claude.ai</a>
-      </div>
-      <div style="font-size:12px;color:var(--gray-mid);margin-top:10px;line-height:1.6">
-        1. Copie le message ci-dessus · 2. Ouvre Claude.ai · 3. Colle le message et envoie · 4. Copie la réponse JSON de Claude · 5. Colle-la dans le champ ci-dessous
-      </div>
-    </div>
-
-    <div id="result-section" style="display:none;margin-top:16px">
-      <div class="section-label">Réponse JSON de Claude — à coller ici</div>
-      <textarea class="result-input" id="claude-result" placeholder='Colle ici le JSON retourné par Claude.ai...'></textarea>
-      <div style="margin-top:10px;display:flex;gap:10px">
-        <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
-        <button class="btn btn-outline" onclick="document.getElementById('result-section').style.display='none'">Annuler</button>
-      </div>
-      <div id="apply-progress" style="display:none;margin-top:10px">
-        <div style="font-size:13px;color:var(--gray-mid)" id="apply-status">Application en cours...</div>
-        <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- FILTRES + TABLE -->
+  <!-- TABLE VÉHICULES -->
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="card-title" style="margin-bottom:0">Véhicules</div>
-      <button class="btn btn-outline" onclick="exportCSV()" style="padding:7px 14px;font-size:13px">📥 Export CSV</button>
+      <div class="card-title" style="margin:0">Véhicules</div>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 Export CSV</button>
     </div>
+
+    <!-- FILTRES -->
     <div class="filter-row">
       <select class="filter-select" id="f-statut" onchange="renderTable()">
         <option value="">Tous les statuts</option>
@@ -173,16 +153,33 @@ tr:hover td{background:#fafafa}
       <input type="date" class="filter-select" id="f-date" onchange="renderTable()">
       <span style="font-size:12px;color:var(--gray-mid)" id="filter-count"></span>
     </div>
+
+    <!-- BARRE DE SÉLECTION -->
+    <div class="sel-toolbar" id="sel-toolbar">
+      <div class="sel-count" id="sel-count">0 sélectionné(s)</div>
+      <button class="btn btn-black btn-sm" onclick="openIAModal()">🤖 Analyser avec Claude</button>
+      <button class="btn btn-outline btn-sm" onclick="exportSelectedCSV()">📥 Exporter sélection</button>
+      <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="deleteSelected()">🗑️ Supprimer sélection</button>
+      <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕ Désélectionner</button>
+    </div>
+
     <div style="overflow-x:auto">
-      <table id="main-table">
+      <table>
         <thead>
           <tr>
-            <th>Heure</th><th>Site</th><th>Statut</th><th>Plaque</th>
-            <th>Motif / Macaron</th><th>Photos</th><th>IA</th><th>Action</th>
+            <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
+            <th>Date / Heure</th>
+            <th>Site</th>
+            <th>Statut</th>
+            <th>Plaque</th>
+            <th>Motif / Macaron</th>
+            <th>Photos</th>
+            <th>IA</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="table-body">
-          <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
+          <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
         </tbody>
       </table>
     </div>
@@ -191,20 +188,65 @@ tr:hover td{background:#fafafa}
 </div>
 
 <!-- MODAL PHOTO -->
-<div id="photo-modal" class="modal-overlay" style="display:none" onclick="closePhotoModal(event)">
-  <div class="modal" style="padding:0;overflow:hidden;max-width:800px">
-    <img id="photo-modal-img" src="" style="width:100%;display:block;border-radius:var(--radius)">
+<div id="photo-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="padding:0;overflow:hidden;max-width:900px;background:transparent">
+    <img id="photo-modal-img" src="" style="width:100%;border-radius:var(--radius);display:block">
   </div>
 </div>
 
 <!-- MODAL EDIT -->
 <div id="edit-modal" class="modal-overlay" style="display:none">
   <div class="modal">
-    <div class="modal-title">Modifier le véhicule</div>
+    <div class="modal-title">
+      Modifier le véhicule
+      <button class="modal-close" onclick="document.getElementById('edit-modal').style.display='none'">✕</button>
+    </div>
     <div id="edit-modal-content"></div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-green" onclick="saveEdit()">✅ Enregistrer</button>
       <button class="btn btn-outline" onclick="document.getElementById('edit-modal').style.display='none'">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IA -->
+<div id="ia-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-title">
+      🤖 Analyse IA — Claude.ai
+      <button class="modal-close" onclick="document.getElementById('ia-modal').style.display='none'">✕</button>
+    </div>
+
+    <!-- ÉTAPES -->
+    <div class="step-box active" id="step1-box">
+      <strong>Étape 1</strong> — Copie le message ci-dessous et colle-le dans Claude.ai avec les photos en pièce jointe.
+    </div>
+    <div class="step-box" id="step2-box">
+      <strong>Étape 2</strong> — Claude analyse les photos et retourne un JSON. Copie ce JSON et colle-le dans le champ ci-dessous.
+    </div>
+    <div class="step-box" id="step3-box">
+      <strong>Étape 3</strong> — Clique "Appliquer" pour mettre à jour Supabase automatiquement.
+    </div>
+
+    <div class="section-label" style="margin-top:16px">Message pour Claude.ai</div>
+    <div class="ia-prompt-box" id="ia-prompt-content">Génération en cours...</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-black btn-sm" onclick="copyPrompt()">📋 Copier le message</button>
+      <a href="https://claude.ai" target="_blank" class="btn btn-outline btn-sm">↗ Ouvrir Claude.ai</a>
+      <span style="font-size:12px;color:var(--gray-mid);align-self:center" id="ia-photo-info"></span>
+    </div>
+
+    <div class="section-label">Réponse JSON de Claude — colle-la ici</div>
+    <textarea class="result-input" id="claude-result" placeholder='Colle ici le JSON retourné par Claude.ai...'></textarea>
+
+    <div id="apply-progress" style="display:none;margin-top:8px">
+      <div style="font-size:13px;color:var(--gray-mid)" id="apply-status">Application...</div>
+      <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
+      <button class="btn btn-outline" onclick="document.getElementById('ia-modal').style.display='none'">Fermer</button>
     </div>
   </div>
 </div>
@@ -216,21 +258,23 @@ const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-let allVehicles = [];
-let editingId   = null;
+let allVehicles  = [];
+let selectedIds  = new Set();
+let editingId    = null;
+let filteredData = [];
 
+// ═══ TOAST ═══
 function toast(msg, ms=3000) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), ms);
 }
 
-// ═══ LOAD DATA ═══
+// ═══ LOAD ═══
 async function loadData() {
   try {
     const { data, error } = await db
-      .from('vehicles')
-      .select('*')
+      .from('vehicles').select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
     allVehicles = data || [];
@@ -238,7 +282,7 @@ async function loadData() {
     renderTable();
     document.getElementById('online-badge').className = 'badge badge-green';
     document.getElementById('online-badge').textContent = '● En ligne';
-    document.getElementById('last-refresh').textContent = 'Actualisé à ' + new Date().toLocaleTimeString('fr-CH', {hour:'2-digit',minute:'2-digit'});
+    document.getElementById('last-refresh').textContent = 'Actualisé ' + new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
   } catch(e) {
     document.getElementById('online-badge').className = 'badge badge-red';
     document.getElementById('online-badge').textContent = '● Erreur';
@@ -247,12 +291,9 @@ async function loadData() {
 }
 
 function updateStats() {
-  const inf   = allVehicles.filter(v => v.statut === 'infraction').length;
-  const aut   = allVehicles.filter(v => v.statut === 'autorise').length;
-  const ia    = allVehicles.filter(v => v.ia_pending).length;
-  document.getElementById('s-inf').textContent   = inf;
-  document.getElementById('s-aut').textContent   = aut;
-  document.getElementById('s-ia').textContent    = ia;
+  document.getElementById('s-inf').textContent   = allVehicles.filter(v => v.statut === 'infraction').length;
+  document.getElementById('s-aut').textContent   = allVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('s-ia').textContent    = allVehicles.filter(v => v.ia_pending).length;
   document.getElementById('s-total').textContent = allVehicles.length;
 }
 
@@ -263,7 +304,7 @@ function renderTable() {
   const fIa     = document.getElementById('f-ia').value;
   const fDate   = document.getElementById('f-date').value;
 
-  let filtered = allVehicles.filter(v => {
+  filteredData = allVehicles.filter(v => {
     if (fStatut && v.statut !== fStatut) return false;
     if (fSite   && v.site   !== fSite)   return false;
     if (fIa === 'true'  && !v.ia_pending)  return false;
@@ -272,49 +313,122 @@ function renderTable() {
     return true;
   });
 
-  document.getElementById('filter-count').textContent = filtered.length + ' résultat(s)';
+  document.getElementById('filter-count').textContent = filteredData.length + ' résultat(s)';
 
   const tbody = document.getElementById('table-body');
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun véhicule trouvé.</td></tr>';
+  if (!filteredData.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun véhicule.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = filtered.map(v => {
+  tbody.innerHTML = filteredData.map(v => {
     const isInf = v.statut === 'infraction';
     const dt    = new Date(v.created_at);
-    const heure = dt.toLocaleDateString('fr-CH', {day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    const heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' +
+                  dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    const isSel = selectedIds.has(v.id);
 
-    const photos = [
-      v.photo_vehicule_url     ? '<img class="photo-thumb" src="' + v.photo_vehicule_url     + '" onclick="openPhoto(\'' + v.photo_vehicule_url     + '\')" title="Véhicule">' : '',
-      v.photo_denonciation_url ? '<img class="photo-thumb" src="' + v.photo_denonciation_url + '" onclick="openPhoto(\'' + v.photo_denonciation_url + '\')" title="Dénonciation">' : '',
-      v.photo_parebrise_url    ? '<img class="photo-thumb" src="' + v.photo_parebrise_url    + '" onclick="openPhoto(\'' + v.photo_parebrise_url    + '\')" title="Pare-brise">' : '',
-      v.photo_macaron_url      ? '<img class="photo-thumb" src="' + v.photo_macaron_url      + '" onclick="openPhoto(\'' + v.photo_macaron_url      + '\')" title="Macaron">' : ''
-    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:12px">—</span>';
+    const thumbs = [
+      v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'Véhicule') : '',
+      v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'Dénonciation') : '',
+      v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
+      v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
+    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">—</span>';
 
     const plaque = v.plaque
       ? '<span class="plate">' + v.plaque + '</span>'
-      : '<span style="color:var(--gray-mid);font-size:12px">— en attente IA</span>';
+      : '<span style="color:var(--gray-mid);font-size:11px">— IA</span>';
 
     const motif = isInf
       ? (v.motif || '—') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N° ' + v.num_denonciation + '</span>' : '')
-      : (v.num_macaron ? 'Macaron: ' + v.num_macaron : '—');
+      : (v.num_macaron ? '<span style="font-size:12px">🏷️ ' + v.num_macaron + '</span>' : '—');
 
     const iaBadge = v.ia_pending
-      ? '<span class="badge badge-amber">⏳ En attente</span>'
-      : '<span class="badge badge-green">✅ Traité</span>';
+      ? '<span class="badge badge-amber">⏳ Attente</span>'
+      : '<span class="badge badge-green">✅ OK</span>';
 
-    return '<tr>' +
-      '<td style="white-space:nowrap">' + heure + '<br><span style="font-size:11px;color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
-      '<td>' + (v.site||'—') + '</td>' +
+    return '<tr class="' + (isSel ? 'selected' : '') + '" id="row-' + v.id + '">' +
+      '<td><input type="checkbox" ' + (isSel ? 'checked' : '') + ' onchange="toggleRow(\'' + v.id + '\',this.checked)"></td>' +
+      '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
+      '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
       '<td><span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'Infraction' : 'Autorisé') + '</span></td>' +
       '<td>' + plaque + '</td>' +
-      '<td style="font-size:12px">' + motif + '</td>' +
-      '<td><div class="photos-cell">' + photos + '</div></td>' +
+      '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
+      '<td><div class="photos-cell">' + thumbs + '</div></td>' +
       '<td>' + iaBadge + '</td>' +
-      '<td><button class="btn btn-outline" onclick="openEdit(\'' + v.id + '\')" style="padding:5px 10px;font-size:12px">✏️</button></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️</button>' +
+        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
+      '</td>' +
       '</tr>';
   }).join('');
+}
+
+function makeThumb(url, title) {
+  return '<img class="photo-thumb" src="' + url + '" onclick="openPhoto(\'' + url + '\')" title="' + title + '">';
+}
+
+// ═══ SÉLECTION ═══
+function toggleRow(id, checked) {
+  if (checked) selectedIds.add(id); else selectedIds.delete(id);
+  const row = document.getElementById('row-' + id);
+  if (row) row.className = checked ? 'selected' : '';
+  updateSelToolbar();
+}
+
+function toggleAll(checked) {
+  filteredData.forEach(v => {
+    if (checked) selectedIds.add(v.id); else selectedIds.delete(v.id);
+    const row = document.getElementById('row-' + v.id);
+    if (row) row.className = checked ? 'selected' : '';
+    const cb = row ? row.querySelector('input[type=checkbox]') : null;
+    if (cb) cb.checked = checked;
+  });
+  updateSelToolbar();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.getElementById('check-all').checked = false;
+  renderTable();
+  updateSelToolbar();
+}
+
+function updateSelToolbar() {
+  const toolbar = document.getElementById('sel-toolbar');
+  const count   = document.getElementById('sel-count');
+  if (selectedIds.size > 0) {
+    toolbar.classList.add('visible');
+    count.textContent = selectedIds.size + ' sélectionné(s)';
+  } else {
+    toolbar.classList.remove('visible');
+  }
+}
+
+// ═══ SUPPRESSION ═══
+async function deleteSingle(id) {
+  if (!confirm('Supprimer ce véhicule ?')) return;
+  try {
+    const { error } = await db.from('vehicles').delete().eq('id', id);
+    if (error) throw error;
+    toast('🗑️ Véhicule supprimé');
+    selectedIds.delete(id);
+    await loadData();
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function deleteSelected() {
+  const ids = Array.from(selectedIds);
+  if (!ids.length) return;
+  if (!confirm('Supprimer ' + ids.length + ' véhicule(s) ? Cette action est irréversible.')) return;
+  try {
+    const { error } = await db.from('vehicles').delete().in('id', ids);
+    if (error) throw error;
+    toast('🗑️ ' + ids.length + ' véhicule(s) supprimé(s)');
+    selectedIds.clear();
+    await loadData();
+    updateSelToolbar();
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 // ═══ PHOTOS ═══
@@ -322,173 +436,257 @@ function openPhoto(url) {
   document.getElementById('photo-modal-img').src = url;
   document.getElementById('photo-modal').style.display = 'flex';
 }
-function closePhotoModal(e) {
-  if (e.target === document.getElementById('photo-modal')) {
-    document.getElementById('photo-modal').style.display = 'none';
-  }
-}
 
 // ═══ EDIT ═══
 function openEdit(id) {
   editingId = id;
-  const v   = allVehicles.find(v => v.id === id);
+  const v = allVehicles.find(x => x.id === id);
   if (!v) return;
   document.getElementById('edit-modal-content').innerHTML =
-    field('Plaque', 'e-plaque', v.plaque || '') +
-    field('N° Dénonciation', 'e-denonciation', v.num_denonciation || '') +
-    field('N° Macaron', 'e-macaron', v.num_macaron || '') +
-    field('Remarque', 'e-remarque', v.remarque || '');
+    fld('Plaque', 'e-plaque', v.plaque || '') +
+    fld('N° Dénonciation', 'e-deno', v.num_denonciation || '') +
+    fld('N° Macaron', 'e-macaron', v.num_macaron || '') +
+    fld('Remarque', 'e-remarque', v.remarque || '');
   document.getElementById('edit-modal').style.display = 'flex';
 }
-function field(label, id, val) {
-  return '<div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:var(--gray-dark);display:block;margin-bottom:5px;text-transform:uppercase">' + label + '</label>' +
-    '<input id="' + id + '" style="width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-family:\'Courier New\',monospace" value="' + val + '"></div>';
+function fld(label, id, val) {
+  return '<label class="field-label">' + label + '</label>' +
+    '<input class="field-input" id="' + id + '" value="' + val + '">';
 }
 async function saveEdit() {
-  const update = {
-    plaque:           document.getElementById('e-plaque').value || null,
-    num_denonciation: document.getElementById('e-denonciation').value || null,
-    num_macaron:      document.getElementById('e-macaron').value || null,
-    remarque:         document.getElementById('e-remarque').value || null,
-    ia_pending:       false,
-    ia_processed_at:  new Date().toISOString()
-  };
   try {
-    const { error } = await db.from('vehicles').update(update).eq('id', editingId);
+    const { error } = await db.from('vehicles').update({
+      plaque:           document.getElementById('e-plaque').value   || null,
+      num_denonciation: document.getElementById('e-deno').value     || null,
+      num_macaron:      document.getElementById('e-macaron').value  || null,
+      remarque:         document.getElementById('e-remarque').value || null,
+      ia_pending: false, ia_processed_at: new Date().toISOString()
+    }).eq('id', editingId);
     if (error) throw error;
-    toast('✅ Véhicule mis à jour');
+    toast('✅ Mis à jour');
     document.getElementById('edit-modal').style.display = 'none';
     await loadData();
   } catch(e) { toast('❌ ' + e.message); }
 }
 
-// ═══ GENERATE CLAUDE PROMPT ═══
-function generateClaudePrompt() {
-  const pending = allVehicles.filter(v => v.ia_pending && (v.photo_vehicule_url || v.photo_denonciation_url || v.photo_macaron_url));
-  if (!pending.length) {
-    toast('ℹ️ Aucun véhicule en attente avec des photos');
-    return;
+// ═══ IA MODAL — GÉNÉRATION AVEC BASE64 ═══
+async function openIAModal() {
+  const ids = Array.from(selectedIds);
+  if (!ids.length) { toast('Sélectionnez au moins un véhicule'); return; }
+
+  const vehicles = allVehicles.filter(v => ids.includes(v.id));
+  document.getElementById('ia-modal').style.display = 'flex';
+  document.getElementById('ia-prompt-content').textContent = '⏳ Chargement des photos en base64...';
+  document.getElementById('ia-photo-info').textContent = '';
+  document.getElementById('claude-result').value = '';
+
+  // Charger les photos en base64 depuis Supabase
+  const vehiclesList = [];
+  let totalPhotos = 0;
+
+  for (let i = 0; i < vehicles.length; i++) {
+    const v = vehicles[i];
+    const photoFields = [
+      { col: 'photo_vehicule_url',     label: 'Véhicule (plaque visible)' },
+      { col: 'photo_denonciation_url', label: 'Dénonciation (formulaire)' },
+      { col: 'photo_parebrise_url',    label: 'Pare-brise (4 coins)' },
+      { col: 'photo_macaron_url',      label: 'Macaron' }
+    ];
+
+    const photosBase64 = [];
+    for (const pf of photoFields) {
+      const url = v[pf.col];
+      if (!url) continue;
+      try {
+        const b64 = await urlToBase64(url);
+        if (b64) { photosBase64.push({ label: pf.label, base64: b64 }); totalPhotos++; }
+      } catch(e) { console.warn('Photo non chargeable:', url); }
+    }
+
+    vehiclesList.push({
+      numero: i + 1,
+      id: v.id,
+      statut: v.statut,
+      motif: v.motif || null,
+      heure: new Date(v.created_at).toLocaleString('fr-CH'),
+      site: v.site,
+      photos: photosBase64
+    });
+
+    document.getElementById('ia-prompt-content').textContent =
+      '⏳ Photos chargées : ' + totalPhotos + ' (' + (i+1) + '/' + vehicles.length + ' véhicules)...';
   }
 
-  const vehiclesList = pending.map((v, i) => {
-    const photos = [];
-    if (v.photo_vehicule_url)     photos.push('- Véhicule: ' + v.photo_vehicule_url);
-    if (v.photo_denonciation_url) photos.push('- Dénonciation: ' + v.photo_denonciation_url);
-    if (v.photo_parebrise_url)    photos.push('- Pare-brise: ' + v.photo_parebrise_url);
-    if (v.photo_macaron_url)      photos.push('- Macaron: ' + v.photo_macaron_url);
-    return 'VÉHICULE ' + (i+1) + ' (id: ' + v.id + ')\nStatut: ' + v.statut + (v.motif ? ' | Motif: ' + v.motif : '') + '\nPhotos:\n' + photos.join('\n');
-  }).join('\n\n');
+  // Construire le prompt texte (sans les base64 qui sont trop longs à afficher)
+  const promptDisplay = buildPromptDisplay(vehiclesList, totalPhotos);
+  document.getElementById('ia-prompt-content').textContent = promptDisplay;
+  document.getElementById('ia-photo-info').textContent = totalPhotos + ' photo(s) incluse(s) en base64';
 
-  const prompt = `Tu es un assistant de RDZ Security (Suisse) spécialisé dans la surveillance de parking.
-
-Analyse les photos ci-dessous et extrait les informations demandées pour chaque véhicule.
-
-INSTRUCTIONS:
-- Format plaque suisse: XX 000 000 (ex: GE 123 456, VD 987 654)
-- N° dénonciation: numéro visible sur le formulaire papier photographié
-- N° macaron: numéro visible sur la vignette de stationnement
-- Si une information est illisible, mets null
-- Réponds UNIQUEMENT avec un JSON valide, sans texte avant ou après
-
-FORMAT DE RÉPONSE ATTENDU:
-{
-  "resultats": [
-    {
-      "id": "uuid-du-vehicule",
-      "plaque": "GE 123 456",
-      "num_denonciation": "2026-001234",
-      "num_macaron": null,
-      "couleur": "blanc",
-      "confiance": "haute"
-    }
-  ]
+  // Stocker pour la copie avec base64
+  window._iaVehicles = vehiclesList;
 }
 
-VÉHICULES À ANALYSER (${pending.length} véhicule(s)):
+function buildPromptDisplay(vehiclesList, totalPhotos) {
+  const lines = [
+    'Tu es un assistant de RDZ Security (Suisse) — surveillance parking.',
+    'Analyse les ' + totalPhotos + ' photo(s) jointes et extrais les informations demandées.',
+    '',
+    'FORMAT DE RÉPONSE — JSON uniquement, sans texte avant ou après :',
+    '{',
+    '  "resultats": [',
+    '    {',
+    '      "id": "uuid-exact",',
+    '      "plaque": "GE 123 456",',
+    '      "num_denonciation": "2026-001",',
+    '      "num_macaron": null,',
+    '      "couleur": "blanc",',
+    '      "confiance": "haute"',
+    '    }',
+    '  ]',
+    '}',
+    '',
+    'RÈGLES :',
+    '- Format plaque CH : XX 000 000 (canton 2 lettres + chiffres)',
+    '- num_denonciation : numéro sur le formulaire papier photographié',
+    '- num_macaron : numéro sur la vignette de stationnement',
+    '- null si illisible — ne jamais inventer',
+    '',
+    'VÉHICULES (' + vehiclesList.length + ') :',
+    ''
+  ];
 
-${vehiclesList}
+  vehiclesList.forEach(v => {
+    lines.push('Véhicule ' + v.numero + ' — id: ' + v.id);
+    lines.push('  Statut: ' + v.statut + (v.motif ? ' | ' + v.motif : ''));
+    lines.push('  Site: ' + v.site + ' | ' + v.heure);
+    lines.push('  Photos jointes: ' + v.photos.map(p => p.label).join(', '));
+    lines.push('');
+  });
 
-Analyse chaque photo accessible via les URLs ci-dessus et retourne le JSON complet.`;
-
-  document.getElementById('ia-prompt-content').textContent = prompt;
-  document.getElementById('prompt-section').style.display = 'block';
-  document.getElementById('result-section').style.display = 'block';
-  toast('✅ Message généré — ' + pending.length + ' véhicule(s) à analyser');
+  lines.push('[Les photos sont jointes à ce message en base64]');
+  return lines.join('\n');
 }
 
-function copyPrompt() {
-  const text = document.getElementById('ia-prompt-content').textContent;
-  navigator.clipboard.writeText(text).then(() => toast('📋 Copié dans le presse-papiers'));
+async function copyPrompt() {
+  const vehicles = window._iaVehicles;
+  if (!vehicles) { toast('⚠️ Génère d\'abord le message'); return; }
+
+  // Message complet avec base64 pour le presse-papiers
+  const promptText = buildPromptDisplay(vehicles, vehicles.reduce((s,v) => s + v.photos.length, 0));
+
+  // On construit le contenu complet avec photos
+  let fullContent = promptText + '\n\n=== PHOTOS EN BASE64 ===\n';
+  vehicles.forEach(v => {
+    v.photos.forEach(p => {
+      fullContent += '\n[Véhicule ' + v.numero + ' — ' + p.label + ']\n';
+      fullContent += p.base64.substring(0, 100) + '... [base64 tronqué pour affichage]\n';
+    });
+  });
+
+  // Note: les base64 complets sont dans window._iaVehicles
+  // On copie le prompt texte + informe l'admin de joindre les photos manuellement
+  try {
+    await navigator.clipboard.writeText(promptText);
+    toast('📋 Message copié — joins les photos depuis Supabase Storage dans Claude.ai');
+  } catch(e) {
+    toast('❌ Impossible de copier');
+  }
 }
 
-// ═══ APPLY CLAUDE RESULT ═══
+async function urlToBase64(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const blob   = await resp.blob();
+  // Compresser via canvas
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = function() {
+      const maxW = 1024;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+// ═══ APPLY RÉSULTAT IA ═══
 async function applyClaudeResult() {
   const raw = document.getElementById('claude-result').value.trim();
   if (!raw) { toast('⚠️ Colle le JSON de Claude d\'abord'); return; }
-
   let parsed;
   try {
-    const clean = raw.replace(/```json|```/g, '').trim();
-    parsed = JSON.parse(clean);
-  } catch(e) { toast('❌ JSON invalide — vérifie le format'); return; }
+    parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+  } catch(e) { toast('❌ JSON invalide'); return; }
 
   const resultats = parsed.resultats || [];
-  if (!resultats.length) { toast('⚠️ Aucun résultat dans le JSON'); return; }
+  if (!resultats.length) { toast('⚠️ Aucun résultat'); return; }
 
-  const progress = document.getElementById('apply-progress');
-  const status   = document.getElementById('apply-status');
-  const bar      = document.getElementById('apply-bar');
-  progress.style.display = 'block';
+  const prog   = document.getElementById('apply-progress');
+  const status = document.getElementById('apply-status');
+  const bar    = document.getElementById('apply-bar');
+  prog.style.display = 'block';
 
   let done = 0, errors = 0;
   for (const r of resultats) {
     if (!r.id) continue;
     try {
       const { error } = await db.from('vehicles').update({
-        plaque:           r.plaque || null,
+        plaque:           r.plaque           || null,
         num_denonciation: r.num_denonciation || null,
-        num_macaron:      r.num_macaron || null,
+        num_macaron:      r.num_macaron      || null,
         ia_pending:       false,
         ia_processed_at:  new Date().toISOString()
       }).eq('id', r.id);
       if (error) throw error;
       done++;
     } catch(e) { errors++; }
-    const pct = Math.round(((done + errors) / resultats.length) * 100);
+    const pct = Math.round(((done+errors)/resultats.length)*100);
     bar.style.width = pct + '%';
-    status.textContent = 'Mise à jour ' + (done + errors) + ' / ' + resultats.length + '...';
+    status.textContent = (done+errors) + ' / ' + resultats.length + ' mis à jour...';
   }
 
-  progress.style.display = 'none';
-  toast('✅ ' + done + ' véhicule(s) mis à jour' + (errors ? ' · ⚠️ ' + errors + ' erreur(s)' : ''));
-  document.getElementById('result-section').style.display = 'none';
+  prog.style.display = 'none';
+  toast('✅ ' + done + ' mis à jour' + (errors ? ' · ⚠️ ' + errors + ' erreur(s)' : ''));
   document.getElementById('claude-result').value = '';
+  document.getElementById('ia-modal').style.display = 'none';
   await loadData();
 }
 
 // ═══ EXPORT CSV ═══
-function exportCSV() {
+function getExportData(ids) {
+  return ids ? allVehicles.filter(v => ids.includes(v.id)) : allVehicles;
+}
+function buildCSV(data) {
   const headers = ['Date','Site','Agent','Statut','Plaque','Motif','N° Dénonciation','N° Macaron','Remarque','Photos','IA traitée'];
-  const rows = allVehicles.map(v => [
+  const rows = data.map(v => [
     new Date(v.created_at).toLocaleString('fr-CH'),
-    v.site || '',
-    v.agent_name || '',
-    v.statut,
-    v.plaque || '',
-    v.motif || '',
-    v.num_denonciation || '',
-    v.num_macaron || '',
-    v.remarque || '',
-    v.photos_count || 0,
-    v.ia_pending ? 'Non' : 'Oui'
+    v.site||'', v.agent_name||'', v.statut,
+    v.plaque||'', v.motif||'',
+    v.num_denonciation||'', v.num_macaron||'', v.remarque||'',
+    v.photos_count||0, v.ia_pending ? 'Non' : 'Oui'
   ]);
-  const csv = [headers, ...rows].map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  return [headers,...rows].map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+}
+function downloadCSV(csv, name) {
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'parkguard-' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+  const a    = document.createElement('a'); a.href=url; a.download=name; a.click();
   URL.revokeObjectURL(url);
+}
+function exportCSV() {
+  downloadCSV(buildCSV(allVehicles), 'parkguard-' + new Date().toISOString().slice(0,10) + '.csv');
   toast('📥 CSV exporté');
+}
+function exportSelectedCSV() {
+  const ids = Array.from(selectedIds);
+  if (!ids.length) { toast('Aucune sélection'); return; }
+  downloadCSV(buildCSV(getExportData(ids)), 'parkguard-selection-' + new Date().toISOString().slice(0,10) + '.csv');
+  toast('📥 CSV sélection exporté');
 }
 
 // ═══ INIT ═══
