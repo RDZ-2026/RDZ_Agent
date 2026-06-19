@@ -367,6 +367,7 @@ function renderTable() {
       '<td><div class="photos-cell">' + thumbs + '</div></td>' +
       '<td>' + iaBadge + '</td>' +
       '<td style="white-space:nowrap">' +
+        (isInf ? '<button class="btn btn-sm" style="background:var(--blue-light);color:var(--blue);border:none;margin-right:4px" onclick="openRapport(\'' + v.id + '\')" title="Rapport PDF">📄</button>' : '') +
         '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️</button>' +
         '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
       '</td>' +
@@ -439,6 +440,15 @@ async function deleteSelected() {
     await loadData();
     updateSelToolbar();
   } catch(e) { toast('❌ ' + e.message); }
+}
+
+// ═══ RAPPORT PDF ═══
+function openRapport(id) {
+  const v = allVehicles.find(x => x.id === id);
+  if (!v) return;
+  // Stocker les données pour le rapport
+  localStorage.setItem('rdz_rapport_data', JSON.stringify(v));
+  window.open('parkguard-rapport-denonciation.html', '_blank');
 }
 
 // ═══ PHOTOS ═══
