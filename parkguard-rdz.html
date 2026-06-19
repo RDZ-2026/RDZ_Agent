@@ -497,7 +497,6 @@ async function confirmSupabaseSync() {
 
   if (!navigator.onLine) {
     box.innerHTML = '<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Sync impossible — retentez avec le réseau.</div></div></div>';
-    document.getElementById('ia-box').innerHTML = '<div class="db-warn"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--amber)">IA disponible en ligne uniquement</div></div></div>';
     return;
   }
 
@@ -565,14 +564,14 @@ function exportJSON() {
   a.href = url; a.download = name; a.click();
   URL.revokeObjectURL(url);
 
-  const info = document.getElementById('json-export-info');
-  info.style.display = 'block';
-  info.innerHTML = '✅ <strong>' + name + '</strong> téléchargé.<br>Envoie ce fichier + les photos par WhatsApp à l\'administratif.<br>Dans Claude.ai : colle le JSON + photos → extraction automatique des plaques.';
+  var _info = document.getElementById('json-export-info');
+  if (_info) { _info.style.display = 'block'; _info.innerHTML = '✅ <strong>' + name + '</strong> téléchargé.<br>Envoie ce fichier + les photos par WhatsApp à l\'administratif.<br>Dans Claude.ai : colle le JSON + photos → extraction automatique des plaques.'; }
 }
 
 // ═══ PIPELINE IA GPT-4o ═══
 async function runIAPipeline() {
   const iaBox = document.getElementById('ia-box');
+  if (!iaBox) return; // section IA supprimée
 
   if (!OPENAI_KEY || OPENAI_KEY.startsWith('VOTRE')) {
     iaBox.innerHTML = '<div class="db-warn"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--amber)">Clé API non configurée</div><div class="db-sub" style="color:var(--amber)">Remplacez VOTRE_CLE_API_OPENAI_ICI dans le code.</div></div></div>';
@@ -609,7 +608,8 @@ async function runIAPipeline() {
   const ok = results.filter(r => r.plaque).length;
   iaBox.innerHTML = '<div class="db-ok"><div class="db-icon">🤖</div><div><div class="db-label" style="color:var(--green)">Analyse terminée</div><div class="db-sub" style="color:var(--green)">' + ok + ' / ' + results.length + ' plaque(s) extraite(s)</div></div></div>';
 
-  document.getElementById('ia-results-list').innerHTML = results.map(function(r) {
+  var _rl = document.getElementById('ia-results-list');
+  if (_rl) _rl.innerHTML = results.map(function(r) {
     const isInf = r.vehicle.statut === 'infraction';
     return '<div class="ia-vehicle-card ' + (isInf ? 'inf' : 'aut') + '">' +
       '<div style="display:flex;align-items:center;gap:8px">' +
@@ -623,7 +623,8 @@ async function runIAPipeline() {
       (r.error ? ' · ⚠️ ' + r.error : '') +
       '</div></div>';
   }).join('');
-  document.getElementById('ia-results').style.display = 'block';
+  var _rr = document.getElementById('ia-results');
+  if (_rr) _rr.style.display = 'block';
 }
 
 async function analyzeWithGPT(vehicle, photos) {
