@@ -203,6 +203,10 @@ input[type="file"]{display:none}
       <div class="action-btn-icon">✅</div>
       <div><div class="action-btn-label">Autorisé</div><div class="action-btn-sub">Macaron valide</div></div>
     </button>
+    <button class="action-btn" style="background:var(--gray-light);color:var(--black)" onclick="showScreen('s-parking-vide')">
+      <div class="action-btn-icon" style="background:rgba(0,0,0,0.08)">🅿️</div>
+      <div><div class="action-btn-label">Parking vide</div><div class="action-btn-sub" style="color:var(--gray-dark)">Aucun véhicule — photo(s) de preuve</div></div>
+    </button>
     <div class="section-label" style="margin-top:20px">Véhicules traités</div>
     <div id="vehicle-list"><p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p></div>
   </div>
@@ -222,7 +226,59 @@ input[type="file"]{display:none}
   <div class="bottom-bar" id="flow-bottom"></div>
 </div>
 
-<!-- ══════ RECAP VÉHICULE ══════ -->
+<!-- ══════ PARKING VIDE ══════ -->
+<div id="s-parking-vide" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title">Parking vide</div>
+      <div class="topbar-sub">Preuve de passage</div>
+    </div>
+    <div class="badge badge-gray">VIDE</div>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow" style="color:var(--gray-dark)">Aucun véhicule constaté</div>
+    <div class="step-title">Photos de preuve</div>
+    <div class="step-sub">Prenez 1 à 6 photos d'emplacements vides pour prouver votre passage sur le site.</div>
+
+    <div id="vide-photos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"></div>
+
+    <button class="outline-btn" id="btn-add-vide-photo" onclick="addVidePhoto()" style="margin-bottom:12px">
+      📷 Ajouter une photo d'emplacement
+    </button>
+
+    <div class="field-group">
+      <label class="field-label">Remarque (optionnel)</label>
+      <input class="field-input" type="text" id="vide-remarque" placeholder="Ex: parking entièrement libre, vérifié à 09h30">
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" id="btn-save-vide" disabled onclick="saveVideRonde()" style="background:var(--gray-dark)">Enregistrer — Parking vide</button>
+  </div>
+</div>
+
+<!-- ══════ RECAP PARKING VIDE ══════ -->
+<div id="s-recap-vide" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge badge-gray" style="margin-left:auto">🅿️ Vide</div>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px">🅿️</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px">Parking vide enregistré</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-vide-meta">—</div>
+    </div>
+    <div class="recap-check"><div class="recap-icon">📸</div><span id="recap-vide-photos">Photos enregistrées</span></div>
+    <div class="recap-check"><div class="recap-icon">✅</div><span>Preuve de passage enregistrée dans Supabase</span></div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
+      Ce passage sera inclus dans le rapport de ronde. La preuve de présence sur site est enregistrée avec horodatage.
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" onclick="showScreen('s-round')">Continuer la ronde</button>
+  </div>
+</div>
 <div id="s-recap" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
@@ -655,7 +711,91 @@ document.getElementById('file-input').addEventListener('change', function() {
 });
 function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
 
-// ═══ FLOW ═══
+// ═══ PARKING VIDE ═══
+let videPhotos = [];
+
+function addVidePhoto() {
+  if (videPhotos.length >= 6) { toast('Maximum 6 photos'); return; }
+  triggerCamera(function(dataUrl, file) {
+    videPhotos.push({ dataUrl, file });
+    renderVidePhotos();
+  });
+}
+
+function renderVidePhotos() {
+  const grid = document.getElementById('vide-photos-grid');
+  const btn  = document.getElementById('btn-add-vide-photo');
+  const save = document.getElementById('btn-save-vide');
+
+  grid.innerHTML = videPhotos.map((p, i) =>
+    '<div style="position:relative">' +
+    '<img src="' + p.dataUrl + '" style="width:100%;height:110px;object-fit:cover;border-radius:var(--radius-sm);border:1.5px solid var(--green);display:block">' +
+    '<button onclick="removeVidePhoto(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(208,2,27,.85);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1">×</button>' +
+    '<div style="font-size:10px;color:var(--gray-mid);text-align:center;margin-top:3px">Emplacement ' + (i+1) + '</div>' +
+    '</div>'
+  ).join('');
+
+  btn.style.display  = videPhotos.length >= 6 ? 'none' : 'flex';
+  btn.textContent    = '📷 Ajouter une photo (' + videPhotos.length + '/6)';
+  save.disabled      = videPhotos.length === 0;
+  save.style.opacity = videPhotos.length === 0 ? '.35' : '1';
+}
+
+function removeVidePhoto(i) {
+  videPhotos.splice(i, 1);
+  renderVidePhotos();
+}
+
+async function saveVideRonde() {
+  const time     = nowStr();
+  const remarque = document.getElementById('vide-remarque').value.trim();
+  const entry = {
+    id: uid(),
+    round_id: currentRoundId,
+    site: currentSite,
+    agent_name: currentAgent,
+    statut: 'parking_vide',
+    motif: 'Aucun véhicule constaté',
+    remarque: remarque || null,
+    plaque: null,
+    photos_count: videPhotos.length,
+    ia_pending: false,
+    created_at: new Date().toISOString()
+  };
+
+  // Upload photos si en ligne
+  if (isOnline) {
+    for (let i = 0; i < videPhotos.length; i++) {
+      const filename = entry.id + '_vide_' + (i+1) + '.jpg';
+      try {
+        const resp = await db.storage.from('parkguard-photos').upload(filename, videPhotos[i].file, { contentType: 'image/jpeg', upsert: true });
+        if (i === 0) entry.photo_vehicule_url     = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 1) entry.photo_denonciation_url = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 2) entry.photo_parebrise_url    = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 3) entry.photo_macaron_url      = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+      } catch(e) {}
+    }
+  }
+
+  let synced = false;
+  if (isOnline) {
+    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
+  }
+  if (!synced) savePending(entry);
+
+  roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: {} }));
+  updateRoundStats();
+
+  document.getElementById('recap-vide-meta').textContent = videPhotos.length + ' photo(s) · ' + time + (remarque ? ' · ' + remarque : '');
+  document.getElementById('recap-vide-photos').textContent = videPhotos.length + ' photo(s) d\'emplacements vides';
+
+  // Reset
+  videPhotos = [];
+  document.getElementById('vide-remarque').value = '';
+  renderVidePhotos();
+
+  showScreen('s-recap-vide');
+}
 function startFlow(type) {
   flowType = type; flowStep = 0; flowPhotos = {}; flowBlobs = {}; flowFields = {};
   if (type === 'infraction') flowFields.motif = STEPS.infraction[1].fields[0].opts[0];
