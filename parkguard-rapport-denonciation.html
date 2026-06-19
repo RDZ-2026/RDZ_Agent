@@ -104,8 +104,8 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
           <div class="field"><label>Plaque d'immatriculation</label><div class="field-val plate" id="v-plaque">—</div></div>
         </div>
         <div class="field-row three">
-          <div class="field"><label>Site</label><div class="field-val" id="v-site">—</div></div>
           <div class="field"><label>Motif d'infraction</label><div class="field-val" id="v-motif">—</div></div>
+          <div class="field"><label>N° Dénonciation</label><div class="field-val" id="v-deno-body" style="font-weight:700;color:#C8102E">—</div></div>
           <div class="field"><label>Statut</label><div class="field-val"><span class="statut-badge">Infraction</span></div></div>
         </div>
         <div class="field-row full" style="margin-top:10px">
@@ -138,21 +138,7 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
       </div>
     </div>
 
-    <div class="sec">
-      <div class="sec-title">3 — Déclaration de l'agent</div>
-      <div class="sec-body">
-        <div class="field-row full">
-          <div class="field">
-            <label>Déclaration</label>
-            <div class="field-val">Je soussigné(e), agent de surveillance RDZ Security Management SA, certifie avoir constaté le véhicule ci-dessus en infraction de stationnement à la date et heure mentionnées, sur le site indiqué.</div>
-          </div>
-        </div>
-        <div class="field-row" style="margin-top:20px">
-          <div class="field"><label>Signature de l'agent</label><div class="field-val" style="min-height:50px;border-bottom:1.5px solid #999"></div></div>
-          <div class="field"><label>Cachet RDZ Security</label><div class="field-val" style="min-height:50px;border:1.5px dashed #ddd;border-radius:6px;background:#fafafa"></div></div>
-        </div>
-      </div>
-    </div>
+
 
   </div>
 
@@ -215,11 +201,13 @@ function loadData() {
   }
   document.getElementById('m-agent').textContent   = data.agent_name || data.agent || '—';
   document.getElementById('m-deno').textContent    = data.num_denonciation || '— (extraction IA en attente)';
-  document.getElementById('rpt-site').textContent  = (data.site || 'Site') + ' — RDZ Security';
+  document.getElementById('rpt-site').textContent  = data.site || 'Site';
   document.getElementById('v-plaque').textContent  = data.plaque || '— (extraction IA en attente)';
   document.getElementById('v-site').textContent    = data.site || '—';
   document.getElementById('v-motif').textContent   = data.motif || '—';
   document.getElementById('v-remarque').textContent = data.remarque && data.remarque !== 'null' ? data.remarque : '—';
+  var denoBody = document.getElementById('v-deno-body');
+  if (denoBody) denoBody.textContent = data.num_denonciation || '— (extraction IA en attente)';
   document.getElementById('ftr-ref').textContent   = 'Réf. : ' + (data.id || '').substring(0,8).toUpperCase();
 
   setPhoto('pb-vehicule',     data.photo_vehicule_url);

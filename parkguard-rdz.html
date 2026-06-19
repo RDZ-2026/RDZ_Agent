@@ -187,7 +187,7 @@ input[type="file"]{display:none}
       <div class="topbar-title" id="round-site-name">—</div>
       <div class="topbar-sub" id="round-sub">Ronde en cours</div>
     </div>
-    <button onclick="confirmEndRound()" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;font-weight:700">FIN</button>
+    <button onclick="confirmEndRound()" style="background:var(--red);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:700;padding:7px 14px;border-radius:var(--radius-sm)">Terminer ›</button>
   </div>
   <div class="content">
     <div class="stats-grid">
@@ -323,26 +323,7 @@ input[type="file"]{display:none}
       🔄 Forcer la synchronisation
     </button>
 
-    <!-- 2. EXPORT JSON -->
-    <div class="section-label">2 · Export pour analyse IA</div>
-    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-dark);line-height:1.6">
-      Télécharge le fichier JSON de la ronde. Envoie-le par WhatsApp avec les photos à l'administratif, ou colle-le directement dans Claude.ai pour l'extraction des plaques.
-    </div>
-    <button class="outline-btn" onclick="exportJSON()">📤 Télécharger le JSON de la ronde</button>
-    <div id="json-export-info" style="display:none;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);margin-bottom:8px;line-height:1.6"></div>
 
-    <!-- 3. IA AUTO -->
-    <div class="section-label">3 · Extraction IA automatique</div>
-    <div id="ia-box" style="margin-bottom:8px">
-      <div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">En attente de la sync...</div></div></div>
-    </div>
-    <button class="outline-btn" id="btn-force-ia" onclick="runIAPipeline()">🤖 Lancer l'IA manuellement</button>
-
-    <!-- RÉSULTATS IA -->
-    <div id="ia-results" style="display:none">
-      <div class="section-label">Données extraites par l'IA</div>
-      <div id="ia-results-list"></div>
-    </div>
   </div>
   <div class="bottom-bar">
     <button class="primary-btn" onclick="closeRound()">Nouvelle ronde</button>
@@ -754,8 +735,8 @@ async function saveVideRonde() {
     round_id: currentRoundId,
     site: currentSite,
     agent_name: currentAgent,
-    statut: 'parking_vide',
-    motif: 'Aucun véhicule constaté',
+    statut: 'autorise',  // parking vide stocké comme autorisé avec motif spécial
+    motif: 'PARKING_VIDE - Aucun véhicule constaté',
     remarque: remarque || null,
     plaque: null,
     photos_count: videPhotos.length,

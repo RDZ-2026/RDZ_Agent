@@ -135,6 +135,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 
     <!-- FILTRES -->
     <div class="filter-row">
+      <input type="text" class="filter-select" id="f-search" placeholder="🔍 Plaque ou N° dénonciation..." oninput="renderTable()" style="min-width:220px">
       <select class="filter-select" id="f-statut" onchange="renderTable()">
         <option value="">Tous les statuts</option>
         <option value="infraction">Infractions</option>
@@ -314,12 +315,19 @@ function renderTable() {
   const fIa     = document.getElementById('f-ia').value;
   const fDate   = document.getElementById('f-date').value;
 
+  var fSearch = (document.getElementById('f-search').value || '').toLowerCase().trim();
   filteredData = allVehicles.filter(v => {
     if (fStatut && v.statut !== fStatut) return false;
     if (fSite   && v.site   !== fSite)   return false;
     if (fIa === 'true'  && !v.ia_pending)  return false;
     if (fIa === 'false' &&  v.ia_pending)  return false;
     if (fDate && !v.created_at.startsWith(fDate)) return false;
+    if (fSearch) {
+      var plate = (v.plaque || '').toLowerCase().replace(/[\s\-]/g,'');
+      var deno  = (v.num_denonciation || '').toLowerCase();
+      var searchClean = fSearch.replace(/[\s\-]/g,'');
+      if (!plate.includes(searchClean) && !deno.includes(fSearch)) return false;
+    }
     return true;
   });
 
