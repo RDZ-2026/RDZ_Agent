@@ -128,6 +128,33 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
     <div class="stat-box"><div class="stat-val blue" id="s-total">—</div><div class="stat-lbl">Total</div></div>
   </div>
 
+  <!-- COMPTAGES DLCC -->
+  <div id="comptages-section" style="display:none">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="card-title" style="margin:0">🔢 Derniers relevés de comptage</div>
+        <select id="comptage-site-filter" class="filter-select" onchange="renderComptages()" style="font-size:12px;padding:5px 10px">
+          <option value="">Tous les sites guidage</option>
+        </select>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--gray-light)">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Date / Heure</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Agent</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Zone</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Véhicules</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Places</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Taux</th>
+          </tr>
+        </thead>
+        <tbody id="comptages-table-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- TABLE VÉHICULES -->
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -325,6 +352,7 @@ async function loadData() {
     allVehicles = data || [];
     updateStats();
     renderTable();
+    await loadComptages();
     document.getElementById('online-badge').className = 'badge badge-green';
     document.getElementById('online-badge').textContent = '● En ligne';
     document.getElementById('last-refresh').textContent = 'Actualisé ' + new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
@@ -334,6 +362,83 @@ async function loadData() {
     toast('❌ ' + e.message);
   }
 }
+
+// ═══ COMPTAGES ═══
+let allComptages = [];
+let allSitesGuidage = [];
+
+async function loadComptages() {
+  try {
+    // Charger sites guidage
+    const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage').eq('actif',true);
+    allSitesGuidage = sites || [];
+
+    if (!allSitesGuidage.length) {
+      document.getElementById('comptages-section').style.display = 'none';
+      return;
+    }
+
+    // Afficher la section
+    document.getElementById('comptages-section').style.display = 'block';
+
+    // Remplir le filtre sites
+    const sel = document.getElementById('comptage-site-filter');
+    sel.innerHTML = '<option value="">Tous les sites guidage</option>' +
+      allSitesGuidage.map(s => '<option value="' + s.id + '">' + s.nom + '</option>').join('');
+
+    // Charger les 50 derniers comptages
+    const siteIds = allSitesGuidage.map(s => s.id);
+    const { data: comptages } = await db.from('comptages')
+      .select('*,zones(nom)')
+      .in('site_id', siteIds)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    allComptages = comptages || [];
+    renderComptages();
+  } catch(e) {
+    console.warn('Erreur chargement comptages:', e);
+  }
+}
+
+function renderComptages() {
+  const tbody = document.getElementById('comptages-table-body');
+  const siteFilter = document.getElementById('comptage-site-filter').value;
+
+  const filtered = siteFilter
+    ? allComptages.filter(c => c.site_id === siteFilter)
+    : allComptages;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun relevé de comptage</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => {
+    const dt = new Date(c.created_at);
+    const dateStr = pad(dt.getDate()) + '/' + pad(dt.getMonth()+1) + '/' + dt.getFullYear();
+    const heureStr = pad(dt.getHours()) + 'h' + pad(dt.getMinutes());
+    const taux = c.taux_occupation !== null ? parseFloat(c.taux_occupation) : null;
+    const tauxColor = taux === null ? '#888' : taux >= 90 ? 'var(--red)' : taux >= 70 ? 'var(--amber)' : 'var(--green)';
+    const zoneName = c.zones ? c.zones.nom : '—';
+    return '<tr style="border-bottom:1px solid var(--gray-border)">' +
+      '<td style="padding:9px 12px;font-size:12px">' + dateStr + '<br><span style="color:var(--gray-mid)">' + heureStr + '</span></td>' +
+      '<td style="padding:9px 12px;font-size:12px">' + (c.agent_name || '—') + '</td>' +
+      '<td style="padding:9px 12px"><span style="font-weight:700">' + zoneName + '</span></td>' +
+      '<td style="padding:9px 12px;font-size:14px;font-weight:700">' + c.vehicules_presents + '</td>' +
+      '<td style="padding:9px 12px;font-size:12px;color:var(--gray-mid)">' + c.places_totales + '</td>' +
+      '<td style="padding:9px 12px">' +
+        (taux !== null
+          ? '<span style="font-weight:700;color:' + tauxColor + '">' + taux + '%</span>' +
+            '<div style="margin-top:4px;height:6px;background:#e0e0e0;border-radius:3px;width:80px;overflow:hidden">' +
+            '<div style="height:100%;background:' + tauxColor + ';border-radius:3px;width:' + Math.min(100,taux) + '%"></div></div>'
+          : '—') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function pad(v) { return String(v).padStart(2,'0'); }
 
 function updateStats() {
   document.getElementById('s-inf').textContent   = allVehicles.filter(v => v.statut === 'infraction').length;
