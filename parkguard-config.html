@@ -69,6 +69,7 @@ tr:hover td{background:#fafafa}
   <button class="tab active" onclick="switchTab('agents')">&#128100; Agents</button>
   <button class="tab" onclick="switchTab('sites')">&#127359; Sites</button>
   <button class="tab" onclick="switchTab('objectifs')">&#127919; Objectifs</button>
+    <button class="tab" onclick="switchTab('references')">&#128196; Références</button>
 </div>
 
 <!-- AGENTS -->
@@ -111,6 +112,41 @@ tr:hover td{background:#fafafa}
   <div class="warn-box">&#9888;&#65039; Modifier un objectif cr&#233;e une nouvelle entr&#233;e dat&#233;e. Les statistiques restent calcul&#233;es avec l'objectif en vigueur &#224; chaque date &mdash; pas d'effet r&#233;troactif.</div>
   <div id="objectifs-list"></div>
 </div>
+</div>
+
+<!-- RÉFÉRENCES -->
+<div id="panel-references" class="panel">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+
+    <!-- Codes infraction -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">&#9888;&#65039; Codes d'infraction</div>
+        <button class="btn btn-red btn-sm" onclick="openAddRef('infraction')">+ Ajouter</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Code</th><th>Libellé</th><th>Ordre</th><th></th></tr></thead>
+          <tbody id="codes-table"><tr><td colspan="4" style="text-align:center;color:var(--gray-mid);padding:16px">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Catégories véhicules -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">&#128663; Catégories véhicules</div>
+        <button class="btn btn-red btn-sm" onclick="openAddRef('categorie')">+ Ajouter</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Code</th><th>Libellé</th><th>Ordre</th><th></th></tr></thead>
+          <tbody id="cats-table"><tr><td colspan="4" style="text-align:center;color:var(--gray-mid);padding:16px">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- MODAL AGENT -->
@@ -186,6 +222,24 @@ tr:hover td{background:#fafafa}
   </div>
 </div>
 
+<!-- MODAL RÉFÉRENCE -->
+<div id="modal-ref" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-title"><span id="modal-ref-title">Ajouter</span> <button class="modal-close" onclick="closeModal('modal-ref')">&#10005;</button></div>
+    <input type="hidden" id="ref-type">
+    <input type="hidden" id="ref-id">
+    <div class="form-row">
+      <div class="field"><label>Code</label><input id="ref-code" type="text" placeholder="Ex: B31A"></div>
+      <div class="field"><label>Ordre d'affichage</label><input id="ref-ordre" type="number" value="0" min="0"></div>
+    </div>
+    <div class="form-row full"><div class="field"><label>Libellé</label><input id="ref-libelle" type="text" placeholder="Ex: Stationner sans vignette"></div></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-green" onclick="saveRef()">&#10003; Enregistrer</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-ref')">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL OBJECTIF -->
 <div id="modal-objectif" class="modal-overlay">
   <div class="modal">
@@ -215,12 +269,12 @@ let allAgents=[], allSites=[], allObjectifs=[], allZones=[];
 let pendingImport=[], editingSiteId=null, zoneCount=0;
 
 async function init() {
-  await Promise.all([loadAgents(),loadSites(),loadObjectifs(),loadZones()]);
+  await Promise.all([loadAgents(),loadSites(),loadObjectifs(),loadZones(),loadReferences()]);
   renderAgents(); renderSites(); renderObjectifs();
 }
 
 function switchTab(name) {
-  const names=['agents','sites','objectifs'];
+  const names=['agents','sites','objectifs','references'];
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+name).classList.add('active');
@@ -547,6 +601,90 @@ async function saveObjectif(){
 }
 
 // ═══ UTILITAIRES ═══
+// ═══ RÉFÉRENCES ═══
+let allCodes=[], allCats=[], editingRefId=null;
+
+async function loadReferences() {
+  const [{data:codes},{data:cats}] = await Promise.all([
+    db.from('codes_infraction').select('*').order('ordre'),
+    db.from('categories_vehicule').select('*').order('ordre')
+  ]);
+  allCodes = codes||[]; allCats = cats||[];
+  renderCodes(); renderCats();
+}
+function renderCodes() {
+  const tb=document.getElementById('codes-table');
+  if(!allCodes.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--gray-mid);padding:16px">Aucun code</td></tr>';return;}
+  tb.innerHTML=allCodes.map(c=>`<tr>
+    <td style="font-weight:700;font-family:monospace">${c.code}</td>
+    <td style="font-size:13px">${c.libelle}</td>
+    <td style="color:var(--gray-mid);font-size:12px">${c.ordre}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openEditRef('infraction','${c.id}')" style="margin-right:4px">&#9998;</button>
+      <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5" onclick="deleteRef('infraction','${c.id}')">&#128465;</button>
+    </td>
+  </tr>`).join('');
+}
+function renderCats() {
+  const tb=document.getElementById('cats-table');
+  if(!allCats.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--gray-mid);padding:16px">Aucune catégorie</td></tr>';return;}
+  tb.innerHTML=allCats.map(c=>`<tr>
+    <td style="font-weight:700;font-family:monospace">${c.code}</td>
+    <td style="font-size:13px">${c.libelle}</td>
+    <td style="color:var(--gray-mid);font-size:12px">${c.ordre}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openEditRef('categorie','${c.id}')" style="margin-right:4px">&#9998;</button>
+      <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5" onclick="deleteRef('categorie','${c.id}')">&#128465;</button>
+    </td>
+  </tr>`).join('');
+}
+function openAddRef(type) {
+  editingRefId=null;
+  document.getElementById('ref-type').value=type;
+  document.getElementById('ref-id').value='';
+  document.getElementById('ref-code').value='';
+  document.getElementById('ref-libelle').value='';
+  document.getElementById('ref-ordre').value='0';
+  document.getElementById('modal-ref-title').textContent=(type==='infraction'?'Ajouter un code d\u2019infraction':'Ajouter une catégorie');
+  openModal('modal-ref');
+}
+function openEditRef(type,id) {
+  const list = type==='infraction' ? allCodes : allCats;
+  const item = list.find(x=>x.id===id); if(!item) return;
+  editingRefId=id;
+  document.getElementById('ref-type').value=type;
+  document.getElementById('ref-id').value=id;
+  document.getElementById('ref-code').value=item.code;
+  document.getElementById('ref-libelle').value=item.libelle;
+  document.getElementById('ref-ordre').value=item.ordre||0;
+  document.getElementById('modal-ref-title').textContent='Modifier';
+  openModal('modal-ref');
+}
+async function saveRef() {
+  const type=document.getElementById('ref-type').value;
+  const id=document.getElementById('ref-id').value;
+  const code=document.getElementById('ref-code').value.trim();
+  const libelle=document.getElementById('ref-libelle').value.trim();
+  const ordre=parseInt(document.getElementById('ref-ordre').value)||0;
+  if(!code||!libelle){toast('&#9888;&#65039; Code et libellé requis');return;}
+  const table = type==='infraction' ? 'codes_infraction' : 'categories_vehicule';
+  let error;
+  if(id) { ({error}=await db.from(table).update({code,libelle,ordre}).eq('id',id)); }
+  else    { ({error}=await db.from(table).insert({code,libelle,ordre})); }
+  if(error){toast('&#10060; '+error.message);return;}
+  toast('&#9989; Enregistré');
+  closeModal('modal-ref');
+  await loadReferences();
+}
+async function deleteRef(type,id) {
+  if(!confirm('Supprimer cet élément ?')) return;
+  const table = type==='infraction' ? 'codes_infraction' : 'categories_vehicule';
+  const {error}=await db.from(table).delete().eq('id',id);
+  if(error){toast('&#10060; '+error.message);return;}
+  toast('&#9989; Supprimé');
+  await loadReferences();
+}
+
 function openModal(id){document.getElementById(id).style.display='flex';}
 function closeModal(id){document.getElementById(id).style.display='none';}
 function toast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',dur);}

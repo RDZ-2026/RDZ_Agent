@@ -437,6 +437,96 @@ const STEPS = {
   ]
 };
 
+// ═══ RAPPELS ═══
+var _refCache = { codes: [], categories: [] };
+
+async function loadReferences() {
+  try {
+    const [{ data: codes }, { data: cats }] = await Promise.all([
+      db.from('codes_infraction').select('code,libelle').eq('actif', true).order('ordre'),
+      db.from('categories_vehicule').select('code,libelle').eq('actif', true).order('ordre')
+    ]);
+    if (codes && codes.length)  { _refCache.codes      = codes; localStorage.setItem('pg_codes_inf', JSON.stringify(codes)); }
+    if (cats  && cats.length)   { _refCache.categories = cats;  localStorage.setItem('pg_cats_veh',  JSON.stringify(cats)); }
+    // Mettre à jour la liste déroulante motif
+    const codesOpts = codes ? codes.map(function(c) { return c.code + ' - ' + c.libelle; }) : null;
+    if (codesOpts) STEPS.infraction[1].fields[0].opts = codesOpts;
+  } catch(e) {
+    _refCache.codes      = JSON.parse(localStorage.getItem('pg_codes_inf') || '[]');
+    _refCache.categories = JSON.parse(localStorage.getItem('pg_cats_veh')  || '[]');
+    if (_refCache.codes.length) {
+      STEPS.infraction[1].fields[0].opts = _refCache.codes.map(function(c) { return c.code + ' - ' + c.libelle; });
+    }
+  }
+}
+
+function buildRappelBlock() {
+  // Site courant — adresse depuis le cache
+  var sites = window._sitesCache || [];
+  var site  = sites.find(function(s) { return s.nom === currentSite; });
+  var adresseSite = site && site.adresse ? site.adresse : currentSite || '—';
+
+  // Catégories véhicules
+  var cats = _refCache.categories.length ? _refCache.categories : [
+    { code: 'AUT', libelle: 'Automobile' },
+    { code: 'VU',  libelle: 'Véhicule utilitaire' }
+  ];
+  var catsHtml = cats.map(function(c) {
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #eee">' +
+      '<span style="font-family:monospace;font-weight:700;font-size:13px;color:var(--black);min-width:40px">' + c.code + '</span>' +
+      '<span style="font-size:13px;color:var(--gray-dark)">' + c.libelle + '</span>' +
+    '</div>';
+  }).join('');
+
+  // Marques logos
+  var marquesHtml = '<div onclick="copyToClipboard(\'Renault\')" style="background:#EFDF00;color:#000;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Renault">Renault</div><div onclick="copyToClipboard(\'Peugeot\')" style="background:#0B2265;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Peugeot">Peugeot</div><div onclick="copyToClipboard(\'Citroën\')" style="background:#FF0000;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Citroën">Citroën</div><div onclick="copyToClipboard(\'Volkswagen\')" style="background:#001F5B;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Volkswagen">Volkswagen</div><div onclick="copyToClipboard(\'BMW\')" style="background:#0066B1;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : BMW">BMW</div><div onclick="copyToClipboard(\'Mercedes\')" style="background:#222;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Mercedes">Mercedes</div><div onclick="copyToClipboard(\'Audi\')" style="background:#BB0A30;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Audi">Audi</div><div onclick="copyToClipboard(\'Toyota\')" style="background:#EB0A1E;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Toyota">Toyota</div><div onclick="copyToClipboard(\'Ford\')" style="background:#003499;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Ford">Ford</div><div onclick="copyToClipboard(\'Opel\')" style="background:#FFD700;color:#000;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Opel">Opel</div><div onclick="copyToClipboard(\'Fiat\')" style="background:#8B0000;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Fiat">Fiat</div><div onclick="copyToClipboard(\'Seat\')" style="background:#FA0230;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Seat">Seat</div><div onclick="copyToClipboard(\'Skoda\')" style="background:#4BA82E;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Skoda">Skoda</div><div onclick="copyToClipboard(\'Honda\')" style="background:#CC0000;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Honda">Honda</div><div onclick="copyToClipboard(\'Hyundai\')" style="background:#002C5F;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Hyundai">Hyundai</div><div onclick="copyToClipboard(\'Kia\')" style="background:#05141F;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Kia">Kia</div><div onclick="copyToClipboard(\'Nissan\')" style="background:#C3002F;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Nissan">Nissan</div><div onclick="copyToClipboard(\'Tesla\')" style="background:#CC0000;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Tesla">Tesla</div><div onclick="copyToClipboard(\'Volvo\')" style="background:#003057;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Volvo">Volvo</div><div onclick="copyToClipboard(\'Mini\')" style="background:#1C1C1C;color:#fff;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.3px;min-width:0;word-break:break-word;user-select:none" title="Copier : Mini">Mini</div>';
+
+  return '<div style="margin-top:20px;border-top:2px solid var(--gray-border);padding-top:16px">' +
+
+    // Titre rappel
+    '<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;' +
+      'color:var(--gray-mid);margin-bottom:12px">&#9432; Rappels formulaire</div>' +
+
+    // Catégories véhicules
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:8px">Catégories véhicules</div>' +
+      catsHtml +
+    '</div>' +
+
+    // Dénonciateur
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Dénonciateur</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--black)">RDZ Security Management SA</div>' +
+      '<div style="font-size:12px;color:var(--gray-dark)">Quai du Seujet 22 — 1201 Genève</div>' +
+    '</div>' +
+
+    // Site
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Lieu de l\u2019infraction</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--black)">' + adresseSite + '</div>' +
+    '</div>' +
+
+    // Marques
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:8px">Marques (appuyer pour copier)</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' +
+        marquesHtml +
+      '</div>' +
+      '<div id="copy-confirm" style="font-size:11px;color:var(--green);text-align:center;margin-top:8px;height:16px"></div>' +
+    '</div>' +
+
+  '</div>';
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var el = document.getElementById('copy-confirm');
+      if (el) { el.textContent = '✓ Copié : ' + text; setTimeout(function(){ el.textContent=''; }, 2000); }
+    });
+  }
+}
+
 // ═══ UTILS ═══
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -766,6 +856,7 @@ function waitAndLoadTerrain(n) {
   initDB();
   if (window.db) {
     loadSitesAndAgents();
+    loadReferences();
   } else if (n > 0) {
     setTimeout(function() { waitAndLoadTerrain(n-1); }, 150);
   } else {
@@ -1131,6 +1222,10 @@ function renderFlowStep() {
     });
   }
 
+  // Injecter le bloc rappel sur l'étape motif
+  if (s.key === 'motif') {
+    html += buildRappelBlock();
+  }
   document.getElementById('flow-content').innerHTML = html;
   const isLast = flowStep === steps.length - 1;
   const label  = isLast ? (flowType === 'infraction' ? "Enregistrer l'infraction" : 'Enregistrer') : 'Continuer';
