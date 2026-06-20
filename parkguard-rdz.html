@@ -204,17 +204,21 @@ input[type="file"]{display:none}
       <div class="stat-box"><div class="stat-val green" id="r-aut">0</div><div class="stat-lbl">Autorisés</div></div>
     </div>
     <p style="font-size:14px;color:var(--gray-dark);margin-bottom:16px;font-weight:500">Statut du prochain véhicule :</p>
-    <button class="action-btn btn-inf" onclick="startFlow('infraction')">
+    <button id="btn-infraction" class="action-btn btn-inf" onclick="startFlow('infraction')">
       <div class="action-btn-icon">⚠️</div>
       <div><div class="action-btn-label">Infraction</div><div class="action-btn-sub">B31A · B37A · Sans macaron</div></div>
     </button>
-    <button class="action-btn btn-aut" onclick="startFlow('autorise')">
+    <button id="btn-autorise" class="action-btn btn-aut" onclick="startFlow('autorise')">
       <div class="action-btn-icon">✅</div>
       <div><div class="action-btn-label">Autorisé</div><div class="action-btn-sub">Macaron valide</div></div>
     </button>
-    <button class="action-btn" style="background:var(--gray-light);color:var(--black)" onclick="showScreen('s-parking-vide')">
+    <button id="btn-parking-vide" class="action-btn" style="background:var(--gray-light);color:var(--black)" onclick="showScreen('s-parking-vide')">
       <div class="action-btn-icon" style="background:rgba(0,0,0,0.08)">🅿️</div>
       <div><div class="action-btn-label">Parking vide</div><div class="action-btn-sub" style="color:var(--gray-dark)">Aucun véhicule — photo(s) de preuve</div></div>
+    </button>
+    <button id="btn-comptage" class="action-btn" style="background:#1d4ed8;color:#fff;display:none" onclick="showComptageScreen()">
+      <div class="action-btn-icon" style="background:rgba(255,255,255,0.2)">🔢</div>
+      <div><div class="action-btn-label">Relevé de comptage</div><div class="action-btn-sub" style="color:rgba(255,255,255,0.8)">Saisir le nombre de véhicules par zone</div></div>
     </button>
     <div class="section-label" style="margin-top:20px">Véhicules traités</div>
     <div id="vehicle-list"><p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p></div>
@@ -233,6 +237,51 @@ input[type="file"]{display:none}
   </div>
   <div class="content" id="flow-content"></div>
   <div class="bottom-bar" id="flow-bottom"></div>
+</div>
+
+<!-- ══════ COMPTAGE DLCC ══════ -->
+<div id="s-comptage" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title">Relevé de comptage</div>
+      <div class="topbar-sub" id="comptage-site-name">—</div>
+    </div>
+    <div class="badge" style="background:#1d4ed8;color:#fff;margin-left:auto">GUIDAGE</div>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow">Comptage visuel</div>
+    <div class="step-title">Véhicules présents</div>
+    <div class="step-sub">Saisissez le nombre de véhicules actuellement stationnés dans chaque zone.</div>
+    <div id="comptage-zones-list" style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px"></div>
+    <div class="field-group">
+      <label class="field-label">Remarque (optionnel)</label>
+      <input class="field-input" type="text" id="comptage-remarque" placeholder="Ex: zone DLCC saturée, travaux zone B...">
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" id="btn-save-comptage" onclick="saveComptage()" style="background:#1d4ed8">💾 Enregistrer le relevé</button>
+  </div>
+</div>
+
+<!-- ══════ RECAP COMPTAGE ══════ -->
+<div id="s-recap-comptage" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge" style="background:#1d4ed8;color:#fff;margin-left:auto">🔢 Comptage</div>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px">🔢</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px">Relevé enregistré</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-comptage-meta">—</div>
+    </div>
+    <div id="recap-comptage-details" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px"></div>
+    <div class="recap-check"><div class="recap-icon">✅</div><span>Relevé enregistré dans Supabase</span></div>
+  </div>
+  <div class="bottom-bar">
+    <button class="primary-btn" onclick="showScreen('s-round')">Continuer la ronde</button>
+  </div>
 </div>
 
 <!-- ══════ PARKING VIDE ══════ -->
@@ -360,6 +409,7 @@ initDB();
 // ═══ STATE ═══
 let currentAgent = null;
 let currentSite = null;
+let currentSiteType = 'standard'; // 'standard' ou 'guidage'
 let currentRoundId = null;
 let roundVehicles = [];
 let isOnline = navigator.onLine;
@@ -454,8 +504,9 @@ async function syncPending() {
 }
 
 // ═══ SITE & ROUND ═══
-function selectSite(site) {
+function selectSite(site, type) {
   currentSite = site;
+  currentSiteType = type || 'standard';
   currentRoundId = uid();
   roundVehicles = [];
   document.getElementById('round-site-name').textContent = site;
@@ -463,7 +514,19 @@ function selectSite(site) {
   document.getElementById('active-round-wrap').style.display = 'block';
   document.getElementById('active-round-name').textContent = site;
   updateRoundStats();
+  // Adapter l'écran selon le type de site
+  adaptRoundScreen();
   showScreen('s-round');
+}
+
+function adaptRoundScreen() {
+  const isGuidage = currentSiteType === 'guidage';
+  // Boutons standard
+  document.getElementById('btn-infraction').style.display = isGuidage ? 'none' : 'flex';
+  document.getElementById('btn-autorise').style.display   = 'flex'; // toujours visible
+  document.getElementById('btn-parking-vide').style.display = isGuidage ? 'none' : 'flex';
+  // Bouton comptage DLCC
+  document.getElementById('btn-comptage').style.display   = isGuidage ? 'flex' : 'none';
 }
 
 function confirmEndRound() {
@@ -726,6 +789,127 @@ document.getElementById('file-input').addEventListener('change', function() {
   }
 });
 function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
+
+// ═══ COMPTAGE DLCC ═══
+let comptageZones = []; // zones chargées depuis Supabase
+
+async function showComptageScreen() {
+  // Charger les zones du site depuis le cache
+  const sites = window._sitesCache || [];
+  const site  = sites.find(s => s.nom === currentSite);
+  if (!site) { showScreen('s-round'); return; }
+
+  // Essayer de récupérer les zones
+  try {
+    const { data: zones } = await db.from('zones').select('*').eq('site_id', site.id).eq('actif', true).order('nom');
+    comptageZones = zones || [];
+  } catch(e) {
+    // Cache local si hors ligne
+    comptageZones = JSON.parse(localStorage.getItem('pg_zones_' + site.id) || '[]');
+  }
+
+  // Sauvegarder en cache
+  if (comptageZones.length) {
+    const site2 = sites.find(s => s.nom === currentSite);
+    if (site2) localStorage.setItem('pg_zones_' + site2.id, JSON.stringify(comptageZones));
+  }
+
+  // Fallback si pas de zones configurées
+  if (!comptageZones.length) {
+    comptageZones = [
+      { id: 'dlcc', nom: 'DLCC', places_totales: 80 },
+      { id: 'clx',  nom: 'CLX',  places_totales: 35 }
+    ];
+  }
+
+  document.getElementById('comptage-site-name').textContent = currentSite;
+  renderComptageZones();
+  showScreen('s-comptage');
+}
+
+function renderComptageZones() {
+  const el = document.getElementById('comptage-zones-list');
+  el.innerHTML = comptageZones.map(function(z, i) {
+    return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px">' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:4px">' + z.nom +
+        ' <span style="font-size:12px;font-weight:400;color:var(--gray-mid)">' + z.places_totales + ' places</span></div>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-top:10px">' +
+        '<button onclick="adjustComptage(' + i + ',-1)" style="width:40px;height:40px;font-size:22px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer">−</button>' +
+        '<div style="flex:1;text-align:center">' +
+          '<div id="comptage-val-' + i + '" style="font-size:36px;font-weight:800;color:var(--black)">0</div>' +
+          '<div style="font-size:11px;color:var(--gray-mid)">véhicules</div>' +
+        '</div>' +
+        '<button onclick="adjustComptage(' + i + ',+1)" style="width:40px;height:40px;font-size:22px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer">+</button>' +
+      '</div>' +
+      '<div style="margin-top:8px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">' +
+        '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:4px;width:0%;transition:width .3s"></div>' +
+      '</div>' +
+      '<div id="comptage-taux-' + i + '" style="font-size:11px;color:var(--gray-mid);margin-top:4px;text-align:right">0%</div>' +
+    '</div>';
+  }).join('');
+  // Reset valeurs
+  window._comptageVals = comptageZones.map(() => 0);
+}
+
+function adjustComptage(idx, delta) {
+  if (!window._comptageVals) window._comptageVals = comptageZones.map(() => 0);
+  const max = comptageZones[idx].places_totales || 999;
+  window._comptageVals[idx] = Math.max(0, Math.min(max + 10, (window._comptageVals[idx] || 0) + delta));
+  const val = window._comptageVals[idx];
+  const pct = Math.min(100, Math.round(val / max * 100));
+  document.getElementById('comptage-val-' + idx).textContent = val;
+  const bar = document.getElementById('comptage-bar-' + idx);
+  bar.style.width = pct + '%';
+  bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : '#1d4ed8';
+  document.getElementById('comptage-taux-' + idx).textContent = pct + '%';
+}
+
+async function saveComptage() {
+  const vals  = window._comptageVals || [];
+  const now   = new Date().toISOString();
+  const remarque = document.getElementById('comptage-remarque').value.trim();
+  const sites = window._sitesCache || [];
+  const site  = sites.find(s => s.nom === currentSite);
+
+  let details = '';
+  const entries = [];
+  comptageZones.forEach((z, i) => {
+    const v = vals[i] || 0;
+    const pct = Math.round(v / (z.places_totales || 1) * 100);
+    details += z.nom + ' : ' + v + '/' + z.places_totales + ' places (' + pct + '%)\n';
+    entries.push({
+      site_id:           (site && site.id) ? site.id : null,
+      zone_id:           (z.id && z.id.length > 10) ? z.id : null,
+      agent_name:        currentAgent,
+      vehicules_presents: v,
+      places_totales:    z.places_totales || 0,
+      created_at:        now
+    });
+  });
+
+  // Sauvegarder chaque zone
+  let synced = false;
+  if (isOnline && site?.id) {
+    try {
+      const { error } = await db.from('comptages').insert(entries);
+      if (!error) synced = true;
+    } catch(e) { console.warn('Erreur comptage:', e); }
+  }
+  if (!synced) {
+    const p = JSON.parse(localStorage.getItem('pg_pending_comptages') || '[]');
+    entries.forEach(e => p.push(e));
+    localStorage.setItem('pg_pending_comptages', JSON.stringify(p));
+  }
+
+  // Recap
+  document.getElementById('recap-comptage-meta').textContent =
+    nowStr() + ' · ' + currentAgent + (remarque ? ' · ' + remarque : '');
+  document.getElementById('recap-comptage-details').textContent = details;
+
+  // Reset
+  document.getElementById('comptage-remarque').value = '';
+  showScreen('s-recap-comptage');
+}
 
 // ═══ PARKING VIDE ═══
 let videPhotos = [];
@@ -1081,7 +1265,7 @@ function selectAgent(nom) {
 function selectSiteIdx(i) {
   const s = window._sitesCache && window._sitesCache[i];
   if (!s) return;
-  selectSite(s.nom);
+  selectSite(s.nom, s.type || 'standard');
 }
 
 // ═══ INIT ═══
