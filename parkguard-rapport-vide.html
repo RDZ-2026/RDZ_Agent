@@ -188,8 +188,7 @@ function loadData() {
   grid.innerHTML = allUrls.map(function(url, i) {
     return '<div class="photo-item">' +
       '<div class="photo-label">Vue ' + (i+1) + '</div>' +
-      '<div class="photo-box"><img src="' + url + '" alt="Vue ' + (i+1) + '" ' +
-        'onerror="this.parentNode.className='photo-box empty';this.parentNode.innerHTML='📷<span>Photo inaccessible</span>'"></div>' +
+      '<div class="photo-box"><img src="' + url + '" alt="Vue ' + (i+1) + '"></div>' +
     '</div>';
   }).join('');
 }
