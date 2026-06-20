@@ -390,7 +390,7 @@ async function loadComptages() {
     // Charger les 50 derniers comptages
     const siteIds = allSitesGuidage.map(s => s.id);
     const { data: comptages } = await db.from('comptages')
-      .select('*,zones(nom)')
+      .select('*,zones(nom,places_totales)')
       .in('site_id', siteIds)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -421,7 +421,12 @@ function renderComptages() {
     const heureStr = pad(dt.getHours()) + 'h' + pad(dt.getMinutes());
     const taux = c.taux_occupation !== null ? parseFloat(c.taux_occupation) : null;
     const tauxColor = taux === null ? '#888' : taux >= 90 ? 'var(--red)' : taux >= 70 ? 'var(--amber)' : 'var(--green)';
-    const zoneName = c.zones ? c.zones.nom : '—';
+    // Nom de zone : depuis la jointure, ou depuis places_totales si zone_id null
+    var zoneName = c.zones ? c.zones.nom : '—';
+    if (zoneName === '—' && c.places_totales) {
+      // Heuristique : 80 places = DLCC, 35 places = CLX
+      zoneName = c.places_totales === 80 ? 'DLCC' : c.places_totales === 35 ? 'CLX' : c.places_totales + ' pl';
+    }
     return '<tr style="border-bottom:1px solid var(--gray-border)">' +
       '<td style="padding:9px 12px;font-size:12px">' + dateStr + '<br><span style="color:var(--gray-mid)">' + heureStr + '</span></td>' +
       '<td style="padding:9px 12px;font-size:12px">' + (c.agent_name || '—') + '</td>' +

@@ -794,33 +794,50 @@ function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('
 let comptageZones = []; // zones chargées depuis Supabase
 
 async function showComptageScreen() {
-  // Charger les zones du site depuis le cache
-  const sites = window._sitesCache || [];
-  const site  = sites.find(s => s.nom === currentSite);
-  if (!site) { showScreen('s-round'); return; }
-
-  // Essayer de récupérer les zones
+  // Charger le site depuis Supabase directement pour avoir l'UUID fiable
+  let siteData = null;
   try {
-    const { data: zones } = await db.from('zones').select('*').eq('site_id', site.id).eq('actif', true).order('nom');
+    const { data: sites } = await db.from('sites').select('id,nom,type').eq('nom', currentSite).limit(1);
+    if (sites && sites.length) siteData = sites[0];
+  } catch(e) {
+    // Fallback cache
+    const cached = window._sitesCache || [];
+    siteData = cached.find(function(s) { return s.nom === currentSite; }) || null;
+  }
+
+  if (!siteData || !siteData.id) {
+    toast('Site introuvable — vérifiez la connexion');
+    showScreen('s-round');
+    return;
+  }
+
+  // Charger les zones avec les vrais UUIDs
+  try {
+    const { data: zones } = await db.from('zones')
+      .select('id,nom,places_totales,site_id,question_type')
+      .eq('site_id', siteData.id)
+      .eq('actif', true)
+      .order('nom');
     comptageZones = zones || [];
   } catch(e) {
-    // Cache local si hors ligne
-    comptageZones = JSON.parse(localStorage.getItem('pg_zones_' + site.id) || '[]');
+    comptageZones = JSON.parse(localStorage.getItem('pg_zones_' + siteData.id) || '[]');
   }
 
   // Sauvegarder en cache
   if (comptageZones.length) {
-    const site2 = sites.find(s => s.nom === currentSite);
-    if (site2) localStorage.setItem('pg_zones_' + site2.id, JSON.stringify(comptageZones));
+    localStorage.setItem('pg_zones_' + siteData.id, JSON.stringify(comptageZones));
   }
 
   // Fallback si pas de zones configurées
   if (!comptageZones.length) {
     comptageZones = [
-      { id: 'dlcc', nom: 'DLCC', places_totales: 80 },
-      { id: 'clx',  nom: 'CLX',  places_totales: 35 }
+      { id: null, site_id: siteData.id, nom: 'DLCC', places_totales: 80 },
+      { id: null, site_id: siteData.id, nom: 'CLX',  places_totales: 35 }
     ];
   }
+
+  // Stocker site_id pour saveComptage
+  window._currentSiteId = siteData.id;
 
   document.getElementById('comptage-site-name').textContent = currentSite;
   renderComptageZones();
@@ -907,13 +924,11 @@ async function saveComptage() {
   const now      = new Date().toISOString();
   const remarque = document.getElementById('comptage-remarque').value.trim();
 
-  // site_id depuis les zones Supabase (plus fiable)
-  const siteIdFromZone = comptageZones.length && comptageZones[0].site_id ? comptageZones[0].site_id : null;
-  const sites  = window._sitesCache || [];
-  const site   = sites.find(function(s) { return s.nom === currentSite; });
-  const siteId = siteIdFromZone || (site && site.id) || null;
+  // site_id depuis showComptageScreen (le plus fiable)
+  const siteId = window._currentSiteId ||
+    (comptageZones.length && comptageZones[0].site_id ? comptageZones[0].site_id : null);
 
-  if (!siteId) { toast('Site non identifie - reconnectez-vous'); return; }
+  if (!siteId) { toast('Site non identifié — reconnectez-vous'); return; }
 
   let details = '';
   const entries = [];
