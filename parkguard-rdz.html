@@ -348,7 +348,14 @@ input[type="file"]{display:none}
 const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+var db;
+function initDB() {
+  if (typeof supabase !== 'undefined' && !db) {
+    db = supabase.createClient(SUPA_URL, SUPA_KEY);
+  }
+  return !!db;
+}
+initDB();
 
 // ═══ STATE ═══
 let currentAgent = null;
@@ -689,7 +696,21 @@ function updateRoundStats() {
 function closeRound() {
   currentSite = null; currentRoundId = null; roundVehicles = [];
   document.getElementById('active-round-wrap').style.display = 'none';
-  loadSitesAndAgents();
+  function waitAndLoadTerrain(n) {
+  initDB();
+  if (window.db) {
+    loadSitesAndAgents();
+  } else if (n > 0) {
+    setTimeout(function() { waitAndLoadTerrain(n-1); }, 150);
+  } else {
+    loadSitesAndAgents(); // fallback hors ligne
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { waitAndLoadTerrain(20); });
+} else {
+  waitAndLoadTerrain(20);
+}
 showScreen('s-select-agent');
 }
 
@@ -970,54 +991,76 @@ async function loadSitesAndAgents() {
       db.from('agents').select('id,nom,matricule').eq('actif', true).order('nom')
     ]);
 
-    // Rendre la liste des agents
-    const agentEl = document.getElementById('agents-list-home');
-    if (agentEl) {
-      if (agents && agents.length) {
-        agentEl.innerHTML = agents.map((a,i) => {
-          var safeNom = a.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-          return '<div class="card" onclick="selectAgentIdx(' + i + ')" data-agent="' + safeNom + '">' +
-            '<div class="card-icon">\u{1F464}</div>' +
-            '<div><div class="card-name">' + a.nom + '</div>' +
-            '<div class="card-meta">' + (a.matricule || 'Agent de surveillance') + '</div></div>' +
-            '<div class="card-arrow">\u203a</div></div>';
-        }).join('');
-        window._agentsCache = agents;
-      } else {
-        agentEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun agent actif.<br>Configurez les agents dans la page Config.</div>';
-      }
-    }
+    // Sauvegarder en cache localStorage pour usage hors ligne
+    if (agents && agents.length) localStorage.setItem('pg_agents_cache', JSON.stringify(agents));
+    if (sites  && sites.length)  localStorage.setItem('pg_sites_cache',  JSON.stringify(sites));
 
-    // Rendre la liste des sites
-    const siteEl = document.getElementById('sites-list-home');
-    if (siteEl) {
-      const icons = { standard: '🏢', guidage: '🚗' };
-      const metas = { standard: 'Résidence privée', guidage: 'Guidage & surveillance' };
-      if (sites && sites.length) {
-        window._sitesCache = sites;
-        siteEl.innerHTML = sites.map(function(s, i) {
-          return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
-            '<div class="card-icon">' + (icons[s.type] || '\uD83C\uDFE2') + '</div>' +
-            '<div><div class="card-name">' + s.nom + '</div>' +
-            '<div class="card-meta">' + (s.adresse || metas[s.type] || '') + '</div></div>' +
-            '<div class="card-arrow">&#8250;</div></div>';
-        }).join('');
-      } else {
-        siteEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun site actif.<br>Configurez les sites dans la page Config.</div>';
-      }
-    }
+    renderAgentsList(agents || []);
+    renderSitesList(sites || []);
+
   } catch(e) {
-    console.warn('Impossible de charger sites/agents:', e);
-    const siteEl = document.getElementById('sites-list-home');
-    if (siteEl) siteEl.innerHTML =
-      ['Grange Canal','Clair Matin'].map(function(nom, i) {
-        return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
-          '<div class="card-icon">\uD83C\uDFE2</div>' +
-          '<div><div class="card-name">' + nom + '</div><div class="card-meta">Résidence privée</div></div>' +
-          '<div class="card-arrow">&#8250;</div></div>';
-      }).join('');
-    window._sitesCache = [{nom:'Grange Canal',type:'standard'},{nom:'Clair Matin',type:'standard'}];
+    console.warn('Supabase inaccessible — lecture du cache local:', e);
+
+    // Lire le cache localStorage
+    const agents = JSON.parse(localStorage.getItem('pg_agents_cache') || '[]');
+    const sites  = JSON.parse(localStorage.getItem('pg_sites_cache')  || '[]');
+
+    // Fallback codé en dur si cache vide
+    const sitesFinaux = sites.length ? sites : [
+      {nom:'Grange Canal', type:'standard'},
+      {nom:'Clair Matin',  type:'standard'}
+    ];
+
+    renderAgentsList(agents);
+    renderSitesList(sitesFinaux);
+
+    // Bannière hors ligne
+    const banner = document.getElementById('home-sync-banner');
+    if (banner) {
+      banner.className = 'sync-banner offline';
+      banner.querySelector('#home-sync-text').textContent =
+        agents.length
+          ? 'Hors ligne — agents et sites chargés depuis le cache'
+          : 'Hors ligne — données sauvegardées localement';
+    }
   }
+}
+
+function renderAgentsList(agents) {
+  const el = document.getElementById('agents-list-home');
+  if (!el) return;
+  if (!agents.length) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun agent actif.<br>Configurez les agents dans la page Config.</div>';
+    return;
+  }
+  window._agentsCache = agents;
+  el.innerHTML = agents.map(function(a, i) {
+    var safeNom = a.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return '<div class="card" onclick="selectAgentIdx(' + i + ')" data-agent="' + safeNom + '">' +
+      '<div class="card-icon">\uD83D\uDC64</div>' +
+      '<div><div class="card-name">' + a.nom + '</div>' +
+      '<div class="card-meta">' + (a.matricule || 'Agent de surveillance') + '</div></div>' +
+      '<div class="card-arrow">&#8250;</div></div>';
+  }).join('');
+}
+
+function renderSitesList(sites) {
+  const el = document.getElementById('sites-list-home');
+  if (!el) return;
+  if (!sites.length) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun site actif.<br>Configurez les sites dans la page Config.</div>';
+    return;
+  }
+  window._sitesCache = sites;
+  const icons = { standard: '\uD83C\uDFE2', guidage: '\uD83D\uDE97' };
+  const metas = { standard: 'R\u00e9sidence priv\u00e9e', guidage: 'Guidage & surveillance' };
+  el.innerHTML = sites.map(function(s, i) {
+    return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
+      '<div class="card-icon">' + (icons[s.type] || '\uD83C\uDFE2') + '</div>' +
+      '<div><div class="card-name">' + s.nom + '</div>' +
+      '<div class="card-meta">' + (s.adresse || metas[s.type] || '') + '</div></div>' +
+      '<div class="card-arrow">&#8250;</div></div>';
+  }).join('');
 }
 
 function selectAgentIdx(i) {
