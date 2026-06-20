@@ -109,23 +109,21 @@ select.ctrl-select:focus{outline:none;border-color:var(--red)}
   <div class="section-title">&#128338; Dernier passage</div>
   <div id="dernier-passage"></div>
 
-  <!-- KPIs -->
-  <div class="section-title">&#128200; Indicateurs clés</div>
+  <!-- KPIs — communs (rempli différemment selon type site) -->
+  <div class="section-title" id="kpis-title">&#128200; Indicateurs clés</div>
   <div class="kpi-grid" id="kpis"></div>
 
   <!-- CALENDRIER -->
-  <div class="section-title">&#128197; Calendrier des passages — mois en cours</div>
+  <div class="section-title">&#128197; Calendrier des passages</div>
   <div class="card"><div class="card-body" id="calendrier"></div></div>
 
-  <!-- SECTION GUIDAGE DLCC -->
-  <div id="section-guidage">
-    <!-- KPIs occupation -->
-    <div class="section-title">&#127359; Taux d'occupation — Dernier relevé</div>
+  <!-- SECTION GUIDAGE DLCC — visible seulement pour sites guidage -->
+  <div id="section-guidage" style="display:none">
+    <!-- Évolution taux max/jour -->
+    <div class="section-title">&#128200; Évolution du taux d'occupation max/jour</div>
     <div class="card"><div class="card-body" id="gauges"></div></div>
-    <!-- KPIs occupation résumé -->
-    <div class="kpi-grid" id="kpis-occupation" style="margin-bottom:20px"></div>
-    <!-- Courbe journée -->
-    <div class="section-title">&#128200; Évolution de l'occupation — Journée en cours</div>
+    <!-- Taux moyen par créneau horaire -->
+    <div class="section-title">&#128337;&#65039; Taux moyen d'occupation par créneau horaire</div>
     <div class="card"><div class="card-body" id="courbe-occupation"></div></div>
     <!-- Tendance mensuelle -->
     <div class="section-title">&#128197; Tendance d'occupation par mois</div>
@@ -605,41 +603,6 @@ function renderTendanceOccupation(){
 }
 
 function renderRecurrentsAutEl(aut,elId){
-  const el=document.getElementById(elId);
-  if(!el)return;
-  const counts={};
-  aut.forEach(function(v){if(v.plaque&&v.plaque!=='null'){counts[v.plaque]=(counts[v.plaque]||0)+1;}});
-  const sorted=Object.entries(counts).filter(function(e){return e[1]>1;}).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
-  if(!sorted.length){el.innerHTML='<div class="no-data">Aucun véhicule autorisé récurrent sur la période</div>';return;}
-  const max=sorted[0][1];
-  el.innerHTML=sorted.map(function(e,i){
-    var pct=Math.round(e[1]/max*100);
-    return '<div class="bar-row">'+
-      '<div class="bar-label">'+( i+1)+'. '+e[0]+'</div>'+
-      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)"></div></div>'+
-      '<div class="bar-val">'+e[1]+'x</div>'+
-    '</div>';
-  }).join('');
-}
-
-function renderCourbeOccupation(){
-  var el=document.getElementById('courbe-occupation');if(!el)return;
-  var zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
-  if(!zones.length||!allComptages.length){el.innerHTML='<div class="no-data">Aucun relevé disponible</div>';return;}
-  var colors=['var(--blue)','var(--green)'],W=600,H=160,PAD={top:16,right:20,bottom:30,left:44};
-  var byHour=Array.from({length:24},function(){return {};});
-  zones.forEach(function(z,zi){allComptages.filter(function(c){return c.zone_id===z.id;}).forEach(function(c){var h=new Date(c.created_at).getHours();if(!byHour[h][zi])byHour[h][zi]={sum:0,count:0};byHour[h][zi].sum+=parseFloat(c.taux_occupation||0);byHour[h][zi].count++;});});
-  var heures=[];for(var h=0;h<24;h++){if(Object.keys(byHour[h]).length)heures.push(h);}
-  if(heures.length<2){el.innerHTML='<div class="no-data">Pas assez de données horaires</div>';return;}
-  var xStep=(W-PAD.left-PAD.right)/Math.max(1,heures.length-1);
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">';
-  [0,25,50,75,100].forEach(function(pct){var y=PAD.top+(H-PAD.top-PAD.bottom)*(1-pct/100);svg+='<line x1="'+PAD.left+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.right)+'" y2="'+y.toFixed(1)+'" stroke="var(--gray-border)" stroke-width="1"/>';svg+='<text x="'+(PAD.left-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--gray-mid)">'+pct+'%</text>';});
-  zones.forEach(function(z,zi){var pts=heures.map(function(h,i){var data=byHour[h][zi];if(!data||!data.count)return null;var v=Math.round(data.sum/data.count);return {x:PAD.left+i*xStep,y:PAD.top+(H-PAD.top-PAD.bottom)*(1-v/100),v:v,h:h};}).filter(Boolean);if(!pts.length)return;var path=pts.map(function(p,i){return (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');var area=path+' L'+pts[pts.length-1].x.toFixed(1)+','+(H-PAD.bottom)+' L'+pts[0].x.toFixed(1)+','+(H-PAD.bottom)+' Z';svg+='<path d="'+area+'" fill="'+colors[zi]+'" opacity="0.1"/>';svg+='<path d="'+path+'" fill="none" stroke="'+colors[zi]+'" stroke-width="2.5" stroke-linejoin="round"/>';pts.forEach(function(p){svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="'+colors[zi]+'"/>';});});
-  heures.forEach(function(h,i){if(h%3===0)svg+='<text x="'+(PAD.left+i*xStep).toFixed(1)+'" y="'+(H-PAD.bottom+14).toFixed(1)+'" text-anchor="middle" font-size="9" fill="var(--gray-mid)">'+pad(h)+'h</text>';});
-  svg+='</svg>';
-  var leg=zones.map(function(z,i){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><span style="width:20px;height:3px;background:'+colors[i]+';display:inline-block;border-radius:2px"></span>'+z.nom+'</span>';}).join(' &middot; ');
-  el.innerHTML=svg+'<div style="display:flex;gap:16px;margin-top:6px">'+leg+'</div><div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Taux moyen par créneau horaire sur la période sélectionnée</div>';
-}function renderRecurrentsAutEl(aut,elId){
   const el=document.getElementById(elId);
   if(!el)return;
   const counts={};
