@@ -309,16 +309,27 @@ function renderDernierPassage(rondes){
   '</div>';
 }
 
+// ═══ UTILS COMPTAGE ═══
+// Matcher un comptage à une zone même si zone_id est null (fallback par places_totales)
+function comptagesForZone(zone) {
+  return allComptages.filter(function(c) {
+    if (c.zone_id && c.zone_id === zone.id) return true;
+    // Fallback : pas de zone_id mais places_totales correspond
+    if (!c.zone_id && c.places_totales === zone.places_totales) return true;
+    return false;
+  });
+}
+
 function renderKPIsGuidage(rondes,aut){
   var el=document.getElementById('kpis');if(!el)return;
   var zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
   var nbWeeks=Math.max(1,(new Date()-getPeriodStart(currentPeriod))/(7*24*3600000));
   var obj=getObjectifForDate(currentSite&&currentSite.id,getPeriodStart(currentPeriod));
   var objTot=Math.round(obj*nbWeeks),couv=objTot>0?Math.round(rondes.length/objTot*100):0;
-  function tmjm(zid){var bd={};allComptages.filter(function(c){return c.zone_id===zid;}).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10),t=parseFloat(c.taux_occupation||0);if(!bd[d]||t>bd[d])bd[d]=t;});var days=Object.values(bd);return days.length?Math.round(days.reduce(function(s,v){return s+v;},0)/days.length):null;}
+  function tmjm(zone){var bd={};comptagesForZone(zone).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10),t=parseFloat(c.taux_occupation||0);if(!bd[d]||t>bd[d])bd[d]=t;});var days=Object.values(bd);return days.length?Math.round(days.reduce(function(s,v){return s+v;},0)/days.length):null;}
   function mvg(){var bd={};allComptages.forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10);if(!bd[d])bd[d]={};var t=c.vehicules_presents||0;if(!bd[d][c.zone_id]||t>bd[d][c.zone_id])bd[d][c.zone_id]=t;});var days=Object.values(bd);if(!days.length)return null;return Math.round(days.map(function(z){return Object.values(z).reduce(function(s,v){return s+v;},0);}).reduce(function(s,v){return s+v;},0)/days.length);}
   var dlccZ=zones.find(function(z){return z.nom==='DLCC';}),clxZ=zones.find(function(z){return z.nom==='CLX';});
-  var tD=dlccZ?tmjm(dlccZ.id):null,tC=clxZ?tmjm(clxZ.id):null,mV=mvg();
+  var tD=dlccZ?tmjm(dlccZ):null,tC=clxZ?tmjm(clxZ):null,mV=mvg();
   function ck(v){return v===null?'blue':v>=90?'red':v>=70?'orange':v>=50?'amber':'green';}
   el.innerHTML='<div class="kpi-card blue"><div class="kpi-num blue">'+rondes.length+'</div><div class="kpi-label">Passages réalisés</div><div class="kpi-sub">Obj: '+objTot+' · '+couv+'% couverture</div></div>'+
     (tD!==null?'<div class="kpi-card '+ck(tD)+'"><div class="kpi-num '+ck(tD)+'">'+tD+'%</div><div class="kpi-label">Taux max/jour moy. DLCC</div><div class="kpi-sub">'+(dlccZ?dlccZ.places_totales+' places':'')+'</div></div>':'')+
@@ -394,7 +405,7 @@ function renderOneMois(rondes,year,month,jours,moisNames,compact){
   rondes.forEach(function(r){var d=new Date(r.start);if(d.getMonth()===month&&d.getFullYear()===year){var k=d.getDate();if(!rondesByDay[k])rondesByDay[k]=[];rondesByDay[k].push(r);}});
   var tauxDLCCByDay={};
   if(isGuidage){var dlccZ=allZones.find(function(z){return currentSite&&z.site_id===currentSite.id&&z.nom==='DLCC';});
-    if(dlccZ)allComptages.filter(function(c){return c.zone_id===dlccZ.id;}).forEach(function(c){var cd=new Date(c.created_at);if(cd.getMonth()===month&&cd.getFullYear()===year){var k=cd.getDate(),t=parseFloat(c.taux_occupation||0);if(!tauxDLCCByDay[k]||t>tauxDLCCByDay[k])tauxDLCCByDay[k]=t;}});}
+    if(dlccZ)comptagesForZone(dlccZ).forEach(function(c){var cd=new Date(c.created_at);if(cd.getMonth()===month&&cd.getFullYear()===year){var k=cd.getDate(),t=parseFloat(c.taux_occupation||0);if(!tauxDLCCByDay[k]||t>tauxDLCCByDay[k])tauxDLCCByDay[k]=t;}});}
   var html='<div><div style="font-size:'+(compact?'11':'13')+'px;font-weight:700;margin-bottom:6px;color:var(--black)">'+moisNames[month]+' '+year+'</div><div class="calendar">';
   if(!compact)jours.forEach(function(j){html+='<div class="cal-head">'+j+'</div>';});
   for(var i=0;i<firstDayMon;i++)html+='<div class="cal-day empty"></div>';
@@ -529,7 +540,7 @@ function renderGauges(){
   if(!zones.length||!allComptages.length){el.innerHTML='<div class="no-data">Aucun relevé disponible</div>';return;}
   var colors=['var(--blue)','var(--green)'],W=600,H=180,PAD={top:20,right:20,bottom:36,left:44};
   var allDays={};
-  zones.forEach(function(z,zi){allComptages.filter(function(c){return c.zone_id===z.id;}).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10);if(!allDays[d])allDays[d]={};var t=parseFloat(c.taux_occupation||0);if(allDays[d][zi]===undefined||t>allDays[d][zi])allDays[d][zi]=t;});});
+  zones.forEach(function(z,zi){comptagesForZone(z).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10);if(!allDays[d])allDays[d]={};var t=parseFloat(c.taux_occupation||0);if(allDays[d][zi]===undefined||t>allDays[d][zi])allDays[d][zi]=t;});});
   var days=Object.keys(allDays).sort().slice(-30);
   if(days.length<2){el.innerHTML='<div class="no-data">Pas assez de données (min. 2 jours)</div>';return;}
   var xStep=(W-PAD.left-PAD.right)/Math.max(1,days.length-1);
@@ -637,7 +648,7 @@ function renderCourbeOccupation(){
     svg+=`<text x="${PAD.left-6}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--gray-mid)">${Math.round(100*(1-i/4))}%</text>`;
   }
   zones.forEach((z,zi)=>{
-    const pts=recentComptages.filter(c=>c.zone_id===z.id);
+    const pts=recentComptages.filter(function(c){return !c.zone_id?c.places_totales===z.places_totales:c.zone_id===z.id;});
     if(!pts.length)return;
     const xStep=(W-PAD.left-PAD.right)/Math.max(1,pts.length-1);
     const pathPts=pts.map((c,i)=>{
