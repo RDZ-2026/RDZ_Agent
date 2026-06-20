@@ -891,13 +891,24 @@ function renderComptageZones() {
 }
 
 function updateComptageDisplay(idx) {
-  const max = comptageZones[idx].places_totales || 999;
-  const val = window._comptageVals[idx] || 0;
-  const pct = Math.min(100, Math.round(val / max * 100));
+  const max   = comptageZones[idx].places_totales || 999;
+  const saisi = window._comptageVals[idx] || 0;
+  const types = window._comptageTypes || [];
+  const isDisp = types[idx] === 'disponibles';
+
+  // Pour DLCC (places libres) : taux d'occupation = (max - saisi) / max
+  // Pour CLX (véhicules) : taux d'occupation = saisi / max
+  const vehicules = isDisp ? Math.max(0, max - saisi) : saisi;
+  const pct = Math.min(100, Math.round(vehicules / max * 100));
+
   const bar = document.getElementById('comptage-bar-' + idx);
   bar.style.width = pct + '%';
   bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : '#1d4ed8';
-  document.getElementById('comptage-taux-' + idx).textContent = val + ' / ' + max + ' \u2014 ' + pct + '%';
+
+  const label = isDisp
+    ? saisi + ' libres → ' + vehicules + ' véhicules / ' + max + ' — ' + pct + '% occupé'
+    : vehicules + ' / ' + max + ' — ' + pct + '%';
+  document.getElementById('comptage-taux-' + idx).textContent = label;
 }
 
 function onComptageInput(idx) {
