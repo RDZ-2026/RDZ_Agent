@@ -522,8 +522,14 @@ function renderTable() {
       '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
       (function(){
         var st = v.statut;
-        // Compatibilité anciens enregistrements parking vide stockés comme autorisé
-        if (st==='autorise' && v.remarque && v.remarque.startsWith('PARKING_VIDE')) st='parking_vide';
+        // parking_vide natif (nouveaux enregistrements)
+        // OU anciens stockés comme autorisé avec marqueur PARKING_VIDE dans remarque
+        // OU anciens sans plaque ET motif null stockés comme autorisé (heuristique)
+        if (st==='autorise' && (
+          (v.remarque && v.remarque.startsWith('PARKING_VIDE')) ||
+          (v.motif && v.motif.startsWith('PARKING_VIDE')) ||
+          (!v.plaque && !v.motif && v.photos_count > 0)
+        )) st='parking_vide';
         var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
         var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
         v._statut_display = st; // pour openRapport
@@ -636,12 +642,14 @@ function openRapport(id, type) {
     photo_parebrise_url: v.photo_parebrise_url || '',
     photo_macaron_url: v.photo_macaron_url || ''
   });
+  // Utiliser le statut affiché (corrigé) plutôt que le statut brut Supabase
+  const effectiveType = type || v._statut_display || v.statut;
   const targets = {
     'infraction':   'parkguard-rapport-denonciation.html',
     'autorise':     'parkguard-rapport-autorise.html',
     'parking_vide': 'parkguard-rapport-vide.html'
   };
-  const target = targets[type || v.statut] || 'parkguard-rapport-denonciation.html';
+  const target = targets[effectiveType] || 'parkguard-rapport-denonciation.html';
   window.open(target + '?' + params.toString(), '_blank');
 }
 
