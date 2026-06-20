@@ -432,42 +432,47 @@ async function handleExcelFile(file) {
   reader.readAsArrayBuffer(file);
 }
 function processExcelRows(rows) {
-  if(!rows.length){toast('⚠️ Fichier vide');return;}
-  const keys=Object.keys(rows[0]);
-  const nomKey=keys.find(k=>/nom|name|agent|prénom/i.test(k));
-  const matKey=keys.find(k=>/matricule|mat|code|num/i.test(k));
-  if(!nomKey){toast('⚠️ Colonne "Nom" introuvable dans le fichier');return;}
-  const existingNoms=allAgents.map(a=>a.nom.toLowerCase().trim());
-  const seen=new Set();
-  const preview=[];
-  rows.forEach(row=>{
-    const nom=String(row[nomKey]||'').trim();
-    const prenom=prenomKey?String(row[prenomKey]||'').trim():'';
-    const matRaw=matKey?String(row[matKey]||'').trim():'';
-    // Normaliser matricule : "B 23034" → "B23034"
-    const mat=matRaw.replace(/\s+/g,'');
-    const brig=brigKey?String(row[brigKey]||'').trim():'';
-    if(!nom)return;
-    // Doublon = même nom ET même matricule
-      const isDup=allAgents.some(function(a){return a.nom.toLowerCase()===nom.toLowerCase()&&(a.matricule||'')===(mat||'');})||seen.has(nom.toLowerCase()+'|'+(mat||''));
-      seen.add(nom.toLowerCase()+'|'+(mat||''));
-    preview.push({nom,prenom:prenom||null,matricule:mat||null,brigade:brig||null,isDup});
+  if(!rows.length){toast('Fichier vide');return;}
+  var keys=Object.keys(rows[0]);
+  function normCol(s){ return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+  var nomKey    = keys.find(function(k){ var n=normCol(k); return n==='nom'||n==='name'||n==='surname'; });
+  var prenomKey = keys.find(function(k){ var n=normCol(k); return n==='prenom'||n.startsWith('preno')||n==='first'; });
+  var matKey    = keys.find(function(k){ var n=normCol(k); return n.includes('matricul')||n.startsWith('mat'); });
+  var brigKey   = keys.find(function(k){ var n=normCol(k); return n.includes('brigade')||n.startsWith('brig'); });
+  if(!nomKey){ toast('Colonne NOM introuvable. Colonnes : '+keys.join(', ')); return; }
+  var seen=new Set();
+  var preview=[];
+  rows.forEach(function(row){
+    var nom    = String(row[nomKey]   ||'').trim();
+    var prenom = prenomKey ? String(row[prenomKey]||'').trim() : '';
+    var matRaw = matKey    ? String(row[matKey]   ||'').trim() : '';
+    var mat    = matRaw.replace(/\s+/g,'');
+    var brig   = brigKey   ? String(row[brigKey]  ||'').trim() : '';
+    if(!nom) return;
+    var isDup = allAgents.some(function(a){
+      return a.nom.toLowerCase()===nom.toLowerCase() && (a.matricule||'')===mat;
+    }) || seen.has(nom.toLowerCase()+'|'+mat);
+    seen.add(nom.toLowerCase()+'|'+mat);
+    preview.push({nom:nom, prenom:prenom||null, matricule:mat||null, brigade:brig||null, isDup:isDup});
   });
-  const newOnes=preview.filter(p=>!p.isDup);
-  const dupOnes=preview.filter(p=>p.isDup);
+  var newOnes=preview.filter(function(p){return !p.isDup;});
+  var dupOnes=preview.filter(function(p){return  p.isDup;});
   pendingImport=newOnes;
   document.getElementById('import-preview').style.display='block';
-  document.getElementById('import-preview-title').textContent='Aperçu — '+preview.length+' agent(s) dans le fichier';
-  document.getElementById('import-counts').textContent=newOnes.length+' nouveaux · '+dupOnes.length+' doublons';
-  document.getElementById('import-preview-body').innerHTML=preview.map(p=>`
-    <div class="import-row ${p.isDup?'dup':'new-agent'}">
-      <span>${p.isDup?'⊘':'✚'} <strong>${p.nom}</strong>${p.matricule?' · '+p.matricule:''}</span>
-      <span class="badge ${p.isDup?'badge-gray':'badge-green'}">${p.isDup?'Doublon':'Nouveau'}</span>
-    </div>`).join('');
-  const btn=document.getElementById('btn-confirm-import');
+  document.getElementById('import-preview-title').textContent='Aper\u00e7u \u2014 '+preview.length+' agent(s) dans le fichier';
+  document.getElementById('import-counts').textContent=newOnes.length+' nouveaux \u00b7 '+dupOnes.length+' doublons';
+  document.getElementById('import-preview-body').innerHTML=preview.map(function(p){
+    return '<div class="import-row '+(p.isDup?'dup':'new-agent')+'">'+
+      '<span>'+(p.isDup?'\u2298':'\u271a')+' <strong>'+((p.prenom||'')+' '+p.nom).trim()+'</strong>'+(p.matricule?' \u00b7 '+p.matricule:'')+'</span>'+
+      '<span class="badge '+(p.isDup?'badge-gray':'badge-green')+'">'+(p.isDup?'Doublon':'Nouveau')+'</span>'+
+    '</div>';
+  }).join('');
+  var btn=document.getElementById('btn-confirm-import');
   btn.style.display=newOnes.length?'inline-flex':'none';
-  btn.textContent='✅ Importer '+newOnes.length+' nouvel(s) agent(s)';
+  btn.textContent='\u2705 Importer '+newOnes.length+' agent(s)';
 }
+
+
 async function confirmImport() {
   if(!pendingImport.length)return;
   const safeImport=pendingImport.map(function(a){var o={nom:a.nom};if(a.prenom)o.prenom=a.prenom;if(a.matricule)o.matricule=a.matricule;if(a.brigade)o.brigade=a.brigade;return o;});
