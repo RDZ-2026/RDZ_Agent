@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ParkGuard RDZ — Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onload="initDB()"></script>
 <style>
 :root {
   --red:#D0021B;--red-light:#FFF0F1;--red-dark:#A80016;
@@ -293,7 +293,15 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 <script>
 const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
-const db = supabase.createClient(SUPA_URL, SUPA_KEY);
+var db;
+function initDB() {
+  if (typeof supabase !== 'undefined' && !db) {
+    db = supabase.createClient(SUPA_URL, SUPA_KEY);
+  }
+  return !!db;
+}
+// Essayer immédiatement
+initDB();
 
 let allVehicles  = [];
 let selectedIds  = new Set();
@@ -395,7 +403,7 @@ function renderTable() {
       '<td><input type="checkbox" ' + (isSel ? 'checked' : '') + ' onchange="toggleRow(\'' + v.id + '\',this.checked)"></td>' +
       '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
       '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
-      '<td><span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'Infraction' : 'Autorisé') + '</span></td>' +
+      '<td><span class="badge ' + (v.statut==='infraction'?'badge-red':v.statut==='parking_vide'?'badge-gray':'badge-green') + '">' + (v.statut==='infraction'?'Infraction':v.statut==='parking_vide'?'🅿️ Vide':'Autorisé') + '</span></td>' +
       '<td>' + plaque + '</td>' +
       '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
       '<td><div class="photos-cell">' + thumbs + '</div></td>' +
@@ -479,7 +487,7 @@ async function deleteSelected() {
 }
 
 // ═══ RAPPORT PDF ═══
-function openRapport(id) {
+function openRapport(id, type) {
   const v = allVehicles.find(x => x.id === id);
   if (!v) return;
   // sessionStorage est partagé entre onglets du même domaine (fichier local)
@@ -1055,8 +1063,23 @@ function exportSelectedCSV() {
 }
 
 // ═══ INIT ═══
-loadData();
-setInterval(loadData, 60000);
+function waitAndLoad(n) {
+  initDB();
+  if (window.db) {
+    loadData();
+    setInterval(loadData, 60000);
+  } else if (n > 0) {
+    setTimeout(function() { waitAndLoad(n-1); }, 150);
+  } else {
+    var b = document.getElementById('online-badge');
+    if (b) { b.className='badge badge-red'; b.textContent='● SDK non chargé'; }
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { waitAndLoad(30); });
+} else {
+  waitAndLoad(30);
+}
 </script>
 </body>
 </html>
