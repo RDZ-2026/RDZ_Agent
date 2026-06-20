@@ -365,6 +365,9 @@ async function saveAgent() {
   if(editingAgentId){
     ({error}=await db.from('agents').update({nom,matricule:mat||null}).eq('id',editingAgentId));
   } else {
+    // Vérifier doublon exact (nom + matricule)
+    const existe = allAgents.find(function(a){ return a.nom.toLowerCase()===nom.toLowerCase() && (a.matricule||'')===(mat||''); });
+    if(existe){ toast('⚠️ Agent déjà existant : '+nom); return; }
     ({error}=await db.from('agents').insert({nom,matricule:mat||null}));
   }
   if(error){toast('❌ '+error.message);return;}
@@ -424,8 +427,9 @@ function processExcelRows(rows) {
     const nom=String(row[nomKey]||'').trim();
     const mat=matKey?String(row[matKey]||'').trim():'';
     if(!nom)return;
-    const isDup=existingNoms.includes(nom.toLowerCase())||seen.has(nom.toLowerCase());
-    seen.add(nom.toLowerCase());
+    // Doublon = même nom ET même matricule
+      const isDup=allAgents.some(function(a){return a.nom.toLowerCase()===nom.toLowerCase()&&(a.matricule||'')===(mat||'');})||seen.has(nom.toLowerCase()+'|'+(mat||''));
+      seen.add(nom.toLowerCase()+'|'+(mat||''));
     preview.push({nom,matricule:mat||null,isDup});
   });
   const newOnes=preview.filter(p=>!p.isDup);
