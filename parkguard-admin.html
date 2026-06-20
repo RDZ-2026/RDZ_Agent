@@ -146,6 +146,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
             <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Véhicules</th>
             <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Places</th>
             <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Taux</th>
+            <th style="padding:8px 12px"></th>
           </tr>
         </thead>
         <tbody id="comptages-table-body">
@@ -410,7 +411,7 @@ function renderComptages() {
     : allComptages;
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun relevé de comptage</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun relevé de comptage</td></tr>';
     return;
   }
 
@@ -434,8 +435,19 @@ function renderComptages() {
             '<div style="height:100%;background:' + tauxColor + ';border-radius:3px;width:' + Math.min(100,taux) + '%"></div></div>'
           : '—') +
       '</td>' +
+      '<td style="padding:6px 12px">' +
+        '<button onclick="deleteComptage(\'' + c.id + '\')" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑️</button>' +
+      '</td>' +
     '</tr>';
   }).join('');
+}
+
+async function deleteComptage(id) {
+  if (!confirm('Supprimer ce relevé de comptage ?')) return;
+  const { error } = await db.from('comptages').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  toast('✅ Relevé supprimé');
+  await loadComptages();
 }
 
 function pad(v) { return String(v).padStart(2,'0'); }
