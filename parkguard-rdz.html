@@ -903,7 +903,7 @@ async function saveComptage() {
 
   // Sauvegarder chaque zone
   let synced = false;
-  if (isOnline && site?.id) {
+  if (isOnline && site && site.id) {
     try {
       const { error } = await db.from('comptages').insert(entries);
       if (!error) synced = true;
