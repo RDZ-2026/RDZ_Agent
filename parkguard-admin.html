@@ -403,15 +403,26 @@ function renderTable() {
       '<td><input type="checkbox" ' + (isSel ? 'checked' : '') + ' onchange="toggleRow(\'' + v.id + '\',this.checked)"></td>' +
       '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
       '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
-      '<td><span class="badge ' + (v.statut==='infraction'?'badge-red':v.statut==='parking_vide'?'badge-gray':'badge-green') + '">' + (v.statut==='infraction'?'Infraction':v.statut==='parking_vide'?'🅿️ Vide':'Autorisé') + '</span></td>' +
+      (function(){
+        var st = v.statut;
+        // Compatibilité anciens enregistrements parking vide stockés comme autorisé
+        if (st==='autorise' && v.remarque && v.remarque.startsWith('PARKING_VIDE')) st='parking_vide';
+        var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
+        var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
+        v._statut_display = st; // pour openRapport
+        return '<td><span class="badge '+cls+'">'+lbl+'</span></td>';
+      })()+
       '<td>' + plaque + '</td>' +
       '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
       '<td><div class="photos-cell">' + thumbs + '</div></td>' +
       '<td>' + iaBadge + '</td>' +
       '<td style="white-space:nowrap">' +
-        (isInf ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">📄 Rapport</button>' : '') +
-        (!isInf && v.statut==='autorise' ? '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">📄 Rapport</button>' : '') +
-        (!isInf && v.statut==='parking_vide' ? '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">📄 Rapport</button>' : '') +
+        (function(){
+          var st = v._statut_display || v.statut;
+          if (st==='infraction') return '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">📄 Rapport</button>';
+          if (st==='parking_vide') return '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">📄 Rapport</button>';
+          return '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">📄 Rapport</button>';
+        })()+
         '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️ Modifier</button>' +
         '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
       '</td>' +

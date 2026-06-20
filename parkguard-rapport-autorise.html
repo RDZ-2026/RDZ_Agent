@@ -92,7 +92,7 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
     <div class="meta-cell"><label>Date</label><div class="meta-val" id="m-date">—</div></div>
     <div class="meta-cell"><label>Heure</label><div class="meta-val" id="m-heure">—</div></div>
     <div class="meta-cell"><label>Agent</label><div class="meta-val" id="m-agent">—</div></div>
-    <div class="meta-cell"><label>Statut</label><div class="meta-val" style="color:#C8102E;font-weight:700">Infraction</div></div>
+    <div class="meta-cell"><label>Statut</label><div class="meta-val" style="color:#1e6b1e;font-weight:700">Autorisé</div></div>
   </div>
 
   <div class="body">
@@ -202,7 +202,9 @@ function loadData() {
   if (motifVal.startsWith('PARKING_VIDE')) motifVal = '—';
   var macaronEl = document.getElementById('v-macaron'); if(macaronEl) macaronEl.textContent = data.num_macaron||'—';
   var macaronDet = document.getElementById('v-macaron-details'); if(macaronDet) macaronDet.textContent = data.macaron_details||'—';
-  document.getElementById('v-remarque').textContent = data.remarque && data.remarque !== 'null' ? data.remarque : '—';
+  var rem = data.remarque && data.remarque !== 'null' ? data.remarque : '—';
+  if (rem.startsWith('PARKING_VIDE')) rem = rem.replace(/^PARKING_VIDE ?—? ?/, '').trim() || '—';
+  document.getElementById('v-remarque').textContent = rem;
 
   document.getElementById('ftr-ref').textContent   = 'Réf. : ' + (data.id || '').substring(0,8).toUpperCase();
 
