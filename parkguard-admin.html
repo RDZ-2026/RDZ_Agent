@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ParkGuard RDZ — Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onload="initDB()"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --red:#D0021B;--red-light:#FFF0F1;--red-dark:#A80016;
@@ -584,6 +584,9 @@ async function openIAModal() {
   const btn = document.getElementById('btn-zip');
   btn.disabled = false;
   btn.textContent = '📦 Télécharger le pack (photos + message)';
+  // Afficher les photos des véhicules sélectionnés
+  const vehiclesSel = allVehicles.filter(v => ids.includes(v.id));
+  renderIAModal(vehiclesSel);
 }
 
 async function downloadPack() {
@@ -777,6 +780,8 @@ function loadScript(src) {
   });
 }
 
+function renderIAModal(vehicles) {
+
   // Construire la liste des photos à télécharger
   const photoFields = [
     { col:'photo_vehicule_url',     label:'Véhicule' },
@@ -822,6 +827,9 @@ function loadScript(src) {
   }
 
   document.getElementById('photos-download-list').innerHTML = photosHtml;
+}
+
+
 // ═══ APPLY RÉSULTAT IA ═══
 async function applyClaudeResult() {
   const raw = document.getElementById('claude-result').value.trim();
