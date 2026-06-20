@@ -312,42 +312,20 @@ function renderDernierPassage(rondes){
 }
 
 function renderKPIsGuidage(rondes,aut){
-  const el=document.getElementById('kpis');
-  if(!el)return;
-  const zones=allZones.filter(function(z){return currentSite && z.site_id===currentSite.id;});
-  // Taux moyen toutes zones au dernier relevé
-  var tauxDernier=null, heureReleve='—';
-  if(allComptages.length && zones.length){
-    var lastReleve = allComptages[0];
-    if(lastReleve){
-      heureReleve = fmt(lastReleve.created_at)+' '+fmtH(lastReleve.created_at);
-      // Taux global = somme véhicules / somme places
-      var lastByZone={}; 
-      allComptages.forEach(function(c){if(!lastByZone[c.zone_id])lastByZone[c.zone_id]=c;});
-      var totVeh=0,totPl=0;
-      Object.values(lastByZone).forEach(function(c){totVeh+=c.vehicules_presents;totPl+=c.places_totales;});
-      tauxDernier=totPl>0?Math.round(totVeh/totPl*100):null;
-    }
-  }
-  // Taux moyen sur la période
-  var moyPeriode=null;
-  if(allComptages.length){
-    var tot=allComptages.reduce(function(s,c){return s+parseFloat(c.taux_occupation||0);},0);
-    moyPeriode=Math.round(tot/allComptages.length);
-  }
-  const start=getPeriodStart(currentPeriod);
-  const msPerWeek=7*24*3600000;
-  const nbWeeks=Math.max(1,(new Date()-start)/msPerWeek);
-  const objectif=getObjectifForDate(currentSite&&currentSite.id,start);
-  const objectifTotal=Math.round(objectif*nbWeeks);
-  const couverture=objectifTotal>0?Math.round((rondes.length/objectifTotal)*100):0;
-  const colorTaux=tauxDernier===null?'blue':tauxDernier>=90?'red':tauxDernier>=70?'orange':tauxDernier>=50?'amber':'green';
-
-  el.innerHTML=
-    '<div class="kpi-card blue"><div class="kpi-num blue">'+rondes.length+'</div><div class="kpi-label">Passages réalisés</div><div class="kpi-sub">Obj: '+objectifTotal+' · '+couverture+'% couverture</div></div>'+
-    (tauxDernier!==null?'<div class="kpi-card '+colorTaux+'"><div class="kpi-num '+colorTaux+'">'+tauxDernier+'%</div><div class="kpi-label">Taux occupation actuel</div><div class="kpi-sub">'+heureReleve+'</div></div>':'') +
-    (moyPeriode!==null?'<div class="kpi-card amber"><div class="kpi-num amber">'+moyPeriode+'%</div><div class="kpi-label">Taux moyen / période</div><div class="kpi-sub">Sur '+allComptages.length+' relevés</div></div>':'')+
-    '<div class="kpi-card green"><div class="kpi-num green">'+aut.length+'</div><div class="kpi-label">Véhicules autorisés</div><div class="kpi-sub">Sur la période</div></div>';
+  var el=document.getElementById('kpis');if(!el)return;
+  var zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
+  var nbWeeks=Math.max(1,(new Date()-getPeriodStart(currentPeriod))/(7*24*3600000));
+  var obj=getObjectifForDate(currentSite&&currentSite.id,getPeriodStart(currentPeriod));
+  var objTot=Math.round(obj*nbWeeks),couv=objTot>0?Math.round(rondes.length/objTot*100):0;
+  function tmjm(zid){var bd={};allComptages.filter(function(c){return c.zone_id===zid;}).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10),t=parseFloat(c.taux_occupation||0);if(!bd[d]||t>bd[d])bd[d]=t;});var days=Object.values(bd);return days.length?Math.round(days.reduce(function(s,v){return s+v;},0)/days.length):null;}
+  function mvg(){var bd={};allComptages.forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10);if(!bd[d])bd[d]={};var t=c.vehicules_presents||0;if(!bd[d][c.zone_id]||t>bd[d][c.zone_id])bd[d][c.zone_id]=t;});var days=Object.values(bd);if(!days.length)return null;return Math.round(days.map(function(z){return Object.values(z).reduce(function(s,v){return s+v;},0);}).reduce(function(s,v){return s+v;},0)/days.length);}
+  var dlccZ=zones.find(function(z){return z.nom==='DLCC';}),clxZ=zones.find(function(z){return z.nom==='CLX';});
+  var tD=dlccZ?tmjm(dlccZ.id):null,tC=clxZ?tmjm(clxZ.id):null,mV=mvg();
+  function ck(v){return v===null?'blue':v>=90?'red':v>=70?'orange':v>=50?'amber':'green';}
+  el.innerHTML='<div class="kpi-card blue"><div class="kpi-num blue">'+rondes.length+'</div><div class="kpi-label">Passages réalisés</div><div class="kpi-sub">Obj: '+objTot+' · '+couv+'% couverture</div></div>'+
+    (tD!==null?'<div class="kpi-card '+ck(tD)+'"><div class="kpi-num '+ck(tD)+'">'+tD+'%</div><div class="kpi-label">Taux max/jour moy. DLCC</div><div class="kpi-sub">'+(dlccZ?dlccZ.places_totales+' places':'')+'</div></div>':'')+
+    (tC!==null?'<div class="kpi-card '+ck(tC)+'"><div class="kpi-num '+ck(tC)+'">'+tC+'%</div><div class="kpi-label">Taux max/jour moy. CLX</div><div class="kpi-sub">'+(clxZ?clxZ.places_totales+' places':'')+'</div></div>':'')+
+    (mV!==null?'<div class="kpi-card blue"><div class="kpi-num blue">'+mV+'</div><div class="kpi-label">Véhicules guidés/jour moy.</div><div class="kpi-sub">Pic journalier DLCC+CLX</div></div>':'');
 }
 
 function renderKPIs(rondes,inf,aut){
@@ -412,40 +390,27 @@ function renderCalendrier(rondes){
 }
 
 function renderOneMois(rondes,year,month,jours,moisNames,compact){
-  const firstDay=new Date(year,month,1).getDay();
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  const firstDayMon=(firstDay+6)%7;
-  const rondesByDay={};
-  rondes.forEach(function(r){
-    const d=new Date(r.start);
-    if(d.getMonth()===month&&d.getFullYear()===year){
-      const k=d.getDate();
-      if(!rondesByDay[k])rondesByDay[k]=[];
-      rondesByDay[k].push(r);
-    }
-  });
-  let html='<div>';
-  html+='<div style="font-size:'+(compact?'11':'13')+'px;font-weight:700;margin-bottom:6px;color:var(--black)">'+moisNames[month]+' '+year+'</div>';
-  html+='<div class="calendar">';
-  if(!compact) jours.forEach(function(j){html+='<div class="cal-head">'+j+'</div>';});
-  for(let i=0;i<firstDayMon;i++)html+='<div class="cal-day empty"></div>';
-  for(let d=1;d<=daysInMonth;d++){
-    const rr=rondesByDay[d]||[];
-    const inf=rr.reduce(function(s,r){return s+r.vehicles.filter(function(v){return v.statut==='infraction';}).length;},0);
-    const hasNuit=rr.some(function(r){return !r.jour;});
-    const hasJour=rr.some(function(r){return r.jour;});
-    let cls='no-passage';
-    if(rr.length>0)cls=inf>2?'passage-rouge':inf>0?'passage-inf':'passage-ok';
-    const icon=compact?'':(hasJour&&hasNuit?'🌤🌙':hasNuit?'🌙':hasJour?'🌤':'');
-    html+='<div class="cal-day '+cls+'"><span class="cal-daynum"'+( compact?' style="font-size:9px"':'')+'>'+d+'</span>'+
-      (icon?'<span class="cal-icon">'+icon+'</span>':'')+
-      (inf>0&&!compact?'<span style="font-size:9px">'+inf+'⚠</span>':'')+
-    '</div>';
+  var firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate();
+  var firstDayMon=(firstDay+6)%7,isGuidage=currentSite&&currentSite.type==='guidage';
+  var rondesByDay={};
+  rondes.forEach(function(r){var d=new Date(r.start);if(d.getMonth()===month&&d.getFullYear()===year){var k=d.getDate();if(!rondesByDay[k])rondesByDay[k]=[];rondesByDay[k].push(r);}});
+  var tauxDLCCByDay={};
+  if(isGuidage){var dlccZ=allZones.find(function(z){return currentSite&&z.site_id===currentSite.id&&z.nom==='DLCC';});
+    if(dlccZ)allComptages.filter(function(c){return c.zone_id===dlccZ.id;}).forEach(function(c){var cd=new Date(c.created_at);if(cd.getMonth()===month&&cd.getFullYear()===year){var k=cd.getDate(),t=parseFloat(c.taux_occupation||0);if(!tauxDLCCByDay[k]||t>tauxDLCCByDay[k])tauxDLCCByDay[k]=t;}});}
+  var html='<div><div style="font-size:'+(compact?'11':'13')+'px;font-weight:700;margin-bottom:6px;color:var(--black)">'+moisNames[month]+' '+year+'</div><div class="calendar">';
+  if(!compact)jours.forEach(function(j){html+='<div class="cal-head">'+j+'</div>';});
+  for(var i=0;i<firstDayMon;i++)html+='<div class="cal-day empty"></div>';
+  for(var d=1;d<=daysInMonth;d++){
+    var rr=rondesByDay[d]||[],inf=rr.reduce(function(s,r){return s+r.vehicles.filter(function(v){return v.statut==='infraction';}).length;},0);
+    var hasNuit=rr.some(function(r){return !r.jour;}),hasJour=rr.some(function(r){return r.jour;});
+    var cls=rr.length===0?'no-passage':inf>2?'passage-rouge':inf>0?'passage-inf':'passage-ok';
+    var icon=compact?'':(hasJour&&hasNuit?'\uD83C\uDF24\uD83C\uDF19':hasNuit?'\uD83C\uDF19':hasJour?'\uD83C\uDF24':'');
+    var tauxStr='';
+    if(isGuidage&&tauxDLCCByDay[d]!==undefined){var t=Math.round(tauxDLCCByDay[d]),tc=t>=90?'#c00':t>=70?'#ea580c':t>=50?'#f59e0b':'#1e6b1e';tauxStr='<span style="font-size:8px;font-weight:700;color:'+tc+'">'+t+'%</span>';}
+    html+='<div class="cal-day '+cls+'" style="min-height:'+(isGuidage?'52':'44')+'px"><span class="cal-daynum"'+(compact?' style="font-size:9px"':'')+'>'+d+'</span>'+(icon?'<span class="cal-icon">'+icon+'</span>':'')+(!isGuidage&&inf>0&&!compact?'<span style="font-size:9px">'+inf+'\u26A0</span>':'')+tauxStr+'</div>';
   }
-  html+='</div></div>';
-  return html;
+  return html+'</div></div>';
 }
-
 function renderRecidivistes(inf){
   const el=document.getElementById('recidivistes');
   const counts={};
@@ -561,35 +526,28 @@ function renderDissuasion(rondes){
 
 // GUIDAGE DLCC
 function renderGauges(){
-  const el=document.getElementById('gauges');
-  if(!el)return;
-  const zones=allZones.filter(z=>z.site_id===currentSite.id);
-  if(!zones.length){el.innerHTML='<div class="no-data">Aucune zone configurée</div>';return;}
-  let html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">';
-  zones.forEach(z=>{
-    const comptagesZone=allComptages.filter(c=>c.zone_id===z.id);
-    const last=comptagesZone[0];
-    const taux=last?last.taux_occupation:null;
-    const color=taux===null?'var(--gray-mid)':taux>=90?'var(--red)':taux>=70?'var(--orange)':taux>=50?'var(--amber)':'var(--green)';
-    const moyMois=comptagesZone.length?Math.round(comptagesZone.reduce((s,c)=>s+parseFloat(c.taux_occupation||0),0)/comptagesZone.length):null;
-    const moyCumul=comptagesZone.length?Math.round(allComptages.filter(c=>c.zone_id===z.id).reduce((s,c)=>s+parseFloat(c.taux_occupation||0),0)/Math.max(1,allComptages.filter(c=>c.zone_id===z.id).length)):null;
-    html+=`<div style="background:var(--gray-light);border-radius:var(--radius);padding:16px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px">${z.nom} <span style="font-size:12px;color:var(--gray-mid);font-weight:400">(${z.places_totales} places)</span></div>
-      <div class="gauge-track"><div class="gauge-fill" style="width:${taux||0}%;background:${color}"><span>${taux!==null?taux+'%':''}</span></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--gray-mid)">
-        <span>Dernier: <strong style="color:${color}">${taux!==null?taux+'%':'—'}</strong></span>
-        <span>${last?fmtH(last.created_at):'—'}</span>
-      </div>
-      <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--gray-mid)">
-        <span>Moy. période: <strong>${moyMois!==null?moyMois+'%':'—'}</strong></span>
-        <span>Moy. cumulée: <strong>${moyCumul!==null?moyCumul+'%':'—'}</strong></span>
-      </div>
-    </div>`;
-  });
-  html+='</div>';
-  el.innerHTML=html;
+  var el=document.getElementById('gauges');if(!el)return;
+  var zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
+  if(!zones.length||!allComptages.length){el.innerHTML='<div class="no-data">Aucun relevé disponible</div>';return;}
+  var colors=['var(--blue)','var(--green)'],W=600,H=180,PAD={top:20,right:20,bottom:36,left:44};
+  var allDays={};
+  zones.forEach(function(z,zi){allComptages.filter(function(c){return c.zone_id===z.id;}).forEach(function(c){var d=new Date(c.created_at).toISOString().slice(0,10);if(!allDays[d])allDays[d]={};var t=parseFloat(c.taux_occupation||0);if(allDays[d][zi]===undefined||t>allDays[d][zi])allDays[d][zi]=t;});});
+  var days=Object.keys(allDays).sort().slice(-30);
+  if(days.length<2){el.innerHTML='<div class="no-data">Pas assez de données (min. 2 jours)</div>';return;}
+  var xStep=(W-PAD.left-PAD.right)/Math.max(1,days.length-1);
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">';
+  svg+='<rect x="'+PAD.left+'" y="'+PAD.top+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.1)+'" fill="#fff1f2" opacity="0.5"/>';
+  svg+='<rect x="'+PAD.left+'" y="'+(PAD.top+Math.round((H-PAD.top-PAD.bottom)*0.1))+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.2)+'" fill="#fff7ed" opacity="0.5"/>';
+  svg+='<rect x="'+PAD.left+'" y="'+(PAD.top+Math.round((H-PAD.top-PAD.bottom)*0.3))+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.7)+'" fill="#f0fdf4" opacity="0.4"/>';
+  [0,25,50,75,90,100].forEach(function(pct){var y=PAD.top+(H-PAD.top-PAD.bottom)*(1-pct/100);svg+='<line x1="'+PAD.left+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.right)+'" y2="'+y.toFixed(1)+'" stroke="var(--gray-border)" stroke-width="'+(pct===90?'1.5':'1')+'" stroke-dasharray="'+(pct===90?'4,3':'')+'" />';svg+='<text x="'+(PAD.left-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--gray-mid)">'+pct+'%</text>';});
+  var y90=PAD.top+(H-PAD.top-PAD.bottom)*0.1;svg+='<text x="'+(PAD.left+4)+'" y="'+(y90-3).toFixed(1)+'" font-size="8" fill="#c00" font-weight="bold">Saturation 90%</text>';
+  zones.forEach(function(z,zi){var pts=days.map(function(d,i){var v=allDays[d][zi]!==undefined?Math.round(allDays[d][zi]):null;return v!==null?{x:PAD.left+i*xStep,y:PAD.top+(H-PAD.top-PAD.bottom)*(1-v/100),v:v}:null;}).filter(Boolean);if(!pts.length)return;var path=pts.map(function(p,i){return (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');svg+='<path d="'+path+'" fill="none" stroke="'+colors[zi]+'" stroke-width="2.5" stroke-linejoin="round"/>';pts.forEach(function(p){svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="'+colors[zi]+'"/>';});});
+  var step=Math.max(1,Math.floor(days.length/6));
+  days.forEach(function(d,i){if(i%step===0)svg+='<text x="'+(PAD.left+i*xStep).toFixed(1)+'" y="'+(H-PAD.bottom+14).toFixed(1)+'" text-anchor="middle" font-size="8" fill="var(--gray-mid)">'+d.slice(5)+'</text>';});
+  svg+='</svg>';
+  var leg=zones.map(function(z,i){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><span style="width:20px;height:3px;background:'+colors[i]+';display:inline-block;border-radius:2px"></span>'+z.nom+' ('+z.places_totales+'pl)</span>';}).join(' &middot; ');
+  el.innerHTML=svg+'<div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">'+leg+'</div>';
 }
-
 function renderTendanceOccupation(){
   const el=document.getElementById('tendance-occupation');
   if(!el)return;
@@ -647,6 +605,41 @@ function renderTendanceOccupation(){
 }
 
 function renderRecurrentsAutEl(aut,elId){
+  const el=document.getElementById(elId);
+  if(!el)return;
+  const counts={};
+  aut.forEach(function(v){if(v.plaque&&v.plaque!=='null'){counts[v.plaque]=(counts[v.plaque]||0)+1;}});
+  const sorted=Object.entries(counts).filter(function(e){return e[1]>1;}).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+  if(!sorted.length){el.innerHTML='<div class="no-data">Aucun véhicule autorisé récurrent sur la période</div>';return;}
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(function(e,i){
+    var pct=Math.round(e[1]/max*100);
+    return '<div class="bar-row">'+
+      '<div class="bar-label">'+( i+1)+'. '+e[0]+'</div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)"></div></div>'+
+      '<div class="bar-val">'+e[1]+'x</div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderCourbeOccupation(){
+  var el=document.getElementById('courbe-occupation');if(!el)return;
+  var zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
+  if(!zones.length||!allComptages.length){el.innerHTML='<div class="no-data">Aucun relevé disponible</div>';return;}
+  var colors=['var(--blue)','var(--green)'],W=600,H=160,PAD={top:16,right:20,bottom:30,left:44};
+  var byHour=Array.from({length:24},function(){return {};});
+  zones.forEach(function(z,zi){allComptages.filter(function(c){return c.zone_id===z.id;}).forEach(function(c){var h=new Date(c.created_at).getHours();if(!byHour[h][zi])byHour[h][zi]={sum:0,count:0};byHour[h][zi].sum+=parseFloat(c.taux_occupation||0);byHour[h][zi].count++;});});
+  var heures=[];for(var h=0;h<24;h++){if(Object.keys(byHour[h]).length)heures.push(h);}
+  if(heures.length<2){el.innerHTML='<div class="no-data">Pas assez de données horaires</div>';return;}
+  var xStep=(W-PAD.left-PAD.right)/Math.max(1,heures.length-1);
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">';
+  [0,25,50,75,100].forEach(function(pct){var y=PAD.top+(H-PAD.top-PAD.bottom)*(1-pct/100);svg+='<line x1="'+PAD.left+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.right)+'" y2="'+y.toFixed(1)+'" stroke="var(--gray-border)" stroke-width="1"/>';svg+='<text x="'+(PAD.left-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--gray-mid)">'+pct+'%</text>';});
+  zones.forEach(function(z,zi){var pts=heures.map(function(h,i){var data=byHour[h][zi];if(!data||!data.count)return null;var v=Math.round(data.sum/data.count);return {x:PAD.left+i*xStep,y:PAD.top+(H-PAD.top-PAD.bottom)*(1-v/100),v:v,h:h};}).filter(Boolean);if(!pts.length)return;var path=pts.map(function(p,i){return (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');var area=path+' L'+pts[pts.length-1].x.toFixed(1)+','+(H-PAD.bottom)+' L'+pts[0].x.toFixed(1)+','+(H-PAD.bottom)+' Z';svg+='<path d="'+area+'" fill="'+colors[zi]+'" opacity="0.1"/>';svg+='<path d="'+path+'" fill="none" stroke="'+colors[zi]+'" stroke-width="2.5" stroke-linejoin="round"/>';pts.forEach(function(p){svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3" fill="'+colors[zi]+'"/>';});});
+  heures.forEach(function(h,i){if(h%3===0)svg+='<text x="'+(PAD.left+i*xStep).toFixed(1)+'" y="'+(H-PAD.bottom+14).toFixed(1)+'" text-anchor="middle" font-size="9" fill="var(--gray-mid)">'+pad(h)+'h</text>';});
+  svg+='</svg>';
+  var leg=zones.map(function(z,i){return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px"><span style="width:20px;height:3px;background:'+colors[i]+';display:inline-block;border-radius:2px"></span>'+z.nom+'</span>';}).join(' &middot; ');
+  el.innerHTML=svg+'<div style="display:flex;gap:16px;margin-top:6px">'+leg+'</div><div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Taux moyen par créneau horaire sur la période sélectionnée</div>';
+}function renderRecurrentsAutEl(aut,elId){
   const el=document.getElementById(elId);
   if(!el)return;
   const counts={};
