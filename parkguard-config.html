@@ -147,6 +147,20 @@ tr:hover td{background:#fafafa}
     </div>
 
   </div>
+
+  <!-- Marques véhicules -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-head">
+      <div class="card-title">🚗 Marques de véhicules</div>
+      <button class="btn btn-red btn-sm" onclick="openAddMarque()">+ Ajouter</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div id="marques-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;padding:16px">
+        <div style="text-align:center;color:var(--gray-mid);font-size:13px;grid-column:1/-1">Chargement...</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- MODAL AGENT -->
@@ -222,6 +236,35 @@ tr:hover td{background:#fafafa}
   </div>
 </div>
 
+<!-- MODAL MARQUE -->
+<div id="modal-marque" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-title"><span id="modal-marque-title">Ajouter une marque</span> <button class="modal-close" onclick="closeModal('modal-marque')">&#10005;</button></div>
+    <input type="hidden" id="marque-id">
+    <div class="form-row">
+      <div class="field"><label>Nom de la marque</label><input id="marque-nom" type="text" placeholder="Ex: Renault"></div>
+      <div class="field"><label>Ordre d'affichage</label><input id="marque-ordre" type="number" value="0" min="0"></div>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Logo (image)</label>
+      <div id="marque-logo-preview" style="margin-bottom:8px;display:none">
+        <img id="marque-logo-img" src="" style="height:60px;width:auto;border-radius:6px;border:1px solid var(--gray-border)">
+        <button onclick="removeMarqueLogo()" style="margin-left:8px;background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;font-weight:700">✕ Supprimer</button>
+      </div>
+      <div class="drop-zone" id="marque-drop-zone" onclick="document.getElementById('marque-file-input').click()" style="padding:20px">
+        <div style="font-size:24px;margin-bottom:6px">🖼️</div>
+        <div style="font-size:13px;font-weight:600;color:var(--gray-dark)">Cliquer pour choisir un logo</div>
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">PNG, JPG, SVG — fond transparent recommandé</div>
+      </div>
+      <input type="file" id="marque-file-input" accept="image/*" style="display:none" onchange="previewMarqueLogo(this.files[0])">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-green" onclick="saveMarque()">&#10003; Enregistrer</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-marque')">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL RÉFÉRENCE -->
 <div id="modal-ref" class="modal-overlay">
   <div class="modal">
@@ -269,7 +312,7 @@ let allAgents=[], allSites=[], allObjectifs=[], allZones=[];
 let pendingImport=[], editingSiteId=null, zoneCount=0;
 
 async function init() {
-  await Promise.all([loadAgents(),loadSites(),loadObjectifs(),loadZones(),loadReferences()]);
+  await Promise.all([loadAgents(),loadSites(),loadObjectifs(),loadZones(),loadReferences(),loadMarques()]);
   renderAgents(); renderSites(); renderObjectifs();
 }
 
@@ -683,6 +726,126 @@ async function deleteRef(type,id) {
   if(error){toast('&#10060; '+error.message);return;}
   toast('&#9989; Supprimé');
   await loadReferences();
+}
+
+// ═══ MARQUES ═══
+let allMarques = [], marqueLogoFile = null, editingMarqueId = null;
+
+async function loadMarques() {
+  const {data} = await db.from('marques_vehicule').select('*').order('ordre');
+  allMarques = data || [];
+  renderMarques();
+}
+
+function renderMarques() {
+  const grid = document.getElementById('marques-grid');
+  if (!allMarques.length) {
+    grid.innerHTML = '<div style="text-align:center;color:var(--gray-mid);font-size:13px;grid-column:1/-1">Aucune marque</div>';
+    return;
+  }
+  grid.innerHTML = allMarques.map(m => {
+    const logo = m.logo_url
+      ? '<img src="'+m.logo_url+'" style="width:48px;height:48px;object-fit:contain;margin-bottom:6px">'
+      : '<div style="width:48px;height:48px;background:var(--gray-light);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:20px">🚗</div>';
+    return '<div style="text-align:center;padding:10px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:#fff">' +
+      logo +
+      '<div style="font-size:11px;font-weight:700;margin-bottom:6px">'+m.nom+'</div>' +
+      '<div style="display:flex;gap:4px;justify-content:center">' +
+        '<button class="btn btn-outline btn-sm" data-mid="'+m.id+'" onclick="openEditMarque(this.dataset.mid)" style="padding:3px 8px;font-size:10px">✏️</button>' +
+        '<button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;padding:3px 8px;font-size:10px" data-mid="'+m.id+'" data-mnom="'+m.nom+'" onclick="deleteMarque(this.dataset.mid,this.dataset.mnom)">🗑️</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function openAddMarque() {
+  editingMarqueId = null; marqueLogoFile = null;
+  document.getElementById('modal-marque-title').textContent = 'Ajouter une marque';
+  document.getElementById('marque-id').value = '';
+  document.getElementById('marque-nom').value = '';
+  document.getElementById('marque-ordre').value = allMarques.length + 1;
+  document.getElementById('marque-logo-preview').style.display = 'none';
+  document.getElementById('marque-drop-zone').style.display = 'block';
+  document.getElementById('marque-file-input').value = '';
+  openModal('modal-marque');
+}
+
+function openEditMarque(id) {
+  const m = allMarques.find(x => x.id === id); if (!m) return;
+  editingMarqueId = id; marqueLogoFile = null;
+  document.getElementById('modal-marque-title').textContent = 'Modifier — ' + m.nom;
+  document.getElementById('marque-id').value = m.id;
+  document.getElementById('marque-nom').value = m.nom;
+  document.getElementById('marque-ordre').value = m.ordre || 0;
+  if (m.logo_url) {
+    document.getElementById('marque-logo-img').src = m.logo_url;
+    document.getElementById('marque-logo-preview').style.display = 'flex';
+    document.getElementById('marque-drop-zone').style.display = 'none';
+  } else {
+    document.getElementById('marque-logo-preview').style.display = 'none';
+    document.getElementById('marque-drop-zone').style.display = 'block';
+  }
+  openModal('modal-marque');
+}
+
+function previewMarqueLogo(file) {
+  if (!file) return;
+  marqueLogoFile = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('marque-logo-img').src = e.target.result;
+    document.getElementById('marque-logo-preview').style.display = 'flex';
+    document.getElementById('marque-drop-zone').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeMarqueLogo() {
+  marqueLogoFile = null;
+  document.getElementById('marque-logo-img').src = '';
+  document.getElementById('marque-logo-preview').style.display = 'none';
+  document.getElementById('marque-drop-zone').style.display = 'block';
+  document.getElementById('marque-file-input').value = '';
+}
+
+async function saveMarque() {
+  const nom   = document.getElementById('marque-nom').value.trim();
+  const ordre = parseInt(document.getElementById('marque-ordre').value) || 0;
+  const id    = document.getElementById('marque-id').value;
+  if (!nom) { toast('⚠️ Nom requis'); return; }
+
+  let logo_url = null;
+
+  // Upload logo si nouveau fichier
+  if (marqueLogoFile) {
+    const ext      = marqueLogoFile.name.split('.').pop();
+    const filename = 'marques/' + nom.toLowerCase().replace(/\s+/g,'-') + '.' + ext;
+    const { error: uploadErr } = await db.storage
+      .from('parkguard-photos')
+      .upload(filename, marqueLogoFile, { contentType: marqueLogoFile.type, upsert: true });
+    if (uploadErr) { toast('❌ Upload logo : ' + uploadErr.message); return; }
+    logo_url = db.storage.from('parkguard-photos').getPublicUrl(filename).data.publicUrl;
+  }
+
+  let error;
+  if (id) {
+    const upd = { nom, ordre };
+    if (logo_url) upd.logo_url = logo_url;
+    ({ error } = await db.from('marques_vehicule').update(upd).eq('id', id));
+  } else {
+    ({ error } = await db.from('marques_vehicule').insert({ nom, ordre, logo_url }));
+  }
+  if (error) { toast('❌ ' + error.message); return; }
+  toast('✅ Marque enregistrée');
+  closeModal('modal-marque');
+  await loadMarques();
+}
+
+async function deleteMarque(id, nom) {
+  if (!confirm('Supprimer ' + nom + ' ?')) return;
+  await db.from('marques_vehicule').delete().eq('id', id);
+  toast('✅ Marque supprimée');
+  await loadMarques();
 }
 
 function openModal(id){document.getElementById(id).style.display='flex';}
