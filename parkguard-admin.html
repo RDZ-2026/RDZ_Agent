@@ -401,7 +401,9 @@ function renderTable() {
       '<td><div class="photos-cell">' + thumbs + '</div></td>' +
       '<td>' + iaBadge + '</td>' +
       '<td style="white-space:nowrap">' +
-        (isInf ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\')">📄 Rapport PDF</button>' : '') +
+        (isInf ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">📄 Rapport</button>' : '') +
+        (!isInf && v.statut==='autorise' ? '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">📄 Rapport</button>' : '') +
+        (!isInf && v.statut==='parking_vide' ? '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">📄 Rapport</button>' : '') +
         '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️ Modifier</button>' +
         '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
       '</td>' +
@@ -498,7 +500,13 @@ function openRapport(id) {
     photo_parebrise_url: v.photo_parebrise_url || '',
     photo_macaron_url: v.photo_macaron_url || ''
   });
-  window.open('parkguard-rapport-denonciation.html?' + params.toString(), '_blank');
+  const targets = {
+    'infraction':   'parkguard-rapport-denonciation.html',
+    'autorise':     'parkguard-rapport-autorise.html',
+    'parking_vide': 'parkguard-rapport-ronde.html'
+  };
+  const target = targets[type || v.statut] || 'parkguard-rapport-denonciation.html';
+  window.open(target + '?' + params.toString(), '_blank');
 }
 
 function closeIAModal() {

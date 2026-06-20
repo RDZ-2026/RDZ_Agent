@@ -344,7 +344,10 @@ function renderSites() {
       <td style="font-size:12px">${placesStr}</td>
       <td style="font-size:12px">${(s.heure_jour_debut||'06:30').slice(0,5)}→${(s.heure_jour_fin||'19:00').slice(0,5)}</td>
       <td><span class="badge ${s.actif?'badge-green':'badge-gray'}">${s.actif?'Actif':'Inactif'}</span></td>
-      <td><button class="btn btn-outline btn-sm" onclick="openEditSite('${s.id}')">&#9998; Modifier</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditSite('${s.id}')" style="margin-right:4px">&#9998; Modifier</button>
+        <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5" onclick="deleteSite('${s.id}','${s.nom}')">&#128465; Suppr.</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -390,6 +393,13 @@ function addZoneField(nom='',places=0){
     <div class="field"><label>Places</label><input type="number" value="${places}" min="0" class="zone-places"></div>
     <button onclick="this.parentNode.remove()" style="background:none;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;padding:0;font-size:16px;height:38px;align-self:end">&#10005;</button>`;
   document.getElementById('zones-list').appendChild(div);
+}
+async function deleteSite(id,nom) {
+  if(!confirm('Supprimer le site '+nom+' ?\nSes données de ronde restent dans la base.')) return;
+  const {error}=await db.from('sites').delete().eq('id',id);
+  if(error){toast('\u274c '+error.message);return;}
+  toast('\u2705 Site supprim\u00e9');
+  await loadSites();await loadZones();renderSites();
 }
 async function saveSite(){
   const id=document.getElementById('s-id').value;
@@ -442,7 +452,9 @@ function renderObjectifs(){
     return `<div class="card">
       <div class="card-head">
         <div><div class="card-title">${s.nom}</div><div style="font-size:12px;color:var(--gray-mid);margin-top:3px">Objectif actuel : <strong>${actuel?.passages_semaine||'—'} passages/semaine</strong></div></div>
-        <button class="btn btn-red btn-sm" onclick="openObjectif('${s.site_id}','${s.nom}',${actuel?.passages_semaine||3})">Modifier</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-red btn-sm" onclick="openObjectif('${s.site_id}','${s.nom}',${actuel?.passages_semaine||3})">+ Nouvel objectif</button>
+        </div>
       </div>
       <div class="card-body">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-mid);margin-bottom:8px">Historique des objectifs</div>
@@ -461,13 +473,47 @@ function openObjectif(siteId,nom,current){
   document.getElementById('obj-date').value=new Date().toISOString().slice(0,10);
   openModal('modal-objectif');
 }
+let editingObjectifId = null;
+function editObjectifRow(id,passages,dateDebut,dateFin) {
+  editingObjectifId = id;
+  document.getElementById('modal-obj-title').textContent = 'Modifier cet objectif';
+  document.getElementById('obj-passages').value = passages;
+  document.getElementById('obj-date').value = dateDebut;
+  // Ajouter champ date fin si pas présent
+  let dfEl = document.getElementById('obj-date-fin');
+  if(!dfEl) {
+    const wrap = document.getElementById('obj-date').parentNode.parentNode;
+    const extra = document.createElement('div');
+    extra.className='form-row full';
+    extra.innerHTML='<div class="field"><label>Date de fin (optionnel)</label><input id="obj-date-fin" type="date" value="'+dateFin+'"></div>';
+    wrap.after(extra);
+  } else {
+    dfEl.value = dateFin||'';
+  }
+  openModal('modal-objectif');
+}
+async function deleteObjectif(id) {
+  if(!confirm('Supprimer cet objectif ?')) return;
+  const {error}=await db.from('objectifs').delete().eq('id',id);
+  if(error){toast('\u274c '+error.message);return;}
+  toast('\u2705 Objectif supprim\u00e9');
+  await loadObjectifs();renderObjectifs();
+}
 async function saveObjectif(){
   const siteId=document.getElementById('obj-site-id').value;
   const passages=parseInt(document.getElementById('obj-passages').value);
   const dateDebut=document.getElementById('obj-date').value;
   if(!passages||!dateDebut){toast('⚠️ Remplis tous les champs');return;}
-  await db.from('objectifs').update({date_fin:dateDebut}).eq('site_id',siteId).is('date_fin',null);
-  await db.from('objectifs').insert({site_id:siteId,passages_semaine:passages,date_debut:dateDebut});
+  if(editingObjectifId) {
+    // Modifier directement la ligne existante
+    const dateFin = document.getElementById('obj-date-fin')?.value||null;
+    await db.from('objectifs').update({passages_semaine:passages,date_debut:dateDebut,date_fin:dateFin||null}).eq('id',editingObjectifId);
+    editingObjectifId=null;
+  } else {
+    // Nouvel objectif : clôturer le précédent
+    await db.from('objectifs').update({date_fin:dateDebut}).eq('site_id',siteId).is('date_fin',null);
+    await db.from('objectifs').insert({site_id:siteId,passages_semaine:passages,date_debut:dateDebut});
+  }
   toast('✅ Objectif mis à jour');
   closeModal('modal-objectif');
   await loadObjectifs();renderObjectifs();

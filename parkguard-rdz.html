@@ -146,6 +146,22 @@ input[type="file"]{display:none}
 <body>
 <div id="app">
 
+<!-- ══════ SÉLECTION AGENT ══════ -->
+<div id="s-select-agent" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge badge-gray" style="margin-left:auto">Identification</div>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow">RDZ Security Management SA</div>
+    <div class="step-title" style="margin-bottom:8px">Qui êtes-vous ?</div>
+    <div class="step-sub">Sélectionnez votre nom pour commencer la ronde.</div>
+    <div id="agents-list-home">
+      <div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Chargement...</div>
+    </div>
+  </div>
+</div>
+
 <!-- ══════ HOME ══════ -->
 <div id="s-home" class="screen active">
   <div class="rdz-bar">
@@ -157,15 +173,8 @@ input[type="file"]{display:none}
   </div>
   <div class="content">
     <div class="section-label">Choisir un site</div>
-    <div class="card" onclick="selectSite('Grange Canal')">
-      <div class="card-icon">🏢</div>
-      <div><div class="card-name">Grange Canal</div><div class="card-meta">Résidence privée</div></div>
-      <div class="card-arrow">›</div>
-    </div>
-    <div class="card" onclick="selectSite('Clair Matin')">
-      <div class="card-icon">🏘</div>
-      <div><div class="card-name">Clair Matin</div><div class="card-meta">Résidence privée</div></div>
-      <div class="card-arrow">›</div>
+    <div id="sites-list-home">
+      <div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Chargement des sites...</div>
     </div>
     <div id="active-round-wrap" style="display:none">
       <div class="section-label">Ronde en cours</div>
@@ -342,7 +351,7 @@ const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI';
 const db = supabase.createClient(SUPA_URL, SUPA_KEY);
 
 // ═══ STATE ═══
-let currentAgent = 'Agent RDZ';
+let currentAgent = null;
 let currentSite = null;
 let currentRoundId = null;
 let roundVehicles = [];
@@ -680,7 +689,8 @@ function updateRoundStats() {
 function closeRound() {
   currentSite = null; currentRoundId = null; roundVehicles = [];
   document.getElementById('active-round-wrap').style.display = 'none';
-  showScreen('s-home');
+  loadSitesAndAgents();
+showScreen('s-select-agent');
 }
 
 // ═══ PHOTO INPUT ═══
@@ -950,6 +960,84 @@ async function saveEntry() {
       '<div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° macaron : extraction IA en fin de ronde</div>';
   document.getElementById('recap-checks').innerHTML = checks;
   showScreen('s-recap');
+}
+
+// ═══ CHARGEMENT SITES & AGENTS DEPUIS SUPABASE ═══
+async function loadSitesAndAgents() {
+  try {
+    const [{ data: sites }, { data: agents }] = await Promise.all([
+      db.from('sites').select('id,nom,type,adresse').eq('actif', true).order('nom'),
+      db.from('agents').select('id,nom,matricule').eq('actif', true).order('nom')
+    ]);
+
+    // Rendre la liste des agents
+    const agentEl = document.getElementById('agents-list-home');
+    if (agentEl) {
+      if (agents && agents.length) {
+        agentEl.innerHTML = agents.map((a,i) => {
+          var safeNom = a.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          return '<div class="card" onclick="selectAgentIdx(' + i + ')" data-agent="' + safeNom + '">' +
+            '<div class="card-icon">\u{1F464}</div>' +
+            '<div><div class="card-name">' + a.nom + '</div>' +
+            '<div class="card-meta">' + (a.matricule || 'Agent de surveillance') + '</div></div>' +
+            '<div class="card-arrow">\u203a</div></div>';
+        }).join('');
+        window._agentsCache = agents;
+      } else {
+        agentEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun agent actif.<br>Configurez les agents dans la page Config.</div>';
+      }
+    }
+
+    // Rendre la liste des sites
+    const siteEl = document.getElementById('sites-list-home');
+    if (siteEl) {
+      const icons = { standard: '🏢', guidage: '🚗' };
+      const metas = { standard: 'Résidence privée', guidage: 'Guidage & surveillance' };
+      if (sites && sites.length) {
+        window._sitesCache = sites;
+        siteEl.innerHTML = sites.map(function(s, i) {
+          return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
+            '<div class="card-icon">' + (icons[s.type] || '\uD83C\uDFE2') + '</div>' +
+            '<div><div class="card-name">' + s.nom + '</div>' +
+            '<div class="card-meta">' + (s.adresse || metas[s.type] || '') + '</div></div>' +
+            '<div class="card-arrow">&#8250;</div></div>';
+        }).join('');
+      } else {
+        siteEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun site actif.<br>Configurez les sites dans la page Config.</div>';
+      }
+    }
+  } catch(e) {
+    console.warn('Impossible de charger sites/agents:', e);
+    const siteEl = document.getElementById('sites-list-home');
+    if (siteEl) siteEl.innerHTML =
+      ['Grange Canal','Clair Matin'].map(function(nom, i) {
+        return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
+          '<div class="card-icon">\uD83C\uDFE2</div>' +
+          '<div><div class="card-name">' + nom + '</div><div class="card-meta">Résidence privée</div></div>' +
+          '<div class="card-arrow">&#8250;</div></div>';
+      }).join('');
+    window._sitesCache = [{nom:'Grange Canal',type:'standard'},{nom:'Clair Matin',type:'standard'}];
+  }
+}
+
+function selectAgentIdx(i) {
+  const a = window._agentsCache && window._agentsCache[i];
+  if (!a) return;
+  currentAgent = a.nom;
+  const agentBadge = document.getElementById('agent-badge');
+  if (agentBadge) agentBadge.textContent = '\u{1F464} ' + a.nom;
+  showScreen('s-home');
+}
+function selectAgent(nom) {
+  currentAgent = nom;
+  const agentBadge = document.getElementById('agent-badge');
+  if (agentBadge) agentBadge.textContent = '\u{1F464} ' + nom;
+  showScreen('s-home');
+}
+function selectSiteIdx(i) {
+  const s = window._sitesCache && window._sitesCache[i];
+  if (!s) return;
+  selectSite(s.nom);
 }
 
 // ═══ INIT ═══
