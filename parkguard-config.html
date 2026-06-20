@@ -614,8 +614,12 @@ function renderObjectifs(){
       <div class="card-body">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-mid);margin-bottom:8px">Historique des objectifs</div>
         ${s.rows.map(r=>`<div class="obj-row">
-          <span style="font-size:13px">Du <strong>${r.date_debut}</strong>${r.date_fin?' au '+r.date_fin:' → en cours'}</span>
-          <span class="badge ${!r.date_fin?'badge-green':'badge-gray'}">${r.passages_semaine} pass./sem.</span>
+          <span style="font-size:13px">Du <strong>${r.date_debut}</strong>${r.date_fin?' au '+r.date_fin:' \u2192 en cours'}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge ${!r.date_fin?'badge-green':'badge-gray'}">${r.passages_semaine} pass./sem.</span>
+            <button class="btn btn-outline btn-sm" onclick="editObjectifRow('${r.id}','${r.passages_semaine}','${r.date_debut}','${r.date_fin||''}')">✏️</button>
+            <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;padding:4px 8px" onclick="deleteObjectif('${r.id}')">🗑️</button>
+          </div>
         </div>`).join('')}
       </div>
     </div>`;
