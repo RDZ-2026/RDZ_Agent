@@ -830,9 +830,26 @@ async function showComptageScreen() {
 function renderComptageZones() {
   const el = document.getElementById('comptage-zones-list');
   el.innerHTML = comptageZones.map(function(z, i) {
-    return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px">' +
-      '<div style="font-size:14px;font-weight:700;margin-bottom:12px">' + z.nom +
-        ' <span style="font-size:12px;font-weight:400;color:var(--gray-mid)">' + z.places_totales + ' places max</span></div>' +
+    // Question et type de mesure selon la zone
+    // DLCC → places disponibles (libres), CLX → véhicules stationnés
+    var isDisponible = z.question_type === 'disponibles' ||
+      z.nom.toUpperCase().indexOf('DLCC') >= 0;
+    var question = z.question ||
+      (isDisponible
+        ? 'Combien de places sont disponibles sur ' + z.nom + ' ?'
+        : 'Combien de v\u00e9hicules stationnent sur ' + z.nom + ' ?');
+    var unitLabel = isDisponible ? 'places libres' : 'v\u00e9hicules';
+    var icon = isDisponible ? '\uD83D\uDD35' : '\uD83D\uDE97'; // 🔵 ou 🚗
+
+    return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:4px">' +
+      // Zone nom + capacité
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div style="font-size:15px;font-weight:700">' + icon + ' ' + z.nom + '</div>' +
+        '<span style="font-size:11px;color:var(--gray-mid);background:#fff;padding:3px 8px;border-radius:10px;border:1px solid var(--gray-border)">' + z.places_totales + ' places au total</span>' +
+      '</div>' +
+      // Question
+      '<div style="font-size:13px;color:var(--gray-dark);margin-bottom:12px;font-style:italic">' + question + '</div>' +
+      // Saisie
       '<div style="display:flex;align-items:center;gap:10px">' +
         '<button onclick="adjustComptage(' + i + ',-1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">\u2212</button>' +
         '<input type="number" id="comptage-input-' + i + '" value="0" min="0" max="' + (z.places_totales + 10) + '"' +
@@ -840,13 +857,20 @@ function renderComptageZones() {
           ' style="flex:1;text-align:center;font-size:36px;font-weight:800;color:var(--black);border:2px solid var(--gray-border);border-radius:var(--radius-sm);padding:8px 0;background:#fff;-moz-appearance:textfield;appearance:textfield;width:100%">' +
         '<button onclick="adjustComptage(' + i + ',+1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">+</button>' +
       '</div>' +
+      '<div style="font-size:11px;color:var(--gray-mid);margin-top:4px;text-align:center">' + unitLabel + '</div>' +
+      // Barre + taux
       '<div style="margin-top:10px;height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden">' +
         '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:5px;width:0%;transition:width .3s"></div>' +
       '</div>' +
-      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' — 0%</div>' +
+      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' \u2014 0%</div>' +
     '</div>';
   }).join('');
   window._comptageVals = comptageZones.map(function() { return 0; });
+  // Stocker le type de mesure pour saveComptage
+  window._comptageTypes = comptageZones.map(function(z) {
+    return (z.question_type === 'disponibles' || z.nom.toUpperCase().indexOf('DLCC') >= 0)
+      ? 'disponibles' : 'vehicules';
+  });
 }
 
 function updateComptageDisplay(idx) {
@@ -894,14 +918,21 @@ async function saveComptage() {
   let details = '';
   const entries = [];
   comptageZones.forEach(function(z, i) {
-    const v   = parseInt(vals[i]) || 0;
-    const pct = Math.round(v / (z.places_totales || 1) * 100);
-    details += z.nom + ' : ' + v + '/' + z.places_totales + ' places (' + pct + '%)\n';
+    var saisi   = parseInt(vals[i]) || 0;
+    var types   = window._comptageTypes || [];
+    var isDisp  = types[i] === 'disponibles';
+    // Si on a saisi des places disponibles, on calcule les véhicules présents
+    var vehicules = isDisp ? Math.max(0, z.places_totales - saisi) : saisi;
+    var pct = Math.round(vehicules / (z.places_totales || 1) * 100);
+    var label = isDisp
+      ? z.nom + ' : ' + saisi + ' places libres / ' + vehicules + ' véhicules (' + pct + '%)'
+      : z.nom + ' : ' + vehicules + '/' + z.places_totales + ' véhicules (' + pct + '%)';
+    details += label + '\n';
     entries.push({
       site_id:            siteId,
       zone_id:            (z.id && z.id.length > 10) ? z.id : null,
       agent_name:         currentAgent || 'Agent RDZ',
-      vehicules_presents: v,
+      vehicules_presents: vehicules,
       places_totales:     z.places_totales || 0,
       created_at:         now
     });
@@ -975,7 +1006,7 @@ async function saveVideRonde() {
     site: currentSite,
     agent_name: currentAgent,
     statut: 'parking_vide',
-    motif: null,
+    motif: 'PARKING_VIDE',
     remarque: remarque || null,
     plaque: null,
     photos_count: videPhotos.length,
