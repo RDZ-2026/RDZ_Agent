@@ -1366,7 +1366,7 @@ async function loadSitesAndAgents() {
   try {
     const [{ data: sites }, { data: agents }] = await Promise.all([
       db.from('sites').select('id,nom,type,adresse').eq('actif', true).order('nom'),
-      db.from('agents').select('id,nom,matricule').eq('actif', true).order('nom')
+      db.from('agents').select('id,nom,prenom,matricule,actif').order('nom')
     ]);
 
     // Sauvegarder en cache localStorage pour usage hors ligne
@@ -1444,7 +1444,7 @@ function renderSitesList(sites) {
 function selectAgentIdx(i) {
   const a = window._agentsCache && window._agentsCache[i];
   if (!a) return;
-  currentAgent = a.nom;
+  currentAgent = ((a.prenom||'').trim()+' '+(a.nom||'').trim()).trim() || a.nom;
   const agentBadge = document.getElementById('agent-badge');
   if (agentBadge) agentBadge.textContent = '\u{1F464} ' + a.nom;
   showScreen('s-home');

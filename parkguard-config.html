@@ -168,8 +168,12 @@ tr:hover td{background:#fafafa}
   <div class="modal">
     <div class="modal-title">Ajouter un agent <button class="modal-close" onclick="closeModal('modal-agent')">&#10005;</button></div>
     <div class="form-row">
-      <div class="field"><label>Nom complet</label><input id="a-nom" type="text" placeholder="Ex: Jean Martin"></div>
+      <div class="field"><label>Prénom</label><input id="a-prenom" type="text" placeholder="Ex: Jean"></div>
+      <div class="field"><label>Nom</label><input id="a-nom" type="text" placeholder="Ex: Martin"></div>
+    </div>
+    <div class="form-row">
       <div class="field"><label>Matricule</label><input id="a-matricule" type="text" placeholder="Ex: RDZ-042"></div>
+      <div class="field"><label>Brigade</label><input id="a-brigade" type="text" placeholder="Ex: B1"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button class="btn btn-green" onclick="saveAgent()">&#10003; Enregistrer</button>
@@ -325,7 +329,7 @@ function switchTab(name) {
 
 // ═══ AGENTS ═══
 async function loadAgents() {
-  const {data}=await db.from('agents').select('*').order('nom');
+  const {data}=await db.from('agents').select('id,nom,prenom,matricule,brigade,actif,created_at').order('nom');
   allAgents=data||[];
 }
 function renderAgents() {
@@ -344,31 +348,44 @@ function renderAgents() {
 }
 function openAddAgent() {
   editingAgentId = null;
+  document.getElementById('a-prenom').value='';
   document.getElementById('a-nom').value='';
   document.getElementById('a-matricule').value='';
+  var ab=document.getElementById('a-brigade'); if(ab) ab.value='';
   openModal('modal-agent');
 }
 function openEditAgent(id) {
   const a = allAgents.find(x=>x.id===id);
   if(!a) return;
   editingAgentId = id;
+  document.getElementById('a-prenom').value = a.prenom||'';
   document.getElementById('a-nom').value = a.nom;
   document.getElementById('a-matricule').value = a.matricule||'';
+  var ab=document.getElementById('a-brigade'); if(ab) ab.value=a.brigade||'';
   openModal('modal-agent');
 }
 let editingAgentId = null;
 async function saveAgent() {
+  const prenom=document.getElementById('a-prenom').value.trim();
   const nom=document.getElementById('a-nom').value.trim();
   const mat=document.getElementById('a-matricule').value.trim();
+  const brig=(document.getElementById('a-brigade')||{}).value||'';
   if(!nom){toast('⚠️ Nom requis');return;}
   let error;
   if(editingAgentId){
-    ({error}=await db.from('agents').update({nom,matricule:mat||null}).eq('id',editingAgentId));
+    var updateData={nom:nom,prenom:prenom||null};
+    if(mat) updateData.matricule=mat;
+    if(brig) updateData.brigade=brig;
+    ({error}=await db.from('agents').update(updateData).eq('id',editingAgentId));
   } else {
     // Vérifier doublon exact (nom + matricule)
     const existe = allAgents.find(function(a){ return a.nom.toLowerCase()===nom.toLowerCase() && (a.matricule||'')===(mat||''); });
     if(existe){ toast('⚠️ Agent déjà existant : '+nom); return; }
-    ({error}=await db.from('agents').insert({nom,matricule:mat||null}));
+    var insertData={nom:nom};
+    if(prenom) insertData.prenom=prenom;
+    if(mat) insertData.matricule=mat;
+    if(brig) insertData.brigade=brig;
+    ({error}=await db.from('agents').insert(insertData));
   }
   if(error){toast('❌ '+error.message);return;}
   toast(editingAgentId?'✅ Agent modifié':'✅ Agent ajouté');
@@ -425,12 +442,14 @@ function processExcelRows(rows) {
   const preview=[];
   rows.forEach(row=>{
     const nom=String(row[nomKey]||'').trim();
+    const prenom=prenomKey?String(row[prenomKey]||'').trim():'';
     const mat=matKey?String(row[matKey]||'').trim():'';
+    const brig=brigKey?String(row[brigKey]||'').trim():'';
     if(!nom)return;
     // Doublon = même nom ET même matricule
       const isDup=allAgents.some(function(a){return a.nom.toLowerCase()===nom.toLowerCase()&&(a.matricule||'')===(mat||'');})||seen.has(nom.toLowerCase()+'|'+(mat||''));
       seen.add(nom.toLowerCase()+'|'+(mat||''));
-    preview.push({nom,matricule:mat||null,isDup});
+    preview.push({nom,prenom:prenom||null,matricule:mat||null,brigade:brig||null,isDup});
   });
   const newOnes=preview.filter(p=>!p.isDup);
   const dupOnes=preview.filter(p=>p.isDup);
@@ -449,7 +468,8 @@ function processExcelRows(rows) {
 }
 async function confirmImport() {
   if(!pendingImport.length)return;
-  const {error}=await db.from('agents').insert(pendingImport);
+  const safeImport=pendingImport.map(function(a){var o={nom:a.nom};if(a.prenom)o.prenom=a.prenom;if(a.matricule)o.matricule=a.matricule;if(a.brigade)o.brigade=a.brigade;return o;});
+  const {error}=await db.from('agents').insert(safeImport);
   if(error){toast('❌ '+error.message);return;}
   toast('✅ '+pendingImport.length+' agent(s) importé(s)');
   closeModal('modal-excel');
