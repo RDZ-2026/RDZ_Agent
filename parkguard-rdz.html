@@ -831,37 +831,51 @@ function renderComptageZones() {
   const el = document.getElementById('comptage-zones-list');
   el.innerHTML = comptageZones.map(function(z, i) {
     return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px">' +
-      '<div style="font-size:14px;font-weight:700;margin-bottom:4px">' + z.nom +
-        ' <span style="font-size:12px;font-weight:400;color:var(--gray-mid)">' + z.places_totales + ' places</span></div>' +
-      '<div style="display:flex;align-items:center;gap:12px;margin-top:10px">' +
-        '<button onclick="adjustComptage(' + i + ',-1)" style="width:40px;height:40px;font-size:22px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer">−</button>' +
-        '<div style="flex:1;text-align:center">' +
-          '<div id="comptage-val-' + i + '" style="font-size:36px;font-weight:800;color:var(--black)">0</div>' +
-          '<div style="font-size:11px;color:var(--gray-mid)">véhicules</div>' +
-        '</div>' +
-        '<button onclick="adjustComptage(' + i + ',+1)" style="width:40px;height:40px;font-size:22px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer">+</button>' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:12px">' + z.nom +
+        ' <span style="font-size:12px;font-weight:400;color:var(--gray-mid)">' + z.places_totales + ' places max</span></div>' +
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<button onclick="adjustComptage(' + i + ',-1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">\u2212</button>' +
+        '<input type="number" id="comptage-input-' + i + '" value="0" min="0" max="' + (z.places_totales + 10) + '"' +
+          ' oninput="onComptageInput(' + i + ')"' +
+          ' style="flex:1;text-align:center;font-size:36px;font-weight:800;color:var(--black);border:2px solid var(--gray-border);border-radius:var(--radius-sm);padding:8px 0;background:#fff;-moz-appearance:textfield;appearance:textfield;width:100%">' +
+        '<button onclick="adjustComptage(' + i + ',+1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">+</button>' +
       '</div>' +
-      '<div style="margin-top:8px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden">' +
-        '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:4px;width:0%;transition:width .3s"></div>' +
+      '<div style="margin-top:10px;height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden">' +
+        '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:5px;width:0%;transition:width .3s"></div>' +
       '</div>' +
-      '<div id="comptage-taux-' + i + '" style="font-size:11px;color:var(--gray-mid);margin-top:4px;text-align:right">0%</div>' +
+      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' — 0%</div>' +
     '</div>';
   }).join('');
-  // Reset valeurs
-  window._comptageVals = comptageZones.map(() => 0);
+  window._comptageVals = comptageZones.map(function() { return 0; });
 }
 
-function adjustComptage(idx, delta) {
-  if (!window._comptageVals) window._comptageVals = comptageZones.map(() => 0);
+function updateComptageDisplay(idx) {
   const max = comptageZones[idx].places_totales || 999;
-  window._comptageVals[idx] = Math.max(0, Math.min(max + 10, (window._comptageVals[idx] || 0) + delta));
-  const val = window._comptageVals[idx];
+  const val = window._comptageVals[idx] || 0;
   const pct = Math.min(100, Math.round(val / max * 100));
-  document.getElementById('comptage-val-' + idx).textContent = val;
   const bar = document.getElementById('comptage-bar-' + idx);
   bar.style.width = pct + '%';
   bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : '#1d4ed8';
-  document.getElementById('comptage-taux-' + idx).textContent = pct + '%';
+  document.getElementById('comptage-taux-' + idx).textContent = val + ' / ' + max + ' \u2014 ' + pct + '%';
+}
+
+function onComptageInput(idx) {
+  if (!window._comptageVals) window._comptageVals = comptageZones.map(function() { return 0; });
+  const input = document.getElementById('comptage-input-' + idx);
+  const val = Math.max(0, parseInt(input.value) || 0);
+  input.value = val;
+  window._comptageVals[idx] = val;
+  updateComptageDisplay(idx);
+}
+
+function adjustComptage(idx, delta) {
+  if (!window._comptageVals) window._comptageVals = comptageZones.map(function() { return 0; });
+  const max = comptageZones[idx].places_totales || 999;
+  const newVal = Math.max(0, Math.min(max + 10, (window._comptageVals[idx] || 0) + delta));
+  window._comptageVals[idx] = newVal;
+  const input = document.getElementById('comptage-input-' + idx);
+  if (input) input.value = newVal;
+  updateComptageDisplay(idx);
 }
 
 async function saveComptage() {
