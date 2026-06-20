@@ -238,22 +238,49 @@ function renderAgents() {
     <td style="font-weight:600">${a.nom}</td>
     <td style="color:var(--gray-mid)">${a.matricule||'—'}</td>
     <td><span class="badge ${a.actif?'badge-green':'badge-gray'}">${a.actif?'Actif':'Inactif'}</span></td>
-    <td><button class="btn btn-outline btn-sm" onclick="toggleAgent('${a.id}',${a.actif})">${a.actif?'Désactiver':'Réactiver'}</button></td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="openEditAgent('${a.id}')">✏️ Modifier</button>
+      <button class="btn btn-outline btn-sm" onclick="toggleAgent('${a.id}',${a.actif})">${a.actif?'Désactiver':'Réactiver'}</button>
+      <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5" onclick="deleteAgent('${a.id}','${a.nom.replace(/'/g,"\\'")}')">🗑️ Suppr.</button>
+    </td>
   </tr>`).join('');
 }
 function openAddAgent() {
+  editingAgentId = null;
   document.getElementById('a-nom').value='';
   document.getElementById('a-matricule').value='';
   openModal('modal-agent');
 }
+function openEditAgent(id) {
+  const a = allAgents.find(x=>x.id===id);
+  if(!a) return;
+  editingAgentId = id;
+  document.getElementById('a-nom').value = a.nom;
+  document.getElementById('a-matricule').value = a.matricule||'';
+  openModal('modal-agent');
+}
+let editingAgentId = null;
 async function saveAgent() {
   const nom=document.getElementById('a-nom').value.trim();
   const mat=document.getElementById('a-matricule').value.trim();
   if(!nom){toast('⚠️ Nom requis');return;}
-  const {error}=await db.from('agents').insert({nom,matricule:mat||null});
+  let error;
+  if(editingAgentId){
+    ({error}=await db.from('agents').update({nom,matricule:mat||null}).eq('id',editingAgentId));
+  } else {
+    ({error}=await db.from('agents').insert({nom,matricule:mat||null}));
+  }
   if(error){toast('❌ '+error.message);return;}
-  toast('✅ Agent ajouté');
+  toast(editingAgentId?'✅ Agent modifié':'✅ Agent ajouté');
+  editingAgentId=null;
   closeModal('modal-agent');
+  await loadAgents();renderAgents();
+}
+async function deleteAgent(id,nom) {
+  if(!confirm('Supprimer '+nom+' ?\nSes rondes restent dans la base.')) return;
+  const {error}=await db.from('agents').delete().eq('id',id);
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ Agent supprimé');
   await loadAgents();renderAgents();
 }
 async function toggleAgent(id,actif) {
