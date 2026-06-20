@@ -122,10 +122,25 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 
   <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-box"><div class="stat-val red" id="s-inf">—</div><div class="stat-lbl">Infractions</div></div>
-    <div class="stat-box"><div class="stat-val green" id="s-aut">—</div><div class="stat-lbl">Autorisés</div></div>
-    <div class="stat-box"><div class="stat-val amber" id="s-ia">—</div><div class="stat-lbl">En attente IA</div></div>
-    <div class="stat-box"><div class="stat-val blue" id="s-total">—</div><div class="stat-lbl">Total</div></div>
+    <div class="stat-box">
+      <div class="stat-val red" id="s-inf">—</div>
+      <div class="stat-lbl">Infractions aujourd'hui</div>
+      <div id="s-inf-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val green" id="s-aut">—</div>
+      <div class="stat-lbl">Autorisés aujourd'hui</div>
+      <div id="s-aut-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val amber" id="s-ia">—</div>
+      <div class="stat-lbl">En attente IA</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val blue" id="s-total">—</div>
+      <div class="stat-lbl">Total aujourd'hui</div>
+      <div id="s-total-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+    </div>
   </div>
 
   <!-- COMPTAGES DLCC -->
@@ -458,10 +473,40 @@ async function deleteComptage(id) {
 function pad(v) { return String(v).padStart(2,'0'); }
 
 function updateStats() {
-  document.getElementById('s-inf').textContent   = allVehicles.filter(v => v.statut === 'infraction').length;
-  document.getElementById('s-aut').textContent   = allVehicles.filter(v => v.statut === 'autorise').length;
-  document.getElementById('s-ia').textContent    = allVehicles.filter(v => v.ia_pending).length;
-  document.getElementById('s-total').textContent = allVehicles.length;
+  // Fenêtre journée : 06h30 aujourd'hui → 06h29 demain
+  var now = new Date();
+  var jourDebut = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 30, 0);
+  if (now < jourDebut) jourDebut.setDate(jourDebut.getDate() - 1); // avant 6h30 = encore hier
+  var jourFin = new Date(jourDebut); jourFin.setDate(jourFin.getDate() + 1);
+  var veilleDebut = new Date(jourDebut); veilleDebut.setDate(veilleDebut.getDate() - 1);
+
+  function inPeriod(v, from, to) {
+    var t = new Date(v.created_at);
+    return t >= from && t < to;
+  }
+  var today = allVehicles.filter(function(v){ return inPeriod(v, jourDebut, jourFin); });
+  var veille = allVehicles.filter(function(v){ return inPeriod(v, veilleDebut, jourDebut); });
+
+  var tInf   = today.filter(function(v){ return v.statut==='infraction'; }).length;
+  var tAut   = today.filter(function(v){ return v.statut==='autorise'; }).length;
+  var vInf   = veille.filter(function(v){ return v.statut==='infraction'; }).length;
+  var vAut   = veille.filter(function(v){ return v.statut==='autorise'; }).length;
+
+  document.getElementById('s-inf').textContent   = tInf;
+  document.getElementById('s-aut').textContent   = tAut;
+  document.getElementById('s-ia').textContent    = allVehicles.filter(function(v){ return v.ia_pending; }).length;
+  document.getElementById('s-total').textContent = today.length;
+
+  function delta(cur, prev) {
+    if (prev === 0 && cur === 0) return '';
+    var d = cur - prev;
+    var arrow = d > 0 ? '▲' : d < 0 ? '▼' : '=';
+    var color = d > 0 ? 'var(--red)' : d < 0 ? 'var(--green)' : 'var(--gray-mid)';
+    return 'Veille : ' + prev + ' <span style="color:' + color + ';font-weight:700">' + arrow + Math.abs(d) + '</span>';
+  }
+  document.getElementById('s-inf-veille').innerHTML   = delta(tInf, vInf);
+  document.getElementById('s-aut-veille').innerHTML   = delta(tAut, vAut);
+  document.getElementById('s-total-veille').innerHTML = delta(today.length, veille.length);
 }
 
 // ═══ TABLE ═══
