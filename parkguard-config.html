@@ -443,7 +443,9 @@ function processExcelRows(rows) {
   rows.forEach(row=>{
     const nom=String(row[nomKey]||'').trim();
     const prenom=prenomKey?String(row[prenomKey]||'').trim():'';
-    const mat=matKey?String(row[matKey]||'').trim():'';
+    const matRaw=matKey?String(row[matKey]||'').trim():'';
+    // Normaliser matricule : "B 23034" → "B23034"
+    const mat=matRaw.replace(/\s+/g,'');
     const brig=brigKey?String(row[brigKey]||'').trim():'';
     if(!nom)return;
     // Doublon = même nom ET même matricule
