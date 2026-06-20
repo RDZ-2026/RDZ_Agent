@@ -819,7 +819,10 @@ async function saveMarque() {
   // Upload logo si nouveau fichier
   if (marqueLogoFile) {
     const ext      = marqueLogoFile.name.split('.').pop();
-    const filename = 'marques/' + nom.toLowerCase().replace(/\s+/g,'-') + '.' + ext;
+    const safeName = nom.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    const filename = 'marques/' + safeName + '.' + ext;
     const { error: uploadErr } = await db.storage
       .from('parkguard-photos')
       .upload(filename, marqueLogoFile, { contentType: marqueLogoFile.type, upsert: true });
