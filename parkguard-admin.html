@@ -255,9 +255,17 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
       <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
     </div>
 
+    <!-- PANNEAU CONTRÔLE QUALITÉ -->
+    <div id="quality-panel" style="display:none;margin-top:16px;border:1.5px solid var(--gray-border);border-radius:8px;overflow:hidden">
+      <div style="background:var(--gray-light);padding:8px 12px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#555;border-bottom:1px solid var(--gray-border)">
+        🔍 Contrôle qualité dénonciation
+      </div>
+      <div id="quality-panel-body" style="max-height:320px;overflow-y:auto;padding:0"></div>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:12px">
       <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
-      <button class="btn btn-outline" onclick="document.getElementById('ia-modal').style.display='none'">Fermer</button>
+      <button class="btn btn-outline" onclick="closeIAModal()">Fermer</button>
     </div>
   </div>
 </div>
@@ -475,6 +483,12 @@ function openRapport(id) {
   window.open('parkguard-rapport-denonciation.html?' + params.toString(), '_blank');
 }
 
+function closeIAModal() {
+  document.getElementById('ia-modal').style.display = 'none';
+  document.getElementById('quality-panel').style.display = 'none';
+  document.getElementById('quality-panel-body').innerHTML = '';
+}
+
 // ═══ PHOTOS ═══
 function openPhoto(url) {
   document.getElementById('photo-modal-img').src = url;
@@ -521,6 +535,8 @@ async function openIAModal() {
   document.getElementById('ia-modal').style.display = 'flex';
   document.getElementById('claude-result').value = '';
   document.getElementById('apply-progress').style.display = 'none';
+  document.getElementById('quality-panel').style.display = 'none';
+  document.getElementById('quality-panel-body').innerHTML = '';
   document.getElementById('zip-progress').style.display = 'none';
   document.getElementById('zip-done').style.display = 'none';
   const btn = document.getElementById('btn-zip');
@@ -600,55 +616,94 @@ function buildPromptLines(vehicles) {
     'Tu es un assistant expert de RDZ Security (Suisse) — surveillance parking.',
     'Analyse chaque photo jointe et extrais les informations demandées avec précision.',
     '',
-    'RÉPONDS UNIQUEMENT avec ce JSON, sans texte avant ou après :',
+    'RÉPONDS UNIQUEMENT avec ce JSON strict, sans texte avant ou après, sans commentaire :',
     '{',
     '  "resultats": [',
     '    {',
     '      "id": "uuid-exact-du-vehicule",',
-    '      "plaque": "GE123456/CH",',
-    '      "num_denonciation": "2026-001234",',
+    '      "plaque": "VS488278/CH",',
+    '      "num_denonciation": "D800 1757862",',
     '      "num_macaron": "A-1234",',
     '      "macaron_details": "Macaron bleu, valable 2024-2025, zone A",',
     '      "couleur_vehicule": "blanc",',
     '      "marque_vehicule": "Renault",',
-    '      "denonciation_check": {',
-    '        "date_remplie": true,',
-    '        "heure_remplie": true,',
-    '        "plaque_remplie": true,',
-    '        "motif_coche": true,',
-    '        "signature_presente": false,',
-    '        "observations": "Signature manquante en bas du formulaire"',
-    '      },',
     '      "confiance_plaque": "haute",',
-    '      "confiance_deno": "haute"',
+    '      "denonciation_check": {',
+    '        "denonciateur":    { "ok": true,  "valeur_lue": "RDZ Security Management SA, Quai du Seujet 22 1201 Genève", "probleme": null },',
+    '        "date":            { "ok": false, "valeur_lue": "19/06/26", "probleme": "Année sur 2 chiffres — doit être JJ/MM/AAAA" },',
+    '        "heure":           { "ok": false, "valeur_lue": "09:30",   "probleme": "Format interdit — doit être 09h30 (avec H)" },',
+    '        "plaque_deno":     { "ok": false, "valeur_lue": "VS 488278", "probleme": "Manque le code pays — doit être VS488278/CH" },',
+    '        "lieu":            { "ok": false, "valeur_lue": "Chemin du Bournoud 21-23", "probleme": "Plusieurs numéros — garder un seul ex: 23" },',
+    '        "commune":         { "ok": true,  "valeur_lue": "1219 Le Lignon", "probleme": null },',
+    '        "marque_type":     { "ok": false, "valeur_lue": null, "probleme": "Marque ou type véhicule manquant (AUT/VU/...)" },',
+    '        "code_infraction": { "ok": true,  "valeur_lue": "B31A", "probleme": null },',
+    '        "matricule_agent": { "ok": false, "valeur_lue": null, "probleme": "Matricule agent absent" },',
+    '        "signature":       { "ok": false, "valeur_lue": null, "probleme": "Signature absente" },',
+    '        "encre_noire":     { "ok": true,  "valeur_lue": null, "probleme": null }',
+    '      }',
     '    }',
     '  ]',
     '}',
     '',
-    'RÈGLES IMPORTANTES :',
+    '══════════════════════════════════════════',
+    'RÈGLES PRÉCISES PAR CHAMP :',
+    '══════════════════════════════════════════',
     '',
-    '--- PLAQUE ---',
-    '- Format : chiffres+lettres sans espace ni tiret + /code_pays',
-    '- Exemples : GE123456/CH  VD98765/CH  AB123CD/F  M123456/F  W-AB1234/D',
-    '- Code pays : /CH (Suisse) /F (France) /D (Allemagne) /I (Italie) /E (Espagne) etc.',
-    '- Retirer tous les espaces et tirets de la plaque avant le /',
-    '- Si illisible : mettre null',
+    '--- PLAQUE (photo Véhicule) ---',
+    '- Format requis : lettres+chiffres SANS espace SANS tiret + /code_pays',
+    '- Exemples valides : VS488278/CH  GE123456/CH  AB123CD/F  W-AB1234/D',
+    '- Code pays obligatoire : /CH /F /D /I /E /A /GB etc.',
+    '- Si illisible : null',
     '',
-    '--- N° DÉNONCIATION ---',
-    '- Numéro visible sur le formulaire papier (photo Denonciation)',
-    '- Copier exactement tel qu\'écrit sur le formulaire',
-    '- Si illisible : mettre null',
+    '--- DÉNONCIATION (photo Denonciation) — vérifier chaque point : ---',
     '',
-    '--- MACARON ---',
-    '- num_macaron : numéro/code imprimé sur la vignette (photo Macaron)',
-    '- macaron_details : décrire couleur, année de validité, zone si visible',
-    '- Si pas de macaron : mettre null pour les deux',
+    'denonciateur :',
+    '  Valeur attendue EXACTE : "RDZ Security Management SA, Quai du Seujet 22 1201 Genève"',
+    '  → ok=false si manquant, incomplet ou différent',
     '',
-    '--- VÉRIFICATION DÉNONCIATION (photo Denonciation) ---',
-    '- Vérifier si les champs clés sont remplis : date, heure, plaque, motif coché, signature',
-    '- observations : noter tout champ manquant ou illisible',
+    'date :',
+    '  Format requis : JJ/MM/AAAA (année sur 4 chiffres)',
+    '  → ok=false si JJ/MM/AA (2 chiffres) ou autre format',
+    '',
+    'heure :',
+    '  Format requis : HHhMM ex: 06h12 ou 9h30 (lettre H obligatoire)',
+    '  → ok=false si format HH:MM avec deux-points',
+    '',
+    'plaque_deno :',
+    '  La plaque sur le formulaire doit se terminer par /code_pays ex: VS488278/CH',
+    '  → ok=false si pas de code pays',
+    '',
+    'lieu :',
+    '  Le numéro de rue doit être UN SEUL numéro (ex: 23)',
+    '  → ok=false si numéro multiple ex: 21-23 ou 21/23',
+    '',
+    'commune :',
+    '  Doit contenir le nom ET le code postal ex: 1219 Le Lignon',
+    '  → ok=false si manque le code postal ou le nom',
+    '',
+    'marque_type :',
+    '  Doit contenir la marque du véhicule ET son type (AUT=automobile, VU=véhicule utilitaire, MOTO, etc.)',
+    '  → ok=false si vide ou incomplet',
+    '',
+    'code_infraction :',
+    '  Code infraction coché/écrit ex: B31A, B37A',
+    '  → ok=false si absent',
+    '',
+    'matricule_agent :',
+    '  Numéro/code de matricule de l\'agent RDZ',
+    '  → ok=false si absent',
+    '',
+    'signature :',
+    '  Signature manuscrite de l\'agent présente',
+    '  → ok=false si absente',
+    '',
+    'encre_noire :',
+    '  Les annotations MANUSCRITES (pas les libellés imprimés) doivent être en encre BLEUE',
+    '  → ok=false si écriture manuscrite semble noire ou très foncée',
+    '  → ok=true si écriture bleue (normal)',
+    '',
+    '- Pour chaque point : renseigner valeur_lue (ce que tu vois) et probleme (explication courte si ok=false, sinon null)',
     '- Si pas de photo dénonciation : mettre null pour denonciation_check',
-    '',
     '- Ne jamais inventer — null si illisible',
     '- Conserver les IDs exacts ci-dessous',
     '',
@@ -665,8 +720,8 @@ function buildPromptLines(vehicles) {
     if (v.photo_parebrise_url)    photos.push('V'+(i+1)+'_Parebrise.jpg');
     if (v.photo_macaron_url)      photos.push('V'+(i+1)+'_Macaron.jpg');
     lines.push('  Fichiers: ' + photos.join(', '));
-    if (!isInf) lines.push('  → Extraire plaque + détails macaron uniquement');
-    if (isInf)  lines.push('  → Extraire plaque + N° dénonciation + vérifier formulaire');
+    if (!isInf) lines.push('  → Extraire plaque + détails macaron (denonciation_check = null)');
+    if (isInf)  lines.push('  → Extraire plaque + N° dénonciation + vérifier TOUS les points du formulaire');
     lines.push('');
   });
   return lines;
@@ -732,6 +787,149 @@ async function applyClaudeResult() {
   let parsed;
   try {
     parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+  } catch(e) { toast('❌ JSON invalide — vérifie la réponse de Claude'); return; }
+
+  const resultats = parsed.resultats || [];
+  if (!resultats.length) { toast('⚠️ Aucun résultat dans le JSON'); return; }
+
+  // Afficher le panneau qualité AVANT de sauvegarder
+  renderQualityPanel(resultats);
+
+  const prog   = document.getElementById('apply-progress');
+  const status = document.getElementById('apply-status');
+  const bar    = document.getElementById('apply-bar');
+  prog.style.display = 'block';
+
+  let done = 0, errors = 0;
+  for (const r of resultats) {
+    if (!r.id) continue;
+    try {
+      // Construire remarque à partir des erreurs qualité uniquement
+      const erreurs = buildQualityErrors(r);
+      const updateData = {
+        plaque:           r.plaque           || null,
+        num_denonciation: r.num_denonciation || null,
+        num_macaron:      r.num_macaron      || null,
+        ia_pending:       false,
+        ia_processed_at:  new Date().toISOString()
+      };
+      if (r.macaron_details) updateData.remarque = 'Macaron: ' + r.macaron_details;
+      if (erreurs.length)    updateData.remarque = (updateData.remarque ? updateData.remarque + ' | ' : '') + erreurs.join(' | ');
+
+      const { error } = await db.from('vehicles').update(updateData).eq('id', r.id);
+      if (error) throw error;
+      done++;
+    } catch(e) { errors++; console.error(e); }
+    bar.style.width = Math.round(((done+errors)/resultats.length)*100) + '%';
+    status.textContent = (done+errors) + ' / ' + resultats.length + ' mis à jour...';
+  }
+
+  prog.style.display = 'none';
+  toast('✅ ' + done + ' mis à jour' + (errors ? ' · ⚠️ ' + errors + ' erreur(s)' : ''));
+  document.getElementById('claude-result').value = '';
+  await loadData();
+}
+
+function buildQualityErrors(r) {
+  const erreurs = [];
+  if (!r.denonciation_check) return erreurs;
+  const dc = r.denonciation_check;
+  const LABELS = {
+    denonciateur: 'Dénonciateur', date: 'Date', heure: 'Heure',
+    plaque_deno: 'Plaque (formulaire)', lieu: 'Lieu', commune: 'Commune',
+    marque_type: 'Marque/Type', code_infraction: 'Code infraction',
+    matricule_agent: 'Matricule agent', signature: 'Signature', encre_noire: 'Encre'
+  };
+  Object.keys(LABELS).forEach(k => {
+    const champ = dc[k];
+    if (!champ) return;
+    if (k === 'encre_noire') {
+      if (!champ.ok) erreurs.push('⚠️ Encre noire détectée');
+    } else {
+      if (!champ.ok) erreurs.push('❌ ' + LABELS[k] + ': ' + (champ.probleme || 'invalide'));
+    }
+  });
+  return erreurs;
+}
+
+function renderQualityPanel(resultats) {
+  const panel = document.getElementById('quality-panel');
+  const body  = document.getElementById('quality-panel-body');
+  if (!panel || !body) return;
+
+  const LABELS = {
+    denonciateur: 'Dénonciateur', date: 'Date (JJ/MM/AAAA)',
+    heure: 'Heure (HHhMM)', plaque_deno: 'Plaque sur formulaire',
+    lieu: 'Lieu (n° unique)', commune: 'Commune + code postal',
+    marque_type: 'Marque & type véhicule', code_infraction: 'Code infraction',
+    matricule_agent: 'Matricule agent', signature: 'Signature agent',
+    encre_noire: 'Encre bleue obligatoire'
+  };
+
+  let html = '';
+  resultats.forEach((r, i) => {
+    const v = allVehicles.find(x => x.id === r.id);
+    const label = v ? (v.plaque || v.site || 'Véhicule ' + (i+1)) : 'Véhicule ' + (i+1);
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;padding:6px 10px;background:var(--gray-light);border-radius:6px">📋 ' + label + '</div>';
+
+    // Plaque extraite
+    html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)">';
+    html += '<span style="color:#555">Plaque extraite</span>';
+    if (r.plaque) {
+      html += '<span style="font-weight:700;color:var(--green)">' + r.plaque + '</span>';
+    } else {
+      html += '<span style="color:var(--red-dark)">❌ Non lue</span>';
+    }
+    html += '</div>';
+
+    // Macaron
+    if (r.num_macaron) {
+      html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)">';
+      html += '<span style="color:#555">Macaron</span>';
+      html += '<span style="font-weight:600">' + r.num_macaron + (r.macaron_details ? ' · ' + r.macaron_details : '') + '</span>';
+      html += '</div>';
+    }
+
+    // Vérification dénonciation
+    if (r.denonciation_check) {
+      const dc = r.denonciation_check;
+      html += '<div style="margin-top:8px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;padding:0 10px 4px">Contrôle dénonciation</div>';
+      Object.keys(LABELS).forEach(k => {
+        const champ = dc[k];
+        if (!champ) return;
+        const isOk = k === 'encre_noire' ? champ.ok : champ.ok;
+        const icon = isOk ? '✅' : (k === 'encre_noire' ? '⚠️' : '❌');
+        const color = isOk ? 'var(--green)' : (k === 'encre_noire' ? 'var(--amber)' : 'var(--red-dark)');
+        const bg = isOk ? '' : (k === 'encre_noire' ? 'background:#fffbeb' : 'background:#fdf0f0');
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border);' + bg + '">';
+        html += '<span style="color:#555;flex-shrink:0;width:160px">' + icon + ' ' + LABELS[k] + '</span>';
+        html += '<span style="text-align:right;color:' + color + ';font-weight:' + (isOk ? 'normal' : '600') + '">';
+        if (isOk) {
+          html += champ.valeur_lue || '✓';
+        } else {
+          html += (champ.probleme || 'Problème détecté');
+          if (champ.valeur_lue) html += '<br><span style="font-weight:normal;color:#888;font-size:11px">Lu: ' + champ.valeur_lue + '</span>';
+        }
+        html += '</span></div>';
+      });
+    } else {
+      html += '<div style="padding:8px 10px;font-size:12px;color:var(--gray-mid)">Pas de photo dénonciation</div>';
+    }
+    html += '</div>';
+  });
+
+  body.innerHTML = html;
+  panel.style.display = 'block';
+}
+
+
+async function applyClaudeResult() {
+  const raw = document.getElementById('claude-result').value.trim();
+  if (!raw) { toast('⚠️ Colle le JSON de Claude d\'abord'); return; }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
   } catch(e) { toast('❌ JSON invalide'); return; }
 
   const resultats = parsed.resultats || [];
@@ -758,7 +956,8 @@ async function applyClaudeResult() {
         if (!dc.motif_coche) manquants.push('motif');
         if (!dc.signature_presente) manquants.push('signature');
         if (manquants.length) remarqueIA.push('⚠️ Dénonciation — champs manquants: ' + manquants.join(', '));
-        if (dc.observations) remarqueIA.push('Note: ' + dc.observations);
+        if (dc.encre_noire)   remarqueIA.push('⚠️ Encre NOIRE détectée sur la dénonciation — doit être en bleu');
+        if (dc.observations)  remarqueIA.push('Note: ' + dc.observations);
       }
 
       const updateData = {
