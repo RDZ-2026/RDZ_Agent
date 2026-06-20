@@ -206,7 +206,6 @@ function loadData() {
   var hasData2 = !!(data.motif || data.photo_vehicule_url || data.num_denonciation);
   document.getElementById('rpt-site').textContent  = data.site || 'Site';
   document.getElementById('v-plaque').textContent  = data.plaque || '— (extraction IA en attente)';
-  document.getElementById('v-site').textContent    = data.site || '—';
   var motifVal = data.motif || '—';
   if (motifVal.startsWith('PARKING_VIDE')) motifVal = '—';
   document.getElementById('v-motif').textContent   = motifVal;
