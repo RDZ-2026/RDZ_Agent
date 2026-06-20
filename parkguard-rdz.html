@@ -879,39 +879,45 @@ function adjustComptage(idx, delta) {
 }
 
 async function saveComptage() {
-  const vals  = window._comptageVals || [];
-  const now   = new Date().toISOString();
+  const vals     = window._comptageVals || [];
+  const now      = new Date().toISOString();
   const remarque = document.getElementById('comptage-remarque').value.trim();
-  const sites = window._sitesCache || [];
-  const site  = sites.find(s => s.nom === currentSite);
+
+  // site_id depuis les zones Supabase (plus fiable)
+  const siteIdFromZone = comptageZones.length && comptageZones[0].site_id ? comptageZones[0].site_id : null;
+  const sites  = window._sitesCache || [];
+  const site   = sites.find(function(s) { return s.nom === currentSite; });
+  const siteId = siteIdFromZone || (site && site.id) || null;
+
+  if (!siteId) { toast('Site non identifie - reconnectez-vous'); return; }
 
   let details = '';
   const entries = [];
-  comptageZones.forEach((z, i) => {
-    const v = vals[i] || 0;
+  comptageZones.forEach(function(z, i) {
+    const v   = parseInt(vals[i]) || 0;
     const pct = Math.round(v / (z.places_totales || 1) * 100);
     details += z.nom + ' : ' + v + '/' + z.places_totales + ' places (' + pct + '%)\n';
     entries.push({
-      site_id:           (site && site.id) ? site.id : null,
-      zone_id:           (z.id && z.id.length > 10) ? z.id : null,
-      agent_name:        currentAgent,
+      site_id:            siteId,
+      zone_id:            (z.id && z.id.length > 10) ? z.id : null,
+      agent_name:         currentAgent || 'Agent RDZ',
       vehicules_presents: v,
-      places_totales:    z.places_totales || 0,
-      created_at:        now
+      places_totales:     z.places_totales || 0,
+      created_at:         now
     });
   });
 
-  // Sauvegarder chaque zone
   let synced = false;
-  if (isOnline && site && site.id) {
+  if (isOnline) {
     try {
       const { error } = await db.from('comptages').insert(entries);
-      if (!error) synced = true;
+      if (error) { console.error(error); toast('Erreur: ' + error.message); }
+      else synced = true;
     } catch(e) { console.warn('Erreur comptage:', e); }
   }
   if (!synced) {
     const p = JSON.parse(localStorage.getItem('pg_pending_comptages') || '[]');
-    entries.forEach(e => p.push(e));
+    entries.forEach(function(e) { p.push(e); });
     localStorage.setItem('pg_pending_comptages', JSON.stringify(p));
   }
 
