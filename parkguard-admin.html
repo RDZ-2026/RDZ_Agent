@@ -639,7 +639,7 @@ function openRapport(id, type) {
   const targets = {
     'infraction':   'parkguard-rapport-denonciation.html',
     'autorise':     'parkguard-rapport-autorise.html',
-    'parking_vide': 'parkguard-rapport-ronde.html'
+    'parking_vide': 'parkguard-rapport-vide.html'
   };
   const target = targets[type || v.statut] || 'parkguard-rapport-denonciation.html';
   window.open(target + '?' + params.toString(), '_blank');
