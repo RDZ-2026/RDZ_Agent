@@ -164,23 +164,25 @@ function setPhoto(id, url) {
 }
 
 function loadData() {
-  // 1. Essayer sessionStorage (même domaine même onglet)
-  var stored = sessionStorage.getItem('rdz_rapport_data');
   var data = {};
-  if (stored) {
-    try { data = JSON.parse(stored); } catch(e) {}
-  }
 
-  // 2. Essayer URL params en fallback
+  // 1. URL params en PRIORITÉ (fonctionne partout, y compris file://)
   var params = new URLSearchParams(window.location.search);
-  if (!data.id && params.has('id')) {
+  if (params.has('id') || params.has('site')) {
     ['id','site','agent_name','agent','plaque','motif','remarque',
      'num_denonciation','created_at',
      'photo_vehicule_url','photo_denonciation_url',
-     'photo_parebrise_url','photo_macaron_url',
-     'photo_extra_url'].forEach(function(k) {
-      if (params.has(k)) data[k] = params.get(k);
+     'photo_parebrise_url','photo_macaron_url'].forEach(function(k) {
+      if (params.has(k)) data[k] = decodeURIComponent(params.get(k));
     });
+    // Normaliser agent_name depuis 'agent'
+    if (!data.agent_name && data.agent) data.agent_name = data.agent;
+  }
+
+  // 2. sessionStorage en fallback (fonctionne sur GitHub Pages)
+  if (!data.id) {
+    var stored = sessionStorage.getItem('rdz_rapport_data');
+    if (stored) { try { data = JSON.parse(stored); } catch(e) {} }
   }
 
   // Vérifier qu'on a des données

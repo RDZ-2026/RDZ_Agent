@@ -460,6 +460,7 @@ function openRapport(id) {
   const params = new URLSearchParams({
     id: v.id || '',
     site: v.site || '',
+    agent_name: v.agent_name || '',
     agent: v.agent_name || '',
     plaque: v.plaque || '',
     motif: v.motif || '',
@@ -596,42 +597,76 @@ async function downloadPack() {
 
 function buildPromptLines(vehicles) {
   const lines = [
-    'Tu es un assistant de RDZ Security (Suisse) — surveillance parking.',
-    'J\'ai joint les photos à ce message (nommées V1_Vehicule.jpg, V1_Denonciation.jpg, etc.).',
-    'Analyse chaque photo et extrais les informations demandées.',
+    'Tu es un assistant expert de RDZ Security (Suisse) — surveillance parking.',
+    'Analyse chaque photo jointe et extrais les informations demandées avec précision.',
     '',
     'RÉPONDS UNIQUEMENT avec ce JSON, sans texte avant ou après :',
     '{',
     '  "resultats": [',
     '    {',
     '      "id": "uuid-exact-du-vehicule",',
-    '      "plaque": "GE 123 456",',
-    '      "num_denonciation": "2026-001",',
-    '      "num_macaron": null,',
-    '      "couleur": "blanc",',
-    '      "confiance": "haute"',
+    '      "plaque": "GE123456/CH",',
+    '      "num_denonciation": "2026-001234",',
+    '      "num_macaron": "A-1234",',
+    '      "macaron_details": "Macaron bleu, valable 2024-2025, zone A",',
+    '      "couleur_vehicule": "blanc",',
+    '      "marque_vehicule": "Renault",',
+    '      "denonciation_check": {',
+    '        "date_remplie": true,',
+    '        "heure_remplie": true,',
+    '        "plaque_remplie": true,',
+    '        "motif_coche": true,',
+    '        "signature_presente": false,',
+    '        "observations": "Signature manquante en bas du formulaire"',
+    '      },',
+    '      "confiance_plaque": "haute",',
+    '      "confiance_deno": "haute"',
     '    }',
     '  ]',
     '}',
     '',
-    'RÈGLES :',
-    '- Format plaque suisse : XX 000 000 (2 lettres canton + espace + chiffres)',
-    '- num_denonciation : numéro sur le formulaire papier (photo Denonciation)',
-    '- num_macaron : numéro sur la vignette (photo Macaron)',
-    '- Ne jamais inventer — mettre null si illisible',
+    'RÈGLES IMPORTANTES :',
+    '',
+    '--- PLAQUE ---',
+    '- Format : chiffres+lettres sans espace ni tiret + /code_pays',
+    '- Exemples : GE123456/CH  VD98765/CH  AB123CD/F  M123456/F  W-AB1234/D',
+    '- Code pays : /CH (Suisse) /F (France) /D (Allemagne) /I (Italie) /E (Espagne) etc.',
+    '- Retirer tous les espaces et tirets de la plaque avant le /',
+    '- Si illisible : mettre null',
+    '',
+    '--- N° DÉNONCIATION ---',
+    '- Numéro visible sur le formulaire papier (photo Denonciation)',
+    '- Copier exactement tel qu\'écrit sur le formulaire',
+    '- Si illisible : mettre null',
+    '',
+    '--- MACARON ---',
+    '- num_macaron : numéro/code imprimé sur la vignette (photo Macaron)',
+    '- macaron_details : décrire couleur, année de validité, zone si visible',
+    '- Si pas de macaron : mettre null pour les deux',
+    '',
+    '--- VÉRIFICATION DÉNONCIATION (photo Denonciation) ---',
+    '- Vérifier si les champs clés sont remplis : date, heure, plaque, motif coché, signature',
+    '- observations : noter tout champ manquant ou illisible',
+    '- Si pas de photo dénonciation : mettre null pour denonciation_check',
+    '',
+    '- Ne jamais inventer — null si illisible',
     '- Conserver les IDs exacts ci-dessous',
     '',
     'VÉHICULES À ANALYSER (' + vehicles.length + ') :',
     ''
   ];
   vehicles.forEach((v, i) => {
+    const isInf = v.statut === 'infraction';
     lines.push('Véhicule ' + (i+1) + ' — ID: ' + v.id);
     lines.push('  Statut: ' + v.statut + (v.motif ? ' (' + v.motif + ')' : ''));
     lines.push('  Site: ' + v.site + ' | ' + new Date(v.created_at).toLocaleString('fr-CH'));
-    lines.push('  Fichiers: V'+(i+1)+'_Vehicule.jpg' +
-      (v.photo_denonciation_url ? ', V'+(i+1)+'_Denonciation.jpg' : '') +
-      (v.photo_parebrise_url    ? ', V'+(i+1)+'_Parebrise.jpg'    : '') +
-      (v.photo_macaron_url      ? ', V'+(i+1)+'_Macaron.jpg'      : ''));
+    const photos = ['V'+(i+1)+'_Vehicule.jpg'];
+    if (v.photo_denonciation_url) photos.push('V'+(i+1)+'_Denonciation.jpg');
+    if (v.photo_parebrise_url)    photos.push('V'+(i+1)+'_Parebrise.jpg');
+    if (v.photo_macaron_url)      photos.push('V'+(i+1)+'_Macaron.jpg');
+    lines.push('  Fichiers: ' + photos.join(', '));
+    if (!isInf) lines.push('  → Extraire plaque + détails macaron uniquement');
+    if (isInf)  lines.push('  → Extraire plaque + N° dénonciation + vérifier formulaire');
     lines.push('');
   });
   return lines;
@@ -711,13 +746,34 @@ async function applyClaudeResult() {
   for (const r of resultats) {
     if (!r.id) continue;
     try {
-      const { error } = await db.from('vehicles').update({
+      // Construire le remarque enrichi avec les infos IA
+      let remarqueIA = [];
+      if (r.macaron_details) remarqueIA.push('Macaron: ' + r.macaron_details);
+      if (r.denonciation_check) {
+        const dc = r.denonciation_check;
+        const manquants = [];
+        if (!dc.date_remplie) manquants.push('date');
+        if (!dc.heure_remplie) manquants.push('heure');
+        if (!dc.plaque_remplie) manquants.push('plaque');
+        if (!dc.motif_coche) manquants.push('motif');
+        if (!dc.signature_presente) manquants.push('signature');
+        if (manquants.length) remarqueIA.push('⚠️ Dénonciation — champs manquants: ' + manquants.join(', '));
+        if (dc.observations) remarqueIA.push('Note: ' + dc.observations);
+      }
+
+      const updateData = {
         plaque:           r.plaque           || null,
         num_denonciation: r.num_denonciation || null,
         num_macaron:      r.num_macaron      || null,
         ia_pending:       false,
         ia_processed_at:  new Date().toISOString()
-      }).eq('id', r.id);
+      };
+      // Ajouter les infos IA dans remarque si elles existent
+      if (remarqueIA.length) {
+        updateData.remarque = remarqueIA.join(' | ');
+      }
+
+      const { error } = await db.from('vehicles').update(updateData).eq('id', r.id);
       if (error) throw error;
       done++;
     } catch(e) { errors++; }
