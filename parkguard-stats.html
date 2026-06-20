@@ -119,25 +119,37 @@ select.ctrl-select:focus{outline:none;border-color:var(--red)}
 
   <!-- SECTION GUIDAGE DLCC -->
   <div id="section-guidage">
+    <!-- KPIs occupation -->
     <div class="section-title">&#127359; Taux d'occupation — Dernier relevé</div>
     <div class="card"><div class="card-body" id="gauges"></div></div>
-    <div class="section-title">&#128200; Évolution de l'occupation</div>
+    <!-- KPIs occupation résumé -->
+    <div class="kpi-grid" id="kpis-occupation" style="margin-bottom:20px"></div>
+    <!-- Courbe journée -->
+    <div class="section-title">&#128200; Évolution de l'occupation — Journée en cours</div>
     <div class="card"><div class="card-body" id="courbe-occupation"></div></div>
+    <!-- Tendance mensuelle -->
+    <div class="section-title">&#128197; Tendance d'occupation par mois</div>
+    <div class="card"><div class="card-body" id="tendance-occupation"></div></div>
+    <!-- Véhicules autorisés récurrents -->
+    <div class="section-title">&#9989; Véhicules autorisés récurrents</div>
+    <div class="card"><div class="card-body" id="recurrents-aut-guidage"></div></div>
   </div>
 
-  <!-- RÉCIDIVISTES -->
-  <div class="section-title">&#128680; Véhicules récidivistes (2+ infractions)</div>
-  <div class="card"><div class="card-body" id="recidivistes"></div></div>
-
-  <!-- HEATMAP -->
-  <div class="section-title">&#9989; Véhicules autorisés récurrents (2+ passages)</div>
-  <div class="card"><div class="card-body" id="recurrents-aut"></div></div>
-  <div class="section-title">&#9201;&#65039; Heatmap horaire des infractions</div>
-  <div class="card"><div class="card-body"><div id="heatmap"></div></div></div>
-
-  <!-- DISSUASION -->
-  <div class="section-title">&#128200; Tendance dissuasion (infractions par semaine)</div>
-  <div class="card"><div class="card-body" id="dissuasion"></div></div>
+  <!-- SECTIONS STANDARD (masquées pour guidage) -->
+  <div id="section-standard">
+    <!-- RÉCIDIVISTES -->
+    <div class="section-title">&#128680; Véhicules récidivistes (2+ infractions)</div>
+    <div class="card"><div class="card-body" id="recidivistes"></div></div>
+    <!-- AUTORISÉS RÉCURRENTS -->
+    <div class="section-title">&#9989; Véhicules autorisés récurrents (2+ passages)</div>
+    <div class="card"><div class="card-body" id="recurrents-aut"></div></div>
+    <!-- HEATMAP -->
+    <div class="section-title">&#9201;&#65039; Heatmap horaire des infractions</div>
+    <div class="card"><div class="card-body"><div id="heatmap"></div></div></div>
+    <!-- DISSUASION -->
+    <div class="section-title">&#128200; Tendance dissuasion (infractions par semaine)</div>
+    <div class="card"><div class="card-body" id="dissuasion"></div></div>
+  </div>
 
 </div>
 
@@ -242,20 +254,37 @@ function getRondes(vehicles){
 
 function renderAll(){
   const rondes=getRondes(allVehicles);
-  const inf=allVehicles.filter(v=>v.statut==='infraction');
-  const aut=allVehicles.filter(v=>v.statut==='autorise');
+  const inf=allVehicles.filter(function(v){return v.statut==='infraction';});
+  const aut=allVehicles.filter(function(v){return v.statut==='autorise';});
+  const isGuidage = currentSite && currentSite.type==='guidage';
   const siteBadge=document.getElementById('site-badge');
-  if(siteBadge)siteBadge.textContent=(currentSite?.type==='guidage'?'🔵':'🟢')+' '+currentSite?.nom;
+  if(siteBadge)siteBadge.textContent=(isGuidage?'🔵':'🟢')+' '+(currentSite?currentSite.nom:'');
 
+  // Sections selon type de site
+  var secGuidage  = document.getElementById('section-guidage');
+  var secStandard = document.getElementById('section-standard');
+  if(secGuidage)  secGuidage.style.display  = isGuidage ? 'block' : 'none';
+  if(secStandard) secStandard.style.display = isGuidage ? 'none'  : 'block';
+
+  // Sections communes
   renderDernierPassage(rondes);
-  renderKPIs(rondes,inf,aut);
   renderCalendrier(rondes);
-  renderRecidivistes(inf);
-  renderRecurrentsAut(aut);
-  renderHeatmap(inf);
-  renderDissuasion(rondes);
-  if(currentSite?.type==='guidage'){renderGauges();renderCourbeOccupation();}
-  else{const g=document.getElementById('section-guidage');if(g)g.style.display='none';}
+
+  if(isGuidage){
+    // Mode guidage : centré sur l'occupation
+    renderKPIsGuidage(rondes,aut);
+    renderGauges();
+    renderCourbeOccupation();
+    renderTendanceOccupation();
+    renderRecurrentsAutEl(aut,'recurrents-aut-guidage');
+  } else {
+    // Mode standard
+    renderKPIs(rondes,inf,aut);
+    renderRecidivistes(inf);
+    renderRecurrentsAut(aut);
+    renderHeatmap(inf);
+    renderDissuasion(rondes);
+  }
 }
 
 function renderDernierPassage(rondes){
@@ -280,6 +309,45 @@ function renderDernierPassage(rondes){
       '<div class="pstat"><div class="pstat-num">'+r.vehicles.length+'</div><div class="pstat-lbl">Total</div></div>'+
     '</div>'+
   '</div>';
+}
+
+function renderKPIsGuidage(rondes,aut){
+  const el=document.getElementById('kpis');
+  if(!el)return;
+  const zones=allZones.filter(function(z){return currentSite && z.site_id===currentSite.id;});
+  // Taux moyen toutes zones au dernier relevé
+  var tauxDernier=null, heureReleve='—';
+  if(allComptages.length && zones.length){
+    var lastReleve = allComptages[0];
+    if(lastReleve){
+      heureReleve = fmt(lastReleve.created_at)+' '+fmtH(lastReleve.created_at);
+      // Taux global = somme véhicules / somme places
+      var lastByZone={}; 
+      allComptages.forEach(function(c){if(!lastByZone[c.zone_id])lastByZone[c.zone_id]=c;});
+      var totVeh=0,totPl=0;
+      Object.values(lastByZone).forEach(function(c){totVeh+=c.vehicules_presents;totPl+=c.places_totales;});
+      tauxDernier=totPl>0?Math.round(totVeh/totPl*100):null;
+    }
+  }
+  // Taux moyen sur la période
+  var moyPeriode=null;
+  if(allComptages.length){
+    var tot=allComptages.reduce(function(s,c){return s+parseFloat(c.taux_occupation||0);},0);
+    moyPeriode=Math.round(tot/allComptages.length);
+  }
+  const start=getPeriodStart(currentPeriod);
+  const msPerWeek=7*24*3600000;
+  const nbWeeks=Math.max(1,(new Date()-start)/msPerWeek);
+  const objectif=getObjectifForDate(currentSite&&currentSite.id,start);
+  const objectifTotal=Math.round(objectif*nbWeeks);
+  const couverture=objectifTotal>0?Math.round((rondes.length/objectifTotal)*100):0;
+  const colorTaux=tauxDernier===null?'blue':tauxDernier>=90?'red':tauxDernier>=70?'orange':tauxDernier>=50?'amber':'green';
+
+  el.innerHTML=
+    '<div class="kpi-card blue"><div class="kpi-num blue">'+rondes.length+'</div><div class="kpi-label">Passages réalisés</div><div class="kpi-sub">Obj: '+objectifTotal+' · '+couverture+'% couverture</div></div>'+
+    (tauxDernier!==null?'<div class="kpi-card '+colorTaux+'"><div class="kpi-num '+colorTaux+'">'+tauxDernier+'%</div><div class="kpi-label">Taux occupation actuel</div><div class="kpi-sub">'+heureReleve+'</div></div>':'') +
+    (moyPeriode!==null?'<div class="kpi-card amber"><div class="kpi-num amber">'+moyPeriode+'%</div><div class="kpi-label">Taux moyen / période</div><div class="kpi-sub">Sur '+allComptages.length+' relevés</div></div>':'')+
+    '<div class="kpi-card green"><div class="kpi-num green">'+aut.length+'</div><div class="kpi-label">Véhicules autorisés</div><div class="kpi-sub">Sur la période</div></div>';
 }
 
 function renderKPIs(rondes,inf,aut){
@@ -520,6 +588,80 @@ function renderGauges(){
   });
   html+='</div>';
   el.innerHTML=html;
+}
+
+function renderTendanceOccupation(){
+  const el=document.getElementById('tendance-occupation');
+  if(!el)return;
+  const zones=allZones.filter(function(z){return currentSite&&z.site_id===currentSite.id;});
+  if(!allComptages.length){el.innerHTML='<div class="no-data">Aucun relevé disponible</div>';return;}
+  // Grouper par mois
+  const byMonth={};
+  allComptages.forEach(function(c){
+    const d=new Date(c.created_at);
+    const key=d.getFullYear()+'-'+pad(d.getMonth()+1);
+    if(!byMonth[key]){byMonth[key]={sum:0,count:0,label:['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][d.getMonth()]}}; 
+    byMonth[key].sum+=parseFloat(c.taux_occupation||0);
+    byMonth[key].count++;
+  });
+  const months=Object.keys(byMonth).sort();
+  if(months.length<2){el.innerHTML='<div class="no-data">Pas assez de données (min. 2 mois)</div>';return;}
+  const W=600,H=160,PAD={top:16,right:20,bottom:30,left:44};
+  const vals=months.map(function(k){return Math.round(byMonth[k].sum/byMonth[k].count);});
+  const maxV=100;
+  const xStep=(W-PAD.left-PAD.right)/Math.max(1,months.length-1);
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%">';
+  // Zones couleur fond
+  svg+='<rect x="'+PAD.left+'" y="'+PAD.top+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.3)+'" fill="#f0fdf4" opacity="0.5"/>';
+  svg+='<rect x="'+PAD.left+'" y="'+(PAD.top+Math.round((H-PAD.top-PAD.bottom)*0.3))+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.3)+'" fill="#fffbeb" opacity="0.5"/>';
+  svg+='<rect x="'+PAD.left+'" y="'+(PAD.top+Math.round((H-PAD.top-PAD.bottom)*0.6))+'" width="'+(W-PAD.left-PAD.right)+'" height="'+Math.round((H-PAD.top-PAD.bottom)*0.4)+'" fill="#fff1f2" opacity="0.5"/>';
+  // Grille
+  [0,25,50,75,100].forEach(function(pct){
+    var y=PAD.top+(H-PAD.top-PAD.bottom)*(1-pct/100);
+    svg+='<line x1="'+PAD.left+'" y1="'+y.toFixed(1)+'" x2="'+(W-PAD.right)+'" y2="'+y.toFixed(1)+'" stroke="var(--gray-border)" stroke-width="1"/>';
+    svg+='<text x="'+(PAD.left-6)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="9" fill="var(--gray-mid)">'+pct+'%</text>';
+  });
+  // Ligne
+  var pts=vals.map(function(v,i){
+    var x=PAD.left+i*xStep;
+    var y=PAD.top+(H-PAD.top-PAD.bottom)*(1-v/maxV);
+    return {x:x,y:y,v:v,lbl:byMonth[months[i]].label};
+  });
+  var path=pts.map(function(p,i){return (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' ');
+  var area=path+' L'+pts[pts.length-1].x.toFixed(1)+','+(H-PAD.bottom)+' L'+PAD.left+','+(H-PAD.bottom)+' Z';
+  svg+='<defs><linearGradient id="gOcc" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity=".3"/><stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/></linearGradient></defs>';
+  svg+='<path d="'+area+'" fill="url(#gOcc)"/>';
+  svg+='<path d="'+path+'" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linejoin="round"/>';
+  pts.forEach(function(p){
+    svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="4" fill="var(--blue)"/>';
+    svg+='<text x="'+p.x.toFixed(1)+'" y="'+(p.y-8).toFixed(1)+'" text-anchor="middle" font-size="10" font-weight="bold" fill="var(--blue)">'+p.v+'%</text>';
+    svg+='<text x="'+p.x.toFixed(1)+'" y="'+(H-PAD.bottom+14).toFixed(1)+'" text-anchor="middle" font-size="9" fill="var(--gray-mid)">'+p.lbl+'</text>';
+  });
+  svg+='</svg>';
+  svg+='<div style="display:flex;gap:16px;font-size:11px;margin-top:6px">';
+  svg+='<span style="color:var(--green)">■ &lt;50% Libre</span>';
+  svg+='<span style="color:var(--amber)">■ 50-75% Chargé</span>';
+  svg+='<span style="color:var(--red)">■ &gt;75% Saturé</span>';
+  svg+='</div>';
+  el.innerHTML=svg;
+}
+
+function renderRecurrentsAutEl(aut,elId){
+  const el=document.getElementById(elId);
+  if(!el)return;
+  const counts={};
+  aut.forEach(function(v){if(v.plaque&&v.plaque!=='null'){counts[v.plaque]=(counts[v.plaque]||0)+1;}});
+  const sorted=Object.entries(counts).filter(function(e){return e[1]>1;}).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+  if(!sorted.length){el.innerHTML='<div class="no-data">Aucun véhicule autorisé récurrent sur la période</div>';return;}
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(function(e,i){
+    var pct=Math.round(e[1]/max*100);
+    return '<div class="bar-row">'+
+      '<div class="bar-label">'+( i+1)+'. '+e[0]+'</div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)"></div></div>'+
+      '<div class="bar-val">'+e[1]+'x</div>'+
+    '</div>';
+  }).join('');
 }
 
 function renderCourbeOccupation(){
