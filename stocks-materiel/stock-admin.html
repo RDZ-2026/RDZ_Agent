@@ -1091,7 +1091,6 @@ async function addTailleEx(){
   }catch(e){toast('\u274c '+e.message);}
 }
 
-let NV_T=[];
 function setTP(preset){
   const p={std:['XS','S','M','L','XL','XXL','3XL'],shoes:['38','39','40','41','42','43','44','45','46'],pants:['36/34','38/34','40/34','42/34','44/34','46/34','48/34','50/34'],belt:['S/M','L/XL','XXL+'],uni:['Unique']};
   NV_T=[...(p[preset]||[])];renderNvT();
