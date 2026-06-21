@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>RDZ — Stock Terrain</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --red:#C8102E;--black:#1a1a1a;--white:#fff;
+  --gray-light:#f4f4f4;--gray-border:#e0e0e0;--gray-mid:#888;--gray-dark:#555;
+  --green:#1e7a1e;--green-light:#f0f8f0;--green-border:#86c986;
+  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fbbf24;
+  --blue:#2563eb;--blue-light:#eff6ff;
+  --radius:14px;--radius-sm:8px;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--gray-light);display:flex;flex-direction:column}
+
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--black);padding:0 16px;height:52px;display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--red);flex-shrink:0}
+.logo{font-size:16px;font-weight:900;color:#fff;letter-spacing:.06em}
+.logo span{color:var(--red)}
+.logo-sub{font-size:10px;color:#aaa;margin-left:6px;font-weight:600;letter-spacing:.05em}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sync-dot{width:8px;height:8px;border-radius:50%}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.loading{background:var(--amber);animation:blink 1s infinite}
+.sync-dot.err{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.admin-link{font-size:11px;color:#aaa;font-weight:700;text-decoration:none;padding:5px 9px;border:1px solid #333;border-radius:5px}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{background:var(--black);display:flex;border-top:2px solid #2a2a2a;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;cursor:pointer;border:none;background:none;color:#666;font-family:inherit;font-size:10px;font-weight:700;gap:3px;border-top:2px solid transparent;margin-top:-2px}
+.nav-btn.active{color:var(--red);border-top-color:var(--red)}
+.nav-btn .ni{font-size:22px}
+
+/* ── LAYOUT ── */
+.agent-bar{background:var(--white);border-bottom:1px solid var(--gray-border);padding:9px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.av{width:34px;height:34px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0}
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px}
+.content-nb{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sec-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--gray-mid);margin:14px 0 8px}
+
+/* ── STOCK ROW ── */
+.stock-row{background:var(--white);border-radius:var(--radius-sm);border:1px solid var(--gray-border);padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:8px;cursor:pointer}
+.stock-row:active{border-color:var(--red)}
+.si{font-size:24px;flex-shrink:0;width:34px;text-align:center}
+.sinfo{flex:1;min-width:0}
+.sname{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ssub{font-size:11px;color:var(--gray-mid);margin-top:1px}
+.sbar{height:4px;background:var(--gray-border);border-radius:99px;margin-top:5px;overflow:hidden}
+.sbar-f{height:100%;border-radius:99px;transition:.3s}
+.sqty{font-size:24px;font-weight:900;flex-shrink:0;line-height:1;min-width:36px;text-align:right}
+.stot{font-size:10px;color:var(--gray-mid);text-align:right}
+
+/* ── ACTION BTNS ── */
+.abtn{width:100%;padding:15px;border-radius:var(--radius);border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:9px}
+.abtn-red{background:var(--red);color:#fff}.abtn-red:active{background:#a50d26}
+.abtn-green{background:var(--green);color:#fff}.abtn-green:active{background:#165c16}
+.abtn-ghost{background:var(--white);color:var(--black);border:1.5px solid var(--gray-border)}.abtn-ghost:active{background:var(--gray-light)}
+.abtn-amber{background:var(--amber);color:#fff}
+.abtn-blue{background:var(--blue);color:#fff}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.bok{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
+.bwarn{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-border)}
+.balert{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+.bgray{background:var(--gray-light);color:var(--gray-dark);border:1px solid var(--gray-border)}
+
+/* ── FORM ── */
+.flbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray-dark);margin-bottom:5px;display:block}
+.fctrl{width:100%;padding:11px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-size:15px;font-family:inherit;color:var(--black);background:#fff;outline:none;margin-bottom:13px}
+.fctrl:focus{border-color:var(--red)}
+
+/* ── QTY ── */
+.qty-pick{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0}
+.qbtn{width:46px;height:46px;border-radius:50%;border:2px solid var(--gray-border);background:#fff;font-size:22px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center}
+.qbtn:active{border-color:var(--red);color:var(--red)}
+.qval{font-size:38px;font-weight:900;min-width:56px;text-align:center}
+
+/* ── CHIP ── */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:13px}
+.chip{padding:7px 13px;border-radius:99px;border:1.5px solid var(--gray-border);font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:var(--gray-dark)}
+.chip.sel{border-color:var(--red);background:var(--red);color:#fff}
+
+/* ── SHEET ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:none;align-items:flex-end}
+.overlay.show{display:flex}
+.sheet{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:92vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom);animation:up .25s ease}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.shandle{width:40px;height:4px;background:var(--gray-border);border-radius:99px;margin:12px auto 0}
+.shead{padding:13px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--gray-border)}
+.stitle{font-size:16px;font-weight:800}
+.sclose{background:none;border:none;font-size:22px;cursor:pointer;color:var(--gray-mid)}
+.sbody{padding:16px}
+.sfoot{padding:11px 16px;border-top:1px solid var(--gray-border)}
+
+/* ── INVENTAIRE ── */
+.inv-item{background:var(--white);border-radius:var(--radius-sm);border:1px solid var(--gray-border);padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:7px}
+.inv-in{width:56px;padding:7px;border:2px solid var(--gray-border);border-radius:var(--radius-sm);font-size:16px;font-weight:800;text-align:center;font-family:inherit;outline:none}
+.inv-in:focus{border-color:var(--red)}
+.inv-in.ok{border-color:var(--green);color:var(--green)}
+.inv-in.bad{border-color:var(--red);color:var(--red)}
+
+/* ── LOADING / EMPTY ── */
+.loading{display:flex;align-items:center;justify-content:center;padding:40px 16px;gap:10px;color:var(--gray-mid);font-size:13px;flex-direction:column}
+.spinner{width:30px;height:30px;border:3px solid var(--gray-border);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:32px 16px;color:var(--gray-mid)}
+
+/* ── IDENT ── */
+.ident-wrap{padding:32px 20px}
+.ident-h1{font-size:22px;font-weight:900;color:var(--black);margin-bottom:6px}
+.ident-sub{font-size:14px;color:var(--gray-mid);margin-bottom:28px;line-height:1.5}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--black);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none;border-left:4px solid var(--red)}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ IDENT ══════════════════════════ -->
+<div class="screen active" id="sc-ident">
+  <div class="topbar">
+    <div class="logo">RDZ<span>STOCK</span></div>
+    <div class="logo-sub">TERRAIN</div>
+    <div class="topbar-right">
+      <a href="stock-admin.html" class="admin-link">🖥️ Admin</a>
+    </div>
+  </div>
+  <div class="content">
+    <div class="ident-wrap">
+      <div class="ident-h1">Bonjour 👋</div>
+      <div class="ident-sub">Sélectionnez votre nom pour commencer</div>
+      <div id="ident-loading" class="loading"><div class="spinner"></div><span>Chargement des agents…</span></div>
+      <div id="ident-form" style="display:none">
+        <label class="flbl">Votre nom</label>
+        <select class="fctrl" id="agent-sel"><option value="">— Choisir —</option></select>
+        <button class="abtn abtn-red" onclick="loginAgent()">✅ Confirmer</button>
+      </div>
+      <div id="ident-err" style="display:none;color:var(--red);font-size:13px;margin-top:12px;text-align:center;line-height:1.5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ MAIN ══════════════════════════ -->
+<div class="screen" id="sc-main">
+  <div class="agent-bar">
+    <div class="av" id="av">?</div>
+    <div>
+      <div style="font-size:13px;font-weight:700" id="ag-name">—</div>
+      <div style="font-size:11px;color:var(--gray-mid)" id="ag-poste">—</div>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <div class="sync-dot loading" id="sdot"></div>
+      <button style="font-size:11px;color:var(--red);font-weight:700;background:none;border:1px solid var(--red);cursor:pointer;padding:4px 8px;border-radius:4px" onclick="logout()">Changer</button>
+    </div>
+  </div>
+  <div class="content-nb" id="tab-content"><div class="loading"><div class="spinner"></div></div></div>
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nb-stock"  onclick="showTab('stock')"><span class="ni">📦</span>Stock</button>
+    <button class="nav-btn"        id="nb-attr"   onclick="showTab('attr')"><span class="ni">🔄</span>Attribution</button>
+    <button class="nav-btn"        id="nb-maint"  onclick="showTab('maint')"><span class="ni">🔧</span>Maintenance</button>
+    <button class="nav-btn"        id="nb-vest"   onclick="showTab('vest')"><span class="ni">👕</span>Vestiaire</button>
+    <button class="nav-btn"        id="nb-inv"    onclick="showTab('inv')"><span class="ni">📋</span>Inventaire</button>
+  </div>
+</div>
+
+<!-- ══ SHEET SORTIE ══ -->
+<div class="overlay" id="sh-sortie">
+  <div class="sheet"><div class="shandle"></div>
+    <div class="shead"><div class="stitle">📤 Sortie matériel</div><button class="sclose" onclick="closeS('sh-sortie')">✕</button></div>
+    <div class="sbody">
+      <label class="flbl">Matériel</label>
+      <select class="fctrl" id="s-mat" onchange="updSortieInfo()"><option value="">Sélectionner…</option></select>
+      <div id="s-info" style="font-size:12px;color:var(--gray-mid);margin:-10px 0 12px;text-align:center"></div>
+      <label class="flbl">Site / Mission</label>
+      <select class="fctrl" id="s-site">
+        <option>Maison de la Paix</option><option>Parking Cornavin</option>
+        <option>Centre commercial Balexert</option><option>Aéroport Genève</option>
+        <option>Hôpital HUG</option><option>Mission spéciale</option>
+      </select>
+      <label class="flbl">Quantité</label>
+      <div class="qty-pick">
+        <button class="qbtn" onclick="chQ('sq',-1)">−</button>
+        <div class="qval" id="sq-d">1</div>
+        <button class="qbtn" onclick="chQ('sq',1)">+</button>
+        <input type="hidden" id="sq" value="1">
+      </div>
+      <label class="flbl">Note (optionnel)</label>
+      <input type="text" class="fctrl" id="s-note" placeholder="Ex : Radio #12" style="margin-bottom:0">
+    </div>
+    <div class="sfoot"><button class="abtn abtn-red" onclick="doSortie()">✅ Confirmer sortie</button></div>
+  </div>
+</div>
+
+<!-- ══ SHEET RETOUR ══ -->
+<div class="overlay" id="sh-retour">
+  <div class="sheet"><div class="shandle"></div>
+    <div class="shead"><div class="stitle">📥 Retour matériel</div><button class="sclose" onclick="closeS('sh-retour')">✕</button></div>
+    <div class="sbody">
+      <label class="flbl">Attribution à clore</label>
+      <select class="fctrl" id="r-attr"><option value="">Choisir…</option></select>
+      <label class="flbl">État au retour</label>
+      <div class="chips">
+        <span class="chip sel" onclick="selC(this,'r-etat','ok')">✅ Bon état</span>
+        <span class="chip" onclick="selC(this,'r-etat','defectueux')">⚠️ Défectueux</span>
+        <span class="chip" onclick="selC(this,'r-etat','hs')">🔴 Hors service</span>
+      </div>
+      <input type="hidden" id="r-etat" value="ok">
+    </div>
+    <div class="sfoot"><button class="abtn abtn-green" onclick="doRetour()">📥 Confirmer retour</button></div>
+  </div>
+</div>
+
+<!-- ══ SHEET MAINTENANCE ══ -->
+<div class="overlay" id="sh-maint">
+  <div class="sheet"><div class="shandle"></div>
+    <div class="shead"><div class="stitle">🔧 Signaler un problème</div><button class="sclose" onclick="closeS('sh-maint')">✕</button></div>
+    <div class="sbody">
+      <label class="flbl">Matériel concerné</label>
+      <select class="fctrl" id="m-mat"><option value="">Sélectionner…</option></select>
+      <label class="flbl">Type de problème</label>
+      <div class="chips">
+        <span class="chip sel" onclick="selC(this,'m-type','batterie')">🔋 Batterie HS</span>
+        <span class="chip" onclick="selC(this,'m-type','panne')">⚡ Panne</span>
+        <span class="chip" onclick="selC(this,'m-type','remplacement')">🔄 À remplacer</span>
+        <span class="chip" onclick="selC(this,'m-type','perdu')">❓ Perdu</span>
+      </div>
+      <input type="hidden" id="m-type" value="batterie">
+      <label class="flbl">Description</label>
+      <input type="text" class="fctrl" id="m-desc" placeholder="Décrivez le problème…" style="margin-bottom:0">
+    </div>
+    <div class="sfoot"><button class="abtn abtn-amber" onclick="doMaint()">🔧 Signaler</button></div>
+  </div>
+</div>
+
+<!-- ══ SHEET DOTATION ══ -->
+<div class="overlay" id="sh-dot">
+  <div class="sheet"><div class="shandle"></div>
+    <div class="shead"><div class="stitle">👕 Attribution tenue</div><button class="sclose" onclick="closeS('sh-dot')">✕</button></div>
+    <div class="sbody">
+      <label class="flbl">Agent bénéficiaire</label>
+      <select class="fctrl" id="d-ag"><option value="">Sélectionner…</option></select>
+      <label class="flbl">Article</label>
+      <select class="fctrl" id="d-art" onchange="updDotTailles()"><option value="">Sélectionner…</option></select>
+      <div id="d-taille-wrap" style="display:none">
+        <label class="flbl">Taille</label>
+        <select class="fctrl" id="d-taille"><option value="">—</option></select>
+      </div>
+      <label class="flbl">Quantité</label>
+      <div class="qty-pick">
+        <button class="qbtn" onclick="chQ('dq',-1)">−</button>
+        <div class="qval" id="dq-d">1</div>
+        <button class="qbtn" onclick="chQ('dq',1)">+</button>
+        <input type="hidden" id="dq" value="1">
+      </div>
+      <label class="flbl">Type</label>
+      <div class="chips">
+        <span class="chip sel" onclick="selC(this,'d-op','attribution')">📦 Attribution</span>
+        <span class="chip" onclick="selC(this,'d-op','remplacement')">🔄 Remplacement</span>
+        <span class="chip" onclick="selC(this,'d-op','supplement')">➕ Supplément</span>
+      </div>
+      <input type="hidden" id="d-op" value="attribution">
+    </div>
+    <div class="sfoot"><button class="abtn abtn-red" onclick="doDot()">✅ Valider attribution</button></div>
+  </div>
+</div>
+
+<!-- ══ SHEET RETOUR VEST ══ -->
+<div class="overlay" id="sh-rv">
+  <div class="sheet"><div class="shandle"></div>
+    <div class="shead"><div class="stitle">🔙 Retour tenue</div><button class="sclose" onclick="closeS('sh-rv')">✕</button></div>
+    <div class="sbody">
+      <label class="flbl">Agent</label>
+      <select class="fctrl" id="rv-ag" onchange="updRvItems()"><option value="">Sélectionner…</option></select>
+      <label class="flbl">Article à récupérer</label>
+      <select class="fctrl" id="rv-item"><option value="">Choisir…</option></select>
+      <label class="flbl">Motif</label>
+      <div class="chips">
+        <span class="chip sel" onclick="selC(this,'rv-motif','depart')">🚪 Départ agent</span>
+        <span class="chip" onclick="selC(this,'rv-motif','rebut')">🗑️ Mise au rebut</span>
+        <span class="chip" onclick="selC(this,'rv-motif','remplacement')">🔄 Remplacement</span>
+      </div>
+      <input type="hidden" id="rv-motif" value="depart">
+    </div>
+    <div class="sfoot"><button class="abtn abtn-green" onclick="doRetVest()">📥 Confirmer retour</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  ⚙️  CONFIG SUPABASE — REMPLIR CES 2 LIGNES
+// ═══════════════════════════════════════════════════
+const SB_URL  = 'https://VOTRE_PROJECT_ID.supabase.co';
+const SB_KEY  = 'VOTRE_ANON_KEY';
+
+// ═══════════════════════════════════════════════════
+//  CLIENT SUPABASE LÉGER (fetch direct, pas de SDK)
+// ═══════════════════════════════════════════════════
+const sb = {
+  H: {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
+  async get(t,p='')  { const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  async post(t,b)    { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  async patch(t,id,b){ const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  async rpc(fn,b)    { const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); }
+};
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let ME = null, TAB = 'stock', INV_MODE = 'stock', INV_SAISIE = {};
+let DB = { agents:[], stock:[], articles:[], tailles:{}, attr:[], maint:[], dots:[] };
+
+// ═══════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════
+const ini = n => n.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
+const ago = d => { const m=Math.floor((Date.now()-new Date(d))/60000); if(m<1)return 'à l\'instant'; if(m<60)return m+'min'; if(m<1440)return Math.floor(m/60)+'h'; return Math.floor(m/1440)+'j'; };
+const st  = item => item.quantite_dispo <= item.seuil_alerte/2 ? 'alert' : item.quantite_dispo <= item.seuil_alerte ? 'warn' : 'ok';
+const col = s => s==='ok'?'var(--green)':s==='warn'?'var(--amber)':'var(--red)';
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function openS(id)  { document.getElementById(id).classList.add('show'); }
+function closeS(id) { document.getElementById(id).classList.remove('show'); }
+function selC(el,hid,val){ el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); document.getElementById(hid).value=val; }
+function chQ(id,d)  { const i=document.getElementById(id),dp=document.getElementById(id+'-d'); let v=Math.max(1,parseInt(i.value)+d); i.value=v; dp.textContent=v; }
+function sync(s)    { document.getElementById('sdot').className='sync-dot '+s; }
+
+// ═══════════════════════════════════════════════════
+//  CHARGEMENT DONNÉES (tables préfixées stock_)
+// ═══════════════════════════════════════════════════
+async function loadAll() {
+  sync('loading');
+  try {
+    const [agents,stock,articles,tailles,attr,maint,dots] = await Promise.all([
+      sb.get('stock_agents','?actif=eq.true&order=nom'),
+      sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
+      sb.get('stock_vestiaire_items','?actif=eq.true&order=categorie,nom'),
+      sb.get('stock_tailles','?order=taille'),
+      sb.get('stock_attributions','?statut=eq.actif&order=date_sortie.desc'),
+      sb.get('stock_maintenances','?statut=eq.ouvert&order=date_signalement.desc'),
+      sb.get('stock_dotations','?statut=eq.actif'),
+    ]);
+    DB.agents=agents; DB.stock=stock; DB.articles=articles;
+    DB.tailles={};
+    tailles.forEach(t=>{ if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[]; DB.tailles[t.article_id].push(t); });
+    DB.attr=attr; DB.maint=maint; DB.dots=dots;
+    sync('ok'); return true;
+  } catch(e){ sync('err'); console.error(e); return false; }
+}
+
+async function loadAgents() {
+  try { DB.agents = await sb.get('stock_agents','?actif=eq.true&order=nom'); return DB.agents; }
+  catch(e){ return []; }
+}
+
+// ═══════════════════════════════════════════════════
+//  IDENTIFICATION
+// ═══════════════════════════════════════════════════
+async function initIdent() {
+  const agents = await loadAgents();
+  document.getElementById('ident-loading').style.display='none';
+  if(!agents.length){
+    document.getElementById('ident-err').style.display='block';
+    document.getElementById('ident-err').textContent='⚠️ Impossible de charger les agents.\nVérifiez SB_URL et SB_KEY dans le fichier HTML.';
+    return;
+  }
+  const sel=document.getElementById('agent-sel');
+  agents.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=a.nom+' — '+a.matricule; sel.appendChild(o); });
+  document.getElementById('ident-form').style.display='block';
+}
+
+function loginAgent() {
+  const id=document.getElementById('agent-sel').value;
+  if(!id){ toast('⚠️ Sélectionnez votre nom'); return; }
+  const agent=DB.agents.find(a=>a.id===id);
+  setAgent(agent);
+}
+
+async function setAgent(agent) {
+  ME=agent;
+  document.getElementById('av').textContent=ini(agent.nom);
+  document.getElementById('ag-name').textContent=agent.nom;
+  document.getElementById('ag-poste').textContent=agent.poste+' · '+agent.matricule;
+  document.getElementById('sc-ident').classList.remove('active');
+  document.getElementById('sc-main').classList.add('active');
+  const ok=await loadAll();
+  if(!ok) toast('⚠️ Connexion limitée — vérifiez le réseau');
+  fillSheets();
+  showTab('stock');
+}
+
+function logout(){ ME=null; document.getElementById('sc-main').classList.remove('active'); document.getElementById('sc-ident').classList.add('active'); }
+
+// ═══════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════
+function showTab(name) {
+  TAB=name;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nb-'+name).classList.add('active');
+  ({stock:rStock,attr:rAttr,maint:rMaint,vest:rVest,inv:rInv}[name]||rStock)();
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER STOCK
+// ═══════════════════════════════════════════════════
+function rStock(){
+  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
+    <div class="sec-lbl">Tap sur un article pour sortie rapide</div>
+    ${DB.stock.map(item=>{
+      const s=st(item),pct=Math.round(item.quantite_dispo/item.quantite_total*100);
+      return `<div class="stock-row" onclick="openSFor('${item.id}')">
+        <div class="si">${item.icon}</div>
+        <div class="sinfo"><div class="sname">${item.nom}</div><div class="ssub">Seuil : ${item.seuil_alerte}</div>
+          <div class="sbar"><div class="sbar-f" style="width:${pct}%;background:${col(s)}"></div></div></div>
+        <div><div class="sqty" style="color:${col(s)}">${item.quantite_dispo}</div><div class="stot">/ ${item.quantite_total}</div></div>
+      </div>`;
+    }).join('')}
+    <div style="height:6px"></div>
+    <button class="abtn abtn-red" onclick="openS('sh-sortie')">📤 Nouvelle sortie</button>
+    <button class="abtn abtn-ghost" onclick="openS('sh-retour')">📥 Enregistrer retour</button>
+  </div>`;
+}
+
+function openSFor(id){ document.getElementById('s-mat').value=id; updSortieInfo(); openS('sh-sortie'); }
+function updSortieInfo(){
+  const item=DB.stock.find(s=>s.id===document.getElementById('s-mat').value);
+  const el=document.getElementById('s-info');
+  if(item){ el.textContent=item.quantite_dispo+' disponible(s)'; el.style.color=col(st(item)); }
+  else el.textContent='';
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER ATTRIBUTION
+// ═══════════════════════════════════════════════════
+function rAttr(){
+  const mine=DB.attr.filter(a=>a.agent_id===ME?.id);
+  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
+    <div class="sec-lbl">Mes attributions actives</div>
+    ${mine.length?mine.map(attrCard).join(''):'<div class="empty">✅<br>Aucun matériel en votre possession</div>'}
+    <button class="abtn abtn-red" onclick="openS('sh-sortie')">📤 Sortie matériel</button>
+    <button class="abtn abtn-green" onclick="openS('sh-retour')">📥 Retour matériel</button>
+    <div class="sec-lbl" style="margin-top:6px">Toutes les attributions actives (${DB.attr.length})</div>
+    ${DB.attr.map(a=>attrCard(a,false)).join('')}
+  </div>`;
+}
+
+function attrCard(a,withBtn=true){
+  const hrs=Math.floor((Date.now()-new Date(a.date_sortie))/3600000);
+  const late=hrs>24;
+  return `<div style="background:var(--white);border-radius:var(--radius-sm);border:1px solid var(--gray-border);padding:11px;margin-bottom:7px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div>
+        <div style="font-size:13px;font-weight:700">${a.materiel_nom} ×${a.quantite}</div>
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:2px">👮 ${a.agent_nom} · 📍 ${a.site||'—'}${a.note?' · '+a.note:''}</div>
+        <div style="font-size:11px;color:${late?'var(--red)':'var(--gray-mid)'};margin-top:3px">⏱ ${ago(a.date_sortie)}${late?' — ⚠️ retard':''}</div>
+      </div>
+      ${withBtn?`<button style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0" onclick="quickRet('${a.id}')">📥 Retour</button>`:''}
+    </div>
+  </div>`;
+}
+
+function quickRet(id){ document.getElementById('r-attr').value=id; openS('sh-retour'); }
+
+// ═══════════════════════════════════════════════════
+//  RENDER MAINTENANCE
+// ═══════════════════════════════════════════════════
+function rMaint(){
+  const tL={batterie:'🔋 Batterie HS',panne:'⚡ Panne',remplacement:'🔄 À remplacer',perdu:'❓ Perdu'};
+  const tC={batterie:'var(--amber)',panne:'var(--red)',remplacement:'var(--amber)',perdu:'var(--red)'};
+  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
+    <button class="abtn abtn-amber" onclick="openS('sh-maint')">🔧 Signaler un problème</button>
+    <div class="sec-lbl">${DB.maint.length} signalement(s) ouvert(s)</div>
+    ${DB.maint.length?DB.maint.map(m=>`
+      <div style="background:var(--white);border-radius:var(--radius-sm);border:1px solid var(--gray-border);padding:11px;margin-bottom:7px">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px">
+          <div style="width:9px;height:9px;border-radius:50%;background:${tC[m.type_probleme]||'var(--amber)'};flex-shrink:0"></div>
+          <div style="font-size:13px;font-weight:700;flex:1">${m.materiel_nom}</div>
+          <span class="badge bwarn">${tL[m.type_probleme]||m.type_probleme}</span>
+        </div>
+        <div style="font-size:12px;color:var(--gray-dark);margin-bottom:3px">${m.description||'—'}</div>
+        <div style="font-size:11px;color:var(--gray-mid)">Par ${m.agent_nom||'—'} · ${ago(m.date_signalement)}</div>
+        <button onclick="closeMaint('${m.id}')" style="margin-top:8px;width:100%;background:none;border:1px solid var(--green-border);color:var(--green);border-radius:6px;padding:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Marquer résolu</button>
+      </div>`).join(''):'<div class="empty">✅<br>Aucun signalement ouvert</div>'}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER VESTIAIRE
+// ═══════════════════════════════════════════════════
+function rVest(){
+  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
+    <button class="abtn abtn-red" onclick="openS('sh-dot')">👕 Attribuer une tenue</button>
+    <button class="abtn abtn-ghost" onclick="openS('sh-rv')">🔙 Retour / Mise au rebut</button>
+    <div class="sec-lbl">Dotations agents</div>
+    ${DB.agents.map(agent=>{
+      const n=DB.dots.filter(d=>d.agent_id===agent.id).length,tot=8,pct=Math.round(n/tot*100);
+      const c=n>=tot?'var(--green)':n>0?'var(--amber)':'var(--red)';
+      return `<div class="stock-row">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--black);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0">${ini(agent.nom)}</div>
+        <div class="sinfo"><div class="sname">${agent.nom}</div><div class="ssub">${agent.matricule} · ${n}/${tot}</div>
+          <div class="sbar"><div class="sbar-f" style="width:${pct}%;background:${c}"></div></div></div>
+        <span class="badge ${n>=tot?'bok':n>0?'bwarn':'balert'}">${n>=tot?'Complet':n>0?'Partiel':'À équiper'}</span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER INVENTAIRE
+// ═══════════════════════════════════════════════════
+function rInv(){
+  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
+    <div style="background:var(--white);border-radius:var(--radius);border:1px solid var(--gray-border);padding:13px;margin-bottom:11px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--red);margin-bottom:9px">Mode d'inventaire</div>
+      <div class="chips">
+        <span class="chip ${INV_MODE==='stock'?'sel':''}" onclick="setInvMode('stock')">📦 Matériel</span>
+        <span class="chip ${INV_MODE==='vest'?'sel':''}"  onclick="setInvMode('vest')">👕 Vestiaire</span>
+      </div>
+      <button class="abtn abtn-blue" style="padding:12px;margin-bottom:0" onclick="valInv()">✅ Valider l'inventaire</button>
+    </div>
+    <div id="inv-items"></div>
+  </div>`;
+  rInvItems();
+}
+
+function setInvMode(m){ INV_MODE=m; INV_SAISIE={}; rInv(); }
+
+function rInvItems(){
+  const el=document.getElementById('inv-items'); if(!el)return;
+  const items=INV_MODE==='stock'?DB.stock:DB.articles;
+  el.innerHTML=items.map(item=>{
+    const ref=INV_MODE==='stock'?item.quantite_dispo:(DB.tailles[item.id]||[]).reduce((a,t)=>a+t.quantite,0);
+    const v=INV_SAISIE[item.id];
+    const cls=v===undefined?'':(v==ref?' ok':' bad');
+    const chk=v===undefined?'':(v==ref?'<span style="color:var(--green);font-size:18px">✓</span>':'<span style="color:var(--red);font-size:18px">✗</span>');
+    return `<div class="inv-item">
+      <span style="font-size:22px;width:32px;text-align:center;flex-shrink:0">${item.icon}</span>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700">${item.nom}</div>
+        <div style="font-size:11px;color:var(--gray-mid)">Théorique : <strong>${ref}</strong></div></div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <input type="number" min="0" class="inv-in${cls}" placeholder="—" value="${v!==undefined?v:''}"
+          oninput="INV_SAISIE['${item.id}']=this.value===''?undefined:parseInt(this.value);rInvItems()">
+        ${chk}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function valInv(){
+  const items=INV_MODE==='stock'?DB.stock:DB.articles;
+  const done=Object.keys(INV_SAISIE).filter(k=>INV_SAISIE[k]!==undefined).length;
+  if(!done){ toast('⚠️ Saisissez au moins une valeur'); return; }
+  const ecarts=items.filter(item=>{
+    const v=INV_SAISIE[item.id]; if(v===undefined)return false;
+    const ref=INV_MODE==='stock'?item.quantite_dispo:(DB.tailles[item.id]||[]).reduce((a,t)=>a+t.quantite,0);
+    return v!==ref;
+  });
+  try{
+    await sb.rpc('stock_log',{p_module:INV_MODE==='stock'?'materiel':'vestiaire',p_type_op:'inventaire',
+      p_agent_nom:ME?.nom||'—',p_article_nom:`Inventaire — ${done} articles, ${ecarts.length} écart(s)`,p_par:'Terrain'});
+  }catch(e){}
+  toast(`✅ Inventaire validé — ${done} saisis · ${ecarts.length} écart(s)`);
+  INV_SAISIE={}; rInvItems();
+}
+
+// ═══════════════════════════════════════════════════
+//  REMPLISSAGE SHEETS
+// ═══════════════════════════════════════════════════
+function fillSheets(){
+  // stock → sortie / maint
+  ['s-mat','m-mat'].forEach(id=>{
+    const sel=document.getElementById(id); while(sel.options.length>1)sel.remove(1);
+    DB.stock.forEach(s=>{ const o=document.createElement('option'); o.value=id==='s-mat'?s.id:s.nom; o.textContent=s.icon+' '+s.nom+(id==='s-mat'?' ('+s.quantite_dispo+' dispo)':''); sel.appendChild(o); });
+  });
+  // attributions → retour
+  const rAttr=document.getElementById('r-attr'); while(rAttr.options.length>1)rAttr.remove(1);
+  DB.attr.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=a.agent_nom+' — '+a.materiel_nom+' ×'+a.quantite; rAttr.appendChild(o); });
+  // agents → dot / rv
+  ['d-ag','rv-ag'].forEach(id=>{
+    const sel=document.getElementById(id); while(sel.options.length>1)sel.remove(1);
+    DB.agents.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=a.nom; sel.appendChild(o); });
+  });
+  // articles → dot
+  const dArt=document.getElementById('d-art'); while(dArt.options.length>1)dArt.remove(1);
+  DB.articles.forEach(a=>{ const o=document.createElement('option'); o.value=a.id; o.textContent=a.icon+' '+a.nom; dArt.appendChild(o); });
+}
+
+function updDotTailles(){
+  const id=document.getElementById('d-art').value;
+  const wrap=document.getElementById('d-taille-wrap'),sel=document.getElementById('d-taille');
+  while(sel.options.length>1)sel.remove(1);
+  if(!id){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  (DB.tailles[id]||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t.id+'|'+t.taille; o.textContent=t.taille+' ('+t.quantite+' dispo)'; sel.appendChild(o); });
+}
+
+function updRvItems(){
+  const agId=document.getElementById('rv-ag').value;
+  const sel=document.getElementById('rv-item'); while(sel.options.length>1)sel.remove(1);
+  if(!agId)return;
+  DB.dots.filter(d=>d.agent_id===agId).forEach(d=>{
+    const art=DB.articles.find(a=>a.id===d.article_id); if(!art)return;
+    const o=document.createElement('option'); o.value=d.id; o.textContent=art.icon+' '+art.nom+' — '+d.taille+' ×'+d.quantite; sel.appendChild(o);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  ACTIONS → SUPABASE (tables stock_)
+// ═══════════════════════════════════════════════════
+async function doSortie(){
+  const matId=document.getElementById('s-mat').value,site=document.getElementById('s-site').value;
+  const qty=parseInt(document.getElementById('sq').value),note=document.getElementById('s-note').value;
+  if(!matId){ toast('⚠️ Sélectionnez un matériel'); return; }
+  const item=DB.stock.find(s=>s.id===matId);
+  if(item.quantite_dispo<qty){ toast('❌ Stock insuffisant ('+item.quantite_dispo+' dispo)'); return; }
+  sync('loading');
+  try{
+    await sb.patch('stock_materiel_items',matId,{quantite_dispo:item.quantite_dispo-qty});
+    await sb.post('stock_attributions',{agent_id:ME.id,agent_nom:ME.nom,materiel_id:matId,materiel_nom:item.nom,quantite:qty,site,note,statut:'actif'});
+    await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'sortie',p_agent_nom:ME.nom,p_article_nom:item.nom,p_quantite:qty,p_site:site,p_note:note,p_par:'Terrain'});
+    await loadAll(); closeS('sh-sortie');
+    document.getElementById('s-note').value=''; document.getElementById('sq').value=1; document.getElementById('sq-d').textContent=1;
+    fillSheets(); toast('✅ Sortie — '+item.nom+' ×'+qty);
+    if(TAB==='stock')rStock(); else if(TAB==='attr')rAttr();
+  }catch(e){ sync('err'); toast('❌ '+e.message); }
+}
+
+async function doRetour(){
+  const attrId=document.getElementById('r-attr').value,etat=document.getElementById('r-etat').value;
+  if(!attrId){ toast('⚠️ Sélectionnez une attribution'); return; }
+  const a=DB.attr.find(x=>x.id===attrId),item=DB.stock.find(s=>s.id===a?.materiel_id);
+  sync('loading');
+  try{
+    if(etat!=='hs'&&item) await sb.patch('stock_materiel_items',item.id,{quantite_dispo:item.quantite_dispo+a.quantite});
+    await sb.patch('stock_attributions',attrId,{statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat});
+    if(etat==='hs') await sb.post('stock_maintenances',{materiel_nom:a.materiel_nom,type_probleme:'panne',description:'Retourné hors service',agent_id:a.agent_id,agent_nom:a.agent_nom});
+    await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'retour',p_agent_nom:a.agent_nom,p_article_nom:a.materiel_nom,p_quantite:a.quantite,p_site:a.site,p_par:'Terrain'});
+    await loadAll(); closeS('sh-retour'); fillSheets(); toast('📥 Retour — '+a.materiel_nom+' ×'+a.quantite);
+    if(TAB==='stock')rStock(); else if(TAB==='attr')rAttr();
+  }catch(e){ sync('err'); toast('❌ '+e.message); }
+}
+
+async function doMaint(){
+  const mat=document.getElementById('m-mat').value,type=document.getElementById('m-type').value,desc=document.getElementById('m-desc').value;
+  if(!mat||!desc){ toast('⚠️ Complétez tous les champs'); return; }
+  sync('loading');
+  try{
+    await sb.post('stock_maintenances',{materiel_nom:mat,type_probleme:type,description:desc,agent_id:ME.id,agent_nom:ME.nom});
+    await loadAll(); closeS('sh-maint'); document.getElementById('m-desc').value='';
+    toast('🔧 Problème signalé'); if(TAB==='maint')rMaint();
+  }catch(e){ sync('err'); toast('❌ '+e.message); }
+}
+
+async function closeMaint(id){
+  sync('loading');
+  try{
+    await sb.patch('stock_maintenances',id,{statut:'resolu',date_resolution:new Date().toISOString()});
+    await loadAll(); toast('✅ Signalement clôturé'); rMaint();
+  }catch(e){ toast('❌ '+e.message); }
+}
+
+async function doDot(){
+  const agId=document.getElementById('d-ag').value,artId=document.getElementById('d-art').value;
+  const tv=document.getElementById('d-taille').value,qty=parseInt(document.getElementById('dq').value),op=document.getElementById('d-op').value;
+  if(!agId||!artId||!tv){ toast('⚠️ Agent, article et taille requis'); return; }
+  const [tId,taille]=tv.split('|'),art=DB.articles.find(a=>a.id===artId),agent=DB.agents.find(a=>a.id===agId);
+  const tRow=(DB.tailles[artId]||[]).find(t=>t.id===tId);
+  if(!tRow||tRow.quantite<qty){ toast('❌ Stock insuffisant pour taille '+taille); return; }
+  sync('loading');
+  try{
+    await sb.patch('stock_tailles',tId,{quantite:tRow.quantite-qty});
+    const exist=DB.dots.find(d=>d.agent_id===agId&&d.article_id===artId);
+    if(exist) await sb.patch('stock_dotations',exist.id,{quantite:exist.quantite+qty,taille});
+    else await sb.post('stock_dotations',{agent_id:agId,article_id:artId,taille,quantite:qty});
+    await sb.rpc('stock_log',{p_module:'vestiaire',p_type_op:op,p_agent_nom:agent.nom,p_article_nom:art.nom,p_taille:taille,p_quantite:qty,p_par:'Terrain'});
+    await loadAll(); closeS('sh-dot');
+    document.getElementById('d-taille-wrap').style.display='none';
+    document.getElementById('dq').value=1; document.getElementById('dq-d').textContent=1;
+    toast('✅ '+art.nom+' taille '+taille+' → '+agent.nom);
+    if(TAB==='vest')rVest();
+  }catch(e){ sync('err'); toast('❌ '+e.message); }
+}
+
+async function doRetVest(){
+  const dotId=document.getElementById('rv-item').value,motif=document.getElementById('rv-motif').value;
+  if(!dotId){ toast('⚠️ Sélectionnez un article'); return; }
+  const dot=DB.dots.find(d=>d.id===dotId),art=DB.articles.find(a=>a.id===dot?.article_id);
+  if(!dot||!art)return;
+  sync('loading');
+  try{
+    if(motif!=='rebut'){
+      const tRow=(DB.tailles[art.id]||[]).find(t=>t.taille===dot.taille);
+      if(tRow) await sb.patch('stock_tailles',tRow.id,{quantite:tRow.quantite+dot.quantite});
+    }
+    await sb.patch('stock_dotations',dotId,{statut:motif==='rebut'?'rebut':'rendu'});
+    const agent=DB.agents.find(a=>a.id===dot.agent_id);
+    await sb.rpc('stock_log',{p_module:'vestiaire',p_type_op:'retour',p_agent_nom:agent?.nom||'—',p_article_nom:art.nom,p_taille:dot.taille,p_quantite:dot.quantite,p_note:motif,p_par:'Terrain'});
+    await loadAll(); closeS('sh-rv'); toast('🔙 Retour '+art.nom+' enregistré');
+    if(TAB==='vest')rVest();
+  }catch(e){ sync('err'); toast('❌ '+e.message); }
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+initIdent();
+</script>
+</body>
+</html>
