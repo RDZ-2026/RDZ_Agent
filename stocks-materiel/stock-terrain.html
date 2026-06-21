@@ -308,10 +308,12 @@ const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 //  CLIENT SUPABASE LÉGER (fetch direct, pas de SDK)
 // ═══════════════════════════════════════════════════
 const sb = {
-  H: {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
-  async get(t,p='')  { const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  H:  {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
+  Hp: {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=minimal'},
+  async get(t,p='')  { const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H});  if(!r.ok)throw new Error(await r.text()); return r.json(); },
   async post(t,b)    { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
-  async patch(t,id,b){ const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  async patch(t,id,b){ const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.Hp,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return true; },
+  async del(t,id)    { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:this.Hp}); if(!r.ok)throw new Error(await r.text()); return true; },
   async rpc(fn,b)    { const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); }
 };
 

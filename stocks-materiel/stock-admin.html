@@ -473,10 +473,12 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 //  CLIENT SUPABASE LÉGER
 // ═══════════════════════════════════════════════════
 const sb = {
-  H: {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
-  async get(t,p='')  { const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  H:  {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
+  Hp: {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=minimal'},
+  async get(t,p='')  { const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H});  if(!r.ok)throw new Error(await r.text()); return r.json(); },
   async post(t,b)    { const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
-  async patch(t,id,b){ const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); },
+  async patch(t,id,b){ const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.Hp,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return true; },
+  async del(t,id)    { const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:this.Hp}); if(!r.ok)throw new Error(await r.text()); return true; },
   async rpc(fn,b)    { const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',headers:this.H,body:JSON.stringify(b)}); if(!r.ok)throw new Error(await r.text()); return r.json(); }
 };
 
@@ -775,11 +777,24 @@ async function doEditAgent(){
   const poste=document.getElementById('ea-poste').value;
   const actif=document.getElementById('ea-actif').value==='true';
   if(!nom){toast('⚠️ Nom requis');return;}
+  // Vérifier unicité du matricule côté client avant d'envoyer
+  if(mat){
+    const conflit=DB.agents.find(a=>a.matricule===mat&&a.id!==id);
+    if(conflit){toast('⚠️ Matricule '+mat+' déjà utilisé par '+conflit.nom);return;}
+  }
   try{
-    await sb.patch('stock_agents',id,{nom,matricule:mat,poste,actif});
+    const body={nom,poste,actif};
+    if(mat) body.matricule=mat; // n'envoyer matricule que s'il est renseigné
+    await sb.patch('stock_agents',id,body);
     await loadAll(); closeM('m-edit-agent'); renderCfgAgents();
     toast('✅ Agent mis à jour');
-  }catch(e){toast('❌ '+e.message);}
+  }catch(e){
+    if(e.message.includes('23505')||e.message.includes('unique')){
+      toast('⚠️ Ce matricule est déjà utilisé par un autre agent');
+    } else {
+      toast('❌ '+e.message);
+    }
+  }
 }
 
 // ── MATÉRIEL ─────────────────────────────────────────
