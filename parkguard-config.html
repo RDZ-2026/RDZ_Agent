@@ -208,6 +208,13 @@ tr:hover td{background:#fafafa}
       <div id="zones-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
       <button class="btn btn-outline btn-sm" onclick="addZoneField()">+ Ajouter une zone</button>
     </div>
+    <!-- Codes infraction pour ce site -->
+    <div style="margin-top:14px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-mid);margin-bottom:8px">Codes d'infraction actifs sur ce site</div>
+      <div id="site-codes-list" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px;background:var(--gray-light);border-radius:var(--radius-sm)">
+        <div style="font-size:12px;color:var(--gray-mid)">Chargement...</div>
+      </div>
+    </div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn btn-green" onclick="saveSite()">&#10003; Enregistrer</button>
       <button class="btn btn-outline" onclick="closeModal('modal-site')">Annuler</button>
@@ -518,11 +525,13 @@ function openAddSite(){
   document.getElementById('guidage-zones').style.display='none';
   document.getElementById('zones-list').innerHTML='';
   zoneCount=0;
+  renderSiteCodesCheckboxes([]);
   openModal('modal-site');
 }
 function openEditSite(id){
   const s=allSites.find(x=>x.id===id);if(!s)return;
   editingSiteId=id;
+  renderSiteCodesCheckboxes(s.codes_infraction||[]);
   document.getElementById('modal-site-title').textContent='Modifier — '+s.nom;
   document.getElementById('s-id').value=s.id;
   document.getElementById('s-nom').value=s.nom;
@@ -556,6 +565,26 @@ async function deleteSite(id,nom) {
   toast('\u2705 Site supprim\u00e9');
   await loadSites();await loadZones();renderSites();
 }
+function renderSiteCodesCheckboxes(activeCodes) {
+  const el = document.getElementById('site-codes-list');
+  if(!el) return;
+  if(!allCodes.length) {
+    el.innerHTML='<div style="font-size:12px;color:var(--gray-mid)">Aucun code configuré — ajoutez-en dans l\'onglet Références</div>';
+    return;
+  }
+  el.innerHTML = allCodes.map(function(c) {
+    const checked = activeCodes.length===0 || activeCodes.includes(c.code);
+    return '<label style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid '+(checked?'var(--red)':'var(--gray-border)')+';border-radius:20px;padding:5px 12px;cursor:pointer;font-size:13px;font-weight:600">' +
+      '<input type="checkbox" class="site-code-cb" value="'+c.code+'"'+(checked?' checked':'')+' style="accent-color:var(--red)">' +
+      c.code+' <span style="font-weight:400;color:var(--gray-mid)">'+c.libelle+'</span>' +
+    '</label>';
+  }).join('');
+}
+
+function getSelectedCodes() {
+  return Array.from(document.querySelectorAll('.site-code-cb:checked')).map(function(el){ return el.value; });
+}
+
 async function saveSite(){
   const id=document.getElementById('s-id').value;
   const nom=document.getElementById('s-nom').value.trim();
@@ -566,7 +595,9 @@ async function saveSite(){
     type:document.getElementById('s-type').value,
     places_totales:parseInt(document.getElementById('s-places').value)||0,
     heure_jour_debut:document.getElementById('s-heure-debut').value+':00',
-    heure_jour_fin:document.getElementById('s-heure-fin').value+':00',actif:true
+    heure_jour_fin:document.getElementById('s-heure-fin').value+':00',
+    codes_infraction: getSelectedCodes(),
+    actif:true
   };
   let siteId=id;
   if(id){

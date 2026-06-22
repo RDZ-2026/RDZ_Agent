@@ -455,16 +455,12 @@ async function loadReferences() {
       MARQUES_LOGOS = marques.filter(function(m){ return m.logo_url; })
         .map(function(m){ return {nom: m.nom, src: m.logo_url}; });
     }
-    // Mettre à jour la liste déroulante motif
-    const codesOpts = codes ? codes.map(function(c) { return c.code + ' - ' + c.libelle; }) : null;
-    if (codesOpts) STEPS.infraction[1].fields[0].opts = codesOpts;
+    updateCodesInfraction(codes || []);
   } catch(e) {
     _refCache.codes      = JSON.parse(localStorage.getItem('pg_codes_inf') || '[]');
     _refCache.categories = JSON.parse(localStorage.getItem('pg_cats_veh')  || '[]');
     _refCache.marques    = JSON.parse(localStorage.getItem('pg_marques')    || '[]');
-    if (_refCache.codes.length) {
-      STEPS.infraction[1].fields[0].opts = _refCache.codes.map(function(c) { return c.code + ' - ' + c.libelle; });
-    }
+    if (_refCache.codes.length) updateCodesInfraction(_refCache.codes);
     if (_refCache.marques.length) {
       MARQUES_LOGOS = _refCache.marques.filter(function(m){ return m.logo_url; })
         .map(function(m){ return {nom: m.nom, src: m.logo_url}; });
@@ -512,6 +508,13 @@ function buildRappelBlock() {
     '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
       '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:8px">Catégories véhicules</div>' +
       catsHtml +
+    '</div>' +
+
+    // Agent en service
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Agent en service</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--black)">' + (currentAgent||'—') + '</div>' +
+      ((window._currentAgentData&&window._currentAgentData.matricule)?'<div style="font-size:12px;color:var(--gray-dark);margin-top:2px">Matricule : ' + window._currentAgentData.matricule + '</div>':'') +
     '</div>' +
 
     // Dénonciateur
@@ -618,14 +621,20 @@ async function syncPending() {
 function selectSite(site, type) {
   currentSite = site;
   currentSiteType = type || 'standard';
+  // Aller vers sélection agent
+  currentAgent = null; window._currentAgentData = null;
+  showScreen('s-home');
+}
+
+function startRonde() {
   currentRoundId = uid();
   roundVehicles = [];
-  document.getElementById('round-site-name').textContent = site;
-  document.getElementById('round-sub').textContent = 'Démarré à ' + nowStr() + ' · ' + currentAgent;
+  document.getElementById('round-site-name').textContent = currentSite;
+  document.getElementById('round-sub').textContent = 'Démarré à ' + nowStr() + ' · ' + (currentAgent||'—');
   document.getElementById('active-round-wrap').style.display = 'block';
-  document.getElementById('active-round-name').textContent = site;
+  document.getElementById('active-round-name').textContent = currentSite;
   updateRoundStats();
-  // Adapter l'écran selon le type de site
+  updateCodesInfraction(_refCache.codes || []);
   adaptRoundScreen();
   showScreen('s-round');
 }
@@ -870,7 +879,7 @@ function updateRoundStats() {
 function closeRound() {
   currentSite = null; currentRoundId = null; roundVehicles = [];
   document.getElementById('active-round-wrap').style.display = 'none';
-  showScreen('s-select-agent');
+  showScreen('s-home');
 }
 
 function waitAndLoadTerrain(n) {
@@ -1402,6 +1411,22 @@ async function loadSitesAndAgents() {
           : 'Hors ligne — données sauvegardées localement';
     }
   }
+}
+
+function updateCodesInfraction(allCodes) {
+  // Filtrer selon les codes actifs du site courant
+  var sites = window._sitesCache || [];
+  var site  = sites.find(function(s){ return s.nom === currentSite; });
+  var actifs = site && site.codes_infraction && site.codes_infraction.length
+    ? site.codes_infraction
+    : null; // null = tous les codes
+  var filtered = actifs
+    ? allCodes.filter(function(c){ return actifs.includes(c.code); })
+    : allCodes;
+  if (!filtered.length) filtered = allCodes; // fallback
+  STEPS.infraction[1].fields[0].opts = filtered.map(function(c){ return c.code + ' - ' + c.libelle; });
+  // Valeur par défaut = premier code
+  if (filtered.length) flowFields.motif = filtered[0].code + ' - ' + filtered[0].libelle;
 }
 
 function renderAgentsList(agents) {
