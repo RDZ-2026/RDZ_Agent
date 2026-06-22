@@ -623,8 +623,6 @@ function selectSite(site, type) {
   currentSiteType = type || 'standard';
   currentAgent = null;
   window._currentAgentData = null;
-  // Recharger la liste agents pour ce site si besoin
-  loadSitesAndAgents();
   showScreen('s-select-agent');
 }
 
@@ -1377,7 +1375,7 @@ async function loadSitesAndAgents() {
   try {
     const [{ data: sites }, { data: agents }] = await Promise.all([
       db.from('sites').select('id,nom,type,adresse').eq('actif', true).order('nom'),
-      db.from('agents').select('id,nom,prenom,matricule,actif').order('nom')
+      db.from('agents').select('id,nom,prenom,matricule,actif').eq('actif', true).order('nom')
     ]);
 
     // Sauvegarder en cache localStorage pour usage hors ligne
@@ -1472,15 +1470,17 @@ function selectAgentIdx(i) {
   const a = window._agentsCache && window._agentsCache[i];
   if (!a) return;
   currentAgent = ((a.prenom||'').trim()+' '+(a.nom||'').trim()).trim() || a.nom;
+  window._currentAgentData = a;
   const agentBadge = document.getElementById('agent-badge');
-  if (agentBadge) agentBadge.textContent = '\u{1F464} ' + a.nom;
-  showScreen('s-home');
+  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + currentAgent;
+  startRonde();
 }
 function selectAgent(nom) {
   currentAgent = nom;
+  window._currentAgentData = {nom: nom};
   const agentBadge = document.getElementById('agent-badge');
-  if (agentBadge) agentBadge.textContent = '\u{1F464} ' + nom;
-  showScreen('s-home');
+  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + nom;
+  startRonde();
 }
 function selectSiteIdx(i) {
   const s = window._sitesCache && window._sitesCache[i];
