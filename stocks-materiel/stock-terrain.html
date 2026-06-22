@@ -802,6 +802,55 @@ function rAcces(){
     +'</div>';
 }
 
+function openRemise(){
+  const now=new Date();
+  const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  document.getElementById('ac-date').value=local;
+  fillAccesSheets();
+  openS('sh-acces');
+}
+
+function openRetourAcces(){
+  fillAccesSheets();
+  const sel=document.getElementById('ar-remise');
+  while(sel.options.length>1)sel.remove(1);
+  DB.acces.filter(a=>a.statut==='actif').forEach(a=>{
+    const o=document.createElement('option');
+    o.value=a.id;
+    o.textContent=(a.item_type==='badge'?'🪪':'🔑')+' '+a.item_nom+' → '+a.receptionnaire_nom+' ('+a.site_nom+')';
+    sel.appendChild(o);
+  });
+  document.getElementById('ar-detail').style.display='none';
+  openS('sh-acces-retour');
+}
+
+function fillAccesSheets(){
+  [['ac-site',DB.acesSites],['ac-agent',DB.agents],['ac-item',DB.acesItems],['ac-recept',DB.acesRecept]].forEach(function(pair){
+    const sel=document.getElementById(pair[0]);
+    if(!sel)return;
+    const cur=sel.value;
+    while(sel.options.length>1)sel.remove(1);
+    pair[1].forEach(function(item){
+      const o=document.createElement('option');
+      o.value=item.id;
+      o.textContent=item.nom+(item.societe?' ('+item.societe+')':'');
+      sel.appendChild(o);
+    });
+    if(cur)sel.value=cur;
+  });
+  const sel=document.getElementById('ar-remise');
+  if(sel){
+    sel.onchange=function(){
+      const a=DB.acces.find(x=>x.id===sel.value);
+      const el=document.getElementById('ar-detail');
+      if(a){
+        el.style.display='block';
+        el.innerHTML='🔑 '+a.item_nom+' · 📍 '+a.site_nom+'<br>👮 '+a.agent_nom+' → 👤 '+a.receptionnaire_nom+(a.notes?'<br>📝 '+a.notes:'');
+      } else el.style.display='none';
+    };
+  }
+}
+
 async function doRemise(){
   const siteId=document.getElementById('ac-site').value;
   const agentId=document.getElementById('ac-agent').value;
