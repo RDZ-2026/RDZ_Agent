@@ -127,6 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   <button class="nav-item" id="nav-stock" onclick="go('stock')"><span class="ni">📦</span>Stock matériel</button>
   <button class="nav-item" id="nav-hmat"  onclick="go('hmat')"><span class="ni">📜</span>Historique</button>
   <button class="nav-item" id="nav-maint" onclick="go('maint')"><span class="ni">🔧</span>Maintenance <span class="nav-bdg" id="nb-m">—</span></button>
+  <button class="nav-item" id="nav-acces" onclick="go('acces')"><span class="ni">🔑</span>Clés & Badges</button>
   <div class="sb-sec">Vestiaire</div>
   <button class="nav-item" id="nav-vest"  onclick="go('vest')"><span class="ni">👕</span>Stock tenues</button>
   <button class="nav-item" id="nav-dot"   onclick="go('dot')"><span class="ni">👮</span>Dotations</button>
@@ -199,6 +200,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   <div class="sec-title" style="margin-top:18px">Résolus récemment</div><div id="maint-closed"></div>
 </div>
 
+<!-- ACCÈS CLÉS/BADGES -->
+<div class="panel" id="panel-acces">
+  <div class="phdr">
+    <div><div class="ptitle">🔑 Clés & Badges</div><div class="psub">Registre des remises à des tiers</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g btn-sm" onclick="go('cfg');setTimeout(()=>setCfg('acces'),100)">⚙️ Configurer</button>
+    </div>
+  </div>
+  <div class="g3 mb20" id="acces-kpi"></div>
+  <div class="sec-title">Remises actives</div>
+  <div id="acces-actifs"></div>
+  <div class="sec-title" style="margin-top:18px">Historique complet</div>
+  <div class="card"><div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>Date remise</th><th>Site</th><th>Agent</th><th>Clé / Badge</th><th>Réceptionnaire</th><th>Statut</th><th>Notes</th></tr></thead>
+      <tbody id="acces-hist-body"></tbody>
+    </table>
+  </div></div>
+</div>
+
 <!-- STOCK VESTIAIRE -->
 <div class="panel" id="panel-vest">
   <div class="phdr">
@@ -264,6 +285,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     <button class="cfg-tab" id="ctab-agents" onclick="setCfg('agents')" style="background:var(--red);color:#fff">👮 Agents</button>
     <button class="cfg-tab" id="ctab-mat"    onclick="setCfg('mat')"    style="background:none;color:var(--gray-mid)">📦 Matériel</button>
     <button class="cfg-tab" id="ctab-vest"   onclick="setCfg('vest')"   style="background:none;color:var(--gray-mid)">👕 Vestiaire</button>
+    <button class="cfg-tab" id="ctab-acces"  onclick="setCfg('acces')"  style="background:none;color:var(--gray-mid)">🔑 Accès</button>
   </div>
   <div id="cfg-agents-p">
     <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
@@ -486,6 +508,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-tailles')">Fermer</button></div>
 </div></div>
 
+  <div id="cfg-acces-p" style="display:none">
+    <div class="g3" style="margin-bottom:18px">
+      <div>
+        <div class="sec-title">Sites</div>
+        <div class="card" id="cfg-acces-sites"></div>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('site')">➕ Ajouter site</button>
+      </div>
+      <div>
+        <div class="sec-title">Clés & Badges</div>
+        <div class="card" id="cfg-acces-items"></div>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('item')">➕ Ajouter clé/badge</button>
+      </div>
+      <div>
+        <div class="sec-title">Réceptionnaires</div>
+        <div class="card" id="cfg-acces-recept"></div>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('recept')">➕ Ajouter réceptionnaire</button>
+      </div>
+    </div>
+  </div>
+
+<!-- MODAL ACCÈS ITEM -->
+<div class="moverlay" id="m-acces-item"><div class="modal">
+  <div class="mhead"><div class="mtitle" id="acces-item-title">➕ Ajouter</div><button class="mclose" onclick="closeM('m-acces-item')">✕</button></div>
+  <div class="mbody">
+    <input type="hidden" id="ai-type">
+    <div class="fg"><label class="fl" id="ai-label-nom">Nom</label><input type="text" class="fc" id="ai-nom" placeholder=""></div>
+    <div id="ai-type-wrap" style="display:none">
+      <div class="fg"><label class="fl">Type</label>
+        <div class="chips" id="ai-type-chips">
+          <span class="chip sel" onclick="selC(this,'ai-item-type','clé')">🔑 Clé</span>
+          <span class="chip" onclick="selC(this,'ai-item-type','badge')">🪪 Badge</span>
+          <span class="chip" onclick="selC(this,'ai-item-type','autre')">📦 Autre</span>
+        </div>
+        <input type="hidden" id="ai-item-type" value="clé">
+      </div>
+    </div>
+    <div id="ai-societe-wrap" style="display:none">
+      <div class="fg"><label class="fl">Société / Organisation</label><input type="text" class="fc" id="ai-societe" placeholder="Ex : Entreprise ABC"></div>
+    </div>
+    <div class="fg"><label class="fl">Description (optionnel)</label><input type="text" class="fc" id="ai-desc" placeholder=""></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-acces-item')">Annuler</button><button class="btn btn-p" onclick="doSaveAccesItem()">✅ Enregistrer</button></div>
+</div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -502,7 +568,7 @@ const sb={
 };
 
 let PANEL='dash';
-let DB={agents:[],stock:[],articles:[],tailles:{},attr:[],maint:[],dots:[],histMat:[],histVest:[]};
+let DB={agents:[],stock:[],articles:[],tailles:{},attr:[],maint:[],dots:[],histMat:[],histVest:[],acces:[],acesSites:[],acesItems:[],acesRecept:[]};
 let NV_T=[],EDIT_ART_ID=null;
 
 const ini=n=>n.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
@@ -522,7 +588,7 @@ function alItems(arr){return arr.length?arr.map(i=>`<div class="al-item ${i.t}">
 async function loadAll(){
   sync('loading','Synchronisation…');
   try{
-    const [agents,stock,articles,tailles,attr,maint,dots,histMat,histVest]=await Promise.all([
+    const [agents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
       sb.get('stock_agents','?actif=eq.true&order=nom'),
       sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
       sb.get('stock_vestiaire_items','?actif=eq.true&order=categorie,nom'),
@@ -532,8 +598,12 @@ async function loadAll(){
       sb.get('stock_dotations','?statut=eq.actif'),
       sb.get('stock_historique','?module=eq.materiel&order=created_at.desc&limit=100'),
       sb.get('stock_historique','?module=eq.vestiaire&order=created_at.desc&limit=100'),
+      sb.get('stock_acces','?order=date_remise.desc&limit=100'),
+      sb.get('stock_acces_sites','?actif=eq.true&order=nom'),
+      sb.get('stock_acces_items','?actif=eq.true&order=nom'),
+      sb.get('stock_acces_recept','?actif=eq.true&order=nom'),
     ]);
-    DB={agents,stock,articles,tailles:{},attr,maint,dots,histMat,histVest};
+    DB={agents,stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept};
     tailles.forEach(t=>{if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[];DB.tailles[t.article_id].push(t);});
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
@@ -550,7 +620,7 @@ function calcAlerts(){
   return n;
 }
 async function refresh(){await loadAll();renderPanel();toast('🔄 Données actualisées');}
-function renderPanel(){({dash:rDash,stock:rStock,hmat:rHmat,maint:rMaint,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
+function renderPanel(){({dash:rDash,stock:rStock,hmat:rHmat,maint:rMaint,acces:rAcces,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
 function go(n){
   PANEL=n;
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -896,6 +966,16 @@ function rAlert(){
   document.getElementById('al-vest').innerHTML=alItems(av);
   document.getElementById('al-ret').innerHTML=alItems(ar);
   document.getElementById('al-inv').innerHTML=alItems(invEcarts);
+  // Accès retard (bonus - inject after al-inv if element exists)
+  const acesRetard=DB.acces.filter(a=>a.statut==='actif'&&Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24)
+    .map(a=>({t:'warn',icon:'🔑',title:'Clé/Badge non rendu — '+a.item_nom,sub:a.receptionnaire_nom+' · '+a.site_nom+' · depuis '+Math.floor((Date.now()-new Date(a.date_remise))/3600000/24)+'j'}));
+  const alInvEl=document.getElementById('al-inv');
+  if(acesRetard.length){
+    const div=document.createElement('div');div.id='al-acces';
+    div.innerHTML='<div class="sec-title" style="margin-top:18px">🔑 Clés/Badges non rendus</div>'+alItems(acesRetard);
+    if(!document.getElementById('al-acces'))alInvEl.parentNode.appendChild(div);
+    else document.getElementById('al-acces').innerHTML=div.innerHTML;
+  }
 }
 
 // ═══ AUDIT ═══
@@ -947,7 +1027,7 @@ function rAudit(){
 // === CONFIG ===
 function rCfg(){setCfg('agents');}
 function setCfg(n){
-  ['agents','mat','vest'].forEach(t=>{
+  ['agents','mat','vest','acces'].forEach(t=>{
     document.getElementById('cfg-'+t+'-p').style.display=t===n?'block':'none';
     const btn=document.getElementById('ctab-'+t);
     btn.style.background=t===n?'var(--red)':'none';
@@ -956,6 +1036,7 @@ function setCfg(n){
   if(n==='agents')rCfgAgents();
   if(n==='mat')rCfgMat();
   if(n==='vest')rCfgVest();
+  if(n==='acces')rCfgAcces();
 }
 function rCfgAgents(){
   document.getElementById('cfg-agents-list').innerHTML=DB.agents.map(a=>`
@@ -1235,6 +1316,120 @@ async function doDot(){
     await sb.rpc('stock_log',{p_module:'vestiaire',p_type_op:'attribution',p_agent_nom:agent.nom,p_article_nom:art.nom,p_taille:taille,p_quantite:qty,p_par:'Admin'});
     await loadAll();closeM('m-dot');rDot();toast('\u2705 '+art.nom+' taille '+taille+' \u2192 '+agent.nom);
   }catch(e){toast('\u274c '+e.message);}
+}
+
+
+// ═══ ACCÈS CLÉS/BADGES ═══
+function rAcces(){
+  const actifs=DB.acces.filter(a=>a.statut==='actif');
+  const total=DB.acces.length;
+  const retard=actifs.filter(a=>Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24).length;
+  document.getElementById('acces-kpi').innerHTML=`
+    <div class="sbox cblue"><div class="snum" style="color:var(--blue)">${actifs.length}</div><div class="slbl">Remises actives</div></div>
+    <div class="sbox ${retard>0?'cred':'cgreen'}"><div class="snum" style="color:var(--${retard>0?'red':'green'})">${retard}</div><div class="slbl">En retard (+24h)</div></div>
+    <div class="sbox cgold"><div class="snum" style="color:#b45309">${total}</div><div class="slbl">Total remises</div></div>`;
+  document.getElementById('acces-actifs').innerHTML=actifs.length?actifs.map(a=>{
+    const hrs=Math.floor((Date.now()-new Date(a.date_remise))/3600000);
+    const late=hrs>24;
+    return `<div class="card mb14">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <span style="font-size:28px">${a.item_type==='badge'?'🪪':'🔑'}</span>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700">${a.item_nom}</div>
+          <div style="font-size:12px;color:var(--gray-mid);margin-top:3px">📍 ${a.site_nom} · 👮 ${a.agent_nom}</div>
+          <div style="font-size:12px;margin-top:3px">👤 <strong>${a.receptionnaire_nom}</strong>${a.receptionnaire_societe?' — '+a.receptionnaire_societe:''}</div>
+          <div style="font-size:11px;color:${late?'var(--red)':'var(--gray-mid)'};margin-top:3px">
+            🕐 ${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+            ${late?' — ⚠️ '+Math.floor(hrs/24)+'j sans retour':''}
+          </div>
+          ${a.notes?`<div style="font-size:11px;color:var(--gray-dark);margin-top:4px;padding:6px 8px;background:var(--gray-light);border-radius:4px">📝 ${a.notes}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <span class="badge ${late?'balert':'bwarn'}">${late?'⚠️ Retard':'En cours'}</span>
+          <button class="btn btn-ok btn-sm" onclick="doRetourAccesAdmin('${a.id}','${a.item_nom}')">↩️ Retour</button>
+        </div>
+      </div>
+    </div>`;
+  }).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucune remise active</div>';
+
+  document.getElementById('acces-hist-body').innerHTML=DB.acces.map(a=>`<tr>
+    <td style="font-size:11px;color:var(--gray-mid);white-space:nowrap">${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
+    <td>${a.site_nom}</td>
+    <td>${a.agent_nom}</td>
+    <td><span style="font-size:16px">${a.item_type==='badge'?'🪪':'🔑'}</span> ${a.item_nom}</td>
+    <td><strong>${a.receptionnaire_nom}</strong>${a.receptionnaire_societe?'<br><span style="font-size:11px;color:var(--gray-mid)">'+a.receptionnaire_societe+'</span>':''}</td>
+    <td><span class="badge ${a.statut==='rendu'?'bok':'bwarn'}">${a.statut==='rendu'?'✅ Rendu':'En cours'}</span>
+      ${a.statut==='rendu'&&a.date_retour_reel?`<br><span style="font-size:10px;color:var(--gray-mid)">${new Date(a.date_retour_reel).toLocaleDateString('fr-FR')}</span>`:''}
+    </td>
+    <td style="font-size:12px;color:var(--gray-mid);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.notes||'—'}</td>
+  </tr>`).join('');
+}
+
+async function doRetourAccesAdmin(id,nom){
+  if(!confirm('Confirmer le retour de "'+nom+'" ?'))return;
+  try{
+    await sb.patch('stock_acces',id,{statut:'rendu',date_retour_reel:new Date().toISOString()});
+    await loadAll();rAcces();toast('↩️ Retour de '+nom+' enregistré');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+// ═══ CONFIG ACCÈS ═══
+function rCfgAcces(){
+  const listHTML=(arr,type)=>arr.map(item=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">${item.nom}${item.societe?' <span style=\"font-size:11px;color:var(--gray-mid);font-weight:400\">('+item.societe+')</span>':''}</div>
+        ${item.type?`<div style="font-size:11px;color:var(--gray-mid)">${item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre'}</div>`:''}
+      </div>
+      <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"
+        onclick="archiveAccesItem('${item.id}','${type}','${item.nom}')">🗑️</button>
+    </div>`).join('')||'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun élément</div>';
+  document.getElementById('cfg-acces-sites').innerHTML=listHTML(DB.acesSites,'site');
+  document.getElementById('cfg-acces-items').innerHTML=listHTML(DB.acesItems,'item');
+  document.getElementById('cfg-acces-recept').innerHTML=listHTML(DB.acesRecept,'recept');
+}
+
+function openNewAccesItem(type){
+  document.getElementById('ai-type').value=type;
+  document.getElementById('ai-nom').value='';
+  document.getElementById('ai-desc').value='';
+  document.getElementById('ai-societe').value='';
+  document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
+  document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
+  const titles={site:'➕ Ajouter un site',item:'➕ Ajouter une clé / badge',recept:'➕ Ajouter un réceptionnaire'};
+  const labels={site:'Nom du site',item:'Nom de la clé / badge',recept:'Nom du réceptionnaire'};
+  document.getElementById('acces-item-title').textContent=titles[type];
+  document.getElementById('ai-label-nom').textContent=labels[type];
+  document.getElementById('m-acces-item').classList.add('show');
+}
+
+async function doSaveAccesItem(){
+  const type=document.getElementById('ai-type').value;
+  const nom=document.getElementById('ai-nom').value.trim();
+  const desc=document.getElementById('ai-desc').value.trim();
+  const societe=document.getElementById('ai-societe').value.trim();
+  const itemType=document.getElementById('ai-item-type').value;
+  if(!nom){toast('⚠️ Nom requis');return;}
+  const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
+  const bodies={
+    site:{nom,actif:true},
+    item:{nom,type:itemType,description:desc||null,actif:true},
+    recept:{nom,societe:societe||null,actif:true}
+  };
+  try{
+    await sb.post(tables[type],bodies[type]);
+    await loadAll();closeM('m-acces-item');rCfgAcces();
+    toast('✅ Ajouté : '+nom);
+  }catch(e){toast('❌ '+e.message);}
+}
+
+async function archiveAccesItem(id,type,nom){
+  if(!confirm('Supprimer "'+nom+'" ?'))return;
+  const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
+  try{
+    await sb.patch(tables[type],id,{actif:false});
+    await loadAll();rCfgAcces();toast('🗑️ '+nom+' supprimé');
+  }catch(e){toast('❌ '+e.message);}
 }
 
 // INIT
