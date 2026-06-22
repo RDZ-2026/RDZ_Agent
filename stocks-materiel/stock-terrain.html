@@ -748,8 +748,11 @@ async function doRetVest(){
 
 /* ═══ ACCÈS CLÉS/BADGES ═══ */
 function rAcces(){
-  const actifs=DB.acces.filter(a=>a.statut==='actif');
   const ago2=d=>{const m=Math.floor((Date.now()-new Date(d))/60000);if(m<60)return m+'min';if(m<1440)return Math.floor(m/60)+'h';return Math.floor(m/1440)+'j';};
+  const acSiteFlt=document.getElementById('ac-flt-site')?.value||'';
+  const acItemFlt=document.getElementById('ac-flt-item')?.value||'';
+  const actifs=DB.acces.filter(a=>a.statut==='actif');
+  const actifsFiltered=actifs.filter(a=>(!acSiteFlt||a.site_nom===acSiteFlt)&&(!acItemFlt||a.item_nom===acItemFlt));
 
   let actifsHTML='<div class="empty">✅<br>Aucune remise en cours</div>';
   if(actifsFiltered.length){
@@ -789,9 +792,6 @@ function rAcces(){
       +'</div>';
   });
 
-  const acSiteFlt=document.getElementById('ac-flt-site')?.value||'';
-  const acItemFlt=document.getElementById('ac-flt-item')?.value||'';
-  const actifsFiltered=actifs.filter(a=>(!acSiteFlt||a.site_nom===acSiteFlt)&&(!acItemFlt||a.item_nom===acItemFlt));
   document.getElementById('tab-content').innerHTML=
     '<div class="content" style="padding-bottom:8px">'
     +'<div style="display:flex;gap:8px;margin-bottom:14px">'
