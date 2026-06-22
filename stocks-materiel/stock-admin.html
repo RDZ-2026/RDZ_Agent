@@ -24,7 +24,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .sync-dot{width:7px;height:7px;border-radius:50%}
 .sync-dot.ok{background:var(--green)}.sync-dot.loading{background:var(--amber);animation:blink 1s infinite}.sync-dot.err{background:var(--red)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.app{display:flex;flex:1;overflow:hidden}
+.app{display:flex;flex:1;overflow:hidden;min-height:0}
 .sidebar{width:var(--sidebar);background:var(--black);flex-shrink:0;overflow-y:auto;border-right:1px solid #222;padding:10px 0}
 .sb-sec{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#444;padding:14px 16px 5px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;color:#aaa;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-size:13px;font-weight:600;font-family:inherit;border-right:3px solid transparent;transition:.1s}
@@ -32,7 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .nav-item.active{background:rgba(200,16,46,.12);color:#fff;border-right-color:var(--red)}
 .nav-item .ni{font-size:17px;flex-shrink:0;width:22px;text-align:center}
 .nav-bdg{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:99px}
-.main{flex:1;overflow-y:auto;padding:22px}
+.main{flex:1;overflow-y:auto;padding:22px;min-width:0}
 .panel{display:none}.panel.active{display:block}
 .phdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px}
 .ptitle{font-size:20px;font-weight:900;color:var(--black)}
@@ -554,7 +554,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 </div></div>
 
   <div id="cfg-acces-p" style="display:none">
-    <div style="display:flex;flex-direction:column;gap:16px;max-width:700px">
+    <div style="display:flex;flex-direction:column;gap:16px">
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div class="sec-title" style="margin-bottom:0">📍 Sites</div>
