@@ -1374,7 +1374,7 @@ async function saveEntry() {
 async function loadSitesAndAgents() {
   try {
     const [{ data: sites }, { data: agents }] = await Promise.all([
-      db.from('sites').select('id,nom,type,adresse').eq('actif', true).order('nom'),
+      db.from('sites').select('id,nom,type,adresse,codes_infraction,heure_jour_debut,heure_jour_fin').eq('actif', true).order('nom'),
       db.from('agents').select('id,nom,prenom,matricule,actif').eq('actif', true).order('nom')
     ]);
 
