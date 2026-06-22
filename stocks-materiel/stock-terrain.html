@@ -313,7 +313,7 @@ function rStock(){
       <button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openS('sh-retour')">📥 Retour</button>
     </div>
     <div class="sec-lbl" style="margin-top:0">Tap sur un article pour sortie rapide</div>
-    ${DB.stock.map(item=>{
+    ${[...DB.stock].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(item=>{
       const s=stm(item),pct=Math.round(item.quantite_dispo/item.quantite_total*100)||0;
       return `<div class="stock-row tap" onclick="sortieRapide('${item.id}')">
         <div class="si">${item.icon}</div>
@@ -446,7 +446,7 @@ function rVest(){
       <button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openS('sh-rv')">🔙 Retour</button>
     </div>
     <div class="sec-lbl" style="margin-top:0">Stock disponible (consultation)</div>
-    ${DB.articles.map(art=>{
+    ${[...DB.articles].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(art=>{
       const ts=DB.tailles[art.id]||[];const tot=ts.reduce((a,t)=>a+t.quantite,0);
       const hasOut=ts.some(t=>t.quantite===0);const hasLow=ts.some(t=>t.quantite>0&&t.quantite<=art.seuil_alerte);
       const pills=ts.map(t=>`<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;
@@ -752,8 +752,8 @@ function rAcces(){
   const ago2=d=>{const m=Math.floor((Date.now()-new Date(d))/60000);if(m<60)return m+'min';if(m<1440)return Math.floor(m/60)+'h';return Math.floor(m/1440)+'j';};
 
   let actifsHTML='<div class="empty">✅<br>Aucune remise en cours</div>';
-  if(actifs.length){
-    actifsHTML=actifs.map(function(a){
+  if(actifsFiltered.length){
+    actifsHTML=actifsFiltered.map(function(a){
       const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
       const icon=a.item_type==='badge'?'🪪':'🔑';
       const societe=a.receptionnaire_societe?' ('+a.receptionnaire_societe+')':'';
@@ -789,13 +789,24 @@ function rAcces(){
       +'</div>';
   });
 
+  const acSiteFlt=document.getElementById('ac-flt-site')?.value||'';
+  const acItemFlt=document.getElementById('ac-flt-item')?.value||'';
+  const actifsFiltered=actifs.filter(a=>(!acSiteFlt||a.site_nom===acSiteFlt)&&(!acItemFlt||a.item_nom===acItemFlt));
   document.getElementById('tab-content').innerHTML=
     '<div class="content" style="padding-bottom:8px">'
     +'<div style="display:flex;gap:8px;margin-bottom:14px">'
     +'<button class="abtn abtn-red" style="flex:1;margin-bottom:0" onclick="openRemise()">🔑 Nouvelle remise</button>'
     +'<button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openRetourAcces()">↩️ Retour</button>'
     +'</div>'
-    +'<div class="sec-lbl">Remises actives ('+actifs.length+')</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
+    +'<select class="fctrl-sm" id="ac-flt-site" onchange="rAcces()" style="flex:1;min-width:120px"><option value="">Tous sites</option>'
+    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.site_nom))].sort().map(s=>'<option value="'+s+'"'+(s===acSiteFlt?' selected':'')+'>'+s+'</option>').join('')
+    +'</select>'
+    +'<select class="fctrl-sm" id="ac-flt-item" onchange="rAcces()" style="flex:1;min-width:120px"><option value="">Toutes clés/badges</option>'
+    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.item_nom))].sort().map(i=>'<option value="'+i+'"'+(i===acItemFlt?' selected':'')+'>'+i+'</option>').join('')
+    +'</select>'
+    +'</div>'
+    +'<div class="sec-lbl" style="margin-top:0">Remises actives ('+actifsFiltered.length+')</div>'
     +actifsHTML
     +'<div class="sec-lbl" style="margin-top:8px">Dernières remises</div>'
     +histHTML
@@ -903,11 +914,11 @@ function fillSheets(){
     if(cur)sel.value=cur;
   });
   const sM=document.getElementById('s-mat');
-  if(sM){while(sM.options.length>1)sM.remove(1);DB.stock.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.icon+' '+s.nom+' ('+s.quantite_dispo+' dispo)';sM.appendChild(o);});}
+  if(sM){while(sM.options.length>1)sM.remove(1);[...DB.stock].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.icon+' '+s.nom+' ('+s.quantite_dispo+' dispo)';sM.appendChild(o);});}
   const mM=document.getElementById('m-mat');
-  if(mM){while(mM.options.length>1)mM.remove(1);DB.stock.forEach(s=>{const o=document.createElement('option');o.value=s.nom;o.textContent=s.icon+' '+s.nom;mM.appendChild(o);});}
+  if(mM){while(mM.options.length>1)mM.remove(1);[...DB.stock].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{const o=document.createElement('option');o.value=s.nom;o.textContent=s.icon+' '+s.nom;mM.appendChild(o);});}
   const dA=document.getElementById('d-art');
-  if(dA){while(dA.options.length>1)dA.remove(1);DB.articles.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.icon+' '+a.nom;dA.appendChild(o);});}
+  if(dA){while(dA.options.length>1)dA.remove(1);[...DB.articles].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.icon+' '+a.nom;dA.appendChild(o);});}
 }
 
 /* ═══ INIT ═══ */

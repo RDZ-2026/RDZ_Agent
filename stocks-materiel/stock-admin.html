@@ -174,12 +174,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 <div class="panel" id="panel-hmat">
   <div class="phdr">
     <div><div class="ptitle">📜 Historique matériel</div></div>
-    <select class="fc" id="hm-type" style="width:auto" onchange="rHmat()">
-      <option value="">Tous types</option>
-      <option value="sortie">Sorties</option>
-      <option value="retour">Retours</option>
-      <option value="inventaire">Inventaires</option>
-    </select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="fc" id="hm-type" style="width:auto" onchange="rHmat()">
+        <option value="">Tous types</option>
+        <option value="sortie">Sorties</option>
+        <option value="retour">Retours</option>
+        <option value="inventaire">Inventaires</option>
+      </select>
+      <select class="fc" id="hm-agent" style="width:auto" onchange="rHmat()">
+        <option value="">Tous les agents</option>
+      </select>
+      <input type="text" class="fc" id="hm-search" style="width:160px" placeholder="🔍 Article…" oninput="rHmat()">
+    </div>
   </div>
   <div class="card"><div style="overflow-x:auto">
     <table class="tbl">
@@ -193,7 +199,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 <div class="panel" id="panel-maint">
   <div class="phdr">
     <div><div class="ptitle">🔧 Maintenance</div></div>
-    <button class="btn btn-p btn-sm" onclick="openNewMaint()">➕ Créer ticket</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select class="fc" id="maint-filter-type" style="width:auto" onchange="rMaint()">
+        <option value="">Tous types</option>
+        <option value="batterie">🔋 Batterie HS</option>
+        <option value="panne">⚡ Panne</option>
+        <option value="remplacement">🔄 Remplacement</option>
+        <option value="perdu">❓ Perdu</option>
+      </select>
+      <select class="fc" id="maint-filter-statut" style="width:auto" onchange="rMaint()">
+        <option value="open">Ouverts / En cours</option>
+        <option value="resolu">Résolus</option>
+        <option value="">Tous</option>
+      </select>
+      <button class="btn btn-p btn-sm" onclick="openNewMaint()">➕ Créer ticket</button>
+    </div>
   </div>
   <div class="g3 mb20" id="maint-kpi"></div>
   <div class="sec-title">Tickets ouverts / en cours</div><div id="maint-open"></div>
@@ -209,9 +229,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     </div>
   </div>
   <div class="g3 mb20" id="acces-kpi"></div>
-  <div class="sec-title">Remises actives</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
+    <div class="sec-title" style="margin-bottom:0">Remises actives</div>
+    <div style="display:flex;gap:8px">
+      <select class="fc" id="ac-filter-actif-site" style="width:auto" onchange="rAcces()">
+        <option value="">Tous sites</option>
+      </select>
+      <select class="fc" id="ac-filter-actif-item" style="width:auto" onchange="rAcces()">
+        <option value="">Toutes clés/badges</option>
+      </select>
+    </div>
+  </div>
   <div id="acces-actifs"></div>
-  <div class="sec-title" style="margin-top:18px">Historique complet</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:11px;flex-wrap:wrap;gap:8px">
+    <div class="sec-title" style="margin-bottom:0">Historique complet</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="fc" id="ac-filter-statut" style="width:auto" onchange="rAcces()">
+        <option value="">Tous statuts</option>
+        <option value="actif">En cours</option>
+        <option value="rendu">Rendus</option>
+      </select>
+      <select class="fc" id="ac-filter-item" style="width:auto" onchange="rAcces()">
+        <option value="">Toutes clés/badges</option>
+      </select>
+      <select class="fc" id="ac-filter-site" style="width:auto" onchange="rAcces()">
+        <option value="">Tous sites</option>
+      </select>
+    </div>
+  </div>
   <div class="card"><div style="overflow-x:auto">
     <table class="tbl">
       <thead><tr><th>Date remise</th><th>Site</th><th>Agent</th><th>Clé / Badge</th><th>Réceptionnaire</th><th>Statut</th><th>Notes</th></tr></thead>
@@ -509,28 +554,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 </div></div>
 
   <div id="cfg-acces-p" style="display:none">
-    <div class="g2" style="margin-bottom:14px;align-items:start">
-      <!-- Colonne gauche : Sites + Clés/Badges -->
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="sec-title" style="margin-bottom:0">Sites</div>
-            <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
-          </div>
-          <div class="card" id="cfg-acces-sites"></div>
-        </div>
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="sec-title" style="margin-bottom:0">Clés & Badges</div>
-            <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
-          </div>
-          <div class="card" id="cfg-acces-items"></div>
-        </div>
-      </div>
-      <!-- Colonne droite : Réceptionnaires -->
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:700px">
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div class="sec-title" style="margin-bottom:0">Réceptionnaires</div>
+          <div class="sec-title" style="margin-bottom:0">📍 Sites</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-sites"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">🔑 Clés & Badges</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-items"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">👤 Réceptionnaires</div>
           <button class="btn btn-p btn-sm" onclick="openNewAccesItem('recept')">➕ Ajouter</button>
         </div>
         <div class="card" id="cfg-acces-recept"></div>
@@ -722,7 +763,19 @@ function updAjInfo(){
 // ═══ HISTORIQUE MAT ═══
 function rHmat(){
   const ft=document.getElementById('hm-type')?.value||'';
-  const rows=DB.histMat.filter(h=>!ft||h.type_op===ft);
+  const fa=document.getElementById('hm-agent')?.value||'';
+  const fs=(document.getElementById('hm-search')?.value||'').toLowerCase();
+  // Populate agent filter
+  const agSel=document.getElementById('hm-agent');
+  if(agSel&&agSel.options.length<2){
+    const names=[...new Set(DB.histMat.map(h=>h.agent_nom).filter(Boolean))].sort();
+    names.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;agSel.appendChild(o);});
+  }
+  const rows=DB.histMat.filter(h=>
+    (!ft||h.type_op===ft)&&
+    (!fa||h.agent_nom===fa)&&
+    (!fs||h.article_nom.toLowerCase().includes(fs))
+  );
   document.getElementById('hmat-body').innerHTML=rows.map(h=>`<tr class="cl" onclick="openHistDetail('${h.id}','mat')">
     <td style="font-size:11px;color:var(--gray-mid);white-space:nowrap">${fmt(h.created_at)}</td>
     <td><strong>${h.agent_nom||'—'}</strong></td>
@@ -763,8 +816,17 @@ async function delHist(id,mod){
 
 // ═══ MAINTENANCE ═══
 function rMaint(){
-  const open=DB.maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours');
-  const closed=DB.maint.filter(m=>m.statut==='resolu').slice(0,5);
+  const ft=document.getElementById('maint-filter-type')?.value||'';
+  const fs=document.getElementById('maint-filter-statut')?.value;
+  const filterStatut=fs===undefined?'open':fs;
+  const open=DB.maint.filter(m=>
+    (m.statut==='ouvert'||m.statut==='en_cours')&&
+    (!ft||m.type_probleme===ft)
+  );
+  const closed=DB.maint.filter(m=>m.statut==='resolu'&&(!ft||m.type_probleme===ft)).slice(0,10);
+  // Show/hide sections based on filter
+  const showOpen=filterStatut==='open'||filterStatut==='';
+  const showClosed=filterStatut==='resolu'||filterStatut==='';
   const tL={batterie:'🔋 Batterie HS',panne:'⚡ Panne',remplacement:'🔄 À remplacer',perdu:'❓ Perdu'};
   const stColor={ouvert:'var(--red)',en_cours:'var(--amber)',resolu:'var(--green)'};
   const stLabel={ouvert:'🔴 Ouvert',en_cours:'🟡 En cours',resolu:'✅ Résolu'};
@@ -787,8 +849,8 @@ function rMaint(){
       </div>
     </div>
   </div>`;
-  document.getElementById('maint-open').innerHTML=open.length?open.map(card).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucun ticket ouvert</div>';
-  document.getElementById('maint-closed').innerHTML=closed.length?closed.map(card).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:6px 0">—</div>';
+  document.getElementById('maint-open').innerHTML=showOpen?(open.length?open.map(card).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucun ticket ouvert</div>'):'';
+  document.getElementById('maint-closed').innerHTML=showClosed?(closed.length?closed.map(card).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:6px 0">—</div>'):'';
 }
 function openNewMaint(){
   document.getElementById('maint-edit-id').value='';
@@ -1331,9 +1393,23 @@ async function doDot(){
 
 // ═══ ACCÈS CLÉS/BADGES ═══
 function rAcces(){
-  const actifs=DB.acces.filter(a=>a.statut==='actif');
+  // Populate filter selects
+  ['ac-filter-item','ac-filter-actif-item'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.item_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
+  ['ac-filter-site','ac-filter-actif-site'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.site_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
+  const fStatut=document.getElementById('ac-filter-statut')?.value||'';
+  const fItem=document.getElementById('ac-filter-item')?.value||'';
+  const fSite=document.getElementById('ac-filter-site')?.value||'';
+  const fActifSite=document.getElementById('ac-filter-actif-site')?.value||'';
+  const fActifItem=document.getElementById('ac-filter-actif-item')?.value||'';
+  const actifs=DB.acces.filter(a=>a.statut==='actif'&&(!fActifSite||a.site_nom===fActifSite)&&(!fActifItem||a.item_nom===fActifItem));
   const total=DB.acces.length;
-  const retard=actifs.filter(a=>Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24).length;
+  const retard=DB.acces.filter(a=>a.statut==='actif'&&Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24).length;
   document.getElementById('acces-kpi').innerHTML=`
     <div class="sbox cblue"><div class="snum" style="color:var(--blue)">${actifs.length}</div><div class="slbl">Remises actives</div></div>
     <div class="sbox ${retard>0?'cred':'cgreen'}"><div class="snum" style="color:var(--${retard>0?'red':'green'})">${retard}</div><div class="slbl">En retard (+24h)</div></div>
@@ -1362,7 +1438,8 @@ function rAcces(){
     </div>`;
   }).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucune remise active</div>';
 
-  document.getElementById('acces-hist-body').innerHTML=DB.acces.map(a=>`<tr>
+  const filteredAcces=DB.acces.filter(a=>(!fStatut||a.statut===fStatut)&&(!fItem||a.item_nom===fItem)&&(!fSite||a.site_nom===fSite));
+  document.getElementById('acces-hist-body').innerHTML=filteredAcces.map(a=>`<tr>
     <td style="font-size:11px;color:var(--gray-mid);white-space:nowrap">${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
     <td>${a.site_nom}</td>
     <td>${a.agent_nom}</td>
