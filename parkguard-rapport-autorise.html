@@ -103,9 +103,8 @@ body{font-family:Arial,sans-serif;background:#f2f2f2;padding:1.5rem 1rem}
         <div class="field-row full" style="margin-bottom:14px">
           <div class="field"><label>Plaque d'immatriculation</label><div class="field-val plate" id="v-plaque">—</div></div>
         </div>
-        <div class="field-row">
-          <div class="field"><label>N° Macaron</label><div class="field-val" id="v-macaron" style="font-weight:700;color:#1e6b1e;font-size:16px">—</div></div>
-          <div class="field"><label>Détails macaron</label><div class="field-val" id="v-macaron-details">—</div></div>
+        <div class="field-row full">
+          <div class="field"><label>N° Macaron</label><div class="field-val" id="v-macaron" style="font-weight:700;color:#1e6b1e;font-size:22px">—</div></div>
         </div>
         <div class="field-row full" style="margin-top:10px">
           <div class="field"><label>Remarques</label><div class="field-val" id="v-remarque" style="min-height:36px">—</div></div>
@@ -201,7 +200,6 @@ function loadData() {
   var motifVal = data.motif || '—';
   if (motifVal.startsWith('PARKING_VIDE')) motifVal = '—';
   var macaronEl = document.getElementById('v-macaron'); if(macaronEl) macaronEl.textContent = data.num_macaron||'—';
-  var macaronDet = document.getElementById('v-macaron-details'); if(macaronDet) macaronDet.textContent = data.macaron_details||'—';
   var rem = data.remarque && data.remarque !== 'null' ? data.remarque : '—';
   if (rem.startsWith('PARKING_VIDE')) rem = rem.replace(/^PARKING_VIDE ?—? ?/, '').trim() || '—';
   document.getElementById('v-remarque').textContent = rem;

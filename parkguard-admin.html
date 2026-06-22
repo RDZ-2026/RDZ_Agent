@@ -683,7 +683,8 @@ function openRapport(id, type) {
     photo_vehicule_url: v.photo_vehicule_url || '',
     photo_denonciation_url: v.photo_denonciation_url || '',
     photo_parebrise_url: v.photo_parebrise_url || '',
-    photo_macaron_url: v.photo_macaron_url || ''
+    photo_macaron_url: v.photo_macaron_url || '',
+    num_macaron: v.num_macaron || ''
   });
   // Utiliser le statut affiché (corrigé) plutôt que le statut brut Supabase
   const effectiveType = type || v._statut_display || v.statut;
