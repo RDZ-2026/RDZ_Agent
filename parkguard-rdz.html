@@ -621,9 +621,11 @@ async function syncPending() {
 function selectSite(site, type) {
   currentSite = site;
   currentSiteType = type || 'standard';
-  // Aller vers sélection agent
-  currentAgent = null; window._currentAgentData = null;
-  showScreen('s-home');
+  currentAgent = null;
+  window._currentAgentData = null;
+  // Recharger la liste agents pour ce site si besoin
+  loadSitesAndAgents();
+  showScreen('s-select-agent');
 }
 
 function startRonde() {
