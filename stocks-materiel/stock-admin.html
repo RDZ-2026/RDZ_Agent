@@ -789,6 +789,26 @@ function rHmat(){
 function openHistDetail(id,mod){
   const arr=mod==='mat'?DB.histMat:DB.histVest;
   const h=arr.find(x=>x.id===id);if(!h)return;
+  // Format note for inventory lines
+  const noteHTML=(()=>{
+    if(!h.note||h.note==='—') return '<em style="color:var(--gray-mid)">—</em>';
+    if(h.type_op==='inventaire'){
+      const lines=h.note.split(' | ');
+      const ok=lines.filter(l=>l.includes('[OK]'));
+      const ecart=lines.filter(l=>l.includes('[ÉCART'));
+      let html='';
+      if(ecart.length){
+        html+='<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">⚠️ Écarts ('+ecart.length+')</div>';
+        html+=ecart.map(l=>'<div style="padding:4px 8px;background:#fef2f2;border-left:3px solid var(--red);margin-bottom:3px;border-radius:0 4px 4px 0;font-size:12px">'+l+'</div>').join('');
+      }
+      if(ok.length){
+        html+='<div style="font-size:11px;font-weight:700;color:var(--green);margin:8px 0 6px">✅ Confirmés OK ('+ok.length+')</div>';
+        html+=ok.map(l=>'<div style="padding:4px 8px;background:var(--green-light);border-left:3px solid var(--green);margin-bottom:3px;border-radius:0 4px 4px 0;font-size:12px">'+l+'</div>').join('');
+      }
+      return html||h.note;
+    }
+    return '<div style="white-space:pre-line">'+h.note+'</div>';
+  })();
   document.getElementById('hist-detail-body').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
       <div><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">DATE</div><strong>${fmt(h.created_at)}</strong></div>
@@ -797,8 +817,8 @@ function openHistDetail(id,mod){
       <div><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">ARTICLE</div><strong>${h.article_nom}</strong></div>
       ${h.taille?`<div><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">TAILLE</div><span class="tag-size">${h.taille}</span></div>`:''}
       ${h.quantite?`<div><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">QUANTITÉ</div><strong>×${h.quantite}</strong></div>`:''}
-      <div style="grid-column:1/-1"><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">NOTE / DÉTAIL</div>
-        <div style="background:var(--gray-light);padding:10px;border-radius:5px;font-size:12px;line-height:1.5">${h.note||'—'}</div></div>
+      <div style="grid-column:1/-1"><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">DÉTAIL ${h.type_op==='inventaire'?'INVENTAIRE':'/ NOTE'}</div>
+        <div style="background:var(--gray-light);padding:10px;border-radius:5px;font-size:12px;line-height:1.6">${noteHTML}</div></div>
       <div><div style="color:var(--gray-mid);font-size:11px;margin-bottom:3px">ENREGISTRÉ PAR</div>${h.par||'—'}</div>
     </div>`;
   document.getElementById('hist-del-btn').onclick=()=>delHist(id,mod);

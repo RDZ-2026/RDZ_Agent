@@ -611,26 +611,46 @@ function updInvStyle(inp,ref){
 async function valInv(){
   const done=Object.keys(INV_SAISIE).filter(k=>INV_SAISIE[k]!==undefined).length;
   if(!done){toast('⚠️ Saisissez au moins une valeur');return;}
-  let ecarts=[];
+
+  // Construire le détail complet : tous les articles comptés, avec marquage écart
+  let lignesOK=[], lignesEcart=[];
+
   if(INV_MODE==='stock'){
-    ecarts=DB.stock.filter(i=>{const v=INV_SAISIE[i.id];return v!==undefined&&v!==i.quantite_dispo;})
-      .map(i=>i.nom+' : théo='+i.quantite_dispo+' compté='+INV_SAISIE[i.id]+' (écart='+(INV_SAISIE[i.id]-i.quantite_dispo)+')');
+    DB.stock.forEach(i=>{
+      const v=INV_SAISIE[i.id];
+      if(v===undefined)return;
+      const diff=v-i.quantite_dispo;
+      const ligne=i.nom+' : théo='+i.quantite_dispo+' compté='+v;
+      if(diff!==0) lignesEcart.push(ligne+' [ÉCART '+(diff>0?'+':'')+diff+']');
+      else lignesOK.push(ligne+' [OK]');
+    });
   } else {
     DB.articles.forEach(art=>(DB.tailles[art.id]||[]).forEach(t=>{
-      const k=art.id+'|'+t.id;const v=INV_SAISIE[k];
-      if(v!==undefined&&v!==t.quantite)ecarts.push(art.nom+' '+t.taille+' : théo='+t.quantite+' compté='+v+' (écart='+(v-t.quantite)+')');
+      const k=art.id+'|'+t.id;
+      const v=INV_SAISIE[k];
+      if(v===undefined)return;
+      const diff=v-t.quantite;
+      const ligne=art.nom+' '+t.taille+' : théo='+t.quantite+' compté='+v;
+      if(diff!==0) lignesEcart.push(ligne+' [ÉCART '+(diff>0?'+':'')+diff+']');
+      else lignesOK.push(ligne+' [OK]');
     }));
   }
+
+  const toutes=[...lignesEcart,...lignesOK];
+  const note=toutes.length?toutes.join(' | '):'Aucun article compté';
+
   try{
     await sb.rpc('stock_log',{
       p_module:INV_MODE==='stock'?'materiel':'vestiaire',
-      p_type_op:'inventaire',p_agent_nom:'Terrain',
-      p_article_nom:'Inventaire tournant — '+done+' article(s)',
-      p_note:ecarts.length?ecarts.join(' | '):'Aucun écart',
+      p_type_op:'inventaire',
+      p_agent_nom:'Terrain',
+      p_article_nom:'Inventaire tournant — '+done+' article(s) compté(s), '+lignesEcart.length+' écart(s)',
+      p_note:note,
       p_par:'Terrain'
     });
   }catch(e){console.error(e);}
-  toast(ecarts.length?'⚠️ '+ecarts.length+' écart(s) signalé(s) à l\'admin':'✅ Inventaire OK — aucun écart');
+
+  toast(lignesEcart.length?'⚠️ '+lignesEcart.length+' écart(s) signalé(s) à l\'admin':'✅ Inventaire OK — '+done+' article(s) confirmé(s)');
   INV_SAISIE={};rInvItems();
 }
 
