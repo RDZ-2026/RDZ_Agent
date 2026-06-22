@@ -509,21 +509,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 </div></div>
 
   <div id="cfg-acces-p" style="display:none">
-    <div class="g3" style="margin-bottom:18px">
-      <div>
-        <div class="sec-title">Sites</div>
-        <div class="card" id="cfg-acces-sites"></div>
-        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('site')">➕ Ajouter site</button>
+    <div class="g2" style="margin-bottom:14px;align-items:start">
+      <!-- Colonne gauche : Sites + Clés/Badges -->
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="sec-title" style="margin-bottom:0">Sites</div>
+            <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
+          </div>
+          <div class="card" id="cfg-acces-sites"></div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="sec-title" style="margin-bottom:0">Clés & Badges</div>
+            <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
+          </div>
+          <div class="card" id="cfg-acces-items"></div>
+        </div>
       </div>
+      <!-- Colonne droite : Réceptionnaires -->
       <div>
-        <div class="sec-title">Clés & Badges</div>
-        <div class="card" id="cfg-acces-items"></div>
-        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('item')">➕ Ajouter clé/badge</button>
-      </div>
-      <div>
-        <div class="sec-title">Réceptionnaires</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">Réceptionnaires</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('recept')">➕ Ajouter</button>
+        </div>
         <div class="card" id="cfg-acces-recept"></div>
-        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="openNewAccesItem('recept')">➕ Ajouter réceptionnaire</button>
       </div>
     </div>
   </div>
