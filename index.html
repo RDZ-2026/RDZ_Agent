@@ -148,8 +148,8 @@
       </div>
     </div>
 
-    <!-- ── MODULES OPÉRATIONNELS ── -->
-    <div class="section-label">Modules actifs</div>
+    <!-- ── MODULES LOGE ── -->
+    <div class="section-label">Modules Loge</div>
     <div class="modules-grid">
 
       <!-- ÉVÉNEMENTS -->
@@ -256,31 +256,8 @@
 
     </div>
 
-    <!-- ── ADMINISTRATION ── -->
-    <div class="section-label">Administration</div>
-    <div class="modules-grid">
-
-      <!-- PARAMÉTRAGE -->
-      <a class="module-card admin" href="parametrage.html">
-        <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </div>
-          <span class="module-badge badge-admin">Administration</span>
-        </div>
-        <div>
-          <div class="module-name">Paramétrage des sites</div>
-          <div class="module-desc">Gestion de la liste des sites de surveillance. Ajout, renommage, activation et suppression des sites utilisés dans tous les modules.</div>
-        </div>
-        <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-        </div>
-      </a>
-
-    </div>
-
-    <!-- ── PARKINGS ── -->
-    <div class="section-label">Parkings</div>
+    <!-- ── APPLICATIONS TERRAIN ── -->
+    <div class="section-label">Applications Terrain</div>
     <div class="modules-grid">
 
       <!-- CONTROLE PARKING -->
@@ -300,6 +277,29 @@
         </div>
       </a>
 
+      <!-- GESTION MATÉRIEL / STOCK TERRAIN -->
+      <a class="module-card active" href="https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-terrain.html" target="_blank" rel="noopener">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <span class="module-badge badge-live">En ligne</span>
+        </div>
+        <div>
+          <div class="module-name">Gestion Matériel / Stock</div>
+          <div class="module-desc">Suivi terrain des équipements et matériels. Consultation des stocks, mouvements et état des articles par site.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- ── MODULES ADMIN / SUPERVISION ── -->
+    <div class="section-label">Modules Admin / Supervision</div>
+    <div class="modules-grid">
+
       <!-- GESTION ADMIN PARKING -->
       <a class="module-card admin" href="https://rdz-2026.github.io/RDZ_Agent/parkguard-admin.html" target="_blank" rel="noopener">
         <div class="module-card-header">
@@ -317,27 +317,39 @@
         </div>
       </a>
 
-    </div>
-
-    <!-- ── MODULES EN DÉVELOPPEMENT ── -->
-    <div class="section-label">Modules en développement</div>
-    <div class="modules-grid">
-
-      <div class="module-card coming-soon">
+      <!-- GESTION ADMIN MATÉRIEL ET STOCK -->
+      <a class="module-card admin" href="https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-admin.html" target="_blank" rel="noopener">
         <div class="module-card-header">
-          <div class="module-icon">
+          <div class="module-icon blue">
             <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           </div>
-          <span class="module-badge badge-wip">En cours</span>
+          <span class="module-badge badge-admin">Administration</span>
         </div>
         <div>
-          <div class="module-name">Gestion des stocks</div>
-          <div class="module-desc">Suivi des équipements, tenues et matériels par site. Inventaire, état des articles et alertes de renouvellement.</div>
+          <div class="module-name">Gestion / Admin Matériel et Stock</div>
+          <div class="module-desc">Administration complète des stocks et équipements. Gestion des inventaires, entrées/sorties et paramétrage par site.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link">Bientôt disponible</span>
+          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
-      </div>
+      </a>
+
+      <!-- PARAMÉTRAGE DES SITES -->
+      <a class="module-card admin" href="parametrage.html">
+        <div class="module-card-header">
+          <div class="module-icon blue">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <span class="module-badge badge-admin">Administration</span>
+        </div>
+        <div>
+          <div class="module-name">Paramétrage des sites</div>
+          <div class="module-desc">Gestion de la liste des sites de surveillance. Ajout, renommage, activation et suppression des sites utilisés dans tous les modules.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
 
     </div>
 
