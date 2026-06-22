@@ -750,88 +750,56 @@ async function doRetVest(){
 function rAcces(){
   const actifs=DB.acces.filter(a=>a.statut==='actif');
   const ago2=d=>{const m=Math.floor((Date.now()-new Date(d))/60000);if(m<60)return m+'min';if(m<1440)return Math.floor(m/60)+'h';return Math.floor(m/1440)+'j';};
-  document.getElementById('tab-content').innerHTML=`<div class="content" style="padding-bottom:8px">
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="abtn abtn-red" style="flex:1;margin-bottom:0" onclick="openRemise()">🔑 Nouvelle remise</button>
-      <button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openRetourAcces()">↩️ Retour</button>
-    </div>
-    <div class="sec-lbl">Clés / badges actuellement sortis (${actifs.length})</div>
-    ${actifs.length?actifs.map(a=>{
+
+  let actifsHTML='<div class="empty">✅<br>Aucune remise en cours</div>';
+  if(actifs.length){
+    actifsHTML=actifs.map(function(a){
       const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
-      return \`<div class="stock-row" style="flex-direction:column;align-items:flex-start;gap:5px">
-        <div style="display:flex;align-items:center;gap:9px;width:100%">
-          <span style="font-size:22px">\${a.item_type==='badge'?'🪪':'🔑'}</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700">\${a.item_nom}</div>
-            <div style="font-size:11px;color:var(--gray-mid)">\${a.site_nom}</div>
-          </div>
-          <span class="badge \${late?'balert':'bwarn'}">\${late?'⚠️ Retard':ago2(a.date_remise)}</span>
-        </div>
-        <div style="font-size:11px;color:var(--gray-mid);padding-left:31px">
-          👮 \${a.agent_nom} → 👤 \${a.receptionnaire_nom}\${a.receptionnaire_societe?' ('+a.receptionnaire_societe+')':''}
-        </div>
-        \${a.notes?'<div style="font-size:11px;color:var(--gray-dark);padding-left:31px;font-style:italic">📝 '+a.notes+'</div>':''}
-      </div>\`;
-    }).join(''):'<div class="empty">✅<br>Aucune remise en cours</div>'}
-    <div class="sec-lbl" style="margin-top:4px">Dernières remises</div>
-    ${DB.acces.slice(0,10).map(a=>`<div class="stock-row" style="opacity:${a.statut==='rendu'?0.6:1}">
-      <span style="font-size:20px">${a.item_type==='badge'?'🪪':'🔑'}</span>
-      <div class="sinfo">
-        <div class="sname">${a.item_nom} — ${a.receptionnaire_nom}</div>
-        <div class="ssub">${a.site_nom} · ${a.agent_nom} · ${ago2(a.date_remise)}</div>
-      </div>
-      <span class="badge ${a.statut==='rendu'?'bok':'bwarn'}">${a.statut==='rendu'?'✅ Rendu':'En cours'}</span>
-    </div>`).join('')}
-  </div>`;
-}
+      const icon=a.item_type==='badge'?'🪪':'🔑';
+      const societe=a.receptionnaire_societe?' ('+a.receptionnaire_societe+')':'';
+      const notesHtml=a.notes?'<div style="font-size:11px;color:var(--gray-dark);padding-left:31px;font-style:italic">📝 '+a.notes+'</div>':'';
+      return '<div class="stock-row" style="flex-direction:column;align-items:flex-start;gap:5px">'
+        +'<div style="display:flex;align-items:center;gap:9px;width:100%">'
+        +'<span style="font-size:22px">'+icon+'</span>'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700">'+a.item_nom+'</div>'
+        +'<div style="font-size:11px;color:var(--gray-mid)">'+a.site_nom+'</div>'
+        +'</div>'
+        +'<span class="badge '+(late?'balert':'bwarn')+'">'+(late?'⚠️ Retard':ago2(a.date_remise))+'</span>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--gray-mid);padding-left:31px">'
+        +'👮 '+a.agent_nom+' → 👤 '+a.receptionnaire_nom+societe
+        +'</div>'
+        +notesHtml
+        +'</div>';
+    }).join('');
+  }
 
-function openRemise(){
-  // Pre-fill datetime to now
-  const now=new Date();
-  const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  document.getElementById('ac-date').value=local;
-  fillAccesSheets();
-  openS('sh-acces');
-}
-function openRetourAcces(){
-  fillAccesSheets();
-  // Fill retour select
-  const sel=document.getElementById('ar-remise');
-  while(sel.options.length>1)sel.remove(1);
-  DB.acces.filter(a=>a.statut==='actif').forEach(a=>{
-    const o=document.createElement('option');o.value=a.id;
-    o.textContent=a.item_nom+' → '+a.receptionnaire_nom+' ('+a.site_nom+')';
-    sel.appendChild(o);
+  let histHTML='';
+  DB.acces.slice(0,10).forEach(function(a){
+    const icon=a.item_type==='badge'?'🪪':'🔑';
+    const st=a.statut==='rendu';
+    histHTML+='<div class="stock-row" style="opacity:'+(st?0.6:1)+'">'
+      +'<span style="font-size:20px">'+icon+'</span>'
+      +'<div class="sinfo">'
+      +'<div class="sname">'+a.item_nom+' — '+a.receptionnaire_nom+'</div>'
+      +'<div class="ssub">'+a.site_nom+' · '+a.agent_nom+' · '+ago2(a.date_remise)+'</div>'
+      +'</div>'
+      +'<span class="badge '+(st?'bok':'bwarn')+'">'+(st?'✅ Rendu':'En cours')+'</span>'
+      +'</div>';
   });
-  document.getElementById('ar-detail').style.display='none';
-  openS('sh-acces-retour');
-}
 
-function fillAccesSheets(){
-  const pairs=[
-    ['ac-site',DB.acesSites],
-    ['ac-agent',DB.agents],
-    ['ac-item',DB.acesItems],
-    ['ac-recept',DB.acesRecept],
-  ];
-  pairs.forEach(([id,arr])=>{
-    const sel=document.getElementById(id);if(!sel)return;
-    const cur=sel.value;while(sel.options.length>1)sel.remove(1);
-    arr.forEach(item=>{
-      const o=document.createElement('option');o.value=item.id;
-      o.textContent=item.nom+(item.societe?' ('+item.societe+')':'');
-      sel.appendChild(o);
-    });
-    if(cur)sel.value=cur;
-  });
-  // Update retour detail on change
-  const sel=document.getElementById('ar-remise');
-  if(sel){sel.onchange=()=>{
-    const a=DB.acces.find(x=>x.id===sel.value);
-    const el=document.getElementById('ar-detail');
-    if(a){el.style.display='block';el.innerHTML='🔑 '+a.item_nom+' · 📍 '+a.site_nom+'<br>👮 '+a.agent_nom+' → 👤 '+a.receptionnaire_nom+(a.notes?'<br>📝 '+a.notes:'');}
-    else el.style.display='none';
-  };}
+  document.getElementById('tab-content').innerHTML=
+    '<div class="content" style="padding-bottom:8px">'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px">'
+    +'<button class="abtn abtn-red" style="flex:1;margin-bottom:0" onclick="openRemise()">🔑 Nouvelle remise</button>'
+    +'<button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openRetourAcces()">↩️ Retour</button>'
+    +'</div>'
+    +'<div class="sec-lbl">Remises actives ('+actifs.length+')</div>'
+    +actifsHTML
+    +'<div class="sec-lbl" style="margin-top:8px">Dernières remises</div>'
+    +histHTML
+    +'</div>';
 }
 
 async function doRemise(){
