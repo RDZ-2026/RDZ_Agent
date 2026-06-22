@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fleet RDZ">
+<meta name="theme-color" content="#2d2d2d">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232d2d2d'/><rect x='10' y='10' width='80' height='80' rx='15' fill='%23c0272d'/><text y='70' x='50' text-anchor='middle' font-size='55'>🚗</text></svg>">
+<title>Fleet Agent — RDZ</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#c0272d;--red-d:#a31f24;--red-l:#fdf2f2;
+  --anth:#2d2d2d;--anth2:#3a3a3a;
+  --bg:#f0f0f3;--white:#fff;
+  --border:#e2e2e6;--border2:#d0d0d6;
+  --text:#2d2d2d;--text2:#4b5563;--text3:#9ca3af;
+  --green:#16a34a;--green-l:#f0fdf4;--green-d:#15803d;
+  --orange:#ea580c;--orange-l:#fff7ed;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --yellow:#ca8a04;--yellow-l:#fefce8;
+  --sh:0 2px 8px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 20px rgba(0,0,0,.12);
+  --sh-lg:0 12px 40px rgba(0,0,0,.18);
+  --r:16px;--r-sm:10px;--r-xs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:'DM Sans',sans-serif;color:var(--text);}
+button,input,select,textarea{font-family:inherit;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ══ SCREENS ══ */
+.screen{
+  position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);
+  transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;overflow:hidden;
+}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
+.screen.back{transform:translateX(-28%);opacity:.5;pointer-events:none;}
+
+/* ══ TOPBAR ══ */
+.topbar{
+  flex-shrink:0;height:54px;background:var(--anth2);
+  display:flex;align-items:center;padding:0 14px;gap:10px;
+  border-bottom:3px solid var(--red);box-shadow:0 2px 16px rgba(0,0,0,.4);z-index:10;
+}
+.tb-back{width:34px;height:34px;background:rgba(255,255,255,.1);border:none;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;color:white;font-size:18px;cursor:pointer;flex-shrink:0;}
+.tb-back:active{background:rgba(255,255,255,.22);}
+.tb-ico{width:30px;height:30px;background:var(--red);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.tb-brand{font-family:'DM Mono';font-size:13px;font-weight:600;color:white;line-height:1.1;}
+.tb-sub{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;}
+.tb-spacer{flex:1;}
+.tb-name{font-size:11px;color:rgba(255,255,255,.6);font-family:'DM Mono';cursor:pointer;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:3px 8px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+.tb-home{display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(255,255,255,.1);border-radius:var(--r-xs);font-size:15px;text-decoration:none;flex-shrink:0;}
+.sync{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.sync.spin{background:var(--yellow);animation:blink 1s infinite;}
+.sync.err{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ══ SCROLLABLE ══ */
+.body{flex:1;overflow-y:auto;overflow-x:hidden;}
+
+/* ══ HOME ══ */
+.home-hero{
+  background:linear-gradient(155deg,var(--anth2) 0%,#1a1a1a 100%);
+  padding:18px 16px 24px;position:relative;overflow:hidden;
+}
+.home-hero::before{content:'';position:absolute;top:-50px;right:-30px;width:170px;height:170px;border-radius:50%;background:rgba(192,39,45,.12);}
+.hero-greeting{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px;}
+.hero-title{font-size:21px;font-weight:700;color:white;margin-bottom:14px;}
+.hero-title span{color:var(--red);}
+.hero-stats{display:flex;gap:8px;}
+.hstat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:9px 12px;flex:1;text-align:center;}
+.hstat-v{font-family:'DM Mono';font-size:19px;font-weight:600;color:white;}
+.hstat-l{font-size:10px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.3px;margin-top:2px;}
+.hstat.alert .hstat-v{color:#fca5a5;}
+.sec-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;padding:14px 16px 8px;}
+
+/* ══ VEHICLE CARDS (home) ══ */
+.vcard{margin:0 12px 12px;background:var(--white);border-radius:var(--r);box-shadow:var(--sh-md);overflow:hidden;cursor:pointer;border:1px solid rgba(0,0,0,.04);transition:transform .12s;}
+.vcard:active{transform:scale(.97);}
+.vc-strip{height:6px;}
+.vc-strip.ok{background:linear-gradient(90deg,var(--green),#22c55e);}
+.vc-strip.warn{background:linear-gradient(90deg,var(--orange),#fb923c);}
+.vc-strip.alert{background:linear-gradient(90deg,var(--red),#f87171);}
+.vc-body{display:flex;align-items:center;gap:12px;padding:13px 15px 10px;}
+.vc-plate{background:var(--anth);color:white;font-family:'DM Mono';font-size:13px;font-weight:700;padding:6px 10px;border-radius:var(--r-xs);letter-spacing:.5px;flex-shrink:0;}
+.vc-info{flex:1;min-width:0;}
+.vc-model{font-size:13.5px;font-weight:700;color:var(--anth);}
+.vc-km{font-size:11px;color:var(--text3);font-family:'DM Mono';margin-top:2px;}
+.vc-chevron{color:var(--text3);font-size:18px;}
+.vc-inds{display:flex;flex-wrap:wrap;gap:5px;padding:0 15px 12px;}
+.ind{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;}
+.ind-g{background:var(--green-l);color:var(--green-d);}
+.ind-o{background:var(--orange-l);color:#9a3412;}
+.ind-r{background:var(--red-l);color:var(--red-d);}
+.ind-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.ind-g .ind-dot{background:var(--green);}
+.ind-o .ind-dot{background:var(--orange);}
+.ind-r .ind-dot{background:var(--red);animation:blink 1.5s infinite;}
+
+/* ══ DETAIL SCREEN ══ */
+.det-hero{background:linear-gradient(150deg,var(--anth2) 0%,#1a1a1a 100%);padding:14px 16px 18px;}
+.det-plate{font-family:'DM Mono';font-size:20px;font-weight:700;color:white;letter-spacing:.5px;}
+.det-model{font-size:12px;color:rgba(255,255,255,.45);margin-top:2px;}
+.det-km{font-size:11px;color:rgba(255,255,255,.35);font-family:'DM Mono';margin-top:3px;}
+.det-inds{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;}
+
+/* ── Tabs ── */
+.tab-row{display:flex;background:var(--white);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+.tab-row::-webkit-scrollbar{display:none;}
+.tab-item{flex-shrink:0;padding:11px 16px;font-size:12px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
+.tab-item.on{color:var(--red);border-bottom-color:var(--red);}
+.tab-pane{display:none;}.tab-pane.on{display:block;}
+
+/* ── Fiche ── */
+.fsec{background:var(--white);margin:10px 12px 0;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;}
+.fsec-title{display:flex;align-items:center;gap:8px;padding:10px 13px;font-size:11.5px;font-weight:700;color:var(--anth);border-bottom:1px solid var(--border);background:var(--bg);}
+.frow{display:flex;gap:8px;padding:8px 13px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.frow:last-child{border-bottom:none;}
+.fkey{font-size:10.5px;font-weight:600;color:var(--text3);min-width:75px;flex-shrink:0;padding-top:1px;}
+.fval{font-size:12.5px;color:var(--anth);flex:1;line-height:1.4;}
+.fval a{color:var(--green-d);font-weight:700;text-decoration:none;}
+.fval.mono{font-family:'DM Mono';font-size:11.5px;}
+
+/* ── Dégâts liste admin ── */
+.dmg-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--white);margin:10px 12px 0;border-radius:var(--r) var(--r) 0 0;box-shadow:var(--sh);}
+.dmg-header-title{font-size:13px;font-weight:700;}
+.btn-signal{display:flex;align-items:center;gap:5px;padding:7px 14px;background:var(--red);color:white;border:none;border-radius:var(--r-xs);font-size:12px;font-weight:700;cursor:pointer;}
+.btn-signal:active{background:var(--red-d);}
+.dmg-list{background:var(--white);margin:0 12px;border-radius:0 0 var(--r) var(--r);box-shadow:var(--sh);overflow:hidden;}
+.dmg-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border);cursor:pointer;}
+.dmg-item:last-child{border-bottom:none;}
+.dmg-item:active{background:var(--bg);}
+.dmg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.dmg-info{flex:1;min-width:0;}
+.dmg-label{font-size:12.5px;font-weight:700;color:var(--anth);}
+.dmg-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.dmg-photo-count{font-size:10.5px;color:var(--blue);font-weight:600;margin-top:2px;}
+.dmg-empty{padding:28px;text-align:center;color:var(--text3);font-size:12.5px;background:var(--white);margin:0 12px;border-radius:0 0 var(--r) var(--r);box-shadow:var(--sh);}
+
+/* ── Main courante ── */
+.mc-wrap{margin:10px 12px 0;border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);}
+.mc-top{background:var(--anth2);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+.mc-top-title{font-size:13px;font-weight:700;color:white;}
+.mc-top-count{font-size:10.5px;color:rgba(255,255,255,.4);font-family:'DM Mono';}
+.mc-add{padding:6px 13px;background:var(--red);color:white;border:none;border-radius:var(--r-xs);font-size:11.5px;font-weight:700;cursor:pointer;}
+.mc-filters{display:flex;gap:5px;overflow-x:auto;padding:9px 11px;background:var(--white);border-bottom:1px solid var(--border);scrollbar-width:none;}
+.mc-filters::-webkit-scrollbar{display:none;}
+.mchip{display:inline-flex;align-items:center;gap:3px;padding:4px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:20px;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s;}
+.mchip.on{background:var(--anth);border-color:var(--anth);color:white;}
+.mc-entries{background:var(--white);}
+.mc-entry{padding:10px 13px;border-bottom:1px solid var(--border);border-left:3px solid transparent;}
+.mc-entry:last-child{border-bottom:none;}
+.mc-ehead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:2px;}
+.mc-elabel{font-size:12px;font-weight:700;color:var(--anth);display:flex;align-items:center;gap:4px;}
+.mc-edate{font-size:10px;color:var(--text3);font-family:'DM Mono';flex-shrink:0;}
+.mc-edesc{font-size:12px;color:var(--text2);line-height:1.4;}
+.mc-efoot{font-size:10px;color:var(--text3);margin-top:3px;display:flex;align-items:center;gap:10px;}
+.mc-eactions{display:flex;gap:5px;margin-top:6px;}
+.bxs{padding:4px 10px;border-radius:4px;font-size:10.5px;font-weight:600;cursor:pointer;border:none;}
+.bxs-e{background:var(--bg);color:var(--text2);border:1px solid var(--border2);}
+.bxs-d{background:var(--red-l);color:var(--red-d);}
+.mc-empty{padding:26px;text-align:center;color:var(--text3);font-size:12px;background:var(--white);}
+.spacer-b{height:80px;}
+
+/* ══ DAMAGE FORM SCREEN ══ */
+.dmg-form-body{background:var(--bg);}
+.schema-wrap{background:var(--white);margin:12px;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;}
+.view-tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border);}
+.vtab{flex:1;padding:9px 4px;text-align:center;font-size:10.5px;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.vtab.on{color:var(--red);border-bottom-color:var(--red);background:var(--white);}
+.svg-container{position:relative;touch-action:none;cursor:crosshair;user-select:none;}
+.svg-container svg{display:block;width:100%;height:auto;}
+.schema-hint{padding:8px 14px;font-size:11px;color:var(--text3);text-align:center;border-top:1px solid var(--border);}
+
+.dmg-details{background:var(--white);margin:0 12px 12px;border-radius:var(--r);box-shadow:var(--sh);padding:14px;}
+.dmg-details.hidden{display:none;}
+.fg{margin-bottom:12px;}
+.fl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;}
+.fi{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:14px;color:var(--text);appearance:none;transition:border-color .15s;}
+.fi:focus{outline:none;border-color:var(--red);background:var(--white);}
+.fi-ta{min-height:70px;resize:vertical;}
+.fi-sel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;}
+
+/* Severity chips */
+.sev-chips{display:flex;gap:7px;margin-top:4px;}
+.sev-chip{flex:1;padding:9px 6px;border:2px solid var(--border);border-radius:var(--r-sm);text-align:center;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;background:var(--bg);}
+.sev-chip.on-mineur{border-color:#ca8a04;background:#fefce8;color:#713f12;}
+.sev-chip.on-modere{border-color:var(--orange);background:var(--orange-l);color:#7c2d12;}
+.sev-chip.on-grave{border-color:var(--red);background:var(--red-l);color:var(--red-d);}
+
+/* Photos */
+.photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.photo-thumb{width:70px;height:70px;border-radius:var(--r-xs);object-fit:cover;border:2px solid var(--border);position:relative;cursor:pointer;}
+.photo-add{width:70px;height:70px;border-radius:var(--r-xs);border:2px dashed var(--border2);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg);gap:3px;transition:border-color .15s;flex-shrink:0;}
+.photo-add:hover{border-color:var(--red);}
+.photo-add-ico{font-size:22px;}
+.photo-add-lbl{font-size:9px;font-weight:600;color:var(--text3);text-align:center;}
+.photo-thumb-wrap{position:relative;display:inline-block;}
+.photo-del{position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:var(--red);border:none;border-radius:50%;color:white;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
+
+/* Submit btn */
+.btn-submit{width:100%;padding:13px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:4px;transition:background .15s;}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed;}
+.btn-submit:active{background:var(--red-d);}
+.pin-instruction{background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--r-sm);padding:10px 14px;margin:12px 12px 0;font-size:12px;color:#1e40af;text-align:center;}
+.pin-instruction.placed{background:var(--green-l);border-color:#bbf7d0;color:var(--green-d);}
+
+/* ══ DAMAGE DETAIL MODAL ══ */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;align-items:flex-end;justify-content:center;}
+.modal-bg.on{display:flex;}
+.modal{background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;animation:sup .25s cubic-bezier(.4,0,.2,1);}
+@keyframes sup{from{transform:translateY(50px);opacity:0}to{transform:none;opacity:1}}
+.modal-drag{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;}
+.modal-hdr{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:15px;font-weight:700;}
+.modal-close{font-size:20px;cursor:pointer;color:var(--text3);background:none;border:none;}
+.modal-body{padding:14px 18px 20px;}
+.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.photos-grid img{width:100%;border-radius:var(--r-sm);object-fit:cover;aspect-ratio:4/3;cursor:pointer;}
+.detail-row{display:flex;gap:8px;margin-bottom:7px;font-size:13px;}
+.detail-key{color:var(--text3);font-weight:600;min-width:80px;flex-shrink:0;}
+.detail-val{color:var(--anth);}
+.sev-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.sev-mineur{background:#fefce8;color:#713f12;}
+.sev-modere{background:var(--orange-l);color:#7c2d12;}
+.sev-grave{background:var(--red-l);color:var(--red-d);}
+.btn-resolve{width:100%;padding:11px;background:var(--green);color:white;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;margin-top:14px;}
+
+/* ══ MC MODAL ══ */
+.mc-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;align-items:flex-end;justify-content:center;}
+.mc-modal-bg.on{display:flex;}
+.mc-modal{background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;animation:sup .25s cubic-bezier(.4,0,.2,1);padding:0 0 16px;}
+.mfg{margin:0 18px 12px;}
+.mfl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px;}
+.mfi{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:14px;color:var(--text);appearance:none;transition:border-color .15s;}
+.mfi:focus{outline:none;border-color:var(--red);}
+.mfi-ta{min-height:75px;resize:vertical;}
+.mfi-sel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;}
+.mc-modal-btns{display:flex;gap:8px;padding:0 18px;}
+.btn-cancel{flex:1;padding:11px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;}
+.btn-save{flex:2;padding:11px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-save:disabled{opacity:.6;}
+
+/* ══ FAB ══ */
+.fab{position:fixed;right:16px;bottom:22px;z-index:100;width:52px;height:52px;border-radius:50%;background:var(--red);color:white;border:none;font-size:24px;box-shadow:0 4px 20px rgba(192,39,45,.5);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s;}
+.fab:active{transform:scale(.9);}
+
+/* ══ LOAD / EMPTY ══ */
+.load-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;}
+.spinner.sm{width:15px;height:15px;border-width:2px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:32px 16px;text-align:center;color:var(--text3);font-size:12.5px;}
+
+/* ══ TOASTS ══ */
+#toasts{position:fixed;top:62px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;z-index:999;width:calc(100% - 24px);max-width:380px;pointer-events:none;}
+.toast{background:var(--anth);color:white;padding:9px 13px;border-radius:9px;font-size:12.5px;display:flex;align-items:center;gap:7px;box-shadow:var(--sh-lg);animation:tin .2s ease;}
+.toast.ok{background:#15803d;}.toast.err{background:#991b1b;}.toast.warn{background:#92400e;}
+.toast.out{animation:tout .2s ease forwards;}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes tout{to{opacity:0;transform:translateY(-6px)}}
+</style>
+</head>
+<body>
+
+<!-- ══ SCREEN: HOME ══ -->
+<div class="screen" id="s-home">
+  <div class="topbar">
+    <div class="tb-ico">🚗</div>
+    <div><div class="tb-brand">Fleet_RDZ</div><div class="tb-sub">Agent terrain</div></div>
+    <div class="tb-spacer"></div>
+    <div class="tb-name" id="tb-name" onclick="promptName()">👤 —</div>
+    <a class="tb-home" href="https://rdz-2026.github.io/RDZ_Agent/index.html" title="Accueil suite">🏠</a>
+    <div class="sync" id="sync-home"></div>
+  </div>
+  <div class="body" id="home-body">
+    <div class="load-wrap" id="init-loader"><div class="spinner"></div></div>
+    <div id="home-content" style="display:none">
+      <div class="home-hero">
+        <div class="hero-greeting">RDZ Security Management</div>
+        <div class="hero-title">Flotte <span>opérationnelle</span></div>
+        <div class="hero-stats" id="hero-stats"></div>
+      </div>
+      <div class="sec-title">Véhicules de patrouille</div>
+      <div id="vcard-list"></div>
+      <div style="height:20px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: DETAIL ══ -->
+<div class="screen hidden" id="s-det">
+  <div class="topbar">
+    <button class="tb-back" onclick="nav('home')">←</button>
+    <div><div class="tb-brand" id="det-plate-tb">—</div><div class="tb-sub">Fiche véhicule</div></div>
+    <div class="tb-spacer"></div>
+    <a class="tb-home" href="https://rdz-2026.github.io/RDZ_Agent/index.html">🏠</a>
+    <div class="sync" id="sync-det"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;height:calc(100% - 54px);overflow:hidden;">
+    <div class="det-hero" id="det-hero"></div>
+    <div class="tab-row">
+      <div class="tab-item on" onclick="showTab('fiche')">📋 Infos</div>
+      <div class="tab-item" onclick="showTab('degats')">💥 Dégâts</div>
+      <div class="tab-item" onclick="showTab('mc')">📝 Main courante</div>
+    </div>
+    <div class="body">
+      <div class="tab-pane on" id="tab-fiche"></div>
+      <div class="tab-pane" id="tab-degats">
+        <div class="dmg-header">
+          <div class="dmg-header-title">💥 Dégâts carrosserie</div>
+          <button class="btn-signal" onclick="nav('damage-form')">+ Signaler</button>
+        </div>
+        <div id="dmg-list-wrap"></div>
+      </div>
+      <div class="tab-pane" id="tab-mc">
+        <div class="mc-wrap">
+          <div class="mc-top">
+            <div><div class="mc-top-title">📝 Main courante</div><div class="mc-top-count" id="mc-count">—</div></div>
+            <button class="mc-add" onclick="openMcModal()">+ Ajouter</button>
+          </div>
+          <div class="mc-filters" id="mc-filters"></div>
+          <div class="mc-entries" id="mc-entries"></div>
+        </div>
+        <div class="spacer-b"></div>
+      </div>
+      <div style="height:80px"></div>
+    </div>
+  </div>
+  <button class="fab" id="fab-det" onclick="fabAction()" style="display:none">＋</button>
+</div>
+
+<!-- ══ SCREEN: DAMAGE FORM ══ -->
+<div class="screen hidden" id="s-dmg">
+  <div class="topbar">
+    <button class="tb-back" onclick="nav('det')">←</button>
+    <div><div class="tb-brand">Signaler un dégât</div><div class="tb-sub" id="dmg-veh-sub">—</div></div>
+    <div class="tb-spacer"></div>
+    <div class="sync" id="sync-dmg"></div>
+  </div>
+  <div class="body dmg-form-body">
+    <div class="pin-instruction" id="pin-hint">👆 Tapez sur le schéma pour localiser le dégât</div>
+    <div class="schema-wrap">
+      <div class="view-tabs" id="view-tabs"></div>
+      <div class="svg-container" id="svg-container"></div>
+      <div class="schema-hint">Tapez sur le schéma — déplacez en retapant</div>
+    </div>
+    <div class="dmg-details hidden" id="dmg-details">
+      <div class="fg">
+        <label class="fl">Type de dégât *</label>
+        <select class="fi fi-sel" id="d-type">
+          <option value="">— Sélectionner —</option>
+          <option value="rayure">🔴 Rayure</option>
+          <option value="enfoncement">🟠 Enfoncement / Bosse</option>
+          <option value="bris_vitre">🔵 Bris de vitre</option>
+          <option value="deterioration">🟡 Détérioration</option>
+          <option value="autre">⚫ Autre</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Sévérité *</label>
+        <div class="sev-chips">
+          <div class="sev-chip" id="sev-mineur" onclick="setSev('mineur')">Mineur</div>
+          <div class="sev-chip" id="sev-modere" onclick="setSev('modere')">Modéré</div>
+          <div class="sev-chip" id="sev-grave" onclick="setSev('grave')">Grave</div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Description</label>
+        <textarea class="fi fi-ta" id="d-desc" placeholder="Décrivez le dégât constaté…"></textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">Photos (jusqu'à 5)</label>
+        <div class="photo-row" id="photo-row">
+          <div class="photo-add" onclick="document.getElementById('photo-input').click()">
+            <div class="photo-add-ico">📷</div>
+            <div class="photo-add-lbl">Ajouter photo</div>
+          </div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" multiple style="display:none" onchange="onPhotos(this)">
+      </div>
+      <div class="fg">
+        <label class="fl">Date</label>
+        <input type="date" class="fi" id="d-date">
+      </div>
+      <button class="btn-submit" id="btn-submit-dmg" onclick="submitDamage()">
+        <span>📸</span> Enregistrer le dégât
+      </button>
+    </div>
+    <div style="height:40px"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL: DÉTAIL DÉGÂT ══ -->
+<div class="modal-bg" id="dmg-modal-bg" onclick="closeDmgModal(event)">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <div class="modal-hdr">
+      <div class="modal-title" id="dmg-modal-title">Dégât</div>
+      <button class="modal-close" onclick="closeDmgModal()">✕</button>
+    </div>
+    <div class="modal-body" id="dmg-modal-body"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL: MC ENTRY ══ -->
+<div class="mc-modal-bg" id="mc-modal-bg" onclick="closeMcModal(event)">
+  <div class="mc-modal">
+    <div class="modal-drag"></div>
+    <div class="modal-hdr"><div class="modal-title" id="mc-modal-title">Nouvelle entrée</div></div>
+    <div style="height:14px"></div>
+    <div class="mfg">
+      <label class="mfl">Type *</label>
+      <select class="mfi mfi-sel" id="mc-type" onchange="onMcType()">
+        <option value="">— Sélectionner —</option>
+        <option value="message">💬 Message / Observation</option>
+        <option value="degradation">⚠️ Dégradation</option>
+        <option value="anomalie">🚨 Anomalie technique</option>
+        <option value="reparation">🛠 Réparation</option>
+        <option value="revision">🔧 Révision</option>
+        <option value="pneu">🔵 Pneu</option>
+        <option value="km">🛣 Kilométrage</option>
+        <option value="rdv">📅 RDV</option>
+      </select>
+    </div>
+    <div class="mfg">
+      <label class="mfl">Description *</label>
+      <textarea class="mfi mfi-ta" id="mc-desc" placeholder="Décrivez votre observation…"></textarea>
+    </div>
+    <div class="mfg" id="mc-km-wrap" style="display:none">
+      <label class="mfl">Kilométrage *</label>
+      <input type="number" class="mfi" id="mc-km" placeholder="Ex : 88 500">
+    </div>
+    <div class="mfg">
+      <label class="mfl">Date</label>
+      <input type="date" class="mfi" id="mc-date">
+    </div>
+    <div class="mc-modal-btns">
+      <button class="btn-cancel" onclick="closeMcModal()">Annuler</button>
+      <button class="btn-save" id="mc-save-btn" onclick="saveMcEntry()"><span>💾</span> Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════
+const SB   = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const AEMAIL = 'surveillance@rdz-security-management.ch';
+const APASS  = 'RDZ2026?/';
+const TOK_K  = 'flt_tok_v2';
+const CACHE_K= 'flt_cache_v2';
+const NAME_K = 'flt_name_v2';
+const BUCKET = 'fleet-damages';
+
+const MC_TYPES = {
+  message    :{icon:'💬',label:'Message',    color:'#f8fafc',border:'#94a3b8'},
+  degradation:{icon:'⚠️',label:'Dégradation', color:'#fdf2f2',border:'#ef4444'},
+  anomalie   :{icon:'🚨',label:'Anomalie',    color:'#fdf2f2',border:'#c0272d'},
+  reparation :{icon:'🛠', label:'Réparation', color:'#fff7ed',border:'#ea580c'},
+  revision   :{icon:'🔧',label:'Révision',    color:'#fef3c7',border:'#f59e0b'},
+  pneu       :{icon:'🔵',label:'Pneu',        color:'#eff6ff',border:'#3b82f6'},
+  km         :{icon:'🛣', label:'Kilométrage',color:'#f0fdf4',border:'#16a34a'},
+  rdv        :{icon:'📅',label:'RDV',         color:'#f0fdf4',border:'#16a34a'},
+};
+const DMG_TYPES = {
+  rayure       :{label:'Rayure',            color:'#ef4444'},
+  enfoncement  :{label:'Enfoncement/Bosse', color:'#f97316'},
+  bris_vitre   :{label:'Bris de vitre',     color:'#3b82f6'},
+  deterioration:{label:'Détérioration',     color:'#eab308'},
+  autre        :{label:'Autre',             color:'#6b7280'},
+};
+const SEV_COLOR = {mineur:'#ca8a04',modere:'#ea580c',grave:'#c0272d'};
+const SUPPLIERS = {
+  'Garage Renault RRG Plan-les-Ouates':{phone:'0844 774 774',address:'Rte de Saint-Julien 180, 1228 Plan-les-Ouates',hours:'Lun–Ven 7h30–17h30'},
+  'Allianz Suisse':{phone:'0800 22 33 44',contact:'Sinistres 24h/24'},
+  'Zurich Assurances':{phone:'0800 80 80 80',contact:'Service sinistres'},
+  'Zurich':{phone:'0800 80 80 80',contact:'Service sinistres'},
+};
+
+// ══════════════════════════════════════════
+//  SVG SCHEMAS
+// ══════════════════════════════════════════
+const SVG_VIEWS = {
+  top:`<svg viewBox="0 0 200 430" xmlns="http://www.w3.org/2000/svg">
+    <text x="100" y="20" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">AVANT</text>
+    <text x="100" y="425" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">ARRIÈRE</text>
+    <!-- Carrosserie -->
+    <rect x="28" y="30" width="144" height="370" rx="28" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Capot -->
+    <rect x="38" y="35" width="124" height="90" rx="18" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Pare-brise avant -->
+    <rect x="44" y="108" width="112" height="52" rx="6" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Toit cabine -->
+    <rect x="38" y="160" width="124" height="110" rx="4" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Ligne séparation portes -->
+    <line x1="38" y1="218" x2="162" y2="218" stroke="#9ca3af" stroke-width="1" stroke-dasharray="4,3"/>
+    <!-- Lunette arrière -->
+    <rect x="44" y="270" width="112" height="48" rx="6" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Coffre -->
+    <rect x="38" y="318" width="124" height="78" rx="18" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Roues AV G -->
+    <rect x="4" y="72" width="26" height="52" rx="7" fill="#374151"/>
+    <rect x="8" y="76" width="18" height="44" rx="5" fill="#4b5563"/>
+    <!-- Roues AV D -->
+    <rect x="170" y="72" width="26" height="52" rx="7" fill="#374151"/>
+    <rect x="174" y="76" width="18" height="44" rx="5" fill="#4b5563"/>
+    <!-- Roues AR G -->
+    <rect x="4" y="308" width="26" height="52" rx="7" fill="#374151"/>
+    <rect x="8" y="312" width="18" height="44" rx="5" fill="#4b5563"/>
+    <!-- Roues AR D -->
+    <rect x="170" y="308" width="26" height="52" rx="7" fill="#374151"/>
+    <rect x="174" y="312" width="18" height="44" rx="5" fill="#4b5563"/>
+    <!-- Rétroviseurs -->
+    <rect x="8" y="162" width="20" height="12" rx="4" fill="#6b7280"/>
+    <rect x="172" y="162" width="20" height="12" rx="4" fill="#6b7280"/>
+  </svg>`,
+
+  front:`<svg viewBox="0 0 280 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="140" y="14" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">AVANT</text>
+    <!-- Capot / carrosserie -->
+    <path d="M20,100 Q20,50 50,40 L100,25 L180,25 L230,40 Q260,50 260,100 L260,155 L20,155 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Pare-brise -->
+    <path d="M65,80 L80,28 L200,28 L215,80 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Phare G -->
+    <rect x="22" y="100" width="58" height="36" rx="6" fill="#fef9c3" stroke="#d97706" stroke-width="1"/>
+    <rect x="26" y="104" width="50" height="28" rx="4" fill="#fef08a"/>
+    <!-- Phare D -->
+    <rect x="200" y="100" width="58" height="36" rx="6" fill="#fef9c3" stroke="#d97706" stroke-width="1"/>
+    <rect x="204" y="104" width="50" height="28" rx="4" fill="#fef08a"/>
+    <!-- Calandre -->
+    <rect x="88" y="115" width="104" height="28" rx="5" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Pare-choc -->
+    <rect x="14" y="148" width="252" height="28" rx="10" fill="#d1d5db" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Roues -->
+    <ellipse cx="62" cy="190" rx="50" ry="12" fill="#374151"/>
+    <ellipse cx="62" cy="190" rx="36" ry="8" fill="#4b5563"/>
+    <ellipse cx="218" cy="190" rx="50" ry="12" fill="#374151"/>
+    <ellipse cx="218" cy="190" rx="36" ry="8" fill="#4b5563"/>
+  </svg>`,
+
+  rear:`<svg viewBox="0 0 280 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="140" y="14" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">ARRIÈRE</text>
+    <!-- Carrosserie -->
+    <path d="M20,100 Q20,50 50,40 L100,25 L180,25 L230,40 Q260,50 260,100 L260,155 L20,155 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Lunette -->
+    <path d="M70,78 L82,28 L198,28 L210,78 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Feux G -->
+    <rect x="22" y="100" width="55" height="36" rx="6" fill="#fecaca" stroke="#dc2626" stroke-width="1"/>
+    <rect x="26" y="104" width="47" height="28" rx="4" fill="#fca5a5"/>
+    <!-- Feux D -->
+    <rect x="203" y="100" width="55" height="36" rx="6" fill="#fecaca" stroke="#dc2626" stroke-width="1"/>
+    <rect x="207" y="104" width="47" height="28" rx="4" fill="#fca5a5"/>
+    <!-- Coffre / hayon -->
+    <rect x="88" y="108" width="104" height="30" rx="3" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Pare-choc -->
+    <rect x="14" y="148" width="252" height="28" rx="10" fill="#d1d5db" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Roues -->
+    <ellipse cx="62" cy="190" rx="50" ry="12" fill="#374151"/>
+    <ellipse cx="62" cy="190" rx="36" ry="8" fill="#4b5563"/>
+    <ellipse cx="218" cy="190" rx="50" ry="12" fill="#374151"/>
+    <ellipse cx="218" cy="190" rx="36" ry="8" fill="#4b5563"/>
+  </svg>`,
+
+  left:`<svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="190" y="14" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">CÔTÉ GAUCHE</text>
+    <!-- Carrosserie côté -->
+    <path d="M30,150 L30,90 Q32,60 55,48 L95,30 L285,30 L320,48 Q348,60 350,90 L350,150 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+    <!-- Pare-brise -->
+    <path d="M100,30 L88,90 L148,90 L155,30 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Vitre AV -->
+    <rect x="152" y="34" width="68" height="56" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Vitre AR -->
+    <rect x="224" y="34" width="68" height="56" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Lunette AR -->
+    <path d="M296,30 L290,90 L345,90 L348,60 Q346,38 330,30 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <!-- Séparation portes -->
+    <line x1="220" y1="92" x2="222" y2="150" stroke="#9ca3af" stroke-width="2"/>
+    <line x1="150" y1="92" x2="150" y2="150" stroke="#9ca3af" stroke-width="2"/>
+    <!-- Bas de caisse -->
+    <rect x="30" y="148" width="320" height="10" rx="3" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <!-- Roue AV -->
+    <circle cx="95" cy="168" r="30" fill="#374151"/>
+    <circle cx="95" cy="168" r="20" fill="#4b5563"/>
+    <circle cx="95" cy="168" r="8" fill="#6b7280"/>
+    <!-- Roue AR -->
+    <circle cx="285" cy="168" r="30" fill="#374151"/>
+    <circle cx="285" cy="168" r="20" fill="#4b5563"/>
+    <circle cx="285" cy="168" r="8" fill="#6b7280"/>
+    <!-- Phare AV -->
+    <rect x="30" y="95" width="38" height="28" rx="5" fill="#fef9c3" stroke="#d97706" stroke-width="1"/>
+    <!-- Feu AR -->
+    <rect x="332" y="95" width="18" height="28" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width="1"/>
+  </svg>`,
+
+  right:`<svg viewBox="0 0 380 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="190" y="14" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="DM Sans,sans-serif">CÔTÉ DROIT</text>
+    <path d="M30,150 L30,90 Q32,60 55,48 L95,30 L285,30 L320,48 Q348,60 350,90 L350,150 Z" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+    <path d="M225,30 L232,90 L292,90 L280,30 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <rect x="160" y="34" width="68" height="56" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <rect x="88" y="34" width="68" height="56" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <path d="M84,30 L90,90 L35,90 L32,60 Q34,38 50,30 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <line x1="158" y1="92" x2="158" y2="150" stroke="#9ca3af" stroke-width="2"/>
+    <line x1="230" y1="92" x2="228" y2="150" stroke="#9ca3af" stroke-width="2"/>
+    <rect x="30" y="148" width="320" height="10" rx="3" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <circle cx="285" cy="168" r="30" fill="#374151"/>
+    <circle cx="285" cy="168" r="20" fill="#4b5563"/>
+    <circle cx="285" cy="168" r="8" fill="#6b7280"/>
+    <circle cx="95" cy="168" r="30" fill="#374151"/>
+    <circle cx="95" cy="168" r="20" fill="#4b5563"/>
+    <circle cx="95" cy="168" r="8" fill="#6b7280"/>
+    <rect x="312" y="95" width="38" height="28" rx="5" fill="#fef9c3" stroke="#d97706" stroke-width="1"/>
+    <rect x="30" y="95" width="18" height="28" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width="1"/>
+  </svg>`,
+};
+
+const VIEW_LABELS = {top:'🔝 Dessus',front:'⬛ Avant',rear:'⬛ Arrière',left:'◀ Gauche',right:'▶ Droite'};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let vehicles=[], events=[], damages=[], authToken=null;
+let agentName='', currentVeh=null, currentTab='fiche';
+let mcFilter='all', mcEditId=null;
+let dmgView='top', pinX=null, pinY=null, dmgSeverity='';
+let pendingPhotos=[]; // {dataUrl, file}
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+const today=()=>new Date().toISOString().slice(0,10);
+const fmt=d=>{if(!d)return'—';const[y,m,j]=d.split('-');return`${j}.${m}.${y}`;};
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const uid=()=>crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);});
+const daysSince=iso=>iso?Math.floor((Date.now()-new Date(iso))/864e5):null;
+const daysUntil=iso=>iso?Math.ceil((new Date(iso)-Date.now())/864e5):null;
+const isMe=e=>agentName&&e.created_by&&e.created_by.trim().toLowerCase()===agentName.trim().toLowerCase();
+
+function syncDot(id,state){const d=document.getElementById(id);if(!d)return;d.className='sync'+(state==='spin'?' spin':state==='err'?' err':'');}
+function toast(msg,type='ok',ms=3200){const t=Object.assign(document.createElement('div'),{className:`toast ${type}`,innerHTML:`<span>${{ok:'✓',err:'✗',warn:'⚠'}[type]}</span><span>${esc(msg)}</span>`});document.getElementById('toasts').appendChild(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),230);},ms);}
+
+// ══════════════════════════════════════════
+//  PWA
+// ══════════════════════════════════════════
+if('serviceWorker' in navigator){
+  const sw=`self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});`;
+  const blob=new Blob([sw],{type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// ══════════════════════════════════════════
+//  AUTH SILENCIEUSE
+// ══════════════════════════════════════════
+async function silentLogin(){
+  try{const s=JSON.parse(localStorage.getItem(TOK_K)||'{}');if(s.t&&s.e&&Date.now()/1000<s.e-60){authToken=s.t;return;}}catch(_){}
+  const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:AEMAIL,password:APASS})});
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error_description||'Auth échouée');}
+  const d=await r.json();
+  authToken=d.access_token;
+  localStorage.setItem(TOK_K,JSON.stringify({t:d.access_token,e:Math.floor(Date.now()/1000)+(d.expires_in||3600)}));
+}
+
+// ══════════════════════════════════════════
+//  SUPABASE
+// ══════════════════════════════════════════
+async function sb(path,opts={}){
+  const r=await fetch(`${SB}/rest/v1/${path}`,{...opts,headers:{'apikey':KEY,'Content-Type':'application/json',...(authToken?{'Authorization':`Bearer ${authToken}`}:{}),...(opts.headers||{})}});
+  if(!r.ok){const t=await r.text();throw new Error(t||`HTTP ${r.status}`);}
+  if(r.status===204)return null;
+  const txt=await r.text();return txt?JSON.parse(txt):null;
+}
+async function uploadPhoto(file){
+  const name=`${uid()}.${file.name.split('.').pop()||'jpg'}`;
+  const r=await fetch(`${SB}/storage/v1/object/${BUCKET}/${name}`,{method:'POST',headers:{'apikey':KEY,'Authorization':`Bearer ${authToken}`,'Content-Type':file.type||'image/jpeg'},body:file});
+  if(!r.ok){const t=await r.text();throw new Error('Upload: '+t);}
+  return `${SB}/storage/v1/object/public/${BUCKET}/${name}`;
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded',async()=>{
+  agentName=localStorage.getItem(NAME_K)||'';
+  refreshNameBadge();
+  document.getElementById('mc-date').value=today();
+  document.getElementById('d-date').value=today();
+  buildViewTabs();
+  syncDot('sync-home','spin');
+  try{await silentLogin();}catch(e){console.warn(e.message);}
+  await loadData();
+});
+
+async function loadData(){
+  try{
+    const[vd,ed,dd]=await Promise.all([
+      sb('fleet_vehicles?select=*&active=eq.true&order=plate.asc'),
+      sb('fleet_events?select=*&order=date.desc'),
+      sb('fleet_damages?select=*&order=created_at.desc'),
+    ]);
+    vehicles=(vd||[]).filter(v=>v.category==='operational');
+    events=(ed||[]).filter(e=>MC_TYPES[e.type]);
+    damages=dd||[];
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    syncDot('sync-home','');
+  }catch(err){
+    console.warn('Offline:',err.message);
+    try{const c=JSON.parse(localStorage.getItem(CACHE_K)||'{}');vehicles=(c.vehicles||DEF_VEH).filter(v=>v.category==='operational');events=(c.events||[]).filter(e=>MC_TYPES[e.type]);damages=c.damages||[];}
+    catch(_){vehicles=DEF_VEH;events=[];damages=[];}
+    toast('Mode hors-ligne','warn');
+    syncDot('sync-home','err');
+  }
+  showHome();
+}
+
+// ══════════════════════════════════════════
+//  AGENT NAME
+// ══════════════════════════════════════════
+function refreshNameBadge(){document.getElementById('tb-name').textContent=agentName?`👤 ${agentName}`:'👤 Mon nom';}
+function promptName(){const n=prompt('Votre prénom / nom :',agentName||'');if(n===null)return;agentName=n.trim();localStorage.setItem(NAME_K,agentName);refreshNameBadge();}
+
+// ══════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════
+function nav(to){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('back'));
+  if(to==='home'){
+    document.getElementById('s-det').classList.add('hidden');
+    document.getElementById('s-dmg').classList.add('hidden');
+    document.getElementById('s-home').classList.remove('hidden','back');
+    currentVeh=null;
+  } else if(to==='det'){
+    document.getElementById('s-home').classList.add('back');
+    document.getElementById('s-dmg').classList.add('hidden');
+    document.getElementById('s-det').classList.remove('hidden');
+    document.getElementById('s-det').classList.remove('back');
+  } else if(to==='damage-form'){
+    document.getElementById('s-det').classList.add('back');
+    document.getElementById('s-dmg').classList.remove('hidden');
+    resetDmgForm();
+  }
+}
+
+function openVehicle(id){
+  currentVeh=vehicles.find(v=>v.id===id);
+  if(!currentVeh)return;
+  mcFilter='all';
+  nav('det');
+  renderDetail();
+  showTab('fiche');
+}
+
+// ══════════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════════
+function showHome(){
+  document.getElementById('init-loader').style.display='none';
+  document.getElementById('home-content').style.display='block';
+  renderHome();
+}
+function renderHome(){
+  const alerts=vehicles.filter(v=>getRevSt(v.id).level==='red'||getCTSt(v)).length;
+  document.getElementById('hero-stats').innerHTML=`
+    <div class="hstat"><div class="hstat-v">${vehicles.length}</div><div class="hstat-l">Véhicules</div></div>
+    <div class="hstat"><div class="hstat-v">${events.length}</div><div class="hstat-l">MC</div></div>
+    <div class="hstat"><div class="hstat-v">${damages.filter(d=>!d.resolved).length}</div><div class="hstat-l">Dégâts actifs</div></div>
+    <div class="hstat ${alerts?'alert':''}"><div class="hstat-v">${alerts}</div><div class="hstat-l">Alertes</div></div>`;
+  document.getElementById('vcard-list').innerHTML=vehicles.map(vcardHtml).join('');
+}
+function vcardHtml(v){
+  const rev=getRevSt(v.id),ct=getCTSt(v);
+  const strip=rev.level==='red'||ct?'alert':rev.level==='orange'?'warn':'ok';
+  const inds=[];
+  inds.push(`<span class="ind ${rev.level==='red'?'ind-r':rev.level==='orange'?'ind-o':'ind-g'}"><span class="ind-dot"></span>🔧 ${esc(rev.label)}</span>`);
+  if(ct)inds.push(`<span class="ind ${ct.level==='red'?'ind-r':'ind-o'}"><span class="ind-dot"></span>🔍 ${esc(ct.label)}</span>`);
+  const dmgCount=damages.filter(d=>d.vehicle_id===v.id&&!d.resolved).length;
+  if(dmgCount)inds.push(`<span class="ind ind-r"><span class="ind-dot"></span>💥 ${dmgCount} dégât${dmgCount>1?'s':''}</span>`);
+  return `<div class="vcard" onclick="openVehicle('${v.id}')">
+    <div class="vc-strip ${strip}"></div>
+    <div class="vc-body">
+      <div class="vc-plate">${esc(v.plate)}</div>
+      <div class="vc-info">
+        <div class="vc-model">${esc(v.brand)} ${esc(v.model)}</div>
+        <div class="vc-km">📍 ${v.km_current?Number(v.km_current).toLocaleString('fr-CH')+' km':'km inconnu'} · 📋 ${events.filter(e=>e.vehicle_id===v.id).length} MC</div>
+      </div>
+      <div class="vc-chevron">›</div>
+    </div>
+    <div class="vc-inds">${inds.join('')}</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════
+//  DETAIL
+// ══════════════════════════════════════════
+function renderDetail(){
+  const v=currentVeh;
+  document.getElementById('det-plate-tb').textContent=v.plate;
+  document.getElementById('dmg-veh-sub').textContent=`${v.plate} — ${v.brand} ${v.model}`;
+  syncDot('sync-det','');
+  const rev=getRevSt(v.id),ct=getCTSt(v);
+  const inds=[];
+  inds.push(`<span class="ind ${rev.level==='red'?'ind-r':rev.level==='orange'?'ind-o':'ind-g'}"><span class="ind-dot"></span>🔧 ${esc(rev.label)}</span>`);
+  if(ct)inds.push(`<span class="ind ${ct.level==='red'?'ind-r':'ind-o'}"><span class="ind-dot"></span>🔍 ${esc(ct.label)}</span>`);
+  document.getElementById('det-hero').innerHTML=`
+    <div class="det-plate">${esc(v.plate)}</div>
+    <div class="det-model">${esc(v.brand)} ${esc(v.model)}</div>
+    <div class="det-km">📍 ${v.km_current?Number(v.km_current).toLocaleString('fr-CH')+' km':'Km inconnu'}</div>
+    <div class="det-inds">${inds.join('')}</div>`;
+  renderFiche(v);
+  renderDmgList();
+  renderMC();
+}
+
+function showTab(t){
+  currentTab=t;
+  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mc'][i]===t));
+  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mc'][i]===t));
+  const fab=document.getElementById('fab-det');
+  if(t==='mc'){fab.style.display='flex';fab.onclick=openMcModal;}
+  else if(t==='degats'){fab.style.display='flex';fab.onclick=()=>nav('damage-form');}
+  else fab.style.display='none';
+}
+
+function renderFiche(v){
+  const gS=SUPPLIERS[v.garage_name]||{},iS=SUPPLIERS[v.insurance_name]||{};
+  const drv=events.filter(e=>e.vehicle_id===v.id&&e.type==='conducteur').sort((a,b)=>b.date.localeCompare(a.date))[0]?.description||'';
+  let h=`<div class="fsec" style="margin-top:12px;">
+    <div class="fsec-title">🚗 Identification</div>
+    <div class="frow"><span class="fkey">Immatric.</span><span class="fval mono">${esc(v.plate)}</span></div>
+    <div class="frow"><span class="fkey">Véhicule</span><span class="fval">${esc(v.brand)} ${esc(v.model)}</span></div>
+    ${v.vin?`<div class="frow"><span class="fkey">VIN</span><span class="fval mono" style="font-size:11px">${esc(v.vin)}</span></div>`:''}
+    ${drv?`<div class="frow"><span class="fkey">Conducteur</span><span class="fval" style="font-weight:700">${esc(drv)}</span></div>`:''}
+    ${v.ct_date?`<div class="frow"><span class="fkey">CT</span><span class="fval">${fmt(v.ct_date)}</span></div>`:''}
+  </div>`;
+  if(v.garage_name)h+=`<div class="fsec">
+    <div class="fsec-title">🏭 Garage</div>
+    <div class="frow"><span class="fkey">Nom</span><span class="fval">${esc(v.garage_name)}</span></div>
+    ${gS.address?`<div class="frow"><span class="fkey">Adresse</span><span class="fval">${esc(gS.address)}</span></div>`:''}
+    ${gS.hours?`<div class="frow"><span class="fkey">Horaires</span><span class="fval">${esc(gS.hours)}</span></div>`:''}
+    ${gS.phone?`<div class="frow"><span class="fkey">Tél.</span><span class="fval"><a href="tel:${esc(gS.phone)}">${esc(gS.phone)}</a></span></div>`:''}
+  </div>`;
+  if(v.insurance_name)h+=`<div class="fsec">
+    <div class="fsec-title">🔒 Assurance</div>
+    <div class="frow"><span class="fkey">Compagnie</span><span class="fval">${esc(v.insurance_name)}</span></div>
+    ${iS.contact?`<div class="frow"><span class="fkey">Contact</span><span class="fval">${esc(iS.contact)}</span></div>`:''}
+    ${iS.phone?`<div class="frow"><span class="fkey">Urgence</span><span class="fval"><a href="tel:${esc(iS.phone)}">${esc(iS.phone)}</a></span></div>`:''}
+  </div>`;
+  if(v.tires_size||v.tires_winter||v.tires_summer)h+=`<div class="fsec">
+    <div class="fsec-title">🔵 Pneumatiques</div>
+    ${v.tires_size?`<div class="frow"><span class="fkey">Taille</span><span class="fval mono">${esc(v.tires_size)}</span></div>`:''}
+    ${v.tires_winter?`<div class="frow"><span class="fkey">❄️ Hiver</span><span class="fval">${esc(v.tires_winter)}</span></div>`:''}
+    ${v.tires_summer?`<div class="frow"><span class="fkey">☀️ Été</span><span class="fval">${esc(v.tires_summer)}</span></div>`:''}
+  </div>`;
+  const opNotes=(v.notes||'').split('\n').filter(l=>l.trim()&&!/CHF|contrat|loyer|leasing/i.test(l)).join('\n');
+  if(opNotes)h+=`<div class="fsec"><div class="fsec-title">📝 Notes</div><div style="padding:10px 13px;font-size:12px;color:#1e40af;line-height:1.5;white-space:pre-wrap">${esc(opNotes)}</div></div>`;
+  h+=`<div style="height:20px"></div>`;
+  document.getElementById('tab-fiche').innerHTML=h;
+}
+
+// ══════════════════════════════════════════
+//  DÉGÂTS LIST
+// ══════════════════════════════════════════
+function renderDmgList(){
+  const vDmg=damages.filter(d=>d.vehicle_id===currentVeh.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const active=vDmg.filter(d=>!d.resolved),resolved=vDmg.filter(d=>d.resolved);
+  let h='';
+  if(!vDmg.length){h=`<div class="dmg-empty">Aucun dégât signalé pour ce véhicule.</div>`;}
+  else{
+    const renderGroup=(list,title)=>{
+      if(!list.length)return'';
+      return list.map(d=>{
+        const cfg=DMG_TYPES[d.type]||{label:d.type,color:'#6b7280'};
+        const sevCls=`sev-${d.severity||'mineur'}`;
+        const photoCount=(d.photos||[]).length;
+        return `<div class="dmg-item" onclick="showDmgDetail('${d.id}')">
+          <div class="dmg-dot" style="background:${d.resolved?'#9ca3af':cfg.color}"></div>
+          <div class="dmg-info">
+            <div class="dmg-label">${esc(cfg.label)}</div>
+            <div class="dmg-sub">${fmt(d.date)} · ${VIEW_LABELS[d.view]||d.view} · <span class="sev-badge ${sevCls}" style="font-size:10px;padding:1px 7px">${d.severity||'—'}</span></div>
+            ${d.description?`<div class="dmg-sub" style="margin-top:2px">${esc(d.description.slice(0,60))}${d.description.length>60?'…':''}</div>`:''}
+            ${photoCount?`<div class="dmg-photo-count">📸 ${photoCount} photo${photoCount>1?'s':''}</div>`:''}
+          </div>
+          <div style="color:var(--text3);font-size:16px">›</div>
+        </div>`;
+      }).join('');
+    };
+    h=`<div class="dmg-list">${renderGroup(active,'Actifs')}${resolved.length?`<div style="padding:8px 13px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;background:var(--bg);border-top:1px solid var(--border)">Résolus (${resolved.length})</div>${renderGroup(resolved,'')}`:''}`;
+  }
+  document.getElementById('dmg-list-wrap').innerHTML=h;
+}
+
+function showDmgDetail(id){
+  const d=damages.find(x=>x.id===id);if(!d)return;
+  const cfg=DMG_TYPES[d.type]||{label:d.type};
+  const v=vehicles.find(x=>x.id===d.vehicle_id);
+  const sevClass={mineur:'sev-mineur',modere:'sev-modere',grave:'sev-grave'}[d.severity]||'sev-mineur';
+  let h=`
+    <div class="detail-row"><span class="detail-key">Véhicule</span><span class="detail-val">${esc(v?.plate||'—')}</span></div>
+    <div class="detail-row"><span class="detail-key">Type</span><span class="detail-val">${esc(cfg.label)}</span></div>
+    <div class="detail-row"><span class="detail-key">Vue</span><span class="detail-val">${VIEW_LABELS[d.view]||d.view}</span></div>
+    <div class="detail-row"><span class="detail-key">Sévérité</span><span class="detail-val"><span class="sev-badge ${sevClass}">${d.severity||'—'}</span></span></div>
+    <div class="detail-row"><span class="detail-key">Date</span><span class="detail-val">${fmt(d.date)}</span></div>
+    <div class="detail-row"><span class="detail-key">Agent</span><span class="detail-val">${esc(d.created_by||'—')}</span></div>
+    ${d.description?`<div class="detail-row"><span class="detail-key">Description</span><span class="detail-val">${esc(d.description)}</span></div>`:''}`;
+  const photos=d.photos||[];
+  if(photos.length)h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
+    <div class="photos-grid">${photos.map(url=>`<img src="${esc(url)}" onclick="window.open('${esc(url)}','_blank')" loading="lazy">`).join('')}</div>`;
+  if(!d.resolved&&isMe(d))h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
+  document.getElementById('dmg-modal-title').textContent=cfg.label;
+  document.getElementById('dmg-modal-body').innerHTML=h;
+  document.getElementById('dmg-modal-bg').classList.add('on');
+}
+function closeDmgModal(e){if(!e||e.target===document.getElementById('dmg-modal-bg'))document.getElementById('dmg-modal-bg').classList.remove('on');}
+async function resolveDmg(id){
+  try{
+    await sb(`fleet_damages?id=eq.${id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({resolved:true,resolved_at:today()})});
+    const d=damages.find(x=>x.id===id);if(d){d.resolved=true;d.resolved_at=today();}
+    toast('Dégât marqué comme résolu');
+    closeDmgModal();
+    renderDmgList();
+    renderHome();
+  }catch(e){toast('Erreur : '+e.message,'err');}
+}
+
+// ══════════════════════════════════════════
+//  DAMAGE FORM
+// ══════════════════════════════════════════
+function buildViewTabs(){
+  document.getElementById('view-tabs').innerHTML=Object.entries(VIEW_LABELS).map(([k,l])=>
+    `<div class="vtab ${k==='top'?'on':''}" id="vtab-${k}" onclick="setView('${k}')">${l}</div>`).join('');
+}
+function setView(v){
+  dmgView=v;pinX=null;pinY=null;
+  document.querySelectorAll('.vtab').forEach(el=>el.classList.remove('on'));
+  document.getElementById(`vtab-${v}`)?.classList.add('on');
+  renderSchema();
+  document.getElementById('pin-hint').className='pin-instruction';
+  document.getElementById('pin-hint').textContent='👆 Tapez sur le schéma pour localiser le dégât';
+  document.getElementById('dmg-details').classList.add('hidden');
+}
+
+function renderSchema(extraPins=[]){
+  const container=document.getElementById('svg-container');
+  container.innerHTML=SVG_VIEWS[dmgView]||SVG_VIEWS.top;
+  const svg=container.querySelector('svg');
+  // Draw existing damage pins for this vehicle/view
+  const vDmgs=damages.filter(d=>d.vehicle_id===currentVeh?.id&&d.view===dmgView&&!d.resolved);
+  vDmgs.forEach(d=>{
+    const cfg=DMG_TYPES[d.type]||{color:'#6b7280'};
+    const vb=svg.viewBox.baseVal;
+    const cx=d.location_x/100*vb.width,cy=d.location_y/100*vb.height;
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r','10');
+    circle.setAttribute('fill',cfg.color);circle.setAttribute('opacity','0.7');circle.setAttribute('stroke','white');circle.setAttribute('stroke-width','2');
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x',cx);text.setAttribute('y',cy+4);text.setAttribute('text-anchor','middle');
+    text.setAttribute('font-size','10');text.setAttribute('fill','white');text.setAttribute('font-weight','700');
+    text.textContent='!';
+    svg.appendChild(circle);svg.appendChild(text);
+  });
+  // Draw current pin
+  if(pinX!==null&&pinY!==null){
+    const vb=svg.viewBox.baseVal;
+    const cx=pinX/100*vb.width,cy=pinY/100*vb.height;
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r','14');
+    ring.setAttribute('fill','none');ring.setAttribute('stroke','var(--red)');ring.setAttribute('stroke-width','2.5');ring.setAttribute('opacity','0.6');
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','8');
+    dot.setAttribute('fill','var(--red)');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','2');
+    svg.appendChild(ring);svg.appendChild(dot);
+  }
+  // Click handler
+  container.addEventListener('click',onSchemaTap,{once:true});
+  container.onclick=onSchemaTap;
+}
+
+function onSchemaTap(e){
+  const container=document.getElementById('svg-container');
+  const rect=container.getBoundingClientRect();
+  pinX=((e.clientX-rect.left)/rect.width)*100;
+  pinY=((e.clientY-rect.top)/rect.height)*100;
+  renderSchema();
+  // Show details panel
+  document.getElementById('pin-hint').className='pin-instruction placed';
+  document.getElementById('pin-hint').textContent='📍 Position marquée — déplacez en retapant';
+  document.getElementById('dmg-details').classList.remove('hidden');
+  document.getElementById('dmg-details').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function setSev(s){
+  dmgSeverity=s;
+  ['mineur','modere','grave'].forEach(x=>{
+    document.getElementById(`sev-${x}`).className=`sev-chip${s===x?` on-${x}`:''}`;
+  });
+}
+
+function resetDmgForm(){
+  dmgView='top';pinX=null;pinY=null;dmgSeverity='';pendingPhotos=[];
+  document.getElementById('d-type').value='';
+  document.getElementById('d-desc').value='';
+  document.getElementById('d-date').value=today();
+  document.querySelectorAll('.vtab').forEach(el=>el.classList.remove('on'));
+  document.getElementById('vtab-top')?.classList.add('on');
+  document.getElementById('pin-hint').className='pin-instruction';
+  document.getElementById('pin-hint').textContent='👆 Tapez sur le schéma pour localiser le dégât';
+  document.getElementById('dmg-details').classList.add('hidden');
+  setSev('');
+  renderSchema();
+  renderPhotoRow();
+}
+
+// Photos
+function onPhotos(input){
+  const files=Array.from(input.files);
+  if(pendingPhotos.length+files.length>5){toast('Maximum 5 photos','warn');return;}
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{pendingPhotos.push({dataUrl:e.target.result,file:f});renderPhotoRow();};
+    r.readAsDataURL(f);
+  });
+  input.value='';
+}
+function removePhoto(i){pendingPhotos.splice(i,1);renderPhotoRow();}
+function renderPhotoRow(){
+  const row=document.getElementById('photo-row');
+  let h=pendingPhotos.map((p,i)=>`
+    <div class="photo-thumb-wrap">
+      <img class="photo-thumb" src="${p.dataUrl}">
+      <button class="photo-del" onclick="removePhoto(${i})">×</button>
+    </div>`).join('');
+  if(pendingPhotos.length<5)h+=`<div class="photo-add" onclick="document.getElementById('photo-input').click()"><div class="photo-add-ico">📷</div><div class="photo-add-lbl">Ajouter photo</div></div>`;
+  row.innerHTML=h;
+}
+
+async function submitDamage(){
+  if(pinX===null){toast('Localisez le dégât sur le schéma','err');return;}
+  if(!document.getElementById('d-type').value){toast('Sélectionnez un type de dégât','err');return;}
+  if(!dmgSeverity){toast('Sélectionnez la sévérité','err');return;}
+  if(!agentName){const n=prompt('Votre nom :','');if(!n?.trim()){toast('Indiquez votre nom','err');return;}agentName=n.trim();localStorage.setItem(NAME_K,agentName);refreshNameBadge();}
+  const btn=document.getElementById('btn-submit-dmg');
+  btn.disabled=true;btn.innerHTML='<span class="spinner sm"></span> Envoi en cours…';
+  try{
+    // Upload photos
+    const photoUrls=[];
+    for(const p of pendingPhotos){
+      try{const url=await uploadPhoto(p.file);photoUrls.push(url);}
+      catch(e){console.warn('Photo upload failed:',e.message);}
+    }
+    const payload={
+      id:uid(),
+      vehicle_id:currentVeh.id,
+      date:document.getElementById('d-date').value||today(),
+      type:document.getElementById('d-type').value,
+      severity:dmgSeverity,
+      view:dmgView,
+      location_x:Math.round(pinX*100)/100,
+      location_y:Math.round(pinY*100)/100,
+      description:document.getElementById('d-desc').value.trim(),
+      photos:photoUrls,
+      created_by:agentName,
+      resolved:false,
+    };
+    await sb('fleet_damages',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    damages.unshift(payload);
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    toast('Dégât enregistré ✓');
+    nav('det');
+    showTab('degats');
+    renderDmgList();
+    renderHome();
+  }catch(e){
+    const msg=JSON.parse(e.message.match(/\{.*\}/)?.[0]||'{}')?.message||e.message;
+    toast('Erreur : '+msg,'err',6000);
+  }finally{btn.disabled=false;btn.innerHTML='<span>📸</span> Enregistrer le dégât';}
+}
+
+// ══════════════════════════════════════════
+//  MAIN COURANTE
+// ══════════════════════════════════════════
+function renderMC(){
+  const vEvts=events.filter(e=>e.vehicle_id===currentVeh.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const filtered=mcFilter==='all'?vEvts:vEvts.filter(e=>e.type===mcFilter);
+  document.getElementById('mc-count').textContent=`${vEvts.length} entrée${vEvts.length>1?'s':''}`;
+  const types=[...new Set(vEvts.map(e=>e.type))];
+  document.getElementById('mc-filters').innerHTML=
+    `<div class="mchip on" id="mchip-all" onclick="setMcFilter('all')">Toutes (${vEvts.length})</div>`+
+    types.map(t=>{const c=MC_TYPES[t]||{icon:'📌',label:t};const n=vEvts.filter(e=>e.type===t).length;return`<div class="mchip" id="mchip-${t}" onclick="setMcFilter('${t}')">${c.icon} ${c.label} (${n})</div>`;}).join('');
+  if(!filtered.length){document.getElementById('mc-entries').innerHTML=`<div class="mc-empty">${vEvts.length===0?'Aucune entrée.':'Aucune entrée pour ce filtre.'}</div>`;return;}
+  document.getElementById('mc-entries').innerHTML=filtered.map(e=>{
+    const c=MC_TYPES[e.type]||{icon:'📌',label:e.type,color:'#fff',border:'#ccc'};
+    const own=isMe(e);
+    return `<div class="mc-entry" style="border-left-color:${c.border};background:${c.color}">
+      <div class="mc-ehead">
+        <div class="mc-elabel">${c.icon} ${c.label}</div>
+        <div class="mc-edate">${fmt(e.date)}</div>
+      </div>
+      <div class="mc-edesc">${esc(e.description)}</div>
+      <div class="mc-efoot">
+        ${e.km?`<span>📍 ${Number(e.km).toLocaleString('fr-CH')} km</span>`:''}
+        ${e.created_by?`<span>👤 ${esc(e.created_by)}</span>`:''}
+      </div>
+      ${own?`<div class="mc-eactions">
+        <button class="bxs bxs-e" onclick="openMcModal('${e.id}')">✏️ Modifier</button>
+        <button class="bxs bxs-d" onclick="deleteMcEntry('${e.id}')">🗑</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+function setMcFilter(f){
+  mcFilter=f;
+  document.querySelectorAll('.mchip').forEach(el=>el.classList.remove('on'));
+  document.getElementById(`mchip-${f==='all'?'all':f}`)?.classList.add('on');
+  renderMC();
+}
+
+function openMcModal(id=null){
+  mcEditId=id;
+  document.getElementById('mc-modal-title').textContent=id?'Modifier l\'entrée':'Nouvelle entrée';
+  if(id){const e=events.find(x=>x.id===id);if(!e)return;document.getElementById('mc-type').value=e.type;document.getElementById('mc-desc').value=e.description||'';document.getElementById('mc-km').value=e.km||'';document.getElementById('mc-date').value=e.date||today();onMcType();}
+  else{document.getElementById('mc-type').value='';document.getElementById('mc-desc').value='';document.getElementById('mc-km').value='';document.getElementById('mc-date').value=today();document.getElementById('mc-km-wrap').style.display='none';}
+  document.getElementById('mc-modal-bg').classList.add('on');
+}
+function closeMcModal(e){if(!e||e.target===document.getElementById('mc-modal-bg'))document.getElementById('mc-modal-bg').classList.remove('on');mcEditId=null;}
+function onMcType(){document.getElementById('mc-km-wrap').style.display=document.getElementById('mc-type').value==='km'?'block':'none';}
+function fabAction(){}
+
+async function saveMcEntry(){
+  const type=document.getElementById('mc-type').value,desc=document.getElementById('mc-desc').value.trim(),kmVal=document.getElementById('mc-km').value,dateVal=document.getElementById('mc-date').value||today();
+  if(!type){toast('Sélectionnez un type','err');return;}
+  if(!desc){toast('Description obligatoire','err');return;}
+  if(type==='km'&&!kmVal){toast('Renseignez le kilométrage','err');return;}
+  if(!agentName){const n=prompt('Votre nom :','');if(!n?.trim()){toast('Indiquez votre nom','err');return;}agentName=n.trim();localStorage.setItem(NAME_K,agentName);refreshNameBadge();}
+  const btn=document.getElementById('mc-save-btn');btn.disabled=true;btn.innerHTML='<span class="spinner sm"></span>';
+  const payload={vehicle_id:currentVeh.id,date:dateVal,type,description:desc,km:kmVal?parseInt(kmVal):null,provider:'',invoice:'',amount:null,created_by:agentName};
+  try{
+    if(mcEditId){
+      await sb(`fleet_events?id=eq.${mcEditId}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      const i=events.findIndex(x=>x.id===mcEditId);if(i>-1)events[i]={...events[i],...payload};
+      toast('Modifié');
+    }else{
+      payload.id=uid();
+      await sb('fleet_events',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      events.unshift(payload);
+      if(type==='km'&&payload.km){const vObj=vehicles.find(x=>x.id===currentVeh.id);if(vObj&&(!vObj.km_current||payload.km>vObj.km_current)){vObj.km_current=payload.km;try{await sb(`fleet_vehicles?id=eq.${currentVeh.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({km_current:payload.km})});}catch(_){}}}
+      toast('Entrée ajoutée');
+    }
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    closeMcModal();renderMC();renderHome();
+  }catch(err){const msg=JSON.parse(err.message.match(/\{.*\}/)?.[0]||'{}')?.message||err.message;toast('Erreur : '+msg,'err',6000);}
+  finally{btn.disabled=false;btn.innerHTML='<span>💾</span> Enregistrer';}
+}
+async function deleteMcEntry(id){
+  const e=events.find(x=>x.id===id);if(!e||!isMe(e)){toast('Non autorisé','err');return;}
+  if(!confirm(`Supprimer ?\n"${(e.description||'').slice(0,60)}"`))return;
+  try{await sb(`fleet_events?id=eq.${id}`,{method:'DELETE',headers:{'Prefer':'return=minimal'}});events=events.filter(x=>x.id!==id);localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));toast('Supprimé');renderMC();renderHome();}
+  catch(err){toast('Erreur : '+err.message,'err');}
+}
+
+// ══════════════════════════════════════════
+//  STATUS HELPERS
+// ══════════════════════════════════════════
+function getRevSt(vid){const last=events.filter(e=>e.vehicle_id===vid&&e.type==='revision').sort((a,b)=>b.date.localeCompare(a.date))[0];if(!last)return{level:'red',label:'Révision inconnue'};const d=daysSince(last.date);if(d>365)return{level:'red',label:`Révision à prévoir (${d} j.)`};if(d>300)return{level:'orange',label:'Révision bientôt'};return{level:'green',label:'Révision OK'};}
+function getCTSt(v){if(!v.ct_date)return null;const d=daysUntil(v.ct_date);if(d<0)return{level:'red',label:'CT expiré'};if(d<60)return{level:'orange',label:`CT dans ${d} j.`};return null;}
+
+// ══════════════════════════════════════════
+//  FALLBACK HORS-LIGNE
+// ══════════════════════════════════════════
+const DEF_VEH=[
+  {id:'89df32b0-6e0e-52df-8056-6a83519f2b15',plate:'GE 134 389',brand:'Renault',model:'Zoé',category:'operational',vin:'VF1AG000061726014',km_current:88799,ct_date:null,insurance_name:'Allianz Suisse',garage_name:'Garage Renault RRG Plan-les-Ouates',tires_size:'195/55R/16',tires_summer:'2 pneus dans le stock à REGM',tires_winter:'4 pneus neufs (oct. 24) — Sur véhicule',notes:'Assistance Zoé 24h/24h : +41 44 834 12 01',active:true},
+  {id:'a283cdf9-000c-5ffe-baef-7351ac0fbfa4',plate:'GE 306 576',brand:'Renault',model:'Zoé',category:'operational',vin:'VF1AG000070758610',km_current:26390,ct_date:null,insurance_name:'Zurich',garage_name:'Garage Renault RRG Plan-les-Ouates',tires_size:'195/55R/16',tires_summer:'4 pneus en gardiennage chez RRG',tires_winter:'Sur véhicule',notes:'',active:true},
+];
+</script>
+</body>
+</html>
