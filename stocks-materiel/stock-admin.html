@@ -350,6 +350,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     </div>
     <div class="card" id="cfg-vest-list"></div>
   </div>
+
+  <div id="cfg-acces-p" style="display:none">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">📍 Sites</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-sites"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">🔑 Clés & Badges</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-items"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">👤 Réceptionnaires</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('recept')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-recept"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 </div><!-- /main -->
@@ -552,32 +578,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   </div>
   <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-tailles')">Fermer</button></div>
 </div></div>
-
-  <div id="cfg-acces-p" style="display:none">
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div class="sec-title" style="margin-bottom:0">📍 Sites</div>
-          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
-        </div>
-        <div class="card" id="cfg-acces-sites"></div>
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div class="sec-title" style="margin-bottom:0">🔑 Clés & Badges</div>
-          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
-        </div>
-        <div class="card" id="cfg-acces-items"></div>
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div class="sec-title" style="margin-bottom:0">👤 Réceptionnaires</div>
-          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('recept')">➕ Ajouter</button>
-        </div>
-        <div class="card" id="cfg-acces-recept"></div>
-      </div>
-    </div>
-  </div>
 
 <!-- MODAL ACCÈS ITEM -->
 <div class="moverlay" id="m-acces-item"><div class="modal">
