@@ -868,18 +868,12 @@ function nav(to){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('back'));
   if(to==='home'){
     document.getElementById('s-det').classList.add('hidden');
-    document.getElementById('s-dmg').classList.add('hidden');
     document.getElementById('s-home').classList.remove('hidden','back');
     currentVeh=null;
   } else if(to==='det'){
     document.getElementById('s-home').classList.add('back');
-    document.getElementById('s-dmg').classList.add('hidden');
     document.getElementById('s-det').classList.remove('hidden');
     document.getElementById('s-det').classList.remove('back');
-  } else if(to==='damage-form'){
-    document.getElementById('s-det').classList.add('back');
-    document.getElementById('s-dmg').classList.remove('hidden');
-    resetDmgForm();
   }
 }
 
