@@ -931,7 +931,6 @@ function vcardHtml(v){
 function renderDetail(){
   const v=currentVeh;
   document.getElementById('det-plate-tb').textContent=v.plate;
-  document.getElementById('dmg-veh-sub').textContent=`${v.plate} — ${v.brand} ${v.model}`;
   syncDot('sync-det','');
   const rev=getRevSt(v.id),ct=getCTSt(v);
   const inds=[];
