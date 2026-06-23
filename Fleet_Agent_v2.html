@@ -1018,7 +1018,7 @@ function renderDmgList(){
             <div class="dmg-label">${esc(cfg.label)}</div>
             <div class="dmg-sub">${fmt(d.date)} · <span class="sev-badge ${sevCls}" style="font-size:10px;padding:1px 7px">${d.severity||'—'}</span></div>
             ${d.description?`<div class="dmg-sub" style="margin-top:2px">${esc(d.description.slice(0,60))}${d.description.length>60?'…':''}</div>`:''}
-            ${photoCount?`<div class="dmg-photo-count" onclick="event.stopPropagation();openLightbox(${JSON.stringify(d.photos||[])},0)" style="cursor:zoom-in;">📸 ${photoCount} photo${photoCount>1?'s':''} — voir</div>`:''}
+            ${photoCount?`<div class="dmg-photo-count" onclick="event.stopPropagation();showDmgPhotos('${d.id}')" style="cursor:zoom-in;">📸 ${photoCount} photo${photoCount>1?'s':''} — voir</div>`:''}
           </div>
           <div style="color:var(--text3);font-size:16px">›</div>
         </div>`;
@@ -1031,6 +1031,18 @@ function renderDmgList(){
   renderSchemaImage();
 }
 
+
+function showDmgPhotos(id){
+  const d=damages.find(x=>x.id===id);
+  if(!d)return;
+  const photos=parsePhotos(d.photos);
+  if(photos.length)openLightbox(photos,0);
+  else toast('Aucune photo','warn',2000);
+}
+function openDmgPhoto(idx){
+  const photos=window._dmgDetailPhotos||[];
+  if(photos.length)openLightbox(photos,idx);
+}
 function showDmgDetail(id){
   const d=damages.find(x=>x.id===id);if(!d)return;
   const cfg=DMG_TYPES[d.type]||{label:d.type};
@@ -1046,9 +1058,10 @@ function showDmgDetail(id){
     ${d.description?`<div class="detail-row"><span class="detail-key">Description</span><span class="detail-val">${esc(d.description)}</span></div>`:''}`;
   const photos=parsePhotos(d.photos);
   if(photos.length){
-    const urlsJson=JSON.stringify(photos).replace(/'/g,"&#39;");
+    // Stocker les photos pour accès depuis les onclicks
+    window._dmgDetailPhotos = photos;
     h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
-    <div class="photos-grid">${photos.map((url,i)=>`<img src="${esc(url)}" onclick="openLightbox(${urlsJson},${i})" loading="lazy" style="cursor:zoom-in;">`).join('')}</div>`;
+    <div class="photos-grid">${photos.map((url,i)=>`<img src="${esc(url)}" onclick="openDmgPhoto(${i})" loading="lazy" style="cursor:zoom-in;border-radius:var(--r-sm);width:100%;aspect-ratio:4/3;object-fit:cover;">`).join('')}</div>`;
   }
   if(isMe(d)){
     if(!d.resolved)h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
@@ -1449,7 +1462,7 @@ function renderMovements(){
       <div style="font-size:12px;color:var(--text2);margin-bottom:3px;">👤 ${esc(m.agent_name||'—')}</div>
       ${m.cleanliness?`<div style="font-size:11.5px;color:var(--text3);">${cleanLabel[m.cleanliness]||m.cleanliness}</div>`:''}
       ${m.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic;">${esc(m.notes)}</div>`:''}
-      ${m.photo_dashboard?`<img src="${esc(m.photo_dashboard)}" onclick="openLightbox(['${esc(m.photo_dashboard)}'],0)" style="margin-top:8px;width:100%;max-height:140px;object-fit:cover;border-radius:var(--r-xs);cursor:zoom-in;border:1px solid var(--border);" loading="lazy">`:''}
+      ${m.photo_dashboard?`<img src="${esc(m.photo_dashboard)}" onclick="openLightbox([this.src],0)" style="margin-top:8px;width:100%;max-height:140px;object-fit:cover;border-radius:var(--r-xs);cursor:zoom-in;border:1px solid var(--border);" loading="lazy">`:''}
     </div>`;
   }).join('');
 }
