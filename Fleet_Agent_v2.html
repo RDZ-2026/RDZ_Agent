@@ -311,10 +311,10 @@ button,input,select,textarea{font-family:inherit;}
   <div style="display:flex;flex-direction:column;height:calc(100% - 54px);overflow:hidden;">
     <div class="det-hero" id="det-hero"></div>
     <div class="tab-row">
-      <div class="tab-item on" onclick="showTab('fiche')">📋 Infos</div>
+      <div class="tab-item on" onclick="showTab('mv')">🔑 Mouvements</div>
       <div class="tab-item" onclick="showTab('degats')">💥 Dégâts</div>
-      <div class="tab-item" onclick="showTab('mv')">🔑 Mouvements</div>
       <div class="tab-item" onclick="showTab('mc')">📝 Main courante</div>
+      <div class="tab-item" onclick="showTab('fiche')">📋 Infos</div>
     </div>
     <div class="body">
       <div class="tab-pane on" id="tab-fiche"></div>
@@ -883,7 +883,7 @@ function openVehicle(id){
   mcFilter='all';
   nav('det');
   renderDetail();
-  showTab('fiche');
+  showTab('mv');
 }
 
 // ══════════════════════════════════════════
@@ -949,8 +949,8 @@ function renderDetail(){
 
 function showTab(t){
   currentTab=t;
-  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mv','mc'][i]===t));
-  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mv','mc'][i]===t));
+  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['mv','degats','mc','fiche'][i]===t));
+  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['mv','degats','mc','fiche'][i]===t));
   const fab=document.getElementById('fab-det');
   if(t==='mc'){fab.style.display='flex';fab.onclick=openMcModal;}
   else{fab.style.display='none';}
