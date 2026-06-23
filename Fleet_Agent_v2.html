@@ -992,12 +992,15 @@ function renderDmgList(){
         const sevCls=`sev-${d.severity||'mineur'}`;
         const photoCount=(d.photos||[]).length;
         return `<div class="dmg-item" onclick="showDmgDetail('${d.id}')">
-          <div class="dmg-dot" style="background:${d.resolved?'#9ca3af':cfg.color}"></div>
+          <!-- Pastille colorée sévérité -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+            <div style="width:14px;height:14px;border-radius:50%;background:${d.resolved?'#9ca3af':SEV_COLOR[d.severity]||cfg.color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.2);margin-top:2px;"></div>
+          </div>
           <div class="dmg-info">
             <div class="dmg-label">${esc(cfg.label)}</div>
-            <div class="dmg-sub">${fmt(d.date)} · ${VIEW_LABELS[d.view]||d.view} · <span class="sev-badge ${sevCls}" style="font-size:10px;padding:1px 7px">${d.severity||'—'}</span></div>
+            <div class="dmg-sub">${fmt(d.date)} · <span class="sev-badge ${sevCls}" style="font-size:10px;padding:1px 7px">${d.severity||'—'}</span></div>
             ${d.description?`<div class="dmg-sub" style="margin-top:2px">${esc(d.description.slice(0,60))}${d.description.length>60?'…':''}</div>`:''}
-            ${photoCount?`<div class="dmg-photo-count">📸 ${photoCount} photo${photoCount>1?'s':''}</div>`:''}
+            ${photoCount?`<div class="dmg-photo-count" onclick="event.stopPropagation();openLightbox(${JSON.stringify(d.photos||[])},0)" style="cursor:zoom-in;">📸 ${photoCount} photo${photoCount>1?'s':''} — voir</div>`:''}
           </div>
           <div style="color:var(--text3);font-size:16px">›</div>
         </div>`;
@@ -1024,9 +1027,15 @@ function showDmgDetail(id){
     <div class="detail-row"><span class="detail-key">Agent</span><span class="detail-val">${esc(d.created_by||'—')}</span></div>
     ${d.description?`<div class="detail-row"><span class="detail-key">Description</span><span class="detail-val">${esc(d.description)}</span></div>`:''}`;
   const photos=d.photos||[];
-  if(photos.length)h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
-    <div class="photos-grid">${photos.map(url=>`<img src="${esc(url)}" onclick="window.open('${esc(url)}','_blank')" loading="lazy">`).join('')}</div>`;
-  if(!d.resolved&&isMe(d))h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
+  if(photos.length){
+    const urlsJson=JSON.stringify(photos).replace(/'/g,"&#39;");
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
+    <div class="photos-grid">${photos.map((url,i)=>`<img src="${esc(url)}" onclick="openLightbox(${urlsJson},${i})" loading="lazy" style="cursor:zoom-in;">`).join('')}</div>`;
+  }
+  if(isMe(d)){
+    if(!d.resolved)h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
+    h+=`<button onclick="deleteDmg('${d.id}')" style="width:100%;padding:11px;background:var(--red-l);color:var(--red-d);border:1px solid #fca5a5;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🗑 Supprimer ce dégât</button>`;
+  }
   document.getElementById('dmg-modal-title').textContent=cfg.label;
   document.getElementById('dmg-modal-body').innerHTML=h;
   document.getElementById('dmg-modal-bg').classList.add('on');
@@ -1038,9 +1047,23 @@ async function resolveDmg(id){
     const d=damages.find(x=>x.id===id);if(d){d.resolved=true;d.resolved_at=today();}
     toast('Dégât marqué comme résolu');
     closeDmgModal();
-    renderDmgList();
+    renderDmgList();   // retire la pastille du schéma via renderSchemaImage() appelé dans renderDmgList
     renderHome();
   }catch(e){toast('Erreur : '+e.message,'err');}
+}
+async function deleteDmg(id){
+  const d=damages.find(x=>x.id===id);
+  if(!d||!isMe(d)){toast('Non autorisé','err');return;}
+  if(!confirm(`Supprimer définitivement ce dégât ?\n"${(d.description||d.type||'').slice(0,60)}"\n\nCette action est irréversible.`))return;
+  try{
+    await sb(`fleet_damages?id=eq.${id}`,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
+    damages=damages.filter(x=>x.id!==id);
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    toast('Dégât supprimé');
+    closeDmgModal();
+    renderDmgList();
+    renderHome();
+  }catch(e){toast('Erreur : '+e.message,'err',5000);}
 }
 
 // ══════════════════════════════════════════
@@ -1069,23 +1092,19 @@ function renderSchemaImage(){
     const sevColors={mineur:'#ca8a04',modere:'#ea580c',grave:'#c0272d'};
     const col=sevColors[d.severity]||cfg.color;
     const cx=`${d.location_x}%`,cy=`${d.location_y}%`;
-    // Cercle pulsant
     const g=document.createElementNS('http://www.w3.org/2000/svg','g');
     g.setAttribute('style','cursor:pointer');
     g.setAttribute('onclick',`showDmgDetail('${d.id}')`);
-    // Halo
     const halo=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    halo.setAttribute('cx',cx);halo.setAttribute('cy',cy);halo.setAttribute('r','7%');
+    halo.setAttribute('cx',cx);halo.setAttribute('cy',cy);halo.setAttribute('r','3%');
     halo.setAttribute('fill',col);halo.setAttribute('opacity','0.25');
-    // Cercle principal
     const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r','4%');
-    circle.setAttribute('fill',col);circle.setAttribute('stroke','white');circle.setAttribute('stroke-width','1.5%');
-    // Texte
+    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r','2%');
+    circle.setAttribute('fill',col);circle.setAttribute('stroke','white');circle.setAttribute('stroke-width','0.8%');
     const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
     txt.setAttribute('x',cx);txt.setAttribute('y',cy);txt.setAttribute('text-anchor','middle');
     txt.setAttribute('dominant-baseline','central');
-    txt.setAttribute('font-size','3.5%');txt.setAttribute('fill','white');txt.setAttribute('font-weight','700');
+    txt.setAttribute('font-size','1.8%');txt.setAttribute('fill','white');txt.setAttribute('font-weight','700');
     txt.setAttribute('font-family','DM Sans,sans-serif');
     txt.textContent='!';
     g.appendChild(halo);g.appendChild(circle);g.appendChild(txt);
@@ -1095,11 +1114,11 @@ function renderSchemaImage(){
   if(pinX!==null&&pinY!==null){
     const cx=`${pinX}%`,cy=`${pinY}%`;
     const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r','5.5%');
-    ring.setAttribute('fill','none');ring.setAttribute('stroke','#c0272d');ring.setAttribute('stroke-width','2%');
+    ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r','2.8%');
+    ring.setAttribute('fill','none');ring.setAttribute('stroke','#c0272d');ring.setAttribute('stroke-width','1%');
     const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','3.5%');
-    dot.setAttribute('fill','#c0272d');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','1.5%');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','1.8%');
+    dot.setAttribute('fill','#c0272d');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
     svg.appendChild(ring);svg.appendChild(dot);
   }
   // Gestionnaire de tap
@@ -1313,5 +1332,13 @@ const DEF_VEH=[
   {id:'a283cdf9-000c-5ffe-baef-7351ac0fbfa4',plate:'GE 306 576',brand:'Renault',model:'Zoé',category:'operational',vin:'VF1AG000070758610',km_current:26390,ct_date:null,insurance_name:'Zurich',garage_name:'Garage Renault RRG Plan-les-Ouates',tires_size:'195/55R/16',tires_summer:'4 pneus en gardiennage chez RRG',tires_winter:'Sur véhicule',notes:'',active:true},
 ];
 </script>
+
+<!-- ══ LIGHTBOX PHOTOS ══ -->
+<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:600;align-items:center;justify-content:center;flex-direction:column;">
+  <button onclick="closeLightbox()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;border-radius:50%;width:38px;height:38px;color:white;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+  <img id="lightbox-img" style="max-width:100%;max-height:90vh;object-fit:contain;border-radius:4px;" onclick="event.stopPropagation()">
+  <div id="lightbox-caption" style="color:rgba(255,255,255,.5);font-size:12px;margin-top:10px;font-family:'DM Sans',sans-serif;"></div>
+  <div style="display:flex;gap:16px;margin-top:14px;" id="lightbox-nav"></div>
+</div>
 </body>
 </html>
