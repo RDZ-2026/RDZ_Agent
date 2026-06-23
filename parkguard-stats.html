@@ -256,6 +256,17 @@ function getRondes(vehicles){
   return rondes;
 }
 
+// ═══ UTILS COMPTAGE ═══
+function comptagesForZone(zone) {
+  return allComptages.filter(function(c) {
+    if (c.zone_id && c.zone_id === zone.id) return true;
+    if (!c.zone_id && c.places_totales === zone.places_totales) return true;
+    // Via jointure zones
+    if (c.zones && c.zones.id === zone.id) return true;
+    return false;
+  });
+}
+
 function renderAll(){
   const rondes=getRondes(allVehicles);
   const inf=allVehicles.filter(function(v){return v.statut==='infraction';});
