@@ -1065,8 +1065,10 @@ async function saveComptage() {
   const entries = [];
   comptageZones.forEach(function(z, i) {
     var saisi   = parseInt(vals[i]) || 0;
-    var types   = window._comptageTypes || [];
-    var isDisp  = types[i] === 'disponibles';
+    // Détection fiable : DLCC par nom OU places=80, sinon vehicules directs
+    var isDisp  = (z.question_type === 'disponibles') ||
+                  (z.nom && z.nom.toUpperCase().indexOf('DLCC') >= 0) ||
+                  (window._comptageTypes && window._comptageTypes[i] === 'disponibles');
     // Si on a saisi des places disponibles, on calcule les véhicules présents
     var vehicules = isDisp ? Math.max(0, z.places_totales - saisi) : saisi;
     var pct = Math.round(vehicules / (z.places_totales || 1) * 100);
