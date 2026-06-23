@@ -1549,6 +1549,53 @@ const DEF_VEH=[
   {id:'89df32b0-6e0e-52df-8056-6a83519f2b15',plate:'GE 134 389',brand:'Renault',model:'Zoé',category:'operational',vin:'VF1AG000061726014',km_current:88799,ct_date:null,insurance_name:'Allianz Suisse',garage_name:'Garage Renault RRG Plan-les-Ouates',tires_size:'195/55R/16',tires_summer:'2 pneus dans le stock à REGM',tires_winter:'4 pneus neufs (oct. 24) — Sur véhicule',notes:'Assistance Zoé 24h/24h : +41 44 834 12 01',active:true},
   {id:'a283cdf9-000c-5ffe-baef-7351ac0fbfa4',plate:'GE 306 576',brand:'Renault',model:'Zoé',category:'operational',vin:'VF1AG000070758610',km_current:26390,ct_date:null,insurance_name:'Zurich',garage_name:'Garage Renault RRG Plan-les-Ouates',tires_size:'195/55R/16',tires_summer:'4 pneus en gardiennage chez RRG',tires_winter:'Sur véhicule',notes:'',active:true},
 ];
+
+// ══════════════════════════════════════════
+//  PARSE PHOTOS
+// ══════════════════════════════════════════
+function parsePhotos(val){
+  if(!val)return[];
+  if(Array.isArray(val))return val.filter(Boolean);
+  if(typeof val==='string'){
+    if(val.startsWith('{'))
+      return val.slice(1,-1).split(',').map(s=>s.trim().replace(/^"|"$/g,'')).filter(Boolean);
+    try{return JSON.parse(val)||[];}catch(_){return[];}
+  }
+  return[];
+}
+
+// ══════════════════════════════════════════
+//  LIGHTBOX
+// ══════════════════════════════════════════
+let lbPhotos=[], lbIdx=0;
+
+function openLightbox(urls,idx=0){
+  lbPhotos=Array.isArray(urls)?urls:[urls];
+  lbIdx=Math.min(idx,lbPhotos.length-1);
+  showLbPhoto();
+  document.getElementById('lightbox').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function showLbPhoto(){
+  document.getElementById('lightbox-img').src=lbPhotos[lbIdx]||'';
+  document.getElementById('lightbox-caption').textContent=lbPhotos.length>1?`Photo ${lbIdx+1} / ${lbPhotos.length}`:'';
+  const nav=document.getElementById('lightbox-nav');
+  nav.innerHTML='';
+  if(lbIdx>0)nav.innerHTML+=`<button onclick="lbPrev()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:8px 18px;color:white;font-size:13px;cursor:pointer;">← Préc.</button>`;
+  if(lbIdx<lbPhotos.length-1)nav.innerHTML+=`<button onclick="lbNext()" style="background:rgba(255,255,255,.15);border:none;border-radius:8px;padding:8px 18px;color:white;font-size:13px;cursor:pointer;">Suiv. →</button>`;
+}
+function lbPrev(){if(lbIdx>0){lbIdx--;showLbPhoto();}}
+function lbNext(){if(lbIdx<lbPhotos.length-1){lbIdx++;showLbPhoto();}}
+function closeLightbox(){
+  document.getElementById('lightbox').style.display='none';
+  document.body.style.overflow='';
+  lbPhotos=[];lbIdx=0;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeLightbox();
+  if(e.key==='ArrowLeft')lbPrev();
+  if(e.key==='ArrowRight')lbNext();
+});
 </script>
 
 <!-- ══ LIGHTBOX PHOTOS ══ -->
