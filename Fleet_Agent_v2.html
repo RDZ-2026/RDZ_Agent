@@ -1505,8 +1505,8 @@ function onMvPhoto(input){
 
 async function saveMvEntry(){
   const agName=document.getElementById('mv-agent').value.trim();
-  if(!agName){toast('Indiquez le nom de l'agent','err');return;}
-  if(!mvClean){toast('Indiquez l'état de propreté','err');return;}
+  if(!agName){toast("Indiquez le nom de l'agent",'err');return;}
+  if(!mvClean){toast("Indiquez l'état de propreté",'err');return;}
   const btn=document.getElementById('mv-save-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner sm"></span> Envoi…';
   // Sauvegarder le nom
