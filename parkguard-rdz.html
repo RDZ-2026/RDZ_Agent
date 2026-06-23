@@ -40,6 +40,11 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 .content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
 .bottom-bar{padding:12px 16px;background:var(--white);border-top:1px solid var(--gray-border);flex-shrink:0}
+.topbar-btn{background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.topbar-btn:disabled{background:var(--gray-border);color:var(--gray-mid);cursor:not-allowed}
+.topbar-btn.green{background:var(--green)}
+.topbar-btn.gray{background:var(--gray-dark)}
+.topbar-btn.blue{background:#1d4ed8}
 
 .card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s}
 .card:active{border-color:var(--gray-mid)}
@@ -228,15 +233,14 @@ input[type="file"]{display:none}
 <!-- ══════ FLOW ══════ -->
 <div id="s-flow" class="screen">
   <div class="topbar">
-    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <button class="back-btn" onclick="prevFlowStep()">‹</button>
     <div style="flex:1">
       <div class="topbar-title" id="flow-title">—</div>
       <div class="topbar-sub" id="flow-step-label">Étape 1</div>
     </div>
-    <div class="badge" id="flow-badge">—</div>
+    <button class="topbar-btn" id="flow-next-btn" onclick="nextFlowStep()">Continuer</button>
   </div>
   <div class="content" id="flow-content"></div>
-  <div class="bottom-bar" id="flow-bottom"></div>
 </div>
 
 <!-- ══════ COMPTAGE DLCC ══════ -->
@@ -247,7 +251,7 @@ input[type="file"]{display:none}
       <div class="topbar-title">Relevé de comptage</div>
       <div class="topbar-sub" id="comptage-site-name">—</div>
     </div>
-    <div class="badge" style="background:#1d4ed8;color:#fff;margin-left:auto">GUIDAGE</div>
+    <button class="topbar-btn blue" id="btn-save-comptage" onclick="saveComptage()">💾 Enregistrer</button>
   </div>
   <div class="content">
     <div class="step-eyebrow">Comptage visuel</div>
@@ -258,9 +262,6 @@ input[type="file"]{display:none}
       <label class="field-label">Remarque (optionnel)</label>
       <input class="field-input" type="text" id="comptage-remarque" placeholder="Ex: zone DLCC saturée, travaux zone B...">
     </div>
-  </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" id="btn-save-comptage" onclick="saveComptage()" style="background:#1d4ed8">💾 Enregistrer le relevé</button>
   </div>
 </div>
 
@@ -292,7 +293,7 @@ input[type="file"]{display:none}
       <div class="topbar-title">Parking vide</div>
       <div class="topbar-sub">Preuve de passage</div>
     </div>
-    <div class="badge badge-gray">VIDE</div>
+    <button class="topbar-btn gray" id="btn-save-vide" disabled onclick="saveVideRonde()">Enregistrer</button>
   </div>
   <div class="content">
     <div class="step-eyebrow" style="color:var(--gray-dark)">Aucun véhicule constaté</div>
@@ -309,9 +310,6 @@ input[type="file"]{display:none}
       <label class="field-label">Remarque (optionnel)</label>
       <input class="field-input" type="text" id="vide-remarque" placeholder="Ex: parking entièrement libre, vérifié à 09h30">
     </div>
-  </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" id="btn-save-vide" disabled onclick="saveVideRonde()" style="background:var(--gray-dark)">Enregistrer — Parking vide</button>
   </div>
 </div>
 
@@ -1135,8 +1133,8 @@ function renderVidePhotos() {
 
   btn.style.display  = videPhotos.length >= 6 ? 'none' : 'flex';
   btn.textContent    = '📷 Ajouter une photo (' + videPhotos.length + '/6)';
-  save.disabled      = videPhotos.length === 0;
-  save.style.opacity = videPhotos.length === 0 ? '.35' : '1';
+  var saveBtn = document.getElementById('btn-save-vide');
+  if (saveBtn) { saveBtn.disabled = videPhotos.length === 0; saveBtn.style.opacity = videPhotos.length === 0 ? '.35' : '1'; }
 }
 
 function removeVidePhoto(i) {
@@ -1259,8 +1257,12 @@ function renderFlowStep() {
   document.getElementById('flow-content').innerHTML = html;
   const isLast = flowStep === steps.length - 1;
   const label  = isLast ? (flowType === 'infraction' ? "Enregistrer l'infraction" : 'Enregistrer') : 'Continuer';
-  document.getElementById('flow-bottom').innerHTML =
-    '<button class="primary-btn' + (isInf ? '' : ' green') + '" ' + (canNext ? '' : 'disabled') + ' onclick="nextFlowStep()">' + label + '</button>';
+  var btn = document.getElementById('flow-next-btn');
+  if (btn) {
+    btn.textContent = label;
+    btn.disabled = !canNext;
+    btn.className = 'topbar-btn' + (isInf ? '' : ' green');
+  }
 }
 
 function takeFlowPhoto(key) {
