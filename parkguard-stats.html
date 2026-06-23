@@ -215,14 +215,20 @@ async function loadSiteData(){
   const[{data:v},{data:c}]=await Promise.all([
     db.from('vehicles').select('*').eq('site',currentSite.nom).gte('created_at',startISO).order('created_at',{ascending:false}),
     currentSite.type==='guidage'
-      ? db.from('comptages').select('*').eq('site_id',currentSite.id).gte('created_at',startISO).order('created_at',{ascending:false})
+      ? db.from('comptages').select('*,zones(id,nom,places_totales)').eq('site_id',currentSite.id).gte('created_at',startISO).order('created_at',{ascending:false})
       : Promise.resolve({data:[]})
   ]);
   allVehicles=v||[];
-  allComptages=c||[];
+  allComptages=(c||[]).map(function(x){
+    // Normaliser : si zone_id null, identifier par places_totales
+    if(!x.zone_id && x.places_totales){
+      var z=allZones.find(function(z){return currentSite&&z.site_id===currentSite.id&&z.places_totales===x.places_totales;});
+      if(z) x.zone_id=z.id;
+    }
+    return x;
+  });
   renderAll();
 }
-
 function getObjectifForDate(siteId,date){
   const d=date.toISOString().slice(0,10);
   const obj=allObjectifs
