@@ -949,8 +949,16 @@ function renderDetail(){
 
 function showTab(t){
   currentTab=t;
-  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['mv','degats','mc','fiche'][i]===t));
-  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['mv','degats','mc','fiche'][i]===t));
+  // Activer le bon tab-item (par texte onclick)
+  document.querySelectorAll('.tab-item').forEach(el=>{
+    const fn=el.getAttribute('onclick')||'';
+    el.classList.toggle('on', fn.includes("'"+t+"'"));
+  });
+  // Activer le bon tab-pane (par ID)
+  ['mv','degats','mc','fiche'].forEach(id=>{
+    const el=document.getElementById('tab-'+id);
+    if(el) el.classList.toggle('on', id===t);
+  });
   const fab=document.getElementById('fab-det');
   if(t==='mc'){fab.style.display='flex';fab.onclick=openMcModal;}
   else{fab.style.display='none';}
