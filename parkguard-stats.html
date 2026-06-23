@@ -287,38 +287,50 @@ function renderAll(){
 
 function renderDernierPassage(rondes){
   const el=document.getElementById('dernier-passage');
-  if(!rondes.length){el.innerHTML='<div class="no-data">Aucun passage sur la période</div>';return;}
+  const isGuidage = currentSite && currentSite.type === 'guidage';
+
+  if (isGuidage) {
+    if (!allComptages.length) { el.innerHTML='<div class="no-data">Aucun relevé de comptage sur la période</div>'; return; }
+    const c = allComptages[0];
+    const isJourC = isJour(c.created_at);
+    const samePassage = allComptages.filter(function(x){ return Math.abs(new Date(x.created_at)-new Date(c.created_at))<120000; });
+    const detailsHtml = samePassage.map(function(x){
+      var zName = x.places_totales===80?'DLCC':x.places_totales===35?'CLX':'Zone';
+      var taux = Math.round(parseFloat(x.taux_occupation||0));
+      var col = taux>=90?'var(--red)':taux>=70?'var(--orange)':taux>=50?'var(--amber)':'var(--green)';
+      return '<div class="pstat"><div class="pstat-num" style="color:'+col+'">'+taux+'%</div><div class="pstat-lbl">'+zName+'</div></div>';
+    }).join('');
+    el.innerHTML='<div class="passage-card">'+
+      '<div class="passage-icon '+(isJourC?'jour':'nuit')+'">'+(isJourC?'\uD83C\uDF24':'\uD83C\uDF19')+'</div>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:15px;font-weight:700">'+fmt(c.created_at)+' \u00e0 '+fmtH(c.created_at)+'</div>'+
+        '<div style="font-size:12px;color:var(--gray-mid);margin-top:2px">'+(c.agent_name||'\u2014')+' \u00b7 '+(isJourC?'Jour':'Nuit')+'</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:16px">'+detailsHtml+'</div>'+
+    '</div>';
+    return;
+  }
+
+  if(!rondes.length){el.innerHTML='<div class="no-data">Aucun passage sur la p\u00e9riode</div>';return;}
   const r=rondes[0];
-  const inf=r.vehicles.filter(v=>v.statut==='infraction').length;
-  const aut=r.vehicles.filter(v=>v.statut==='autorise').length;
-  const modeIcon=r.jour?'🌤':'🌙';
+  const inf=r.vehicles.filter(function(v){return v.statut==='infraction';}).length;
+  const aut=r.vehicles.filter(function(v){return v.statut==='autorise';}).length;
+  const modeIcon=r.jour?'\uD83C\uDF24':'\uD83C\uDF19';
   const modeLabel=r.jour?'Jour':'Nuit';
   el.innerHTML='<div class="passage-card">'+
     '<div class="passage-icon '+(r.jour?'jour':'nuit')+'">'+modeIcon+'</div>'+
     '<div style="flex:1">'+
-      '<div style="font-size:15px;font-weight:700">'+fmt(r.start)+' à '+fmtH(r.start)+'</div>'+
-      '<div style="font-size:12px;color:var(--gray-mid);margin-top:2px">'+
-        (r.agent||'—')+' · '+modeLabel+
-      '</div>'+
+      '<div style="font-size:15px;font-weight:700">'+fmt(r.start)+' \u00e0 '+fmtH(r.start)+'</div>'+
+      '<div style="font-size:12px;color:var(--gray-mid);margin-top:2px">'+(r.agent||'\u2014')+' \u00b7 '+modeLabel+'</div>'+
     '</div>'+
     '<div style="display:flex;gap:16px">'+
       '<div class="pstat"><div class="pstat-num red">'+inf+'</div><div class="pstat-lbl">Infractions</div></div>'+
-      '<div class="pstat"><div class="pstat-num green">'+aut+'</div><div class="pstat-lbl">Autorisés</div></div>'+
+      '<div class="pstat"><div class="pstat-num green">'+aut+'</div><div class="pstat-lbl">Autoris\u00e9s</div></div>'+
       '<div class="pstat"><div class="pstat-num">'+r.vehicles.length+'</div><div class="pstat-lbl">Total</div></div>'+
     '</div>'+
   '</div>';
 }
 
-// ═══ UTILS COMPTAGE ═══
-// Matcher un comptage à une zone même si zone_id est null (fallback par places_totales)
-function comptagesForZone(zone) {
-  return allComptages.filter(function(c) {
-    if (c.zone_id && c.zone_id === zone.id) return true;
-    // Fallback : pas de zone_id mais places_totales correspond
-    if (!c.zone_id && c.places_totales === zone.places_totales) return true;
-    return false;
-  });
-}
 
 function renderKPIsGuidage(rondes,aut){
   var el=document.getElementById('kpis');if(!el)return;
