@@ -58,6 +58,11 @@ button,input,select,textarea{font-family:inherit;}
 .sync{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
 .sync.spin{background:var(--yellow);animation:blink 1s infinite;}
 .sync.err{background:var(--red);}
+
+/* Schema consultation mode (read-only markers) */
+#schema-img-wrap{cursor:default;}
+#schema-add-wrap{cursor:crosshair;}
+
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ══ SCROLLABLE ══ */
@@ -307,71 +312,98 @@ button,input,select,textarea{font-family:inherit;}
     <div class="tab-row">
       <div class="tab-item on" onclick="showTab('fiche')">📋 Infos</div>
       <div class="tab-item" onclick="showTab('degats')">💥 Dégâts</div>
+      <div class="tab-item" onclick="showTab('mv')">🔑 Mouvements</div>
       <div class="tab-item" onclick="showTab('mc')">📝 Main courante</div>
     </div>
     <div class="body">
       <div class="tab-pane on" id="tab-fiche"></div>
       <div class="tab-pane" id="tab-degats">
-        <!-- Schéma véhicule interactif -->
+        <!-- ── SCHÉMA CONSULTATION ── -->
         <div class="schema-wrap" style="margin:10px 12px 0;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--bg);border-bottom:1px solid var(--border);">
-            <div style="font-size:12px;font-weight:700;color:var(--anth);">💥 Localiser un dégât</div>
-            <div style="font-size:10.5px;color:var(--text3);" id="pin-hint-inline">👆 Tapez sur le schéma</div>
+            <div style="font-size:12px;font-weight:700;color:var(--anth);">💥 Dégâts carrosserie</div>
+            <div style="font-size:10px;color:var(--text3);" id="pin-hint-inline">Cliquez un marqueur pour le détail</div>
           </div>
-          <!-- Image véhicule + overlay SVG pour les marqueurs -->
-          <div id="schema-img-wrap" style="position:relative;cursor:crosshair;user-select:none;touch-action:none;">
+          <div id="schema-img-wrap" style="position:relative;cursor:default;user-select:none;touch-action:none;">
             <img id="schema-bg-img" src="data:image/png;base64,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" style="width:100%;display:block;pointer-events:none;" draggable="false">
             <svg id="damage-overlay" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
           </div>
-          <div style="padding:6px 12px;font-size:10.5px;color:var(--text3);text-align:center;border-top:1px solid var(--border);">
-            Tapez pour localiser · Retapez pour déplacer
-          </div>
         </div>
-        <!-- Formulaire inline (caché jusqu'au tap) -->
-        <div class="dmg-details hidden" id="dmg-details-inline" style="margin:8px 12px 0;">
-          <div style="font-size:11px;font-weight:700;color:var(--green-d);background:var(--green-l);padding:7px 12px;border-radius:var(--r-xs);margin-bottom:10px;border:1px solid #bbf7d0;">
-            📍 Position marquée — complétez les informations ci-dessous
+        <!-- ── BOUTON SIGNALER ── -->
+        <div style="margin:10px 12px 0;">
+          <button id="btn-open-dmg-form" onclick="openDmgForm()" style="width:100%;padding:12px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span>＋</span> Signaler un nouveau dégât
+          </button>
+        </div>
+        <!-- ── FORMULAIRE (caché par défaut) ── -->
+        <div id="dmg-form-panel" style="display:none;margin:0 12px;background:var(--white);border-radius:var(--r);box-shadow:var(--sh-md);overflow:hidden;margin-top:10px;">
+          <div style="background:var(--anth2);padding:11px 14px;display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:13px;font-weight:700;color:white;">Nouveau signalement</div>
+            <button onclick="closeDmgForm()" style="background:rgba(255,255,255,.15);border:none;border-radius:5px;color:white;padding:4px 10px;font-size:12px;cursor:pointer;">✕ Annuler</button>
           </div>
-          <div class="fg">
-            <label class="fl">Type de dégât *</label>
-            <select class="fi fi-sel" id="d-type">
-              <option value="">— Sélectionner —</option>
-              <option value="rayure">🔴 Rayure</option>
-              <option value="enfoncement">🟠 Enfoncement / Bosse</option>
-              <option value="bris_vitre">🔵 Bris de vitre</option>
-              <option value="deterioration">🟡 Détérioration</option>
-              <option value="autre">⚫ Autre</option>
-            </select>
-          </div>
-          <div class="fg">
-            <label class="fl">Sévérité *</label>
-            <div class="sev-chips">
-              <div class="sev-chip" id="sev-mineur" onclick="setSev('mineur')">Mineur</div>
-              <div class="sev-chip" id="sev-modere" onclick="setSev('modere')">Modéré</div>
-              <div class="sev-chip" id="sev-grave" onclick="setSev('grave')">Grave</div>
+          <!-- Schéma interactif pour ajout -->
+          <div style="border-bottom:1px solid var(--border);">
+            <div style="font-size:10.5px;color:var(--text3);text-align:center;padding:6px 0 2px;" id="pin-hint-add">👆 Tapez sur le schéma pour localiser le dégât</div>
+            <div id="schema-add-wrap" style="position:relative;cursor:crosshair;user-select:none;touch-action:none;">
+              <img src="data:image/png;base64,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" style="width:100%;display:block;pointer-events:none;" draggable="false">
+              <svg id="damage-overlay-add" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
             </div>
           </div>
-          <div class="fg">
-            <label class="fl">Description</label>
-            <textarea class="fi fi-ta" id="d-desc" placeholder="Décrivez le dégât…"></textarea>
+          <!-- Champs formulaire -->
+          <div style="padding:14px;">
+            <div class="fg">
+              <label class="fl">Type de dégât *</label>
+              <select class="fi fi-sel" id="d-type">
+                <option value="">— Sélectionner —</option>
+                <option value="rayure">🔴 Rayure</option>
+                <option value="enfoncement">🟠 Enfoncement / Bosse</option>
+                <option value="bris_vitre">🔵 Bris de vitre</option>
+                <option value="deterioration">🟡 Détérioration</option>
+                <option value="autre">⚫ Autre</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl">Sévérité *</label>
+              <div class="sev-chips">
+                <div class="sev-chip" id="sev-mineur" onclick="setSev('mineur')">Mineur</div>
+                <div class="sev-chip" id="sev-modere" onclick="setSev('modere')">Modéré</div>
+                <div class="sev-chip" id="sev-grave" onclick="setSev('grave')">Grave</div>
+              </div>
+            </div>
+            <div class="fg">
+              <label class="fl">Description</label>
+              <textarea class="fi fi-ta" id="d-desc" placeholder="Décrivez le dégât constaté…"></textarea>
+            </div>
+            <div class="fg">
+              <label class="fl">Photos (jusqu'à 5)</label>
+              <div class="photo-row" id="photo-row">
+                <div class="photo-add" onclick="document.getElementById('photo-input').click()">
+                  <div class="photo-add-ico">📷</div><div class="photo-add-lbl">Ajouter photo</div>
+                </div>
+              </div>
+              <input type="file" id="photo-input" accept="image/*" capture="environment" multiple style="display:none" onchange="onPhotos(this)">
+            </div>
+            <div class="fg">
+              <label class="fl">Date</label>
+              <input type="date" class="fi" id="d-date">
+            </div>
+            <button class="btn-submit" id="btn-submit-dmg" onclick="submitDamage()"><span>📸</span> Enregistrer le dégât</button>
           </div>
-          <div class="fg">
-            <label class="fl">Photos (jusqu'à 5)</label>
-            <div class="photo-row" id="photo-row"></div>
-            <input type="file" id="photo-input" accept="image/*" capture="environment" multiple style="display:none" onchange="onPhotos(this)">
-          </div>
-          <div class="fg">
-            <label class="fl">Date</label>
-            <input type="date" class="fi" id="d-date">
-          </div>
-          <button class="btn-submit" id="btn-submit-dmg" onclick="submitDamage()"><span>📸</span> Enregistrer le dégât</button>
-          <button style="width:100%;padding:10px;background:none;border:1px solid var(--border2);border-radius:var(--r-sm);font-size:13px;color:var(--text3);cursor:pointer;margin-top:6px;" onclick="cancelDmgForm()">Annuler</button>
         </div>
-        <!-- Liste des dégâts -->
-        <div style="margin:10px 12px 0;">
-          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:2px 0 8px;">Dégâts signalés</div>
-        </div>
+        <!-- ── LISTE DES DÉGÂTS ── -->
+        <div style="margin:12px 12px 4px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;" id="dmg-list-title">Dégâts signalés</div>
         <div id="dmg-list-wrap"></div>
+        <div style="height:80px"></div>
+      </div>
+      <div class="tab-pane" id="tab-mv">
+        <!-- Statut véhicule -->
+        <div id="mv-status-bar" style="margin:10px 12px 0;padding:12px 14px;border-radius:var(--r);box-shadow:var(--sh-md);background:var(--white);display:flex;align-items:center;justify-content:space-between;">
+          <div id="mv-status-text" style="font-size:13px;font-weight:700;"></div>
+          <button id="mv-action-btn" style="padding:8px 16px;border:none;border-radius:var(--r-xs);font-size:12.5px;font-weight:700;cursor:pointer;"></button>
+        </div>
+        <!-- Historique -->
+        <div style="margin:12px 12px 4px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Historique des mouvements</div>
+        <div id="mv-list"></div>
         <div style="height:80px"></div>
       </div>
       <div class="tab-pane" id="tab-mc">
@@ -391,66 +423,7 @@ button,input,select,textarea{font-family:inherit;}
   <button class="fab" id="fab-det" onclick="fabAction()" style="display:none">＋</button>
 </div>
 
-<!-- ══ SCREEN: DAMAGE FORM ══ -->
-<div class="screen hidden" id="s-dmg">
-  <div class="topbar">
-    <button class="tb-back" onclick="nav('det')">←</button>
-    <div><div class="tb-brand">Signaler un dégât</div><div class="tb-sub" id="dmg-veh-sub">—</div></div>
-    <div class="tb-spacer"></div>
-    <div class="sync" id="sync-dmg"></div>
-  </div>
-  <div class="body dmg-form-body">
-    <div class="pin-instruction" id="pin-hint">👆 Tapez sur le schéma pour localiser le dégât</div>
-    <div class="schema-wrap">
-      <div class="view-tabs" id="view-tabs"></div>
-      <div class="svg-container" id="svg-container"></div>
-      <div class="schema-hint">Tapez sur le schéma — déplacez en retapant</div>
-    </div>
-    <div class="dmg-details hidden" id="dmg-details">
-      <div class="fg">
-        <label class="fl">Type de dégât *</label>
-        <select class="fi fi-sel" id="d-type">
-          <option value="">— Sélectionner —</option>
-          <option value="rayure">🔴 Rayure</option>
-          <option value="enfoncement">🟠 Enfoncement / Bosse</option>
-          <option value="bris_vitre">🔵 Bris de vitre</option>
-          <option value="deterioration">🟡 Détérioration</option>
-          <option value="autre">⚫ Autre</option>
-        </select>
-      </div>
-      <div class="fg">
-        <label class="fl">Sévérité *</label>
-        <div class="sev-chips">
-          <div class="sev-chip" id="sev-mineur" onclick="setSev('mineur')">Mineur</div>
-          <div class="sev-chip" id="sev-modere" onclick="setSev('modere')">Modéré</div>
-          <div class="sev-chip" id="sev-grave" onclick="setSev('grave')">Grave</div>
-        </div>
-      </div>
-      <div class="fg">
-        <label class="fl">Description</label>
-        <textarea class="fi fi-ta" id="d-desc" placeholder="Décrivez le dégât constaté…"></textarea>
-      </div>
-      <div class="fg">
-        <label class="fl">Photos (jusqu'à 5)</label>
-        <div class="photo-row" id="photo-row">
-          <div class="photo-add" onclick="document.getElementById('photo-input').click()">
-            <div class="photo-add-ico">📷</div>
-            <div class="photo-add-lbl">Ajouter photo</div>
-          </div>
-        </div>
-        <input type="file" id="photo-input" accept="image/*" capture="environment" multiple style="display:none" onchange="onPhotos(this)">
-      </div>
-      <div class="fg">
-        <label class="fl">Date</label>
-        <input type="date" class="fi" id="d-date">
-      </div>
-      <button class="btn-submit" id="btn-submit-dmg" onclick="submitDamage()">
-        <span>📸</span> Enregistrer le dégât
-      </button>
-    </div>
-    <div style="height:40px"></div>
-  </div>
-</div>
+
 
 <!-- ══ MODAL: DÉTAIL DÉGÂT ══ -->
 <div class="modal-bg" id="dmg-modal-bg" onclick="closeDmgModal(event)">
@@ -503,6 +476,53 @@ button,input,select,textarea{font-family:inherit;}
   </div>
 </div>
 
+
+<!-- ══ MODAL: MOUVEMENT (PRISE / RESTITUTION) ══ -->
+<div id="mv-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;align-items:flex-end;justify-content:center;" onclick="closeMvModal(event)">
+  <div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:sup .25s cubic-bezier(.4,0,.2,1);padding:0 0 20px;">
+    <div style="width:40px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;"></div>
+    <div style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:15px;font-weight:700;" id="mv-modal-title">Prise de véhicule</div>
+    </div>
+    <div style="padding:14px 18px 0;">
+      <div class="mfg">
+        <label class="mfl">Nom de l'agent *</label>
+        <input type="text" class="mfi" id="mv-agent" placeholder="Prénom Nom" autocomplete="name">
+      </div>
+      <div class="mfg">
+        <label class="mfl">Date et heure</label>
+        <input type="datetime-local" class="mfi" id="mv-datetime">
+      </div>
+      <div class="mfg">
+        <label class="mfl">État propreté / rangement *</label>
+        <div style="display:flex;gap:7px;margin-top:4px;" id="mv-clean-chips">
+          <div onclick="setClean('propre')" id="clean-propre" style="flex:1;padding:9px 6px;border:2px solid var(--border);border-radius:var(--r-sm);text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--bg);">✅ Propre</div>
+          <div onclick="setClean('acceptable')" id="clean-acceptable" style="flex:1;padding:9px 6px;border:2px solid var(--border);border-radius:var(--r-sm);text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--bg);">⚠️ Acceptable</div>
+          <div onclick="setClean('sale')" id="clean-sale" style="flex:1;padding:9px 6px;border:2px solid var(--border);border-radius:var(--r-sm);text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--bg);">🔴 Sale</div>
+        </div>
+      </div>
+      <div class="mfg">
+        <label class="mfl">Photo tableau de bord</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+          <div id="mv-photo-preview" style="width:80px;height:60px;border:2px dashed var(--border2);border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;background:var(--bg);" onclick="document.getElementById('mv-photo-input').click()">📷</div>
+          <div style="flex:1;">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:4px;" id="mv-photo-label">Aucune photo sélectionnée</div>
+            <button onclick="document.getElementById('mv-photo-input').click()" style="padding:6px 14px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-xs);font-size:12px;font-weight:600;cursor:pointer;">📷 Prendre / Choisir</button>
+          </div>
+        </div>
+        <input type="file" id="mv-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onMvPhoto(this)">
+      </div>
+      <div class="mfg">
+        <label class="mfl">Notes / Remarques</label>
+        <textarea class="mfi mfi-ta" id="mv-notes" placeholder="Observations, remarques particulières…"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button onclick="closeMvModal()" style="flex:1;padding:11px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--r-sm);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;">Annuler</button>
+        <button id="mv-save-btn" onclick="saveMvEntry()" style="flex:2;padding:11px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><span>💾</span> Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="toasts"></div>
 
 <script>
@@ -739,7 +759,7 @@ const VIEW_LABELS = {top:'🔝 Dessus',front:'⬛ Avant',rear:'⬛ Arrière',lef
 // ══════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════
-let vehicles=[], events=[], damages=[], authToken=null;
+let vehicles=[], events=[], damages=[], movements=[], authToken=null;
 let agentName='', currentVeh=null, currentTab='fiche';
 let mcFilter='all', mcEditId=null;
 let dmgView='top', pinX=null, pinY=null, dmgSeverity='';
@@ -812,15 +832,17 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
 async function loadData(){
   try{
-    const[vd,ed,dd]=await Promise.all([
+    const[vd,ed,dd,mv]=await Promise.all([
       sb('fleet_vehicles?select=*&active=eq.true&order=plate.asc'),
       sb('fleet_events?select=*&order=date.desc'),
       sb('fleet_damages?select=*&order=created_at.desc'),
+      sb('fleet_movements?select=*&order=created_at.desc').catch(()=>[]),
     ]);
     vehicles=(vd||[]).filter(v=>v.category==='operational');
     events=(ed||[]).filter(e=>MC_TYPES[e.type]);
     damages=dd||[];
-    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    movements=mv||[];
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,movements,ts:Date.now()}));
     syncDot('sync-home','');
   }catch(err){
     console.warn('Offline:',err.message);
@@ -928,16 +950,18 @@ function renderDetail(){
   renderFiche(v);
   renderDmgList();
   renderMC();
+  renderMovements();
 }
 
 function showTab(t){
   currentTab=t;
-  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mc'][i]===t));
-  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mc'][i]===t));
+  document.querySelectorAll('.tab-item').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mv','mc'][i]===t));
+  document.querySelectorAll('.tab-pane').forEach((el,i)=>el.classList.toggle('on',['fiche','degats','mv','mc'][i]===t));
   const fab=document.getElementById('fab-det');
   if(t==='mc'){fab.style.display='flex';fab.onclick=openMcModal;}
   else{fab.style.display='none';}
   if(t==='degats'){renderSchemaImage();}
+  if(t==='mv'){renderMovements();}
 }
 
 function renderFiche(v){
@@ -990,7 +1014,7 @@ function renderDmgList(){
       return list.map(d=>{
         const cfg=DMG_TYPES[d.type]||{label:d.type,color:'#6b7280'};
         const sevCls=`sev-${d.severity||'mineur'}`;
-        const photoCount=(d.photos||[]).length;
+        const photoCount=parsePhotos(d.photos).length;
         return `<div class="dmg-item" onclick="showDmgDetail('${d.id}')">
           <!-- Pastille colorée sévérité -->
           <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
@@ -1026,7 +1050,7 @@ function showDmgDetail(id){
     <div class="detail-row"><span class="detail-key">Date</span><span class="detail-val">${fmt(d.date)}</span></div>
     <div class="detail-row"><span class="detail-key">Agent</span><span class="detail-val">${esc(d.created_by||'—')}</span></div>
     ${d.description?`<div class="detail-row"><span class="detail-key">Description</span><span class="detail-val">${esc(d.description)}</span></div>`:''}`;
-  const photos=d.photos||[];
+  const photos=parsePhotos(d.photos);
   if(photos.length){
     const urlsJson=JSON.stringify(photos).replace(/'/g,"&#39;");
     h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
@@ -1058,7 +1082,7 @@ async function deleteDmg(id){
   try{
     await sb(`fleet_damages?id=eq.${id}`,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
     damages=damages.filter(x=>x.id!==id);
-    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,movements,ts:Date.now()}));
     toast('Dégât supprimé');
     closeDmgModal();
     renderDmgList();
@@ -1066,6 +1090,62 @@ async function deleteDmg(id){
   }catch(e){toast('Erreur : '+e.message,'err',5000);}
 }
 
+
+// ══════════════════════════════════════════
+//  GESTION FORMULAIRE DÉGÂTS
+// ══════════════════════════════════════════
+let dmgFormOpen = false;
+
+function openDmgForm(){
+  dmgFormOpen=true;
+  document.getElementById('dmg-form-panel').style.display='block';
+  document.getElementById('btn-open-dmg-form').style.display='none';
+  pinX=null;pinY=null;dmgSeverity='';pendingPhotos=[];
+  document.getElementById('d-type').value='';
+  document.getElementById('d-desc').value='';
+  document.getElementById('d-date').value=today();
+  setSev('');renderPhotoRow();renderSchemaAdd();
+  setTimeout(()=>document.getElementById('dmg-form-panel').scrollIntoView({behavior:'smooth',block:'start'}),80);
+}
+
+function closeDmgForm(){
+  dmgFormOpen=false;
+  document.getElementById('dmg-form-panel').style.display='none';
+  document.getElementById('btn-open-dmg-form').style.display='flex';
+  pinX=null;pinY=null;
+  renderSchemaAdd();
+}
+
+function renderSchemaAdd(){
+  const svg=document.getElementById('damage-overlay-add');
+  if(!svg)return;
+  svg.innerHTML='';
+  const wrap=document.getElementById('schema-add-wrap');
+  if(!wrap)return;
+  // Marqueur en cours
+  if(pinX!==null&&pinY!==null){
+    const cx=`${pinX}%`,cy=`${pinY}%`;
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r','2.8%');
+    ring.setAttribute('fill','none');ring.setAttribute('stroke','#c0272d');ring.setAttribute('stroke-width','1%');
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','1.8%');
+    dot.setAttribute('fill','#c0272d');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
+    svg.appendChild(ring);svg.appendChild(dot);
+    const hint=document.getElementById('pin-hint-add');
+    if(hint)hint.textContent='📍 Position marquée — retapez pour déplacer';
+  }
+  wrap.onclick=onSchemaAddTap;
+}
+
+function onSchemaAddTap(e){
+  if(!dmgFormOpen)return;
+  const wrap=document.getElementById('schema-add-wrap');
+  const rect=wrap.getBoundingClientRect();
+  pinX=((e.clientX-rect.left)/rect.width)*100;
+  pinY=((e.clientY-rect.top)/rect.height)*100;
+  renderSchemaAdd();
+}
 // ══════════════════════════════════════════
 //  DAMAGE FORM
 // ══════════════════════════════════════════
@@ -1121,8 +1201,8 @@ function renderSchemaImage(){
     dot.setAttribute('fill','#c0272d');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
     svg.appendChild(ring);svg.appendChild(dot);
   }
-  // Gestionnaire de tap
-  wrap.onclick=onSchemaTap;
+  // Consultation — clic sur le fond n'ajoute pas de marqueur
+  wrap.onclick=null;
 }
 
 function onSchemaTap(e){
@@ -1225,7 +1305,7 @@ async function submitDamage(){
     };
     await sb('fleet_damages',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
     damages.unshift(payload);
-    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,movements,ts:Date.now()}));
     toast('Dégât enregistré ✓');
     cancelDmgForm();
     renderDmgList();
@@ -1306,7 +1386,7 @@ async function saveMcEntry(){
       if(type==='km'&&payload.km){const vObj=vehicles.find(x=>x.id===currentVeh.id);if(vObj&&(!vObj.km_current||payload.km>vObj.km_current)){vObj.km_current=payload.km;try{await sb(`fleet_vehicles?id=eq.${currentVeh.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({km_current:payload.km})});}catch(_){}}}
       toast('Entrée ajoutée');
     }
-    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,ts:Date.now()}));
+    localStorage.setItem(CACHE_K,JSON.stringify({vehicles,events,damages,movements,ts:Date.now()}));
     closeMcModal();renderMC();renderHome();
   }catch(err){const msg=JSON.parse(err.message.match(/\{.*\}/)?.[0]||'{}')?.message||err.message;toast('Erreur : '+msg,'err',6000);}
   finally{btn.disabled=false;btn.innerHTML='<span>💾</span> Enregistrer';}
@@ -1318,6 +1398,151 @@ async function deleteMcEntry(id){
   catch(err){toast('Erreur : '+err.message,'err');}
 }
 
+
+// ══════════════════════════════════════════
+//  MOUVEMENTS VÉHICULE
+// ══════════════════════════════════════════
+let movements = [];
+let mvType = ''; // 'prise' | 'restitution'
+let mvClean = '';
+let mvPhotoFile = null;
+let mvPhotoPreview = null;
+
+async function loadMovements(){
+  try{
+    const d=await sb('fleet_movements?select=*&order=created_at.desc');
+    movements=d||[];
+  }catch(e){
+    console.warn('fleet_movements not available:',e.message);
+    movements=JSON.parse(localStorage.getItem('fleet_movements_local')||'[]');
+  }
+}
+
+function renderMovements(){
+  if(!currentVeh)return;
+  const vMv=movements.filter(m=>m.vehicle_id===currentVeh.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  // Statut bar
+  const lastMv=vMv[0];
+  const isPrise=lastMv&&lastMv.type==='prise';
+  const statusBar=document.getElementById('mv-status-bar');
+  const statusTxt=document.getElementById('mv-status-text');
+  const actionBtn=document.getElementById('mv-action-btn');
+  if(isPrise){
+    statusBar.style.background='#fef3c7';
+    statusTxt.innerHTML=`🔑 En service — <strong>${esc(lastMv.agent_name||'—')}</strong>`;
+    actionBtn.textContent='Restituer';
+    actionBtn.style.cssText='padding:8px 16px;border:none;border-radius:var(--r-xs);font-size:12.5px;font-weight:700;cursor:pointer;background:var(--green);color:white;';
+    actionBtn.onclick=()=>openMvModal('restitution');
+  }else{
+    statusBar.style.background='var(--green-l)';
+    statusTxt.innerHTML='🟢 Véhicule disponible';
+    actionBtn.textContent='Prendre le véhicule';
+    actionBtn.style.cssText='padding:8px 16px;border:none;border-radius:var(--r-xs);font-size:12.5px;font-weight:700;cursor:pointer;background:var(--red);color:white;';
+    actionBtn.onclick=()=>openMvModal('prise');
+  }
+  // Liste
+  const container=document.getElementById('mv-list');
+  if(!vMv.length){container.innerHTML='<div class="empty" style="margin:0 12px;">Aucun mouvement enregistré.</div>';return;}
+  const cleanLabel={'propre':'✅ Propre','acceptable':'⚠️ Acceptable','sale':'🔴 Sale'};
+  container.innerHTML=vMv.map(m=>{
+    const isPr=m.type==='prise';
+    const dt=m.datetime?new Date(m.datetime):new Date(m.created_at);
+    const dtStr=dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="background:var(--white);margin:0 12px 8px;border-radius:var(--r-sm);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid ${isPr?'#ca8a04':'var(--green)'};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-size:13px;font-weight:700;">${isPr?'🔑 Prise':'✅ Restitution'}</div>
+        <div style="font-size:10.5px;color:var(--text3);font-family:DM Mono,monospace;">${dtStr}</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:3px;">👤 ${esc(m.agent_name||'—')}</div>
+      ${m.cleanliness?`<div style="font-size:11.5px;color:var(--text3);">${cleanLabel[m.cleanliness]||m.cleanliness}</div>`:''}
+      ${m.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic;">${esc(m.notes)}</div>`:''}
+      ${m.photo_dashboard?`<img src="${esc(m.photo_dashboard)}" onclick="openLightbox(['${esc(m.photo_dashboard)}'],0)" style="margin-top:8px;width:100%;max-height:140px;object-fit:cover;border-radius:var(--r-xs);cursor:zoom-in;border:1px solid var(--border);" loading="lazy">`:''}
+    </div>`;
+  }).join('');
+}
+
+function openMvModal(type){
+  mvType=type;mvClean='';mvPhotoFile=null;mvPhotoPreview=null;
+  document.getElementById('mv-modal-title').textContent=type==='prise'?'🔑 Prise de véhicule':'✅ Restitution du véhicule';
+  document.getElementById('mv-agent').value=agentName||'';
+  const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById('mv-datetime').value=now.toISOString().slice(0,16);
+  document.getElementById('mv-notes').value='';
+  document.getElementById('mv-photo-label').textContent='Aucune photo sélectionnée';
+  document.getElementById('mv-photo-preview').textContent='📷';
+  ['propre','acceptable','sale'].forEach(s=>{
+    document.getElementById('clean-'+s).style.cssText='flex:1;padding:9px 6px;border:2px solid var(--border);border-radius:var(--r-sm);text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--bg);';
+  });
+  document.getElementById('mv-modal-bg').style.display='flex';
+}
+
+function closeMvModal(e){
+  if(!e||e.target===document.getElementById('mv-modal-bg'))
+    document.getElementById('mv-modal-bg').style.display='none';
+}
+
+function setClean(val){
+  mvClean=val;
+  const colors={propre:'var(--green)',acceptable:'var(--yellow)',sale:'var(--red)'};
+  ['propre','acceptable','sale'].forEach(s=>{
+    const el=document.getElementById('clean-'+s);
+    el.style.cssText=`flex:1;padding:9px 6px;border:2px solid ${s===val?colors[val]:'var(--border)'};border-radius:var(--r-sm);text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:${s===val?'var(--bg)':'var(--bg)'};color:${s===val?colors[val]:'var(--text2)'};`;
+  });
+}
+
+function onMvPhoto(input){
+  const file=input.files[0];if(!file)return;
+  mvPhotoFile=file;
+  const r=new FileReader();
+  r.onload=e=>{
+    mvPhotoPreview=e.target.result;
+    document.getElementById('mv-photo-preview').innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;">`;
+    document.getElementById('mv-photo-label').textContent=file.name;
+  };
+  r.readAsDataURL(file);
+  input.value='';
+}
+
+async function saveMvEntry(){
+  const agName=document.getElementById('mv-agent').value.trim();
+  if(!agName){toast('Indiquez le nom de l'agent','err');return;}
+  if(!mvClean){toast('Indiquez l'état de propreté','err');return;}
+  const btn=document.getElementById('mv-save-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner sm"></span> Envoi…';
+  // Sauvegarder le nom
+  if(!agentName&&agName){agentName=agName;localStorage.setItem(NAME_K,agentName);refreshNameBadge();}
+  try{
+    let photoUrl='';
+    if(mvPhotoFile){
+      try{photoUrl=await uploadPhoto(mvPhotoFile);}catch(e){console.warn('Photo upload:',e.message);}
+    }
+    const payload={
+      id:uid(),
+      vehicle_id:currentVeh.id,
+      type:mvType,
+      agent_name:agName,
+      datetime:document.getElementById('mv-datetime').value||new Date().toISOString(),
+      cleanliness:mvClean,
+      photo_dashboard:photoUrl||null,
+      notes:document.getElementById('mv-notes').value.trim()||null,
+      created_at:new Date().toISOString(),
+    };
+    try{
+      await sb('fleet_movements',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    }catch(e){
+      // Table peut ne pas exister encore — fallback local
+      console.warn('fleet_movements fallback local:',e.message);
+      const local=JSON.parse(localStorage.getItem('fleet_movements_local')||'[]');
+      local.unshift(payload);
+      localStorage.setItem('fleet_movements_local',JSON.stringify(local.slice(0,200)));
+    }
+    movements.unshift(payload);
+    toast(mvType==='prise'?'Prise enregistrée ✓':'Restitution enregistrée ✓');
+    document.getElementById('mv-modal-bg').style.display='none';
+    renderMovements();
+  }catch(e){toast('Erreur : '+e.message,'err',5000);}
+  finally{btn.disabled=false;btn.innerHTML='<span>💾</span> Enregistrer';}
+}
 // ══════════════════════════════════════════
 //  STATUS HELPERS
 // ══════════════════════════════════════════
