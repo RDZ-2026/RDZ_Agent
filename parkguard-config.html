@@ -505,7 +505,12 @@ function renderSites() {
       <td><span class="badge ${s.type==='guidage'?'badge-blue':'badge-green'}">${s.type==='guidage'?'Guidage':'Standard'}</span></td>
       <td style="font-size:12px">${placesStr}</td>
       <td style="font-size:12px">${(s.heure_jour_debut||'06:30').slice(0,5)}→${(s.heure_jour_fin||'19:00').slice(0,5)}</td>
-      <td><span class="badge ${s.actif?'badge-green':'badge-gray'}">${s.actif?'Actif':'Inactif'}</span></td>
+      <td>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" ${s.parking_actif?'checked':''} onchange="toggleParkingActif('${s.id}',this.checked)" style="accent-color:var(--red);width:16px;height:16px">
+          <span style="font-weight:600;color:${s.parking_actif?'var(--red)':'var(--gray-mid)'}">${s.parking_actif?'🅿️ Oui':'Non'}</span>
+        </label>
+      </td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="openEditSite('${s.id}')" style="margin-right:4px">&#9998; Modifier</button>
         <button class="btn btn-sm" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5" onclick="deleteSite('${s.id}','${s.nom}')">&#128465; Suppr.</button>
@@ -558,6 +563,13 @@ function addZoneField(nom='',places=0){
     <button onclick="this.parentNode.remove()" style="background:none;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;padding:0;font-size:16px;height:38px;align-self:end">&#10005;</button>`;
   document.getElementById('zones-list').appendChild(div);
 }
+async function toggleParkingActif(id, actif) {
+  const {error} = await db.from('sites').update({parking_actif: actif}).eq('id', id);
+  if(error){ toast('❌ '+error.message); return; }
+  toast(actif ? '✅ Site activé comme parking' : '✅ Site retiré des parkings');
+  await loadSites(); renderSites();
+}
+
 async function deleteSite(id,nom) {
   if(!confirm('Supprimer le site '+nom+' ?\nSes données de ronde restent dans la base.')) return;
   const {error}=await db.from('sites').delete().eq('id',id);

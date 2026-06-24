@@ -181,7 +181,7 @@ function getPeriodStart(period){
 
 async function init(){
   const[{data:s},{data:z},{data:o}]=await Promise.all([
-    db.from('sites').select('*').eq('actif',true).order('nom'),
+    db.from('sites').select('*').eq('parking_actif',true).order('nom'),
     db.from('zones').select('*'),
     db.from('objectifs').select('*,sites(nom)').order('date_debut',{ascending:false})
   ]);
