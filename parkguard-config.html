@@ -100,8 +100,8 @@ tr:hover td{background:#fafafa}
     </div>
     <div class="card-body" style="padding:0">
       <table>
-        <thead><tr><th>Nom</th><th>Type</th><th>Places / Zones</th><th>Horaire jour</th><th>Statut</th><th>Actions</th></tr></thead>
-        <tbody id="sites-table"><tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr></tbody>
+        <thead><tr><th>Nom</th><th>Type</th><th>Places / Zones</th><th>Horaire jour</th><th>🅿️ Parking</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="sites-table"><tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -491,7 +491,7 @@ async function confirmImport() {
 }
 
 // ═══ SITES ═══
-async function loadSites(){const{data}=await db.from('sites').select('*').order('nom');allSites=data||[];}
+async function loadSites(){const{data}=await db.from('sites').select('id,nom,adresse,type,places_totales,heure_jour_debut,heure_jour_fin,actif,parking_actif').order('nom');allSites=data||[];}
 async function loadZones(){const{data}=await db.from('zones').select('*').order('nom');allZones=data||[];}
 function renderSites() {
   const tb=document.getElementById('sites-table');
