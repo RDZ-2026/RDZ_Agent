@@ -270,7 +270,8 @@ input[type="file"]{display:none}
 <div id="s-recap-comptage" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
-    <div class="badge" style="background:#1d4ed8;color:#fff;margin-left:auto">🔢 Comptage</div>
+    <div class="badge" style="background:#1d4ed8;color:#fff">🔢 Comptage</div>
+    <button class="topbar-btn blue" style="margin-left:auto" onclick="showScreen('s-round')">Continuer ›</button>
   </div>
   <div class="content">
     <div style="text-align:center;padding:24px 0 28px">
@@ -280,9 +281,6 @@ input[type="file"]{display:none}
     </div>
     <div id="recap-comptage-details" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px"></div>
     <div class="recap-check"><div class="recap-icon">✅</div><span>Relevé enregistré dans Supabase</span></div>
-  </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" onclick="showScreen('s-round')">Continuer la ronde</button>
   </div>
 </div>
 
@@ -318,7 +316,8 @@ input[type="file"]{display:none}
 <div id="s-recap-vide" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
-    <div class="badge badge-gray" style="margin-left:auto">🅿️ Vide</div>
+    <div class="badge badge-gray">🅿️ Vide</div>
+    <button class="topbar-btn gray" style="margin-left:auto" onclick="showScreen('s-round')">Continuer ›</button>
   </div>
   <div class="content">
     <div style="text-align:center;padding:24px 0 28px">
@@ -332,14 +331,12 @@ input[type="file"]{display:none}
       Ce passage sera inclus dans le rapport de ronde. La preuve de présence sur site est enregistrée avec horodatage.
     </div>
   </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" onclick="showScreen('s-round')">Continuer la ronde</button>
-  </div>
 </div>
 <div id="s-recap" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
-    <div class="badge" id="recap-sync-badge" style="margin-left:auto">⏳ Sync</div>
+    <div class="badge" id="recap-sync-badge">⏳ Sync</div>
+    <button class="primary-btn" id="recap-next-btn" onclick="showScreen('s-round')" style="margin-left:auto;width:auto;padding:8px 16px;font-size:14px">Véhicule suivant ›</button>
   </div>
   <div class="content">
     <div style="text-align:center;padding:24px 0 28px">
@@ -352,16 +349,14 @@ input[type="file"]{display:none}
       🤖 <strong>Extraction IA</strong> en fin de ronde — plaque, N° dénonciation, N° macaron.
     </div>
   </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" id="recap-next-btn" onclick="showScreen('s-round')">Véhicule suivant</button>
-  </div>
 </div>
 
 <!-- ══════ FIN DE RONDE ══════ -->
 <div id="s-end-round" class="screen">
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
-    <div class="badge badge-gray" style="margin-left:auto" id="end-round-site">—</div>
+    <div class="badge badge-gray" id="end-round-site">—</div>
+    <button class="topbar-btn" style="margin-left:auto;background:var(--green)" onclick="closeRound()">Nouvelle ronde ›</button>
   </div>
   <div class="content">
     <div style="text-align:center;padding:16px 0 20px">
@@ -381,9 +376,6 @@ input[type="file"]{display:none}
     </button>
 
 
-  </div>
-  <div class="bottom-bar">
-    <button class="primary-btn" onclick="closeRound()">Nouvelle ronde</button>
   </div>
 </div>
 
@@ -1361,7 +1353,7 @@ async function saveEntry() {
   const badge = document.getElementById('recap-sync-badge');
   badge.textContent = synced ? '☁️ Synchronisé' : '⏳ En attente sync';
   badge.className   = 'badge ' + (synced ? 'badge-green' : 'badge-amber');
-  document.getElementById('recap-next-btn').className = 'primary-btn' + (isInf ? '' : ' green');
+  var rnb=document.getElementById('recap-next-btn'); if(rnb){rnb.style.background=isInf?'var(--red)':'var(--green)';}
 
   let checks = isInf
     ? '<div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>' +
