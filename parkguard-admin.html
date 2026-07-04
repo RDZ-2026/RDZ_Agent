@@ -823,7 +823,7 @@ async function deleteSelected() {
 
 // ═══ RAPPORT PDF ═══
 function openRapport(id, type) {
-  const v = allVehicles.find(x => x.id === id);
+  const v = allVehicles.find(x => x.id === id) || allVehiclesHist.find(x => x.id === id);
   if (!v) return;
   // sessionStorage est partagé entre onglets du même domaine (fichier local)
   sessionStorage.setItem('rdz_rapport_data', JSON.stringify(v));
@@ -878,7 +878,7 @@ function openPhoto(url, label) {
 // ═══ EDIT ═══
 function openEdit(id) {
   editingId = id;
-  const v = allVehicles.find(x => x.id === id);
+  const v = allVehicles.find(x => x.id === id) || allVehiclesHist.find(x => x.id === id);
   if (!v) return;
   document.getElementById('edit-modal-content').innerHTML =
     fld('Plaque', 'e-plaque', v.plaque || '') +
