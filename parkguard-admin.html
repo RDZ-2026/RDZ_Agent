@@ -361,11 +361,43 @@ function toast(msg, ms=3000) {
 // ═══ LOAD ═══
 async function loadData() {
   try {
+    // Charger les véhicules du dernier passage par site
+    // 1. Trouver la date du dernier enregistrement par site
+    const { data: lastBySite } = await db
+      .from('vehicles')
+      .select('site, created_at')
+      .order('created_at', { ascending: false });
+
+    // Grouper par site — garder le plus récent
+    const latestBySite = {};
+    (lastBySite || []).forEach(function(v) {
+      if (!latestBySite[v.site]) latestBySite[v.site] = v.created_at;
+    });
+
+    // Pour chaque site, charger les véhicules du round_id le plus récent
+    // En pratique : charger tous les véhicules des dernières 24h par site
+    // puis filtrer par round_id du dernier passage
     const { data, error } = await db
       .from('vehicles').select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
     if (error) throw error;
-    allVehicles = data || [];
+
+    // Identifier le round_id le plus récent par site
+    const latestRoundBySite = {};
+    (data || []).forEach(function(v) {
+      if (!latestRoundBySite[v.site]) {
+        latestRoundBySite[v.site] = v.round_id || v.created_at.slice(0,10);
+      }
+    });
+
+    // Garder uniquement les véhicules du dernier round par site
+    allVehicles = (data || []).filter(function(v) {
+      var siteRound = latestRoundBySite[v.site];
+      if (v.round_id) return v.round_id === siteRound;
+      // Pas de round_id : prendre la même journée que le plus récent
+      return v.created_at.slice(0,10) === siteRound;
+    });
     updateStats();
     renderTable();
     await loadComptages();
@@ -402,13 +434,31 @@ async function loadComptages() {
     sel.innerHTML = '<option value="">Tous les sites guidage</option>' +
       allSitesGuidage.map(s => '<option value="' + s.id + '">' + s.nom + '</option>').join('');
 
-    // Charger les 50 derniers comptages
+    // Trouver la dernière journée enregistrée
     const siteIds = allSitesGuidage.map(s => s.id);
-    const { data: comptages } = await db.from('comptages')
-      .select('*,zones(nom,places_totales)')
+    const { data: lastComptage } = await db.from('comptages')
+      .select('created_at')
       .in('site_id', siteIds)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(1);
+
+    let comptages = [];
+    if (lastComptage && lastComptage.length) {
+      const lastDate = lastComptage[0].created_at.slice(0, 10); // YYYY-MM-DD
+      const dayStart = lastDate + 'T00:00:00.000Z';
+      const dayEnd   = lastDate + 'T23:59:59.999Z';
+      const { data: c } = await db.from('comptages')
+        .select('*,zones(nom,places_totales)')
+        .in('site_id', siteIds)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd)
+        .order('created_at', { ascending: false });
+      comptages = c || [];
+      // Afficher la date dans le titre
+      const dateLabel = new Date(lastDate).toLocaleDateString('fr-CH', {day:'2-digit',month:'2-digit',year:'numeric'});
+      const title = document.querySelector('#comptages-section .card-title');
+      if (title) title.textContent = '🔢 Relevés de comptage — Dernière journée : ' + dateLabel;
+    }
 
     allComptages = comptages || [];
     renderComptages();
