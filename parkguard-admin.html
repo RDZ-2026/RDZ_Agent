@@ -375,25 +375,25 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
         <input type="date" class="filter-select" id="h-date-fin" onchange="renderHistorique()" title="Date fin">
         <span style="font-size:12px;color:var(--gray-mid)" id="h-count"></span>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <div style="overflow-x:auto">
+      <table>
         <thead>
-          <tr style="background:var(--gray-light)">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Date / Heure</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Site</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Agent</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Statut</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Plaque</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">IA</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Actions</th>
+          <tr>
+            <th>Date / Heure</th>
+            <th>Site</th>
+            <th>Statut</th>
+            <th>Plaque</th>
+            <th>Motif / Macaron</th>
+            <th>Photos</th>
+            <th>IA</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="historique-table-body">
-          <tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
         </tbody>
       </table>
-      <div id="h-load-more" style="text-align:center;padding:12px;display:none">
-        <button class="btn btn-outline btn-sm" onclick="loadMoreHistorique()">Charger plus...</button>
-      </div>
+    </div>
     </div>
   </div>
 
@@ -1219,9 +1219,9 @@ function renderHistorique() {
     if (dDebut && v.created_at.slice(0,10) < dDebut) return false;
     if (dFin   && v.created_at.slice(0,10) > dFin)   return false;
     if (search) {
-      var plate = (v.plaque||'').toLowerCase().replace(/[\s-]/g,'');
+      var plate = (v.plaque||'').toLowerCase().replace(/[\s\-]/g,'');
       var deno  = (v.num_denonciation||'').toLowerCase();
-      var sc    = search.replace(/[\s-]/g,'');
+      var sc    = search.replace(/[\s\-]/g,'');
       if (!plate.includes(sc) && !deno.includes(search)) return false;
     }
     return true;
@@ -1231,38 +1231,64 @@ function renderHistorique() {
   var tbody = document.getElementById('historique-table-body');
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun r\u00e9sultat</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun v\u00e9hicule.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = filtered.slice(0, 200).map(function(v) {
-    var dt = new Date(v.created_at);
-    var dateStr  = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+'/'+dt.getFullYear();
-    var heureStr = pad(dt.getHours())+'h'+pad(dt.getMinutes());
+  tbody.innerHTML = filtered.slice(0, 300).map(function(v) {
+    var isInf = v.statut === 'infraction';
+    var dt    = new Date(v.created_at);
+    var heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' +
+                dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+
+    var thumbs = [
+      v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'V\u00e9hicule') : '',
+      v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'D\u00e9nonciation') : '',
+      v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
+      v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
+    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">\u2014</span>';
+
+    var plaque = v.plaque
+      ? '<span class="plate">' + v.plaque + '</span>'
+      : '<span style="color:var(--gray-mid);font-size:11px">\u2014 IA</span>';
+
+    var motif = isInf
+      ? (v.motif || '\u2014') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N\u00b0 ' + v.num_denonciation + '</span>' : '')
+      : (v.num_macaron ? '<span style="font-size:12px">\uD83C\uDFF7\uFE0F ' + v.num_macaron + '</span>' : '\u2014');
+
+    var iaBadge = v.ia_pending
+      ? '<span class="badge badge-amber">\u23F3 Attente</span>'
+      : '<span class="badge badge-green">\u2705 OK</span>';
+
     var st = v.statut;
-    if (st==='autorise' && v.motif==='PARKING_VIDE') st='parking_vide';
+    if (st !== 'infraction' && (st === 'parking_vide' || v.motif === 'PARKING_VIDE')) st = 'parking_vide';
+    var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
+    var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'\uD83C\uDD7F\uFE0F Vide':'Autoris\u00e9';
     v._statut_display = st;
-    var stCls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
-    var stLbl = st==='infraction'?'Infraction':st==='parking_vide'?'\uD83C\uDD7F\uFE0F Vide':'Autoris\u00e9';
-    var iaHtml = v.ia_pending
-      ? '<span class="badge badge-amber" style="font-size:10px">\u23F3 En attente</span>'
-      : '<span class="badge badge-green" style="font-size:10px">\u2705 OK</span>';
-    var rCol = st==='infraction'?'var(--blue)':st==='parking_vide'?'#555':'var(--green)';
-    return '<tr style="border-bottom:1px solid var(--gray-border)">' +
-      '<td style="padding:8px 12px;font-size:12px">'+dateStr+'<br><span style="color:var(--gray-mid)">'+heureStr+'</span></td>' +
-      '<td style="padding:8px 12px;font-size:12px;font-weight:600">'+(v.site||'\u2014')+'</td>' +
-      '<td style="padding:8px 12px;font-size:12px">'+(v.agent_name||'\u2014')+'</td>' +
-      '<td style="padding:8px 12px"><span class="badge '+stCls+'">'+stLbl+'</span></td>' +
-      '<td style="padding:8px 12px;font-family:monospace;font-size:12px">'+(v.plaque||'<span style="color:var(--gray-mid)">\u2014 IA</span>')+'</td>' +
-      '<td style="padding:8px 12px">'+iaHtml+'</td>' +
-      '<td style="padding:8px 12px;white-space:nowrap">' +
-        '<button class="btn btn-sm" style="background:'+rCol+';color:#fff;border:none;font-size:11px;margin-right:4px" ' +
-          'data-vid="'+v.id+'" data-vst="'+st+'" onclick="openRapport(this.dataset.vid,this.dataset.vst)">\uD83D\uDCC4</button>' +
-        '<button class="btn btn-outline btn-sm" data-eid="'+v.id+'" onclick="openEdit(this.dataset.eid)" style="font-size:11px">\u270F\uFE0F</button>' +
+
+    var rapportBtn = st==='infraction'
+      ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">\uD83D\uDCC4 Rapport</button>'
+      : st==='parking_vide'
+        ? '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">\uD83D\uDCC4 Rapport</button>'
+        : '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">\uD83D\uDCC4 Rapport</button>';
+
+    return '<tr id="row-' + v.id + '">' +
+      '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
+      '<td style="font-size:13px">' + (v.site||'\u2014') + '</td>' +
+      '<td><span class="badge ' + cls + '">' + lbl + '</span></td>' +
+      '<td>' + plaque + '</td>' +
+      '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
+      '<td><div class="photos-cell">' + thumbs + '</div></td>' +
+      '<td>' + iaBadge + '</td>' +
+      '<td style="white-space:nowrap">' +
+        rapportBtn +
+        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">\u270F\uFE0F Modifier</button>' +
+        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">\uD83D\uDDD1\uFE0F</button>' +
       '</td>' +
     '</tr>';
   }).join('');
 }
+
 
 // ═══ HISTORIQUE COMPTAGES ═══
 async function loadComptagesHist() {
