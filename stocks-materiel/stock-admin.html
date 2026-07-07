@@ -333,7 +333,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     <button class="cfg-tab" id="ctab-acces"  onclick="setCfg('acces')"  style="background:none;color:var(--gray-mid)">🔑 Accès</button>
   </div>
   <div id="cfg-agents-p">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div id="cfg-agents-count" style="font-size:12px;color:var(--gray-mid)"></div>
       <button class="btn btn-p btn-sm" onclick="openNewAgent()">➕ Ajouter agent</button>
     </div>
     <div class="card" id="cfg-agents-list"></div>
@@ -504,7 +505,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
       </select>
     </div>
     <div class="fg"><label class="fl">Statut</label>
-      <select class="fc" id="ea-actif"><option value="true">✅ Actif</option><option value="false">🔴 Archivé</option></select>
+      <select class="fc" id="ea-actif"><option value="true">✅ Actif — visible sur le terrain</option><option value="false">⏸ Inactif — masqué sur le terrain</option></select>
     </div>
   </div>
   <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-agent')">Annuler</button><button class="btn btn-p" onclick="doSaveAgent()">✅ Enregistrer</button></div>
@@ -639,8 +640,9 @@ function alItems(arr){return arr.length?arr.map(i=>`<div class="al-item ${i.t}">
 async function loadAll(){
   sync('loading','Synchronisation…');
   try{
-    const [agents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
+    const [agents,inactiveAgents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
       sb.get('stock_agents','?actif=eq.true&order=nom'),
+      sb.get('stock_agents','?actif=eq.false&order=nom'),
       sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
       sb.get('stock_vestiaire_items','?actif=eq.true&order=categorie,nom'),
       sb.get('stock_tailles','?order=taille'),
@@ -654,7 +656,7 @@ async function loadAll(){
       sb.get('stock_acces_items','?actif=eq.true&order=nom'),
       sb.get('stock_acces_recept','?actif=eq.true&order=nom'),
     ]);
-    DB={agents,stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept};
+    DB={agents,inactiveAgents,stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept};
     tailles.forEach(t=>{if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[];DB.tailles[t.article_id].push(t);});
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
@@ -1150,7 +1152,7 @@ function openNewAgent(){
   document.getElementById('m-agent').classList.add('show');
 }
 function openEditAgent(id){
-  const a=DB.agents.find(x=>x.id===id);if(!a)return;
+  const a=[...(DB.agents||[]),...(DB.inactiveAgents||[])].find(x=>x.id===id);if(!a)return;
   document.getElementById('ea-id').value=a.id;
   document.getElementById('ea-nom').value=a.nom;
   document.getElementById('ea-poste').value=a.poste;
