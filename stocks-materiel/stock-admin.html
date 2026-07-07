@@ -640,9 +640,8 @@ function alItems(arr){return arr.length?arr.map(i=>`<div class="al-item ${i.t}">
 async function loadAll(){
   sync('loading','Synchronisation…');
   try{
-    const [agents,inactiveAgents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
-      sb.get('stock_agents','?actif=eq.true&order=nom'),
-      sb.get('stock_agents','?actif=eq.false&order=nom'),
+    const [allAgents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
+      sb.get('stock_agents','?order=nom'),
       sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
       sb.get('stock_vestiaire_items','?actif=eq.true&order=categorie,nom'),
       sb.get('stock_tailles','?order=taille'),
@@ -656,7 +655,12 @@ async function loadAll(){
       sb.get('stock_acces_items','?actif=eq.true&order=nom'),
       sb.get('stock_acces_recept','?actif=eq.true&order=nom'),
     ]);
-    DB={agents,inactiveAgents,stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept};
+    DB={
+      agents: allAgents.filter(a=>a.actif!==false),
+      inactiveAgents: allAgents.filter(a=>a.actif===false),
+      allAgents,
+      stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept
+    };
     tailles.forEach(t=>{if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[];DB.tailles[t.article_id].push(t);});
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
@@ -1152,7 +1156,7 @@ function openNewAgent(){
   document.getElementById('m-agent').classList.add('show');
 }
 function openEditAgent(id){
-  const a=[...(DB.agents||[]),...(DB.inactiveAgents||[])].find(x=>x.id===id);if(!a)return;
+  const a=(DB.allAgents||[]).find(x=>x.id===id);if(!a)return;
   document.getElementById('ea-id').value=a.id;
   document.getElementById('ea-nom').value=a.nom;
   document.getElementById('ea-poste').value=a.poste;
