@@ -1137,17 +1137,28 @@ function setCfg(n){
   if(n==='acces')rCfgAcces();
 }
 function rCfgAgents(){
-  document.getElementById('cfg-agents-list').innerHTML=DB.agents.map(a=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-border)">
-      <div class="av">${ini(a.nom)}</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:700">${a.nom}</div>
-        <div style="font-size:11px;color:var(--gray-mid)">${a.poste}</div>
-      </div>
-      <span class="badge ${dotSt(a)==='complet'?'bok':dotSt(a)==='partiel'?'bwarn':'balert'}" style="margin-right:6px">${dotSt(a)}</span>
-      <button class="btn btn-g btn-sm" onclick="openEditAgent('${a.id}')">\u270f\ufe0f</button>
-      <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="archiveAgent('${a.id}','${a.nom}')">\u{1f5d1}\ufe0f</button>
-    </div>`).join('')||'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun agent</div>';
+  const tous=(DB.allAgents||[]).slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  const nActif=tous.filter(a=>a.actif!==false).length;
+  const nInactif=tous.filter(a=>a.actif===false).length;
+  const countEl=document.getElementById('cfg-agents-count');
+  if(countEl) countEl.textContent=nActif+' actif(s) \u00b7 '+nInactif+' inactif(s)';
+  document.getElementById('cfg-agents-list').innerHTML=tous.length?tous.map(function(a){
+    const inactif=a.actif===false;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-border);opacity:'+(inactif?0.55:1)+'">'
+      +'<div class="av" style="background:'+(inactif?'var(--gray-mid)':'var(--black)')+'">'+ini(a.nom)+'</div>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;font-weight:700">'+a.nom+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-mid)">'+a.poste+'</div>'
+      +'</div>'
+      +'<span class="badge '+(inactif?'bgray':'bok')+'" style="margin-right:4px">'+(inactif?'\u23f8 Inactif':'\u2705 Actif')+'</span>'
+      +'<span class="badge '+(dotSt(a)==='complet'?'bok':dotSt(a)==='partiel'?'bwarn':'balert')+'" style="margin-right:4px">'+dotSt(a)+'</span>'
+      +'<button class="btn btn-g btn-sm" onclick="openEditAgent(\''+a.id+'\')">\u270f\ufe0f</button>'
+      +'<button class="btn btn-xs" style="background:'+(inactif?'var(--green-light)':'#fef2f2')+';color:'+(inactif?'var(--green)':'var(--red)')+';border:1px solid '+(inactif?'var(--green-border)':'#fca5a5')+'"'
+      +' onclick="toggleAgentActif(\''+a.id+'\','+inactif+',\''+a.nom+'\')">'
+      +(inactif?'\u25b6 Activer':'\u23f8 D\u00e9sactiver')
+      +'</button>'
+      +'</div>';
+  }).join(''):'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun agent</div>';
 }
 function openNewAgent(){
   document.getElementById('ea-id').value='';
@@ -1177,10 +1188,18 @@ async function doSaveAgent(){
     toast(id?'\u2705 Agent mis \u00e0 jour':'\u2705 Agent cr\u00e9\u00e9 : '+nom);
   }catch(e){toast('\u274c '+e.message);}
 }
-async function archiveAgent(id,nom){
-  if(!confirm('Archiver "'+nom+'" ?'))return;
-  try{await sb.patch('stock_agents',id,{actif:false});await loadAll();rCfgAgents();toast('\u{1f5d1}\ufe0f '+nom+' archiv\u00e9');}
-  catch(e){toast('\u274c '+e.message);}
+async function toggleAgentActif(id,currentlyInactif,nom){
+  const newActif=currentlyInactif;
+  const msg=newActif
+    ?'R\u00e9activer "'+nom+'" ? Il r\u00e9appara\u00eatra sur le terrain.'
+    :'D\u00e9sactiver "'+nom+'" ? Il n\'appara\u00eatra plus dans les listes du terrain.';
+  if(!confirm(msg))return;
+  try{
+    await sb.patch('stock_agents',id,{actif:newActif});
+    await loadAll();
+    rCfgAgents();
+    toast(newActif?'\u2705 '+nom+' r\u00e9activ\u00e9':'\u23f8 '+nom+' d\u00e9sactiv\u00e9');
+  }catch(e){toast('\u274c '+e.message);}
 }
 
 function rCfgMat(){
