@@ -991,8 +991,8 @@ function rVest(){
           <div style="flex:1"><div style="font-size:13px;font-weight:700">${art.nom}</div>
             <div style="font-size:11px;color:var(--gray-mid)">${tot} pcs · ${art.valeur_chf} CHF/u · Seuil ${art.seuil_alerte}</div></div>
           <button class="btn btn-g btn-sm" onclick="openEditVest('${art.id}')">✏️ Modifier</button>
-        <b<button class="btn btn-g btn-sm" onclick="openEditVest('${art.id}')">✏️ Modifier</button>
-        utton class="btn btn-g btn-sm" onclick="openGererTailles('${art.id}')">🔧 Tailles</button>
+        <button class="btn btn-g btn-sm" onclick="openGererTailles('${art.id}')">🔧 Tailles</button>
+        <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="archiveVest('${art.id}','${art.nom}')">🗑️</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">${pills||'<span style="font-size:12px;color:var(--gray-mid)">Aucune taille</span>'}</div>
       </div>`;
