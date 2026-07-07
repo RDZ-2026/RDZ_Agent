@@ -585,6 +585,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   <div class="mhead"><div class="mtitle" id="acces-item-title">➕ Ajouter</div><button class="mclose" onclick="closeM('m-acces-item')">✕</button></div>
   <div class="mbody">
     <input type="hidden" id="ai-type">
+    <input type="hidden" id="ai-edit-id">
     <div class="fg"><label class="fl" id="ai-label-nom">Nom</label><input type="text" class="fc" id="ai-nom" placeholder=""></div>
     <div id="ai-type-wrap" style="display:none">
       <div class="fg"><label class="fl">Type</label>
@@ -602,6 +603,41 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     <div class="fg"><label class="fl">Description (optionnel)</label><input type="text" class="fc" id="ai-desc" placeholder=""></div>
   </div>
   <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-acces-item')">Annuler</button><button class="btn btn-p" onclick="doSaveAccesItem()">✅ Enregistrer</button></div>
+</div></div>
+
+
+<!-- MODAL MODIFIER MATÉRIEL -->
+<div class="moverlay" id="m-edit-mat"><div class="modal">
+  <div class="mhead"><div class="mtitle">✏️ Modifier le matériel</div><button class="mclose" onclick="closeM('m-edit-mat')">✕</button></div>
+  <div class="mbody">
+    <input type="hidden" id="em-id">
+    <div class="fr">
+      <div class="fg"><label class="fl">Nom</label><input type="text" class="fc" id="em-nom" placeholder="Nom de l'article"></div>
+      <div class="fg"><label class="fl">Icône emoji</label><input type="text" class="fc" id="em-icon" placeholder="📦" maxlength="4"></div>
+    </div>
+    <div class="fg"><label class="fl">Seuil d'alerte</label><input type="number" min="1" value="3" class="fc" id="em-seuil"></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-edit-mat')">Annuler</button><button class="btn btn-p" onclick="doEditMat()">✅ Enregistrer</button></div>
+</div></div>
+
+<!-- MODAL MODIFIER VESTIAIRE -->
+<div class="moverlay" id="m-edit-vest"><div class="modal">
+  <div class="mhead"><div class="mtitle">✏️ Modifier l'article vestiaire</div><button class="mclose" onclick="closeM('m-edit-vest')">✕</button></div>
+  <div class="mbody">
+    <input type="hidden" id="ev-id">
+    <div class="fr">
+      <div class="fg"><label class="fl">Nom</label><input type="text" class="fc" id="ev-nom" placeholder="Nom de l'article"></div>
+      <div class="fg"><label class="fl">Icône emoji</label><input type="text" class="fc" id="ev-icon" placeholder="👕" maxlength="4"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Catégorie</label>
+        <select class="fc" id="ev-cat"><option>Haut</option><option>Bas</option><option>Chaussures</option><option>Accessoire</option><option>Autre</option></select>
+      </div>
+      <div class="fg"><label class="fl">Valeur CHF/u</label><input type="number" min="0" step="0.01" value="0" class="fc" id="ev-val"></div>
+    </div>
+    <div class="fg"><label class="fl">Seuil d'alerte</label><input type="number" min="1" value="2" class="fc" id="ev-seuil"></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-edit-vest')">Annuler</button><button class="btn btn-p" onclick="doEditVest()">✅ Enregistrer</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -954,7 +990,9 @@ function rVest(){
           <span style="font-size:24px">${art.icon}</span>
           <div style="flex:1"><div style="font-size:13px;font-weight:700">${art.nom}</div>
             <div style="font-size:11px;color:var(--gray-mid)">${tot} pcs · ${art.valeur_chf} CHF/u · Seuil ${art.seuil_alerte}</div></div>
-          <button class="btn btn-g btn-sm" onclick="openGererTailles('${art.id}')">🔧 Tailles</button>
+          <button class="btn btn-g btn-sm" onclick="openEditVest('${art.id}')">✏️ Modifier</button>
+        <b<button class="btn btn-g btn-sm" onclick="openEditVest('${art.id}')">✏️ Modifier</button>
+        utton class="btn btn-g btn-sm" onclick="openGererTailles('${art.id}')">🔧 Tailles</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">${pills||'<span style="font-size:12px;color:var(--gray-mid)">Aucune taille</span>'}</div>
       </div>`;
@@ -1210,10 +1248,31 @@ function rCfgMat(){
         <div style="font-size:13px;font-weight:700">${item.nom}</div>
         <div style="font-size:11px;color:var(--gray-mid)">${item.quantite_dispo}/${item.quantite_total} · Seuil ${item.seuil_alerte}</div>
       </div>
-      <span class="badge ${stm(item)==='ok'?'bok':stm(item)==='warn'?'bwarn':'balert'}" style="margin-right:6px">${stm(item)==='ok'?'OK':stm(item)==='warn'?'Faible':'Critique'}</span>
-      <button class="btn btn-g btn-sm" onclick="openAjustFor('${item.id}')">\u270f\ufe0f Ajuster</button>
+      <span class="badge ${stm(item)==='ok'?'bok':stm(item)==='warn'?'bwarn':'balert'}" style="margin-right:4px">${stm(item)==='ok'?'OK':stm(item)==='warn'?'Faible':'Critique'}</span>
+      <button class="btn btn-g btn-sm" onclick="openEditMat('${item.id}')">\u270f\ufe0f Modifier</button>
       <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="archiveMat('${item.id}','${item.nom}')">\u{1f5d1}\ufe0f</button>
     </div>`).join('')||'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun article</div>';
+}
+
+function openEditMat(id){
+  const item=DB.stock.find(s=>s.id===id);if(!item)return;
+  document.getElementById('em-id').value=id;
+  document.getElementById('em-nom').value=item.nom;
+  document.getElementById('em-icon').value=item.icon||'';
+  document.getElementById('em-seuil').value=item.seuil_alerte;
+  document.getElementById('m-edit-mat').classList.add('show');
+}
+async function doEditMat(){
+  const id=document.getElementById('em-id').value;
+  const nom=document.getElementById('em-nom').value.trim();
+  const icon=document.getElementById('em-icon').value.trim()||'📦';
+  const seuil=parseInt(document.getElementById('em-seuil').value)||3;
+  if(!nom){toast('\u26a0\ufe0f Nom requis');return;}
+  try{
+    await sb.patch('stock_materiel_items',id,{nom,icon,seuil_alerte:seuil});
+    await loadAll();closeM('m-edit-mat');rCfgMat();
+    toast('\u2705 '+nom+' mis \u00e0 jour');
+  }catch(e){toast('\u274c '+e.message);}
 }
 async function archiveMat(id,nom){
   if(!confirm('Archiver "'+nom+'" ?'))return;
@@ -1230,12 +1289,37 @@ function rCfgVest(){
         <span style="font-size:20px">${art.icon}</span>
         <div style="flex:1"><div style="font-size:13px;font-weight:700">${art.nom}</div>
           <div style="font-size:11px;color:var(--gray-mid)">${art.categorie} · ${tot} pcs · ${art.valeur_chf} CHF/u</div></div>
+        <button class="btn btn-g btn-sm" onclick="openEditVest('${art.id}')">\u270f\ufe0f Modifier</button>
         <button class="btn btn-g btn-sm" onclick="openGererTailles('${art.id}')">\u{1f527} Tailles</button>
         <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="archiveVest('${art.id}','${art.nom}')">\u{1f5d1}\ufe0f</button>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px">${pills||'<span style="font-size:11px;color:var(--gray-mid)">Aucune taille</span>'}</div>
     </div>`;
   }).join('')||'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun article</div>';
+}
+function openEditVest(id){
+  const art=DB.articles.find(a=>a.id===id);if(!art)return;
+  document.getElementById('ev-id').value=id;
+  document.getElementById('ev-nom').value=art.nom;
+  document.getElementById('ev-icon').value=art.icon||'';
+  document.getElementById('ev-cat').value=art.categorie||'Autre';
+  document.getElementById('ev-val').value=art.valeur_chf||0;
+  document.getElementById('ev-seuil').value=art.seuil_alerte||2;
+  document.getElementById('m-edit-vest').classList.add('show');
+}
+async function doEditVest(){
+  const id=document.getElementById('ev-id').value;
+  const nom=document.getElementById('ev-nom').value.trim();
+  const icon=document.getElementById('ev-icon').value.trim()||'\u{1f455}';
+  const cat=document.getElementById('ev-cat').value;
+  const val=parseFloat(document.getElementById('ev-val').value)||0;
+  const seuil=parseInt(document.getElementById('ev-seuil').value)||2;
+  if(!nom){toast('\u26a0\ufe0f Nom requis');return;}
+  try{
+    await sb.patch('stock_vestiaire_items',id,{nom,icon,categorie:cat,valeur_chf:val,seuil_alerte:seuil});
+    await loadAll();closeM('m-edit-vest');rCfgVest();
+    toast('\u2705 '+nom+' mis \u00e0 jour');
+  }catch(e){toast('\u274c '+e.message);}
 }
 async function archiveVest(id,nom){
   if(!confirm('Archiver "'+nom+'" ?'))return;
@@ -1513,6 +1597,9 @@ function rCfgAcces(){
         <div style="font-size:13px;font-weight:700">${item.nom}${item.societe?' <span style=\"font-size:11px;color:var(--gray-mid);font-weight:400\">('+item.societe+')</span>':''}</div>
         ${item.type?`<div style="font-size:11px;color:var(--gray-mid)">${item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre'}</div>`:''}
       </div>
+      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">\u270f\ufe0f</button>
+      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️</button>
+      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️</button>
       <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"
         onclick="archiveAccesItem('${item.id}','${type}','${item.nom}')">🗑️</button>
     </div>`).join('')||'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun élément</div>';
@@ -1521,8 +1608,34 @@ function rCfgAcces(){
   document.getElementById('cfg-acces-recept').innerHTML=listHTML(DB.acesRecept,'recept');
 }
 
+function openEditAccesItem(id,type){
+  const arr={site:DB.acesSites,item:DB.acesItems,recept:DB.acesRecept}[type]||[];
+  const item=arr.find(x=>x.id===id);if(!item)return;
+  document.getElementById('ai-type').value=type;
+  document.getElementById('ai-edit-id').value=id;
+  document.getElementById('ai-nom').value=item.nom;
+  document.getElementById('ai-desc').value=item.description||'';
+  document.getElementById('ai-societe').value=item.societe||'';
+  document.getElementById('ai-item-type').value=item.type||'clé';
+  document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
+  document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
+  const titles={site:'✏️ Modifier le site',item:'✏️ Modifier la clé / badge',recept:'✏️ Modifier le réceptionnaire'};
+  const labels={site:'Nom du site',item:'Nom de la clé / badge',recept:'Nom du réceptionnaire'};
+  document.getElementById('acces-item-title').textContent=titles[type];
+  document.getElementById('ai-label-nom').textContent=labels[type];
+  // Update chips for type
+  if(type==='item'){
+    document.querySelectorAll('#ai-type-chips .chip').forEach(c=>{
+      const v=c.textContent.includes('Clé')?'clé':c.textContent.includes('Badge')?'badge':'autre';
+      c.classList.toggle('sel',v===(item.type||'clé'));
+    });
+  }
+  document.getElementById('m-acces-item').classList.add('show');
+}
+
 function openNewAccesItem(type){
   document.getElementById('ai-type').value=type;
+  document.getElementById('ai-edit-id').value='';
   document.getElementById('ai-nom').value='';
   document.getElementById('ai-desc').value='';
   document.getElementById('ai-societe').value='';
