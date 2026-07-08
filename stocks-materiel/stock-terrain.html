@@ -268,13 +268,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 <div class="overlay" id="sh-acces-retour"><div class="sheet"><div class="shandle"></div>
   <div class="shead"><div class="stitle">↩️ Retour clé / badge</div><button class="sclose" onclick="closeS('sh-acces-retour')">✕</button></div>
   <div class="sbody">
-    <label class="flbl">Remise à clore</label>
-    <select class="fctrl" id="ar-remise"><option value="">Choisir…</option></select>
-    <div id="ar-detail" style="display:none;margin:-8px 0 12px;padding:10px;background:var(--blue-light);border-radius:var(--radius-sm);font-size:12px;color:var(--blue)"></div>
-    <label class="flbl">Notes retour (optionnel)</label>
+    <label class="flbl">Réceptionnaire qui rend</label>
+    <select class="fctrl" id="ar-recep" onchange="loadRetourAccesItems()"><option value="">— Sélectionner —</option></select>
+    <div id="ar-items-wrap" style="display:none">
+      <div class="sec-lbl">Cochez ce qui est rendu</div>
+      <div id="ar-items"></div>
+    </div>
+    <div id="ar-empty" style="display:none;text-align:center;color:var(--gray-mid);font-size:13px;padding:16px 0">Aucune remise active pour ce réceptionnaire</div>
+    <label class="flbl" style="margin-top:8px">Notes retour (optionnel)</label>
     <input type="text" class="fctrl" id="ar-notes" placeholder="Observations au retour…" style="margin-bottom:0">
   </div>
-  <div class="sfoot"><button class="abtn abtn-green" style="margin-bottom:0" onclick="doRetourAcces()">↩️ Confirmer le retour</button></div>
+  <div class="sfoot"><button class="abtn abtn-green" style="margin-bottom:0" onclick="doRetourAcces()">↩️ Confirmer les retours</button></div>
 </div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -930,16 +934,23 @@ function openRemise(){
 }
 
 function openRetourAcces(){
-  fillAccesSheets();
-  const sel=document.getElementById('ar-remise');
+  // Build unique receptionnaire list from active remises
+  const sel=document.getElementById('ar-recep');
   while(sel.options.length>1)sel.remove(1);
-  DB.acces.filter(a=>a.statut==='actif').forEach(a=>{
+  const actifs=DB.acces.filter(a=>a.statut==='actif');
+  const seen=new Set();
+  actifs.forEach(a=>{
+    const key=a.receptionnaire_nom;
+    if(seen.has(key))return;seen.add(key);
     const o=document.createElement('option');
-    o.value=a.id;
-    o.textContent=(a.item_type==='badge'?'🪪':'🔑')+' '+a.item_nom+' → '+a.receptionnaire_nom+' ('+a.site_nom+')';
+    o.value=a.receptionnaire_nom;
+    const icon=a.receptionnaire_type==='agent'?'👮':'👤';
+    o.textContent=icon+' '+a.receptionnaire_nom;
     sel.appendChild(o);
   });
-  document.getElementById('ar-detail').style.display='none';
+  document.getElementById('ar-items-wrap').style.display='none';
+  document.getElementById('ar-empty').style.display='none';
+  document.getElementById('ar-notes').value='';
   openS('sh-acces-retour');
 }
 
@@ -971,13 +982,7 @@ function fillAccesSheets(){
   // Items - show all initially
   onAcSiteChange();
   // Retour select detail
-  const arSel=document.getElementById('ar-remise');
-  if(arSel){arSel.onchange=function(){
-    const a=DB.acces.find(x=>x.id===arSel.value);
-    const el=document.getElementById('ar-detail');
-    if(a){el.style.display='block';el.innerHTML='🔑 '+a.item_nom+' · 📍 '+a.site_nom+'<br>👮 '+a.agent_nom+' → '+a.receptionnaire_nom+(a.notes?'<br>📝 '+a.notes:'');}
-    else el.style.display='none';
-  };}
+  // retour acces handled by loadRetourAccesItems()
 }
 
 async function doRemise(){
@@ -1030,16 +1035,50 @@ async function doRemise(){
   }catch(e){sync('err');toast('❌ '+e.message);}
 }
 
+function loadRetourAccesItems(){
+  const recepNom=document.getElementById('ar-recep').value;
+  const wrap=document.getElementById('ar-items-wrap');
+  const empty=document.getElementById('ar-empty');
+  if(!recepNom){wrap.style.display='none';empty.style.display='none';return;}
+  const items=DB.acces.filter(a=>a.statut==='actif'&&a.receptionnaire_nom===recepNom);
+  if(!items.length){wrap.style.display='none';empty.style.display='block';return;}
+  wrap.style.display='block';empty.style.display='none';
+  document.getElementById('ar-items').innerHTML=items.map(function(a){
+    const icon=a.item_type==='badge'?'🪪':'🔑';
+    return '<div class="ret-item">'
+      +'<div class="ret-top">'
+      +'<div class="rchk" id="archk-'+a.id+'" onclick="togArItem(''+a.id+'')"></div>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;font-weight:700">'+icon+' '+a.item_nom+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-mid)">📍 '+a.site_nom+' · 👮 '+a.agent_nom+'</div>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function togArItem(id){
+  const chk=document.getElementById('archk-'+id);
+  const on=!chk.classList.contains('on');
+  chk.classList.toggle('on',on);
+  chk.textContent=on?'✓':'';
+}
+
 async function doRetourAcces(){
-  const id=document.getElementById('ar-remise').value;
+  const recepNom=document.getElementById('ar-recep').value;
   const notes=document.getElementById('ar-notes').value;
-  if(!id){toast('⚠️ Sélectionnez une remise');return;}
+  if(!recepNom){toast('⚠️ Sélectionnez un réceptionnaire');return;}
+  const items=DB.acces.filter(a=>a.statut==='actif'&&a.receptionnaire_nom===recepNom);
+  const coches=items.filter(a=>document.getElementById('archk-'+a.id)?.classList.contains('on'));
+  if(!coches.length){toast('⚠️ Cochez au moins une clé/badge');return;}
   sync('loading');
   try{
-    await sb.patch('stock_acces',id,{statut:'rendu',date_retour_reel:new Date().toISOString(),notes:notes||null});
+    for(const a of coches){
+      await sb.patch('stock_acces',a.id,{statut:'rendu',date_retour_reel:new Date().toISOString(),notes:notes||null});
+    }
     await loadAll();closeS('sh-acces-retour');
     document.getElementById('ar-notes').value='';
-    toast('↩️ Retour enregistré');
+    toast('↩️ '+coches.length+' retour(s) enregistré(s) — '+recepNom);
     if(TAB==='acces')rAcces();
   }catch(e){sync('err');toast('❌ '+e.message);}
 }
