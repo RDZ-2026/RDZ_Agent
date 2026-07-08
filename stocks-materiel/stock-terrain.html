@@ -1040,28 +1040,29 @@ function loadRetourAccesItems(){
   const wrap=document.getElementById('ar-items-wrap');
   const empty=document.getElementById('ar-empty');
   if(!recepNom){wrap.style.display='none';empty.style.display='none';return;}
-  const items=DB.acces.filter(a=>a.statut==='actif'&&a.receptionnaire_nom===recepNom);
+  const items=DB.acces.filter(function(a){return a.statut==='actif'&&a.receptionnaire_nom===recepNom;});
   if(!items.length){wrap.style.display='none';empty.style.display='block';return;}
   wrap.style.display='block';empty.style.display='none';
-  document.getElementById('ar-items').innerHTML=items.map(function(a){
-    const icon=a.item_type==='badge'?'🪪':'🔑';
-    return '<div class="ret-item">'
+  var html='';
+  items.forEach(function(a){
+    var icon=a.item_type==='badge'?'🪪':'🔑';
+    html+='<div class="ret-item">'
       +'<div class="ret-top">'
-      +'<div class="rchk" id="archk-'+a.id+'" onclick="togArItem(''+a.id+'')"></div>'
+      +'<div class="rchk" id="archk-'+a.id+'" onclick="togArItem(this)" data-id="'+a.id+'"></div>'
       +'<div style="flex:1">'
       +'<div style="font-size:13px;font-weight:700">'+icon+' '+a.item_nom+'</div>'
       +'<div style="font-size:11px;color:var(--gray-mid)">📍 '+a.site_nom+' · 👮 '+a.agent_nom+'</div>'
       +'</div>'
       +'</div>'
       +'</div>';
-  }).join('');
+  });
+  document.getElementById('ar-items').innerHTML=html;
 }
 
-function togArItem(id){
-  const chk=document.getElementById('archk-'+id);
-  const on=!chk.classList.contains('on');
-  chk.classList.toggle('on',on);
-  chk.textContent=on?'✓':'';
+function togArItem(el){
+  var on=!el.classList.contains('on');
+  el.classList.toggle('on',on);
+  el.textContent=on?'✓':'';
 }
 
 async function doRetourAcces(){
@@ -1105,5 +1106,7 @@ loadAll().then(ok=>{
   else document.getElementById('tab-content').innerHTML='<div class="empty" style="padding-top:60px;color:var(--red)">⚠️<br>Connexion impossible.<br><small>Vérifiez les clés Supabase.</small></div>';
 });
 </script>
+</body>
+      +'<div class="rchk" id="archk-'+a.id+'" data-id="'+a.id+'" onclick="togArItem(this.dataset.id)"></div>'
 </body>
 </html>
