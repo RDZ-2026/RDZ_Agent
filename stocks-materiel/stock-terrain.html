@@ -223,12 +223,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 <div class="overlay" id="sh-acces"><div class="sheet"><div class="shandle"></div>
   <div class="shead"><div class="stitle">🔑 Remise clé / badge</div><button class="sclose" onclick="closeS('sh-acces')">✕</button></div>
   <div class="sbody">
-    <label class="flbl">Site</label>
-    <select class="fctrl" id="ac-site"><option value="">— Sélectionner —</option></select>
     <label class="flbl">Agent remettant</label>
     <select class="fctrl" id="ac-agent"><option value="">— Sélectionner —</option></select>
     <label class="flbl">Clé / Badge remis</label>
-    <select class="fctrl" id="ac-item"><option value="">— Sélectionner —</option></select>
+    <select class="fctrl" id="ac-item" onchange="onAccesItemChange()"><option value="">— Sélectionner —</option></select>
+    <div id="ac-site-display" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--blue-light);border-radius:var(--radius-sm);font-size:13px;color:var(--blue)">
+      📍 <strong id="ac-site-name"></strong>
+    </div>
+    <input type="hidden" id="ac-site-id">
+    <input type="hidden" id="ac-site-nom">
     <label class="flbl">Réceptionnaire</label>
     <select class="fctrl" id="ac-recept"><option value="">— Sélectionner —</option></select>
     <label class="flbl">Date et heure de remise</label>
@@ -772,7 +775,10 @@ function rAcces(){
   const acSiteFlt=document.getElementById('ac-flt-site')?.value||'';
   const acItemFlt=document.getElementById('ac-flt-item')?.value||'';
   const actifs=DB.acces.filter(a=>a.statut==='actif');
-  const actifsFiltered=actifs.filter(a=>(!acSiteFlt||a.site_nom===acSiteFlt)&&(!acItemFlt||a.item_nom===acItemFlt));
+  const actifsFiltered=actifs.filter(a=>
+    (!acSiteFlt||a.site_nom===acSiteFlt)&&
+    (!acItemFlt||a.item_nom===acItemFlt)
+  );
 
   let actifsHTML='<div class="empty">✅<br>Aucune remise en cours</div>';
   if(actifsFiltered.length){
@@ -855,8 +861,28 @@ function openRetourAcces(){
   openS('sh-acces-retour');
 }
 
+function onAccesItemChange(){
+  const sel=document.getElementById('ac-item');
+  const item=DB.acesItems.find(i=>i.id===sel.value);
+  const disp=document.getElementById('ac-site-display');
+  const nameEl=document.getElementById('ac-site-name');
+  const idEl=document.getElementById('ac-site-id');
+  const nomEl=document.getElementById('ac-site-nom');
+  if(item&&item.site_id){
+    disp.style.display='block';
+    nameEl.textContent=item.site_nom||'—';
+    idEl.value=item.site_id;
+    nomEl.value=item.site_nom||'';
+  } else {
+    disp.style.display='none';
+    nameEl.textContent='';
+    idEl.value='';
+    nomEl.value='';
+  }
+}
+
 function fillAccesSheets(){
-  [['ac-site',DB.acesSites],['ac-agent',DB.agents],['ac-item',DB.acesItems],['ac-recept',DB.acesRecept]].forEach(function(pair){
+  [['ac-agent',DB.agents],['ac-item',DB.acesItems],['ac-recept',DB.acesRecept]].forEach(function(pair){
     const sel=document.getElementById(pair[0]);
     if(!sel)return;
     const cur=sel.value;
@@ -883,21 +909,22 @@ function fillAccesSheets(){
 }
 
 async function doRemise(){
-  const siteId=document.getElementById('ac-site').value;
   const agentId=document.getElementById('ac-agent').value;
   const itemId=document.getElementById('ac-item').value;
   const receptId=document.getElementById('ac-recept').value;
   const dateStr=document.getElementById('ac-date').value;
   const notes=document.getElementById('ac-notes').value;
-  if(!siteId||!agentId||!itemId||!receptId||!dateStr){toast('⚠️ Complétez tous les champs obligatoires');return;}
-  const site=DB.acesSites.find(s=>s.id===siteId);
+  const siteId=document.getElementById('ac-site-id').value;
+  const siteNom=document.getElementById('ac-site-nom').value;
+  if(!agentId||!itemId||!receptId||!dateStr){toast('⚠️ Complétez tous les champs obligatoires');return;}
+  if(!siteId){toast('⚠️ La clé/badge sélectionné(e) n\'a pas de site assigné — configurez-le dans l\'admin');return;}
   const agent=DB.agents.find(a=>a.id===agentId);
   const item=DB.acesItems.find(i=>i.id===itemId);
   const recept=DB.acesRecept.find(r=>r.id===receptId);
   sync('loading');
   try{
     await sb.post('stock_acces',{
-      site_id:siteId,site_nom:site.nom,
+      site_id:siteId,site_nom:siteNom,
       agent_id:agentId,agent_nom:agent.nom,
       item_id:itemId,item_nom:item.nom,item_type:item.type||'clé',
       receptionnaire_id:receptId,receptionnaire_nom:recept.nom,receptionnaire_societe:recept.societe||null,

@@ -596,6 +596,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
         </div>
         <input type="hidden" id="ai-item-type" value="clé">
       </div>
+      <div class="fg"><label class="fl">Site de stockage</label>
+        <select class="fc" id="ai-site"><option value="">— Aucun site assigné —</option></select>
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Le site se pré-remplira automatiquement lors de la remise</div>
+      </div>
     </div>
     <div id="ai-societe-wrap" style="display:none">
       <div class="fg"><label class="fl">Société / Organisation</label><input type="text" class="fc" id="ai-societe" placeholder="Ex : Entreprise ABC"></div>
@@ -1536,6 +1540,15 @@ function rAcces(){
   const fSite=document.getElementById('ac-filter-site')?.value||'';
   const fActifSite=document.getElementById('ac-filter-actif-site')?.value||'';
   const fActifItem=document.getElementById('ac-filter-actif-item')?.value||'';
+  // Populate filter selects if empty
+  ['ac-filter-item','ac-filter-actif-item'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.item_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
+  ['ac-filter-site','ac-filter-actif-site'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.site_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
   const actifs=DB.acces.filter(a=>a.statut==='actif'&&(!fActifSite||a.site_nom===fActifSite)&&(!fActifItem||a.item_nom===fActifItem));
   const total=DB.acces.length;
   const retard=DB.acces.filter(a=>a.statut==='actif'&&Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24).length;
@@ -1594,12 +1607,11 @@ function rCfgAcces(){
   const listHTML=(arr,type)=>arr.map(item=>`
     <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:700">${item.nom}${item.societe?' <span style=\"font-size:11px;color:var(--gray-mid);font-weight:400\">('+item.societe+')</span>':''}</div>
-        ${item.type?`<div style="font-size:11px;color:var(--gray-mid)">${item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre'}</div>`:''}
+        <div style="font-size:13px;font-weight:700">${item.nom}${item.societe?' <span style="font-size:11px;color:var(--gray-mid);font-weight:400">('+item.societe+')</span>':''}</div>
+        <div style="font-size:11px;color:var(--gray-mid)">${item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre'}${item.site_nom?' &nbsp;·&nbsp; 📍 '+item.site_nom:' &nbsp;·&nbsp; <span style=\"color:var(--amber)\">⚠️ Sans site</span>'}</div>
       </div>
       <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">\u270f\ufe0f</button>
-      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️</button>
-      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️</button>
+      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️ Modifier</button>
       <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"
         onclick="archiveAccesItem('${item.id}','${type}','${item.nom}')">🗑️</button>
     </div>`).join('')||'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun élément</div>';
@@ -1617,6 +1629,9 @@ function openEditAccesItem(id,type){
   document.getElementById('ai-desc').value=item.description||'';
   document.getElementById('ai-societe').value=item.societe||'';
   document.getElementById('ai-item-type').value=item.type||'clé';
+  // Pre-fill site
+  const aiSiteEdit=document.getElementById('ai-site');
+  if(aiSiteEdit&&item.site_id){aiSiteEdit.value=item.site_id+'|'+item.site_nom;}
   document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
   document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
   const titles={site:'✏️ Modifier le site',item:'✏️ Modifier la clé / badge',recept:'✏️ Modifier le réceptionnaire'};
@@ -1639,6 +1654,11 @@ function openNewAccesItem(type){
   document.getElementById('ai-nom').value='';
   document.getElementById('ai-desc').value='';
   document.getElementById('ai-societe').value='';
+  // Populate site select
+  const aiSite=document.getElementById('ai-site');
+  if(aiSite){while(aiSite.options.length>1)aiSite.remove(1);
+    DB.acesSites.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{const o=document.createElement('option');o.value=s.id+'|'+s.nom;o.textContent=s.nom;aiSite.appendChild(o);});
+  }
   document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
   document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
   const titles={site:'➕ Ajouter un site',item:'➕ Ajouter une clé / badge',recept:'➕ Ajouter un réceptionnaire'};
