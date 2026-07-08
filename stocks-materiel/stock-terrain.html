@@ -223,21 +223,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 <div class="overlay" id="sh-acces"><div class="sheet"><div class="shandle"></div>
   <div class="shead"><div class="stitle">🔑 Remise clé / badge</div><button class="sclose" onclick="closeS('sh-acces')">✕</button></div>
   <div class="sbody">
+
     <label class="flbl">Agent remettant</label>
     <select class="fctrl" id="ac-agent"><option value="">— Sélectionner —</option></select>
-    <label class="flbl">Clé / Badge remis</label>
-    <select class="fctrl" id="ac-item" onchange="onAccesItemChange()"><option value="">— Sélectionner —</option></select>
-    <div id="ac-site-display" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--blue-light);border-radius:var(--radius-sm);font-size:13px;color:var(--blue)">
-      📍 <strong id="ac-site-name"></strong>
+
+    <label class="flbl">Type de réceptionnaire</label>
+    <div class="chips" style="margin-bottom:12px">
+      <span class="chip sel" onclick="selRecepType(this,'agent')">👮 Agent RDZ</span>
+      <span class="chip" onclick="selRecepType(this,'externe')">👤 Tiers externe</span>
     </div>
-    <input type="hidden" id="ac-site-id">
-    <input type="hidden" id="ac-site-nom">
-    <label class="flbl">Réceptionnaire</label>
-    <select class="fctrl" id="ac-recept"><option value="">— Sélectionner —</option></select>
+    <input type="hidden" id="ac-recep-type" value="agent">
+
+    <div id="ac-recep-agent-wrap">
+      <label class="flbl">Agent réceptionnaire</label>
+      <select class="fctrl" id="ac-recep-agent"><option value="">— Sélectionner —</option></select>
+    </div>
+    <div id="ac-recep-externe-wrap" style="display:none">
+      <label class="flbl">Réceptionnaire externe</label>
+      <select class="fctrl" id="ac-recept"><option value="">— Sélectionner —</option></select>
+    </div>
+
+    <label class="flbl">Site</label>
+    <select class="fctrl" id="ac-site-filter" onchange="onAcSiteChange()"><option value="">— Tous les sites —</option></select>
+
+    <label class="flbl">Ajouter une clé / badge</label>
+    <div style="display:flex;gap:7px;margin-bottom:12px">
+      <select class="fctrl" id="ac-item" style="margin-bottom:0;flex:1"><option value="">Choisir…</option></select>
+      <button class="abtn abtn-ghost abtn-sm" onclick="addPanierAcces()">➕</button>
+    </div>
+
+    <div class="sec-lbl" style="margin-top:0">Clés / badges à remettre</div>
+    <div class="panier" id="ac-panier"><div class="panier-empty">Aucune clé ajoutée</div></div>
+
     <label class="flbl">Date et heure de remise</label>
-    <input type="datetime-local" class="fctrl" id="ac-date" style="margin-bottom:12px">
+    <input type="datetime-local" class="fctrl" id="ac-date">
+
     <label class="flbl">Notes & remarques</label>
-    <textarea class="fctrl" id="ac-notes" rows="3" style="resize:vertical;margin-bottom:0" placeholder="Informations complémentaires…"></textarea>
+    <textarea class="fctrl" id="ac-notes" rows="2" style="resize:none;margin-bottom:0" placeholder="Informations complémentaires…"></textarea>
   </div>
   <div class="sfoot"><button class="abtn abtn-red" style="margin-bottom:0" onclick="doRemise()">✅ Enregistrer la remise</button></div>
 </div></div>
@@ -770,6 +792,8 @@ async function doRetVest(){
 }
 
 /* ═══ ACCÈS CLÉS/BADGES ═══ */
+let PANIER_ACCES=[];
+
 function rAcces(){
   const ago2=d=>{const m=Math.floor((Date.now()-new Date(d))/60000);if(m<60)return m+'min';if(m<1440)return Math.floor(m/60)+'h';return Math.floor(m/1440)+'j';};
   const acSiteFlt=document.getElementById('ac-flt-site')?.value||'';
@@ -797,7 +821,7 @@ function rAcces(){
         +'<span class="badge '+(late?'balert':'bwarn')+'">'+(late?'⚠️ Retard':ago2(a.date_remise))+'</span>'
         +'</div>'
         +'<div style="font-size:11px;color:var(--gray-mid);padding-left:31px">'
-        +'👮 '+a.agent_nom+' → 👤 '+a.receptionnaire_nom+societe
+        +'👮 '+a.agent_nom+' → '+(a.receptionnaire_type==='agent'?'👮':'👤')+' '+a.receptionnaire_nom+societe
         +'</div>'
         +notesHtml
         +'</div>';
@@ -811,7 +835,7 @@ function rAcces(){
     histHTML+='<div class="stock-row" style="opacity:'+(st?0.6:1)+'">'
       +'<span style="font-size:20px">'+icon+'</span>'
       +'<div class="sinfo">'
-      +'<div class="sname">'+a.item_nom+' — '+a.receptionnaire_nom+'</div>'
+      +'<div class="sname">'+a.item_nom+' — '+(a.receptionnaire_type==='agent'?'👮 ':'👤 ')+a.receptionnaire_nom+'</div>'
       +'<div class="ssub">'+a.site_nom+' · '+a.agent_nom+' · '+ago2(a.date_remise)+'</div>'
       +'</div>'
       +'<span class="badge '+(st?'bok':'bwarn')+'">'+(st?'✅ Rendu':'En cours')+'</span>'
@@ -820,16 +844,16 @@ function rAcces(){
 
   document.getElementById('tab-content').innerHTML=
     '<div class="content" style="padding-bottom:8px">'
-    +'<div style="display:flex;gap:8px;margin-bottom:14px">'
+    +'<div style="display:flex;gap:8px;margin-bottom:10px">'
     +'<button class="abtn abtn-red" style="flex:1;margin-bottom:0" onclick="openRemise()">🔑 Nouvelle remise</button>'
     +'<button class="abtn abtn-green" style="flex:1;margin-bottom:0" onclick="openRetourAcces()">↩️ Retour</button>'
     +'</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
     +'<select class="fctrl-sm" id="ac-flt-site" onchange="rAcces()" style="flex:1;min-width:120px"><option value="">Tous sites</option>'
-    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.site_nom))].sort().map(s=>'<option value="'+s+'"'+(s===acSiteFlt?' selected':'')+'>'+s+'</option>').join('')
+    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.site_nom).filter(Boolean))].sort().map(s=>'<option value="'+s+'"'+(s===acSiteFlt?' selected':'')+'>'+s+'</option>').join('')
     +'</select>'
     +'<select class="fctrl-sm" id="ac-flt-item" onchange="rAcces()" style="flex:1;min-width:120px"><option value="">Toutes clés/badges</option>'
-    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.item_nom))].sort().map(i=>'<option value="'+i+'"'+(i===acItemFlt?' selected':'')+'>'+i+'</option>').join('')
+    +[...new Set(DB.acces.filter(a=>a.statut==="actif").map(a=>a.item_nom).filter(Boolean))].sort().map(i=>'<option value="'+i+'"'+(i===acItemFlt?' selected':'')+'>'+i+'</option>').join('')
     +'</select>'
     +'</div>'
     +'<div class="sec-lbl" style="margin-top:0">Remises actives ('+actifsFiltered.length+')</div>'
@@ -839,10 +863,68 @@ function rAcces(){
     +'</div>';
 }
 
+function selRecepType(el,type){
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('ac-recep-type').value=type;
+  document.getElementById('ac-recep-agent-wrap').style.display=type==='agent'?'block':'none';
+  document.getElementById('ac-recep-externe-wrap').style.display=type==='externe'?'block':'none';
+}
+
+function onAcSiteChange(){
+  const siteNom=document.getElementById('ac-site-filter').value;
+  const sel=document.getElementById('ac-item');
+  while(sel.options.length>1)sel.remove(1);
+  // Filter items by selected site (or show all if no site)
+  const items=siteNom
+    ?DB.acesItems.filter(i=>i.site_nom===siteNom)
+    :DB.acesItems;
+  items.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(function(item){
+    const o=document.createElement('option');
+    o.value=JSON.stringify({id:item.id,nom:item.nom,type:item.type||'clé',site_id:item.site_id,site_nom:item.site_nom});
+    o.textContent=(item.type==='badge'?'🪪':'🔑')+' '+item.nom;
+    sel.appendChild(o);
+  });
+}
+
+function addPanierAcces(){
+  const sel=document.getElementById('ac-item');
+  if(!sel.value){toast('⚠️ Choisissez une clé/badge');return;}
+  let item;
+  try{item=JSON.parse(sel.value);}catch(e){return;}
+  if(PANIER_ACCES.find(p=>p.id===item.id)){toast('⚠️ Déjà dans la liste');return;}
+  PANIER_ACCES.push(item);
+  sel.value='';
+  renderPanierAcces();
+}
+
+function renderPanierAcces(){
+  const el=document.getElementById('ac-panier');
+  if(!PANIER_ACCES.length){el.innerHTML='<div class="panier-empty">Aucune clé ajoutée</div>';return;}
+  el.innerHTML=PANIER_ACCES.map(function(p,i){
+    const icon=p.type==='badge'?'🪪':'🔑';
+    return '<div class="panier-item">'
+      +'<div class="pi-icon">'+icon+'</div>'
+      +'<div class="pi-info"><div class="pi-name">'+p.nom+'</div>'
+      +(p.site_nom?'<div class="pi-sub">📍 '+p.site_nom+'</div>':'')
+      +'</div>'
+      +'<button class="pi-del" onclick="PANIER_ACCES.splice('+i+',1);renderPanierAcces()">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
 function openRemise(){
+  PANIER_ACCES=[];
+  renderPanierAcces();
   const now=new Date();
   const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
   document.getElementById('ac-date').value=local;
+  document.getElementById('ac-notes').value='';
+  // Reset recep type to agent
+  document.querySelectorAll('#sh-acces .chips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+  document.getElementById('ac-recep-type').value='agent';
+  document.getElementById('ac-recep-agent-wrap').style.display='block';
+  document.getElementById('ac-recep-externe-wrap').style.display='none';
   fillAccesSheets();
   openS('sh-acces');
 }
@@ -861,79 +943,87 @@ function openRetourAcces(){
   openS('sh-acces-retour');
 }
 
-function onAccesItemChange(){
-  const sel=document.getElementById('ac-item');
-  const item=DB.acesItems.find(i=>i.id===sel.value);
-  const disp=document.getElementById('ac-site-display');
-  const nameEl=document.getElementById('ac-site-name');
-  const idEl=document.getElementById('ac-site-id');
-  const nomEl=document.getElementById('ac-site-nom');
-  if(item&&item.site_id){
-    disp.style.display='block';
-    nameEl.textContent=item.site_nom||'—';
-    idEl.value=item.site_id;
-    nomEl.value=item.site_nom||'';
-  } else {
-    disp.style.display='none';
-    nameEl.textContent='';
-    idEl.value='';
-    nomEl.value='';
-  }
-}
-
 function fillAccesSheets(){
-  [['ac-agent',DB.agents],['ac-item',DB.acesItems],['ac-recept',DB.acesRecept]].forEach(function(pair){
-    const sel=document.getElementById(pair[0]);
-    if(!sel)return;
-    const cur=sel.value;
-    while(sel.options.length>1)sel.remove(1);
-    pair[1].forEach(function(item){
-      const o=document.createElement('option');
-      o.value=item.id;
-      o.textContent=item.nom+(item.societe?' ('+item.societe+')':'');
-      sel.appendChild(o);
-    });
-    if(cur)sel.value=cur;
-  });
-  const sel=document.getElementById('ar-remise');
-  if(sel){
-    sel.onchange=function(){
-      const a=DB.acces.find(x=>x.id===sel.value);
-      const el=document.getElementById('ar-detail');
-      if(a){
-        el.style.display='block';
-        el.innerHTML='🔑 '+a.item_nom+' · 📍 '+a.site_nom+'<br>👮 '+a.agent_nom+' → 👤 '+a.receptionnaire_nom+(a.notes?'<br>📝 '+a.notes:'');
-      } else el.style.display='none';
-    };
-  }
+  // Agent remettant
+  const acAg=document.getElementById('ac-agent');
+  if(acAg){while(acAg.options.length>1)acAg.remove(1);
+    [...DB.agents].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(a=>{
+      const o=document.createElement('option');o.value=a.id;o.textContent=a.nom;acAg.appendChild(o);
+    });}
+  // Agent réceptionnaire (same list)
+  const acRagent=document.getElementById('ac-recep-agent');
+  if(acRagent){while(acRagent.options.length>1)acRagent.remove(1);
+    [...DB.agents].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(a=>{
+      const o=document.createElement('option');o.value=a.id+'|'+a.nom;o.textContent=a.nom;acRagent.appendChild(o);
+    });}
+  // Réceptionnaire externe
+  const acRecept=document.getElementById('ac-recept');
+  if(acRecept){while(acRecept.options.length>1)acRecept.remove(1);
+    [...DB.acesRecept].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(r=>{
+      const o=document.createElement('option');o.value=r.id+'|'+r.nom+(r.societe?'|'+r.societe:'');o.textContent=r.nom+(r.societe?' ('+r.societe+')':'');acRecept.appendChild(o);
+    });}
+  // Sites filter
+  const acSite=document.getElementById('ac-site-filter');
+  if(acSite){while(acSite.options.length>1)acSite.remove(1);
+    [...DB.acesSites].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{
+      const o=document.createElement('option');o.value=s.nom;o.textContent=s.nom;acSite.appendChild(o);
+    });}
+  // Items - show all initially
+  onAcSiteChange();
+  // Retour select detail
+  const arSel=document.getElementById('ar-remise');
+  if(arSel){arSel.onchange=function(){
+    const a=DB.acces.find(x=>x.id===arSel.value);
+    const el=document.getElementById('ar-detail');
+    if(a){el.style.display='block';el.innerHTML='🔑 '+a.item_nom+' · 📍 '+a.site_nom+'<br>👮 '+a.agent_nom+' → '+a.receptionnaire_nom+(a.notes?'<br>📝 '+a.notes:'');}
+    else el.style.display='none';
+  };}
 }
 
 async function doRemise(){
   const agentId=document.getElementById('ac-agent').value;
-  const itemId=document.getElementById('ac-item').value;
-  const receptId=document.getElementById('ac-recept').value;
+  const recepType=document.getElementById('ac-recep-type').value;
   const dateStr=document.getElementById('ac-date').value;
   const notes=document.getElementById('ac-notes').value;
-  const siteId=document.getElementById('ac-site-id').value;
-  const siteNom=document.getElementById('ac-site-nom').value;
-  if(!agentId||!itemId||!receptId||!dateStr){toast('⚠️ Complétez tous les champs obligatoires');return;}
-  if(!siteId){toast('⚠️ La clé/badge sélectionné(e) n\'a pas de site assigné — configurez-le dans l\'admin');return;}
+  if(!agentId){toast('⚠️ Sélectionnez l\'agent remettant');return;}
+  if(!PANIER_ACCES.length){toast('⚠️ Ajoutez au moins une clé/badge');return;}
+  // Réceptionnaire
+  let receptId=null,receptNom='',receptSociete=null,receptType=recepType;
+  if(recepType==='agent'){
+    const v=document.getElementById('ac-recep-agent').value;
+    if(!v){toast('⚠️ Sélectionnez l\'agent réceptionnaire');return;}
+    const parts=v.split('|');receptId=parts[0];receptNom=parts[1];
+  } else {
+    const v=document.getElementById('ac-recept').value;
+    if(!v){toast('⚠️ Sélectionnez le réceptionnaire externe');return;}
+    const parts=v.split('|');receptId=parts[0];receptNom=parts[1];receptSociete=parts[2]||null;
+  }
   const agent=DB.agents.find(a=>a.id===agentId);
-  const item=DB.acesItems.find(i=>i.id===itemId);
-  const recept=DB.acesRecept.find(r=>r.id===receptId);
   sync('loading');
   try{
-    await sb.post('stock_acces',{
-      site_id:siteId,site_nom:siteNom,
-      agent_id:agentId,agent_nom:agent.nom,
-      item_id:itemId,item_nom:item.nom,item_type:item.type||'clé',
-      receptionnaire_id:receptId,receptionnaire_nom:recept.nom,receptionnaire_societe:recept.societe||null,
-      date_remise:new Date(dateStr).toISOString(),
-      statut:'actif',notes:notes||null
-    });
-    await loadAll();closeS('sh-acces');
-    document.getElementById('ac-notes').value='';
-    toast('✅ Remise enregistrée — '+item.nom+' → '+recept.nom);
+    for(const item of PANIER_ACCES){
+      await sb.post('stock_acces',{
+        site_id:item.site_id||null,
+        site_nom:item.site_nom||'—',
+        agent_id:agentId,
+        agent_nom:agent.nom,
+        item_id:item.id,
+        item_nom:item.nom,
+        item_type:item.type||'clé',
+        receptionnaire_id:receptId,
+        receptionnaire_nom:receptNom,
+        receptionnaire_societe:receptSociete,
+        receptionnaire_type:receptType,
+        date_remise:new Date(dateStr).toISOString(),
+        statut:'actif',
+        notes:notes||null
+      });
+    }
+    const nb=PANIER_ACCES.length;
+    await loadAll();
+    closeS('sh-acces');
+    PANIER_ACCES=[];
+    toast('✅ '+nb+' remise(s) enregistrée(s) → '+receptNom);
     if(TAB==='acces')rAcces();
   }catch(e){sync('err');toast('❌ '+e.message);}
 }
