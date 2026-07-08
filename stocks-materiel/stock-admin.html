@@ -1711,21 +1711,41 @@ function openNewAccesItem(type){
 
 async function doSaveAccesItem(){
   const type=document.getElementById('ai-type').value;
+  const editId=document.getElementById('ai-edit-id').value;
   const nom=document.getElementById('ai-nom').value.trim();
   const desc=document.getElementById('ai-desc').value.trim();
   const societe=document.getElementById('ai-societe').value.trim();
   const itemType=document.getElementById('ai-item-type').value;
   if(!nom){toast('⚠️ Nom requis');return;}
+
+  // Récupérer site depuis le select (format "uuid|nom")
+  const aiSiteEl=document.getElementById('ai-site');
+  const siteRaw=aiSiteEl?aiSiteEl.value:'';
+  const sepIdx=siteRaw.indexOf('|');
+  const siteId=sepIdx>0?siteRaw.substring(0,sepIdx):null;
+  const siteNom=sepIdx>0?siteRaw.substring(sepIdx+1):null;
+
   const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
   const bodies={
-    site:{nom,actif:true},
-    item:{nom,type:itemType,description:desc||null,actif:true},
-    recept:{nom,societe:societe||null,actif:true}
+    site:{nom},
+    item:{nom,type:itemType,description:desc||null,site_id:siteId,site_nom:siteNom},
+    recept:{nom,societe:societe||null}
   };
+
   try{
-    await sb.post(tables[type],bodies[type]);
-    await loadAll();closeM('m-acces-item');rCfgAcces();
-    toast('✅ Ajouté : '+nom);
+    if(editId){
+      // Mode modification
+      await sb.patch(tables[type],editId,bodies[type]);
+      toast('✅ Mis à jour : '+nom);
+    } else {
+      // Mode création
+      await sb.post(tables[type],{...bodies[type],actif:true});
+      toast('✅ Ajouté : '+nom);
+    }
+    document.getElementById('ai-edit-id').value='';
+    await loadAll();
+    closeM('m-acces-item');
+    rCfgAcces();
   }catch(e){toast('❌ '+e.message);}
 }
 
