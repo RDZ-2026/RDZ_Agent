@@ -992,7 +992,9 @@ async function doRemise(){
   if(recepType==='agent'){
     const v=document.getElementById('ac-recep-agent').value;
     if(!v){toast('⚠️ Sélectionnez l\'agent réceptionnaire');return;}
-    const parts=v.split('|');receptId=parts[0];receptNom=parts[1];
+    const parts=v.split('|');
+    receptId=null; // agent RDZ : pas d'ID dans stock_acces_recept
+    receptNom=parts[1];
   } else {
     const v=document.getElementById('ac-recept').value;
     if(!v){toast('⚠️ Sélectionnez le réceptionnaire externe');return;}
