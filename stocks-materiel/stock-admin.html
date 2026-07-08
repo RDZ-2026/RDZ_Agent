@@ -1604,20 +1604,48 @@ async function doRetourAccesAdmin(id,nom){
 
 // ═══ CONFIG ACCÈS ═══
 function rCfgAcces(){
-  const listHTML=(arr,type)=>arr.map(item=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:700">${item.nom}${item.societe?' <span style="font-size:11px;color:var(--gray-mid);font-weight:400">('+item.societe+')</span>':''}</div>
-        <div style="font-size:11px;color:var(--gray-mid)">${item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre'}${item.site_nom?' &nbsp;·&nbsp; 📍 '+item.site_nom:' &nbsp;·&nbsp; <span style=\"color:var(--amber)\">⚠️ Sans site</span>'}</div>
-      </div>
-      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">\u270f\ufe0f</button>
-      <button class="btn btn-g btn-sm" onclick="openEditAccesItem('${item.id}','${type}')">✏️ Modifier</button>
-      <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"
-        onclick="archiveAccesItem('${item.id}','${type}','${item.nom}')">🗑️</button>
-    </div>`).join('')||'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun élément</div>';
-  document.getElementById('cfg-acces-sites').innerHTML=listHTML(DB.acesSites,'site');
-  document.getElementById('cfg-acces-items').innerHTML=listHTML(DB.acesItems,'item');
-  document.getElementById('cfg-acces-recept').innerHTML=listHTML(DB.acesRecept,'recept');
+  // Sites - simple list, no type/site display
+  document.getElementById('cfg-acces-sites').innerHTML=
+    DB.acesSites.length?DB.acesSites.map(function(item){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700">📍 '+item.nom+'</div></div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'site\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'site\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun site</div>';
+
+  // Clés & Badges - with type and site
+  document.getElementById('cfg-acces-items').innerHTML=
+    DB.acesItems.length?DB.acesItems.map(function(item){
+      const typeLabel=item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre';
+      const siteLabel=item.site_nom
+        ?'<span style="color:var(--gray-mid)"> · 📍 '+item.site_nom+'</span>'
+        :'<span style="color:var(--amber)"> · ⚠️ Sans site assigné</span>';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700">'+item.nom+'</div>'
+        +'<div style="font-size:11px;color:var(--gray-mid)">'+typeLabel+siteLabel+'</div>'
+        +'</div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'item\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'item\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucune clé/badge</div>';
+
+  // Réceptionnaires
+  document.getElementById('cfg-acces-recept').innerHTML=
+    DB.acesRecept.length?DB.acesRecept.map(function(item){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700">👤 '+item.nom+'</div>'
+        +(item.societe?'<div style="font-size:11px;color:var(--gray-mid)">'+item.societe+'</div>':'')
+        +'</div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'recept\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'recept\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun réceptionnaire</div>';
 }
 
 function openEditAccesItem(id,type){
@@ -1629,9 +1657,18 @@ function openEditAccesItem(id,type){
   document.getElementById('ai-desc').value=item.description||'';
   document.getElementById('ai-societe').value=item.societe||'';
   document.getElementById('ai-item-type').value=item.type||'clé';
-  // Pre-fill site
-  const aiSiteEdit=document.getElementById('ai-site');
-  if(aiSiteEdit&&item.site_id){aiSiteEdit.value=item.site_id+'|'+item.site_nom;}
+  // Populate and pre-fill site select
+  const aiSite=document.getElementById('ai-site');
+  if(aiSite){
+    while(aiSite.options.length>1)aiSite.remove(1);
+    DB.acesSites.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s.id+'|'+s.nom;
+      o.textContent=s.nom;
+      aiSite.appendChild(o);
+    });
+    if(item.site_id) aiSite.value=item.site_id+'|'+item.site_nom;
+  }
   document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
   document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
   const titles={site:'✏️ Modifier le site',item:'✏️ Modifier la clé / badge',recept:'✏️ Modifier le réceptionnaire'};
@@ -1656,8 +1693,12 @@ function openNewAccesItem(type){
   document.getElementById('ai-societe').value='';
   // Populate site select
   const aiSite=document.getElementById('ai-site');
-  if(aiSite){while(aiSite.options.length>1)aiSite.remove(1);
-    DB.acesSites.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{const o=document.createElement('option');o.value=s.id+'|'+s.nom;o.textContent=s.nom;aiSite.appendChild(o);});
+  if(aiSite){
+    while(aiSite.options.length>1)aiSite.remove(1);
+    DB.acesSites.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{
+      const o=document.createElement('option');o.value=s.id+'|'+s.nom;o.textContent=s.nom;aiSite.appendChild(o);
+    });
+    aiSite.value=''; // reset
   }
   document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
   document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
