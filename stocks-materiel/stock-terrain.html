@@ -1013,7 +1013,7 @@ async function doRemise(){
         receptionnaire_id:receptId,
         receptionnaire_nom:receptNom,
         receptionnaire_societe:receptSociete,
-        receptionnaire_type:receptType,
+        receptionnaire_type: recepType==='agent'?'agent':'externe',
         date_remise:new Date(dateStr).toISOString(),
         statut:'actif',
         notes:notes||null
