@@ -884,9 +884,12 @@ function onAcSiteChange(){
     ?DB.acesItems.filter(i=>i.site_nom===siteNom)
     :DB.acesItems;
   items.sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(function(item){
+    const enCours=DB.acces.find(a=>a.statut==='actif'&&a.item_id===item.id);
     const o=document.createElement('option');
-    o.value=JSON.stringify({id:item.id,nom:item.nom,type:item.type||'clé',site_id:item.site_id,site_nom:item.site_nom});
-    o.textContent=(item.type==='badge'?'🪪':'🔑')+' '+item.nom;
+    o.value=enCours?'':JSON.stringify({id:item.id,nom:item.nom,type:item.type||'clé',site_id:item.site_id,site_nom:item.site_nom});
+    o.textContent=(item.type==='badge'?'🪪':'🔑')+' '+item.nom+(enCours?' — 🔴 remis à '+enCours.receptionnaire_nom:'');
+    o.disabled=!!enCours;
+    o.style.color=enCours?'var(--gray-mid)':'';
     sel.appendChild(o);
   });
 }
@@ -897,6 +900,12 @@ function addPanierAcces(){
   let item;
   try{item=JSON.parse(sel.value);}catch(e){return;}
   if(PANIER_ACCES.find(p=>p.id===item.id)){toast('⚠️ Déjà dans la liste');return;}
+  // Vérifier si la clé est déjà en remise active
+  const dejaEnCours=DB.acces.find(a=>a.statut==='actif'&&a.item_id===item.id);
+  if(dejaEnCours){
+    toast('🔴 '+item.nom+' est déjà remis à '+dejaEnCours.receptionnaire_nom);
+    return;
+  }
   PANIER_ACCES.push(item);
   sel.value='';
   renderPanierAcces();
