@@ -494,11 +494,13 @@ async function loadData() {
       }
     });
 
-    // Garder uniquement les véhicules du dernier round par site
+    // Garder : dernier round par site OU en attente IA (quelle que soit la date)
     allVehicles = (data || []).filter(function(v) {
+      // Toujours inclure les véhicules en attente IA
+      if (v.ia_pending) return true;
+      // Sinon : uniquement le dernier round par site
       var siteRound = latestRoundBySite[v.site];
       if (v.round_id) return v.round_id === siteRound;
-      // Pas de round_id : prendre la même journée que le plus récent
       return v.created_at.slice(0,10) === siteRound;
     });
     updateStats();
