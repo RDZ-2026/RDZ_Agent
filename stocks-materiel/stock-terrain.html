@@ -974,7 +974,11 @@ function fillAccesSheets(){
   const acRagent=document.getElementById('ac-recep-agent');
   if(acRagent){while(acRagent.options.length>1)acRagent.remove(1);
     [...DB.agents].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(a=>{
-      const o=document.createElement('option');o.value=a.id+'|'+a.nom;o.textContent=a.nom;acRagent.appendChild(o);
+      const o=document.createElement('option');
+      // Format: agentId|agentNom — nom uniquement après le premier |
+      o.value=a.id+'|'+a.nom;
+      o.textContent=a.nom;
+      acRagent.appendChild(o);
     });}
   // Réceptionnaire externe
   const acRecept=document.getElementById('ac-recept');
@@ -998,22 +1002,30 @@ async function doRemise(){
   const agentId=document.getElementById('ac-agent').value;
   const recepType=document.getElementById('ac-recep-type').value;
   const dateStr=document.getElementById('ac-date').value;
-  const notes=document.getElementById('ac-notes').value;
+  const notes=document.getElementById('ac-notes').value.trim();
   if(!agentId){toast('⚠️ Sélectionnez l\'agent remettant');return;}
   if(!PANIER_ACCES.length){toast('⚠️ Ajoutez au moins une clé/badge');return;}
   // Réceptionnaire
   let receptId=null,receptNom='',receptSociete=null,receptType=recepType;
   if(recepType==='agent'){
-    const v=document.getElementById('ac-recep-agent').value;
+    const sel=document.getElementById('ac-recep-agent');
+    const v=sel?sel.value:'';
     if(!v){toast('⚠️ Sélectionnez l\'agent réceptionnaire');return;}
-    const parts=v.split('|');
-    receptId=null; // agent RDZ : pas d'ID dans stock_acces_recept
-    receptNom=parts[1];
+    // Format: agentId|agentNom
+    const sepIdx=v.indexOf('|');
+    receptNom=sepIdx>=0?v.substring(sepIdx+1):v;
+    receptId=null;
   } else {
-    const v=document.getElementById('ac-recept').value;
+    const sel=document.getElementById('ac-recept');
+    const v=sel?sel.value:'';
     if(!v){toast('⚠️ Sélectionnez le réceptionnaire externe');return;}
-    const parts=v.split('|');receptId=parts[0];receptNom=parts[1];receptSociete=parts[2]||null;
+    // Format: receptId|nom|societe (société peut contenir des |)
+    const parts=v.split('|');
+    receptId=parts[0]||null;
+    receptNom=parts[1]||'';
+    receptSociete=parts.slice(2).join('|')||null;
   }
+  if(!receptNom){toast('⚠️ Réceptionnaire invalide');return;}
   const agent=DB.agents.find(a=>a.id===agentId);
   sync('loading');
   try{
@@ -1084,7 +1096,14 @@ async function doRetourAcces(){
   sync('loading');
   try{
     for(const a of coches){
-      await sb.patch('stock_acces',a.id,{statut:'rendu',date_retour_reel:new Date().toISOString(),notes:notes||null});
+      const retourNote=notes?'[Retour] '+notes:null;
+      // Conserver la note originale, ajouter la note de retour si présente
+      const noteFinale=a.notes&&retourNote?a.notes+' | '+retourNote:retourNote||a.notes||null;
+      await sb.patch('stock_acces',a.id,{
+        statut:'rendu',
+        date_retour_reel:new Date().toISOString(),
+        ...(noteFinale!==undefined?{notes:noteFinale}:{})
+      });
     }
     await loadAll();closeS('sh-acces-retour');
     document.getElementById('ar-notes').value='';
