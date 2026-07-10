@@ -75,6 +75,7 @@
     .event-actions { display: flex; gap: 6px; margin-left: 8px; flex-shrink: 0; }
     .icon-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 2px; border: 1px solid var(--rdz-border); background: transparent; color: var(--rdz-gray); cursor: pointer; transition: all .15s; font-size: 14px; }
     .icon-btn:hover { background: var(--rdz-bg); }
+    .icon-btn.dup:hover { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
     .icon-btn.del:hover { background: #fee2e2; color: #7f1d1d; border-color: #fca5a5; }
 
     .event-details { padding: 12px 18px 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 20px; background: var(--rdz-bg); border-top: 1px solid var(--rdz-border); }
@@ -413,6 +414,7 @@ function render() {
           </div>
           <div class="event-actions">
             <button class="icon-btn" onclick="openEdit('${e.id}')" title="Modifier">✎</button>
+            <button class="icon-btn dup" onclick="openDuplicate('${e.id}')" title="Dupliquer">⧉</button>
             <button class="icon-btn del" onclick="deleteEvent('${e.id}')" title="Supprimer">✕</button>
           </div>
         </div>
@@ -441,6 +443,7 @@ function openAdd() {
   document.getElementById('f-nb-agents').value = '0';
   document.getElementById('f-tenue').value = '';
   document.getElementById('f-site').innerHTML = sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+  document.getElementById('btn-save').textContent = '✓ Enregistrer';
   document.getElementById('modal-event').classList.add('open');
 }
 
@@ -463,10 +466,36 @@ function openEdit(id) {
   document.getElementById('f-remarques').value = e.remarques || '';
   document.getElementById('f-site').innerHTML = sites.map(s =>
     `<option value="${s.id}"${s.id === e.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
+  document.getElementById('btn-save').textContent = '✓ Enregistrer';
   document.getElementById('modal-event').classList.add('open');
 }
 
 function closeModal() { document.getElementById('modal-event').classList.remove('open'); }
+
+function openDuplicate(id) {
+  const e = events.find(x => x.id === id);
+  editId = null; // nouveau record
+  document.getElementById('modal-title').textContent = 'Dupliquer — ' + e.titre;
+  document.getElementById('f-titre').value = e.titre || '';
+  document.getElementById('f-lieu').value = e.lieu || '';
+  // Date : lendemain par défaut
+  document.getElementById('f-date').value = e.date ? addDays(e.date, 1) : (document.getElementById('ref-date').value || today());
+  document.getElementById('f-heure-debut').value = e.heure_debut ? e.heure_debut.slice(0,5) : '';
+  document.getElementById('f-heure-fin').value = e.heure_fin ? e.heure_fin.slice(0,5) : '';
+  document.getElementById('f-heure-service').value = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : '';
+  document.getElementById('f-heure-fin-service').value = e.heure_service_fin ? e.heure_service_fin.slice(0,5) : '';
+  document.getElementById('f-nb-agents').value = e.nb_agents || 0;
+  document.getElementById('f-agents').value = e.agents || '';
+  document.getElementById('f-tenue').value = e.tenue || '';
+  document.getElementById('f-contact').value = e.contact || '';
+  document.getElementById('f-consignes').value = e.consignes || '';
+  document.getElementById('f-remarques').value = e.remarques || '';
+  document.getElementById('f-site').innerHTML = sites.map(s =>
+    `<option value="${s.id}"${s.id === e.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
+  // Indicateur visuel dans le bouton save
+  document.getElementById('btn-save').textContent = '⧉ Créer la copie';
+  document.getElementById('modal-event').classList.add('open');
+}
 
 async function saveEvent() {
   const titre = document.getElementById('f-titre').value.trim();
@@ -826,34 +855,6 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 // ── INIT ─────────────────────────────────────────────────────────────────────
 document.getElementById('ref-date').value = today();
 loadAll();
-
-// ── AUTO-PRINT (déclenché depuis l'index via ?date=&autoprint=1) ─────────────
-(function() {
-  const p = new URLSearchParams(window.location.search);
-  const d = p.get('date');
-  const ap = p.get('autoprint');
-  if (!ap) return;
-
-  // Attendre que loadAll() soit terminé, puis déclencher
-  const origLoadAll = loadAll;
-  window.loadAll = async function() {
-    await origLoadAll();
-    // Appliquer la date demandée
-    if (d) {
-      document.getElementById('ref-date').value = d;
-      document.getElementById('range-filter').value = 'day';
-      render();
-    }
-    // Générer le récap et imprimer
-    setTimeout(() => {
-      showPrintRecap();
-      setTimeout(() => {
-        doPrint('recap-inner', window._recapFilename || 'recap_events');
-      }, 300);
-    }, 300);
-  };
-})();
-
 </script>
 </body>
 </html>
