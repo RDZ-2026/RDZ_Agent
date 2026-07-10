@@ -772,21 +772,41 @@ function rStock(){
   document.getElementById('stock-list').innerHTML=DB.stock.map(item=>{
     const s=stm(item),pct=Math.round(item.quantite_dispo/item.quantite_total*100)||0;
     const c=s==='ok'?'var(--green)':s==='warn'?'var(--amber)':'var(--red)';
-    const inSvc=DB.attr.filter(a=>a.materiel_id===item.id).reduce((x,a)=>x+a.quantite,0);
+    const attribs=DB.attr.filter(a=>a.materiel_id===item.id);
+    const inSvc=attribs.reduce((x,a)=>x+a.quantite,0);
+
+    // Build agents-in-service list
+    const agentsHTML=attribs.length?`
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-border)">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-mid);margin-bottom:7px">En service</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${attribs.map(a=>{
+            const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:${late?'#fef2f2':'var(--gray-light)'};border:1px solid ${late?'#fca5a5':'var(--gray-border)'};border-radius:99px;font-size:12px">
+              <div style="width:22px;height:22px;border-radius:50%;background:var(--black);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0">${ini(a.agent_nom)}</div>
+              <span style="font-weight:600;color:${late?'var(--red)':'var(--black)'}">${a.agent_nom}</span>
+              <span style="color:var(--gray-mid)">×${a.quantite}</span>
+              ${late?'<span style="color:var(--red);font-size:10px">⚠️</span>':''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`:'';
+
     return `<div class="card mb14">
       <div style="display:flex;align-items:center;gap:13px">
         <span style="font-size:30px">${item.icon}</span>
         <div style="flex:1">
           <div style="font-size:14px;font-weight:700">${item.nom}</div>
-          <div style="font-size:12px;color:var(--gray-mid)">Seuil : ${item.seuil_alerte} · En service : ${inSvc}</div>
+          <div style="font-size:12px;color:var(--gray-mid)">Seuil : ${item.seuil_alerte} · En service : <strong>${inSvc}</strong></div>
           <div class="prog" style="margin-top:7px"><div class="prog-b ${s==='ok'?'pgreen':s==='warn'?'pamber':'pred'}" style="width:${pct}%"></div></div>
         </div>
         <div style="text-align:right">
           <div style="font-size:30px;font-weight:900;color:${c};line-height:1">${item.quantite_dispo}</div>
-          <div style="font-size:11px;color:var(--gray-mid)">/ ${item.quantite_total}</div>
+          ${item.quantite_total>0?'<div style="font-size:11px;color:var(--gray-mid)">/ '+item.quantite_total+'</div>':'<div style="font-size:10px;color:var(--gray-mid)">non défini</div>'}
           <span class="badge ${s==='ok'?'bok':s==='warn'?'bwarn':'balert'}" style="margin-top:5px">${s==='ok'?'✅ OK':s==='warn'?'⚠️ Faible':'🚨 Critique'}</span>
         </div>
       </div>
+      ${agentsHTML}
       <div style="margin-top:10px;text-align:right">
         <button class="btn btn-g btn-sm" onclick="openAjustFor('${item.id}')">✏️ Ajuster</button>
       </div>
@@ -1581,16 +1601,25 @@ function rAcces(){
   }).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucune remise active</div>';
 
   const filteredAcces=DB.acces.filter(a=>(!fStatut||a.statut===fStatut)&&(!fItem||a.item_nom===fItem)&&(!fSite||a.site_nom===fSite));
+  const fmtDt=d=>d?new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'—';
+  const duree=a=>{
+    if(!a.date_remise)return '—';
+    const fin=a.date_retour_reel?new Date(a.date_retour_reel):new Date();
+    const h=Math.floor((fin-new Date(a.date_remise))/3600000);
+    if(h<1)return '<1h';if(h<24)return h+'h';
+    const j=Math.floor(h/24);return j+'j '+(h%24)+'h';
+  };
   document.getElementById('acces-hist-body').innerHTML=filteredAcces.map(a=>`<tr>
-    <td style="font-size:11px;color:var(--gray-mid);white-space:nowrap">${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
-    <td>${a.site_nom}</td>
+    <td style="font-size:11px;white-space:nowrap">${fmtDt(a.date_remise)}</td>
+    <td style="font-size:11px;white-space:nowrap;color:${a.statut==='rendu'?'var(--green)':'var(--gray-mid)'}">${fmtDt(a.date_retour_reel)}</td>
+    <td style="font-size:11px;white-space:nowrap"><span class="badge ${a.statut==='rendu'?'bok':'bwarn'}">${duree(a)}</span></td>
+    <td>${a.site_nom||'—'}</td>
     <td>${a.agent_nom}</td>
-    <td><span style="font-size:16px">${a.item_type==='badge'?'🪪':'🔑'}</span> ${a.item_nom}</td>
+    <td><span style="font-size:15px">${a.item_type==='badge'?'🪪':'🔑'}</span> ${a.item_nom}</td>
     <td><strong>${a.receptionnaire_nom}</strong>${a.receptionnaire_societe?'<br><span style="font-size:11px;color:var(--gray-mid)">'+a.receptionnaire_societe+'</span>':''}</td>
-    <td><span class="badge ${a.statut==='rendu'?'bok':'bwarn'}">${a.statut==='rendu'?'✅ Rendu':'En cours'}</span>
-      ${a.statut==='rendu'&&a.date_retour_reel?`<br><span style="font-size:10px;color:var(--gray-mid)">${new Date(a.date_retour_reel).toLocaleDateString('fr-FR')}</span>`:''}
-    </td>
-    <td style="font-size:12px;color:var(--gray-mid);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.notes||'—'}</td>
+    <td><span class="badge ${a.receptionnaire_type==='agent'?'binfo':'bgray'}">${a.receptionnaire_type==='agent'?'👮 Agent':'👤 Externe'}</span></td>
+    <td><span class="badge ${a.statut==='rendu'?'bok':'bwarn'}">${a.statut==='rendu'?'✅ Rendu':'⏳ En cours'}</span></td>
+    <td style="font-size:12px;color:var(--gray-mid);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.notes||'—'}</td>
   </tr>`).join('');
 }
 
@@ -1756,6 +1785,51 @@ async function archiveAccesItem(id,type,nom){
     await sb.patch(tables[type],id,{actif:false});
     await loadAll();rCfgAcces();toast('🗑️ '+nom+' supprimé');
   }catch(e){toast('❌ '+e.message);}
+}
+
+// ═══ EXPORT EXCEL ACCÈS ═══
+function exportAccesExcel(){
+  const fStatut=document.getElementById('ac-filter-statut')?.value||'';
+  const fItem=document.getElementById('ac-filter-item')?.value||'';
+  const fSite=document.getElementById('ac-filter-site')?.value||'';
+  const data=DB.acces.filter(a=>
+    (!fStatut||a.statut===fStatut)&&
+    (!fItem||a.item_nom===fItem)&&
+    (!fSite||a.site_nom===fSite)
+  );
+  const fmtDt=d=>d?new Date(d).toLocaleDateString('fr-FR')+' '+new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';
+  const dureeH=a=>{
+    if(!a.date_remise)return '';
+    const fin=a.date_retour_reel?new Date(a.date_retour_reel):new Date();
+    const h=Math.floor((fin-new Date(a.date_remise))/3600000);
+    return h<24?h+'h':Math.floor(h/24)+'j '+(h%24)+'h';
+  };
+  // Build CSV
+  const cols=['Date remise','Date retour','Durée','Site','Agent remettant','Clé / Badge','Type','Réceptionnaire','Société','Type réceptionnaire','Statut','Notes'];
+  const rows=data.map(a=>[
+    fmtDt(a.date_remise),
+    fmtDt(a.date_retour_reel),
+    dureeH(a),
+    a.site_nom||'',
+    a.agent_nom,
+    a.item_nom,
+    a.item_type==='badge'?'Badge':'Clé',
+    a.receptionnaire_nom,
+    a.receptionnaire_societe||'',
+    a.receptionnaire_type==='agent'?'Agent RDZ':'Externe',
+    a.statut==='rendu'?'Rendu':'En cours',
+    a.notes||''
+  ]);
+  const csv=[cols,...rows].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const BOM='\uFEFF'; // UTF-8 BOM for Excel
+  const blob=new Blob([BOM+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='RDZ_Acces_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('⬇️ Export téléchargé — '+data.length+' ligne(s)');
 }
 
 // INIT
