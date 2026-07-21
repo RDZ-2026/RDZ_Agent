@@ -116,8 +116,8 @@
     .ag-col-hdr:last-child{border-right:none}
     .ag-col-hdr.today{background:#8B1A1A}
     .ag-col-hdr .n{display:block;font-size:15px;margin-top:2px;letter-spacing:0}
-    .ag-allday-label{background:#faf9f7;border-right:1px solid #d0ccc5;border-bottom:2px solid #1a1a1a;font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;display:flex;align-items:center;box-sizing:border-box}
-    .ag-allday-cell{border-right:1px solid #e5e2dd;border-bottom:2px solid #1a1a1a;padding:4px;background:#faf9f7;box-sizing:border-box}
+    .ag-allday-label{background:#faf9f7;border-right:1px solid #d0ccc5;border-top:2px solid #1a1a1a;font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;display:flex;align-items:center;box-sizing:border-box}
+    .ag-allday-cell{border-right:1px solid #e5e2dd;border-top:2px solid #1a1a1a;padding:4px;background:#faf9f7;box-sizing:border-box}
     .ag-allday-cell:last-child{border-right:none}
     .ag-time-labels{background:#faf9f7;border-right:1px solid #d0ccc5}
     .ag-time-slot{height:${ROW_H}px;font-size:9px;color:#9a9a9a;text-align:right;padding:2px 6px 0 0;box-sizing:border-box;border-bottom:1px solid #e5e2dd}
@@ -310,8 +310,8 @@
 
     return `<div class="ag-time-grid" style="grid-template-columns:50px repeat(${cols},1fr)">
       ${headerCells}
-      ${alldayCells}
       ${hourCells}
+      ${alldayCells}
     </div>`;
   }
 
