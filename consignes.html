@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RDZ — Consignes particulières</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="agenda.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -117,6 +118,7 @@
       <a class="btn-nav" href="index.html">← Accueil</a>
       <a class="btn-nav" href="parametrage.html">⚙ Sites</a>
       <button class="btn-nav" onclick="showPrint()">Imprimer</button>
+      <button class="btn-nav" id="btn-toggle-agenda" onclick="toggleAgendaView()">🗓 Vue agenda</button>
       <button class="btn-nav btn-nav-accent" onclick="openAdd()">+ Nouvelle consigne</button>
     </nav>
   </div>
@@ -151,6 +153,7 @@
     Chargement des données…
   </div>
 </div>
+<div class="content" id="agenda-view" style="display:none"></div>
 
 <!-- MODAL CONSIGNE -->
 <div class="modal-overlay" id="modal-consigne">
@@ -568,6 +571,29 @@ function doPrint() {
   setTimeout(() => { win.print(); }, 400);
 }
 
+// ─── BASCULE LISTE / AGENDA ──────────────────────────────────────────────────
+let agendaMounted = false;
+function toggleAgendaView() {
+  const list = document.getElementById('content');
+  const agenda = document.getElementById('agenda-view');
+  const toolbar = document.querySelector('.toolbar');
+  const btn = document.getElementById('btn-toggle-agenda');
+  const showingList = list.style.display !== 'none';
+  if (showingList) {
+    list.style.display = 'none';
+    toolbar.style.display = 'none';
+    agenda.style.display = 'block';
+    btn.textContent = '📋 Vue liste';
+    if (!agendaMounted) { RDZAgenda.mount('agenda-view'); agendaMounted = true; }
+    else { RDZAgenda.refresh(); }
+  } else {
+    list.style.display = '';
+    toolbar.style.display = '';
+    agenda.style.display = 'none';
+    btn.textContent = '🗓 Vue agenda';
+  }
+}
+
 // ─── CLOSE MODALS ON BACKDROP CLICK ─────────────────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
@@ -578,29 +604,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // ─── INIT ────────────────────────────────────────────────────────────────────
 document.getElementById('ref-date').value = today();
 loadAll();
-
-// ── AUTO-PRINT (déclenché depuis l'index via ?date=&autoprint=1) ─────────────
-(function() {
-  const p = new URLSearchParams(window.location.search);
-  const d = p.get('date');
-  const ap = p.get('autoprint');
-  if (!ap) return;
-
-  const origLoadAll = loadAll;
-  window.loadAll = async function() {
-    await origLoadAll();
-    if (d) {
-      document.getElementById('ref-date').value = d;
-      render();
-    }
-    // Générer la feuille d'impression et imprimer
-    setTimeout(() => {
-      showPrint();
-      setTimeout(() => { doPrint(); }, 500);
-    }, 300);
-  };
-})();
-
 </script>
 
 </body>
