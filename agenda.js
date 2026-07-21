@@ -220,7 +220,7 @@
       const dayCons = consignesOn(dateStr);
       const items = [
         ...dayEvs.map(e => ({ type: 'ev', id: e.id, label: `${e.heure_debut ? e.heure_debut.slice(0,5)+' ' : ''}${e.titre}` })),
-        ...dayCons.map(c => ({ type: 'co', id: c.id, label: `📌 ${c.texte}` }))
+        ...dayCons.map(c => ({ type: 'co', id: c.id, label: `📌 ${siteNom(c.site_id) || 'Site ?'} — ${c.texte}` }))
       ];
       const shown = items.slice(0, 3);
       const rest = items.length - shown.length;
@@ -263,7 +263,7 @@
       }).join('');
       html += `<div class="ag-day-col">
         <div class="ag-day-col-hdr${isToday ? ' today' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>
-        <div class="ag-allday">${dayCons.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')">📌 ${escapeHtml(c.texte)}</div>`).join('')}</div>
+        <div class="ag-allday">${dayCons.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(siteNom(c.site_id))} — ${escapeHtml(c.texte)}"><b>${escapeHtml(siteNom(c.site_id) || 'Site ?')}</b> — ${escapeHtml(c.texte)}</div>`).join('')}</div>
         <div class="ag-hours" style="height:${gridHeight}px">
           ${hours.map(() => `<div class="ag-hour-line"></div>`).join('')}
           ${blocks}
