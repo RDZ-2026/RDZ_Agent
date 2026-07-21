@@ -61,6 +61,15 @@
   function siteNom(id) { const s = sites.find(x => x.id === id); return s ? s.nom : ''; }
   function eventsOn(dateStr) { return evs.filter(e => e.date === dateStr).sort((a, b) => (a.heure_debut || '').localeCompare(b.heure_debut || '')); }
   function consignesOn(dateStr) { return cons.filter(c => (!c.date_debut || c.date_debut <= dateStr) && (!c.date_fin || c.date_fin >= dateStr)); }
+  function groupConsignesBySite(list) {
+    const map = new Map();
+    list.forEach(c => {
+      const key = c.site_id || '__none__';
+      if (!map.has(key)) map.set(key, { siteId: c.site_id, siteName: siteNom(c.site_id) || 'Site non précisé', items: [] });
+      map.get(key).items.push(c);
+    });
+    return Array.from(map.values()).sort((a, b) => a.siteName.localeCompare(b.siteName, 'fr'));
+  }
 
   // ── STYLES (injectés une seule fois) ────────────────────────────────────────
   function ensureStyles() {
@@ -116,7 +125,9 @@
     .ag-event-block{position:absolute;left:2px;right:2px;background:#8B1A1A;color:#fff;border-radius:2px;padding:3px 6px;font-size:10px;line-height:1.35;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);z-index:2}
     .ag-event-block:hover{background:#6B1212}
     .ag-event-block b{display:block;font-size:10px}
-    .ag-co-chip-inline{display:block;font-size:9.5px;background:#e0eefc;color:#0c4a6e;border-radius:2px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ag-co-chip-inline{display:block;font-size:9.5px;background:#e0eefc;color:#0c4a6e;border-radius:2px;padding:2px 5px 2px 12px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ag-co-group{margin-bottom:4px}
+    .ag-co-group-site{font-size:9.5px;font-weight:700;color:#0c4a6e;margin-bottom:2px}
 
     /* PANNEAU DÉTAIL */
     .ag-detail-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:199}
@@ -185,6 +196,12 @@
       <div class="row"><div class="lbl">Période</div>${c.date_debut ? fmt(c.date_debut) : '—'} → ${c.date_fin ? fmt(c.date_fin) : 'Permanente'}</div>
       <div class="row"><div class="lbl">Texte</div>${escapeHtml(c.texte).replace(/\n/g,'<br>')}</div>`;
   }
+  function siteConsignesDetailHtml(siteId, dateStr, items) {
+    const site = siteNom(siteId) || 'Site non précisé';
+    return `<h3>📌 ${escapeHtml(site)}</h3>
+      <div class="row"><div class="lbl">Date</div>${fmtFull(parseISO(dateStr))}</div>
+      ${items.map(c => `<div class="row"><div class="lbl">${c.date_debut ? fmt(c.date_debut) : '—'} → ${c.date_fin ? fmt(c.date_fin) : 'Permanente'}</div>${escapeHtml(c.texte).replace(/\n/g,'<br>')}</div>`).join('')}`;
+  }
   function showDetail(html) {
     document.getElementById('ag-detail').innerHTML = `<div class="ag-detail-close" onclick="RDZAgenda.closeDetail()">✕</div>${html}`;
     document.getElementById('ag-detail').style.display = 'block';
@@ -196,6 +213,10 @@
   }
   function openEvent(id) { const e = evs.find(x => x.id === id); if (e) showDetail(eventDetailHtml(e)); }
   function openConsigne(id) { const c = cons.find(x => x.id === id); if (c) showDetail(consigneDetailHtml(c)); }
+  function openSiteConsignes(siteId, dateStr) {
+    const items = consignesOn(dateStr).filter(c => (c.site_id || null) === (siteId || null));
+    showDetail(siteConsignesDetailHtml(siteId, dateStr, items));
+  }
 
   // ── VUE MOIS ──────────────────────────────────────────────────────────────
   function renderMonth() {
@@ -218,15 +239,22 @@
       const isToday = sameDay(cell, todayDate());
       const dayEvs = eventsOn(dateStr);
       const dayCons = consignesOn(dateStr);
+      const consGroups = groupConsignesBySite(dayCons);
       const items = [
         ...dayEvs.map(e => ({ type: 'ev', id: e.id, label: `${e.heure_debut ? e.heure_debut.slice(0,5)+' ' : ''}${e.titre}` })),
-        ...dayCons.map(c => ({ type: 'co', id: c.id, label: `📌 ${siteNom(c.site_id) || 'Site ?'} — ${c.texte}` }))
+        ...consGroups.map(g => ({
+          type: 'co',
+          label: g.items.length > 1 ? `📌 ${g.siteName} (${g.items.length})` : `📌 ${g.siteName} — ${g.items[0].texte}`,
+          onclick: g.items.length > 1
+            ? `RDZAgenda.openSiteConsignes(${g.siteId ? `'${g.siteId}'` : 'null'}, '${dateStr}')`
+            : `RDZAgenda.openConsigne('${g.items[0].id}')`
+        }))
       ];
       const shown = items.slice(0, 3);
       const rest = items.length - shown.length;
       html += `<div class="ag-day-cell${out ? ' out' : ''}${isToday ? ' today' : ''}" onclick="RDZAgenda.gotoDay('${dateStr}')">
         <div class="ag-day-num">${cell.getDate()}</div>
-        ${shown.map(it => `<div class="ag-chip ${it.type === 'ev' ? 'ag-chip-ev' : 'ag-chip-co'}" onclick="event.stopPropagation();RDZAgenda.${it.type === 'ev' ? 'openEvent' : 'openConsigne'}('${it.id}')">${escapeHtml(it.label)}</div>`).join('')}
+        ${shown.map(it => `<div class="ag-chip ${it.type === 'ev' ? 'ag-chip-ev' : 'ag-chip-co'}" onclick="event.stopPropagation();${it.type === 'ev' ? `RDZAgenda.openEvent('${it.id}')` : it.onclick}">${escapeHtml(it.label)}</div>`).join('')}
         ${rest > 0 ? `<div class="ag-more">+ ${rest} autre${rest > 1 ? 's' : ''}</div>` : ''}
       </div>`;
     });
@@ -263,7 +291,10 @@
       }).join('');
       html += `<div class="ag-day-col">
         <div class="ag-day-col-hdr${isToday ? ' today' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>
-        <div class="ag-allday">${dayCons.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(siteNom(c.site_id))} — ${escapeHtml(c.texte)}"><b>${escapeHtml(siteNom(c.site_id) || 'Site ?')}</b> — ${escapeHtml(c.texte)}</div>`).join('')}</div>
+        <div class="ag-allday">${groupConsignesBySite(dayCons).map(g => `<div class="ag-co-group">
+          <div class="ag-co-group-site">📌 ${escapeHtml(g.siteName)}</div>
+          ${g.items.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(c.texte)}">${escapeHtml(c.texte)}</div>`).join('')}
+        </div>`).join('')}</div>
         <div class="ag-hours" style="height:${gridHeight}px">
           ${hours.map(() => `<div class="ag-hour-line"></div>`).join('')}
           ${blocks}
