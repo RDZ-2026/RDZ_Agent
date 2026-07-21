@@ -109,23 +109,25 @@
     .ag-chip-co{background:#e0eefc;color:#0c4a6e}
     .ag-more{font-size:9.5px;color:#9a9a9a;font-weight:700;padding-left:2px}
 
-    /* SEMAINE / JOUR */
-    .ag-time-grid{display:flex;border:1px solid #d0ccc5;border-radius:2px;overflow:hidden;background:#fff}
-    .ag-time-col{width:50px;flex-shrink:0;border-right:1px solid #d0ccc5;background:#faf9f7}
-    .ag-time-col-hdr{height:64px;border-bottom:2px solid #1a1a1a}
+    /* SEMAINE / JOUR — grille en lignes (en-têtes / consignes / heures) alignées */
+    .ag-time-grid{display:grid;border:1px solid #d0ccc5;border-radius:2px;overflow:hidden;background:#fff}
+    .ag-corner{background:#faf9f7;border-right:1px solid #d0ccc5;border-bottom:2px solid #1a1a1a}
+    .ag-col-hdr{background:#1a1a1a;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:8px 4px;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid #1a1a1a;border-right:1px solid #3a3a3a;box-sizing:border-box}
+    .ag-col-hdr:last-child{border-right:none}
+    .ag-col-hdr.today{background:#8B1A1A}
+    .ag-col-hdr .n{display:block;font-size:15px;margin-top:2px;letter-spacing:0}
+    .ag-allday-label{background:#faf9f7;border-right:1px solid #d0ccc5;border-bottom:2px solid #1a1a1a;font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;display:flex;align-items:center;box-sizing:border-box}
+    .ag-allday-cell{border-right:1px solid #e5e2dd;border-bottom:2px solid #1a1a1a;padding:4px;background:#faf9f7;box-sizing:border-box}
+    .ag-allday-cell:last-child{border-right:none}
+    .ag-time-labels{background:#faf9f7;border-right:1px solid #d0ccc5}
     .ag-time-slot{height:${ROW_H}px;font-size:9px;color:#9a9a9a;text-align:right;padding:2px 6px 0 0;box-sizing:border-box;border-bottom:1px solid #e5e2dd}
-    .ag-day-col{flex:1;position:relative;border-right:1px solid #e5e2dd;min-width:0}
-    .ag-day-col:last-child{border-right:none}
-    .ag-day-col-hdr{background:#1a1a1a;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:8px 4px;text-transform:uppercase;letter-spacing:.03em;height:64px;box-sizing:border-box;border-bottom:2px solid #1a1a1a}
-    .ag-day-col-hdr.today{background:#8B1A1A}
-    .ag-day-col-hdr .n{display:block;font-size:15px;margin-top:2px;letter-spacing:0}
-    .ag-allday{min-height:28px;border-bottom:2px solid #1a1a1a;padding:3px;background:#faf9f7}
-    .ag-hours{position:relative}
+    .ag-hours-cell{position:relative;border-right:1px solid #e5e2dd;box-sizing:border-box}
+    .ag-hours-cell:last-child{border-right:none}
     .ag-hour-line{height:${ROW_H}px;border-bottom:1px solid #e5e2dd;box-sizing:border-box}
     .ag-event-block{position:absolute;left:2px;right:2px;background:#8B1A1A;color:#fff;border-radius:2px;padding:3px 6px;font-size:10px;line-height:1.35;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);z-index:2}
     .ag-event-block:hover{background:#6B1212}
     .ag-event-block b{display:block;font-size:10px}
-    .ag-co-chip-inline{display:block;font-size:9.5px;background:#e0eefc;color:#0c4a6e;border-radius:2px;padding:2px 5px 2px 12px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ag-co-chip-inline{display:block;font-size:9.5px;background:#e0eefc;color:#0c4a6e;border-radius:2px;padding:2px 5px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ag-co-group{margin-bottom:4px}
     .ag-co-group-site{font-size:9.5px;font-weight:700;color:#0c4a6e;margin-bottom:2px}
 
@@ -266,17 +268,27 @@
   function renderTimeGrid(days) {
     const hours = [];
     for (let h = START_HOUR; h <= END_HOUR; h++) hours.push(h);
-    let html = `<div class="ag-time-grid">
-      <div class="ag-time-col">
-        <div class="ag-time-col-hdr"></div>
-        ${hours.map(h => `<div class="ag-time-slot">${String(h).padStart(2,'0')}h</div>`).join('')}
-      </div>`;
+    const gridHeight = hours.length * ROW_H;
+    const cols = days.length;
+
+    let headerCells = `<div class="ag-corner"></div>`;
+    let alldayCells = `<div class="ag-allday-label">Consignes</div>`;
+    let hourCells = `<div class="ag-time-labels">${hours.map(h => `<div class="ag-time-slot">${String(h).padStart(2,'0')}h</div>`).join('')}</div>`;
+
     days.forEach(day => {
       const dateStr = iso(day);
       const isToday = sameDay(day, todayDate());
       const dayCons = consignesOn(dateStr);
       const dayEvs = eventsOn(dateStr);
-      const gridHeight = hours.length * ROW_H;
+
+      headerCells += `<div class="ag-col-hdr${isToday ? ' today' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>`;
+
+      const groups = groupConsignesBySite(dayCons);
+      alldayCells += `<div class="ag-allday-cell">${groups.map(g => `<div class="ag-co-group">
+          <div class="ag-co-group-site">📌 ${escapeHtml(g.siteName)}</div>
+          ${g.items.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(c.texte)}">${escapeHtml(c.texte)}</div>`).join('')}
+        </div>`).join('')}</div>`;
+
       const blocks = dayEvs.map(e => {
         const startMin = timeToMinutes(e.heure_debut ? e.heure_debut.slice(0,5) : null);
         if (startMin == null) return '';
@@ -289,20 +301,18 @@
           <b>${e.heure_debut ? e.heure_debut.slice(0,5) : ''} ${escapeHtml(e.titre)}</b>${site ? escapeHtml(site) : ''}
         </div>`;
       }).join('');
-      html += `<div class="ag-day-col">
-        <div class="ag-day-col-hdr${isToday ? ' today' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>
-        <div class="ag-allday">${groupConsignesBySite(dayCons).map(g => `<div class="ag-co-group">
-          <div class="ag-co-group-site">📌 ${escapeHtml(g.siteName)}</div>
-          ${g.items.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(c.texte)}">${escapeHtml(c.texte)}</div>`).join('')}
-        </div>`).join('')}</div>
-        <div class="ag-hours" style="height:${gridHeight}px">
-          ${hours.map(() => `<div class="ag-hour-line"></div>`).join('')}
-          ${blocks}
-        </div>
+
+      hourCells += `<div class="ag-hours-cell" style="height:${gridHeight}px">
+        ${hours.map(() => `<div class="ag-hour-line"></div>`).join('')}
+        ${blocks}
       </div>`;
     });
-    html += `</div>`;
-    return html;
+
+    return `<div class="ag-time-grid" style="grid-template-columns:50px repeat(${cols},1fr)">
+      ${headerCells}
+      ${alldayCells}
+      ${hourCells}
+    </div>`;
   }
 
   function renderWeek() {
