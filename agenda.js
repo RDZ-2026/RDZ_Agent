@@ -110,19 +110,24 @@
     .ag-more{font-size:9.5px;color:#9a9a9a;font-weight:700;padding-left:2px}
 
     /* SEMAINE / JOUR — grille en lignes (en-têtes / consignes / heures) alignées */
-    .ag-time-grid{display:grid;border:1px solid #d0ccc5;border-radius:2px;overflow:hidden;background:#fff}
+    .ag-time-grid-scroll{overflow-x:auto;border:1px solid #d0ccc5;border-radius:2px}
+    .ag-time-grid{display:grid;background:#fff}
     .ag-corner{background:#faf9f7;border-right:1px solid #d0ccc5;border-bottom:2px solid #1a1a1a}
-    .ag-col-hdr{background:#1a1a1a;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:8px 4px;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid #1a1a1a;border-right:1px solid #3a3a3a;box-sizing:border-box}
-    .ag-col-hdr:last-child{border-right:none}
+    .ag-col-hdr{background:#1a1a1a;color:#fff;font-size:10px;font-weight:700;text-align:center;padding:8px 4px;text-transform:uppercase;letter-spacing:.03em;border-bottom:2px solid #1a1a1a;border-right:2px solid #3a3a3a;box-sizing:border-box}
+    .ag-col-hdr.last{border-right:none}
     .ag-col-hdr.today{background:#8B1A1A}
     .ag-col-hdr .n{display:block;font-size:15px;margin-top:2px;letter-spacing:0}
     .ag-allday-label{background:#faf9f7;border-right:1px solid #d0ccc5;border-top:2px solid #1a1a1a;font-size:9px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;display:flex;align-items:center;box-sizing:border-box}
-    .ag-allday-cell{border-right:1px solid #e5e2dd;border-top:2px solid #1a1a1a;padding:4px;background:#faf9f7;box-sizing:border-box}
-    .ag-allday-cell:last-child{border-right:none}
+    .ag-allday-cell{border-right:2px solid #c8c4bd;border-top:2px solid #1a1a1a;padding:4px;background:#faf9f7;box-sizing:border-box}
+    .ag-allday-cell.alt{background:#f3f1ee}
+    .ag-allday-cell.today-col{background:#fdf2f2}
+    .ag-allday-cell.last{border-right:none}
     .ag-time-labels{background:#faf9f7;border-right:1px solid #d0ccc5}
     .ag-time-slot{height:${ROW_H}px;font-size:9px;color:#9a9a9a;text-align:right;padding:2px 6px 0 0;box-sizing:border-box;border-bottom:1px solid #e5e2dd}
-    .ag-hours-cell{position:relative;border-right:1px solid #e5e2dd;box-sizing:border-box}
-    .ag-hours-cell:last-child{border-right:none}
+    .ag-hours-cell{position:relative;border-right:2px solid #c8c4bd;box-sizing:border-box;min-width:110px}
+    .ag-hours-cell.alt{background:#faf9f8}
+    .ag-hours-cell.today-col{background:#fdf5f5}
+    .ag-hours-cell.last{border-right:none}
     .ag-hour-line{height:${ROW_H}px;border-bottom:1px solid #e5e2dd;box-sizing:border-box}
     .ag-event-block{position:absolute;left:2px;right:2px;background:#8B1A1A;color:#fff;border-radius:2px;padding:3px 6px;font-size:10px;line-height:1.35;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);z-index:2}
     .ag-event-block:hover{background:#6B1212}
@@ -275,16 +280,18 @@
     let alldayCells = `<div class="ag-allday-label">Consignes</div>`;
     let hourCells = `<div class="ag-time-labels">${hours.map(h => `<div class="ag-time-slot">${String(h).padStart(2,'0')}h</div>`).join('')}</div>`;
 
-    days.forEach(day => {
+    days.forEach((day, i) => {
       const dateStr = iso(day);
       const isToday = sameDay(day, todayDate());
+      const isLast = i === days.length - 1;
+      const altClass = i % 2 === 1 ? ' alt' : '';
       const dayCons = consignesOn(dateStr);
       const dayEvs = eventsOn(dateStr);
 
-      headerCells += `<div class="ag-col-hdr${isToday ? ' today' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>`;
+      headerCells += `<div class="ag-col-hdr${isToday ? ' today' : ''}${isLast ? ' last' : ''}">${day.toLocaleDateString('fr-CH',{weekday:'short'})}<span class="n">${day.getDate()}</span></div>`;
 
       const groups = groupConsignesBySite(dayCons);
-      alldayCells += `<div class="ag-allday-cell">${groups.map(g => `<div class="ag-co-group">
+      alldayCells += `<div class="ag-allday-cell${altClass}${isToday ? ' today-col' : ''}${isLast ? ' last' : ''}">${groups.map(g => `<div class="ag-co-group">
           <div class="ag-co-group-site">📌 ${escapeHtml(g.siteName)}</div>
           ${g.items.map(c => `<div class="ag-co-chip-inline" onclick="RDZAgenda.openConsigne('${c.id}')" title="${escapeHtml(c.texte)}">${escapeHtml(c.texte)}</div>`).join('')}
         </div>`).join('')}</div>`;
@@ -302,17 +309,17 @@
         </div>`;
       }).join('');
 
-      hourCells += `<div class="ag-hours-cell" style="height:${gridHeight}px">
+      hourCells += `<div class="ag-hours-cell${altClass}${isToday ? ' today-col' : ''}${isLast ? ' last' : ''}" style="height:${gridHeight}px">
         ${hours.map(() => `<div class="ag-hour-line"></div>`).join('')}
         ${blocks}
       </div>`;
     });
 
-    return `<div class="ag-time-grid" style="grid-template-columns:50px repeat(${cols},1fr)">
+    return `<div class="ag-time-grid-scroll"><div class="ag-time-grid" style="grid-template-columns:50px repeat(${cols},minmax(110px,1fr));min-width:${50 + cols*110}px">
       ${headerCells}
       ${hourCells}
       ${alldayCells}
-    </div>`;
+    </div></div>`;
   }
 
   function renderWeek() {
