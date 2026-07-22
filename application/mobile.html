@@ -195,11 +195,15 @@ function showScreen(id) {
 // NB : chemins relatifs (fichiers tous dans /application/, sauf ../ vers la racine)
 const MAIN_ITEMS = [
   { icon: '👥', name: 'Résidents & Accès', desc: "Recherche par nom, chambre, plaque, casier", href: '../residents.html' },
-  { icon: '🚗', name: 'Prise de véhicule', desc: "État, anomalies, kilométrage", href: 'https://rdz-2026.github.io/RDZ_Agent/Fleet_Agent_v2.html', external: true },
-  { icon: '📦', name: 'Matériel', desc: "Stocks, mouvements, état des articles", href: 'https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-terrain.html', external: true },
-  { icon: '🕐', name: 'Feuilles de route', desc: "Rondes et déplacements agents", href: '../RouteOps_Supervision_v2.html' },
   { icon: '🅿️', name: 'Contrôle Parking', desc: "Contrôle et surveillance des parkings", href: 'https://rdz-2026.github.io/RDZ_Agent/parkguard-rdz.html', external: true },
   { icon: '🖨️', name: 'Impression du jour', desc: "Tout imprimer en un clic", href: '../impression_du_jour.html' }
+];
+
+const POSTE_ITEMS = [
+  { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
+  { icon: '🚗', name: 'Prise de véhicule', desc: "État, anomalies, kilométrage", href: 'https://rdz-2026.github.io/RDZ_Agent/Fleet_Agent_v2.html', external: true },
+  { icon: '📦', name: 'Matériel', desc: "Stocks, mouvements, état des articles", href: 'https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-terrain.html', external: true },
+  { icon: '🕐', name: 'Feuilles de route', desc: "Rondes et déplacements agents", href: '../RouteOps_Supervision_v2.html' }
 ];
 
 let currentAgentName = '';
@@ -219,11 +223,11 @@ function cardHtml(item) {
 function renderMenu(nom) {
   currentAgentName = nom;
   document.getElementById('menu-greeting').textContent = 'Bonjour, ' + nom;
-  let html = `<a class="menu-card featured" href="prise-de-poste.html">
+  let html = `<a class="menu-card featured" href="#" onclick="showPosteMenu();return false;">
       <div class="menu-icon featured-icon">🟢</div>
       <div class="menu-txt">
         <div class="menu-name">Prise de poste</div>
-        <div class="menu-desc">Consignes, événements et constats du site et du jour</div>
+        <div class="menu-desc">Consignes, événements, constats, véhicule, matériel, feuille de route</div>
       </div>
       <div class="menu-chevron">›</div>
     </a>`;
@@ -231,6 +235,13 @@ function renderMenu(nom) {
   MAIN_ITEMS.forEach(item => { html += cardHtml(item); });
   document.getElementById('menu-content').innerHTML = html;
   showScreen('screen-menu');
+}
+
+function showPosteMenu() {
+  let html = `<button class="link-btn" style="margin:0 0 14px;text-align:left;display:block" onclick="renderMenu(currentAgentName)">‹ Retour au menu</button>`;
+  html += `<div class="menu-section-label">Prise de poste</div>`;
+  POSTE_ITEMS.forEach(item => { html += cardHtml(item); });
+  document.getElementById('menu-content').innerHTML = html;
 }
 
 // ── IDENTIFICATION ────────────────────────────────────────────────────────────
