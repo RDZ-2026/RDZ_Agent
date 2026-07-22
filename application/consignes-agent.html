@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Consignes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .site-bar { background: #fff; border-bottom: 1px solid var(--rdz-border); padding: 12px 16px; display: flex; align-items: center; gap: 10px; }
+  .site-bar label { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .site-select { flex: 1; padding: 10px 12px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); }
+  .today-note { font-size: 10.5px; color: #9a9a9a; padding: 8px 16px 0; }
+
+  .content { padding: 14px 16px 40px; }
+  .state-msg { text-align: center; padding: 60px 20px; font-size: 13.5px; color: var(--rdz-gray); }
+  .state-msg .big { font-size: 32px; margin-bottom: 10px; }
+
+  .site-block { margin-bottom: 18px; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; background: #fff; }
+  .site-hdr { background: var(--rdz-black); padding: 9px 14px; display: flex; align-items: center; justify-content: space-between; }
+  .site-name { font-size: 12px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .site-count { font-size: 10.5px; color: rgba(255,255,255,.55); background: rgba(255,255,255,.1); padding: 2px 8px; border-radius: 2px; white-space: nowrap; }
+
+  .card { padding: 14px; border-bottom: 1px solid var(--rdz-border); display: flex; gap: 10px; align-items: flex-start; }
+  .card:last-child { border-bottom: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #1e5c2e; margin-top: 5px; flex-shrink: 0; }
+  .card-text { font-size: 13.5px; color: var(--rdz-black); line-height: 1.55; margin-bottom: 6px; white-space: pre-wrap; }
+  .card-dates { display: flex; gap: 8px; flex-wrap: wrap; font-size: 10.5px; color: var(--rdz-gray); font-weight: 600; }
+  .badge-perm { font-size: 9.5px; background: #dbeafe; color: #1e3a5f; padding: 2px 7px; border-radius: 2px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Consignes particulières</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="site-bar">
+  <label for="site-select">Site</label>
+  <select class="site-select" id="site-select" onchange="onSiteChange()">
+    <option value="">Chargement…</option>
+  </select>
+</div>
+<div class="today-note" id="today-note"></div>
+
+<div class="content" id="content">
+  <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const LS_SITE = 'rdz_agent_last_site';
+
+let sites = [];
+let consignes = [];
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmt(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; }
+function isActive(c, ref) {
+  if (c.date_debut && c.date_debut > ref) return false;
+  if (c.date_fin && c.date_fin < ref) return false;
+  return true;
+}
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadAll() {
+  try {
+    const [{ data: s, error: se }, { data: c, error: ce }] = await Promise.all([
+      sb.from('sites').select('*').eq('actif', true).order('nom'),
+      sb.from('consignes').select('*').order('date_debut')
+    ]);
+    if (se || ce) throw se || ce;
+    sites = s || [];
+    consignes = c || [];
+    buildSiteSelect();
+    render();
+  } catch (err) {
+    document.getElementById('content').innerHTML =
+      `<div class="state-msg"><div class="big">⚠️</div>Impossible de charger les consignes.<br><small style="color:#9a9a9a">${err.message}</small></div>`;
+  }
+}
+
+function buildSiteSelect() {
+  const sel = document.getElementById('site-select');
+  if (sites.length === 0) {
+    sel.innerHTML = '<option value="">Aucun site actif</option>';
+    return;
+  }
+  sel.innerHTML =
+    '<option value="all">Tous les sites</option>' +
+    sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+
+  const saved = localStorage.getItem(LS_SITE);
+  if (saved && (saved === 'all' || sites.some(s => s.id === saved))) {
+    sel.value = saved;
+  } else {
+    sel.value = 'all';
+  }
+}
+
+function onSiteChange() {
+  localStorage.setItem(LS_SITE, document.getElementById('site-select').value);
+  render();
+}
+
+function render() {
+  const ref = today();
+  document.getElementById('today-note').textContent = 'Consignes actives aujourd\'hui — ' + fmt(ref);
+
+  const siteVal = document.getElementById('site-select').value;
+  const filteredSites = siteVal === 'all' ? sites : sites.filter(s => s.id === siteVal);
+  const el = document.getElementById('content');
+
+  if (filteredSites.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun site disponible.</div>`;
+    return;
+  }
+
+  let html = '';
+  let totalActive = 0;
+
+  filteredSites.forEach(site => {
+    const cons = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
+    if (cons.length === 0) return;
+    totalActive += cons.length;
+
+    html += `<div class="site-block">
+      <div class="site-hdr">
+        <div class="site-name">${escHtml(site.nom)}</div>
+        <div class="site-count">${cons.length} active${cons.length > 1 ? 's' : ''}</div>
+      </div>`;
+    cons.forEach(c => {
+      html += `<div class="card">
+        <div class="dot"></div>
+        <div>
+          <div class="card-text">${escHtml(c.texte)}</div>
+          <div class="card-dates">
+            <span>📅 Dès le ${fmt(c.date_debut)}</span>
+            ${c.date_fin ? `<span>⛔ Jusqu'au ${fmt(c.date_fin)}</span>` : `<span class="badge-perm">Permanente</span>`}
+          </div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  if (totalActive === 0) {
+    html = `<div class="state-msg"><div class="big">✅</div>Aucune consigne active aujourd'hui${siteVal !== 'all' ? ' pour ce site' : ''}.</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+loadAll();
+</script>
+</body>
+</html>
