@@ -145,6 +145,11 @@ const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Nom complet affiché (le schéma sépare prénom et nom)
+function fullName(a) {
+  return [a.prenom, a.nom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
+}
+
 // ── HASH (identique à parametrage.html) ──────────────────────────────────────
 async function hashPin(pin) {
   const enc = new TextEncoder().encode('RDZ-PIN-2026-' + pin);
@@ -230,9 +235,10 @@ async function showIdentScreen(notice) {
       list.innerHTML = '<div style="text-align:center;color:#9a9a9a;font-size:13px;padding:20px 0">Aucun agent actif. Contactez votre responsable.</div>';
       return;
     }
-    list.innerHTML = data.map(a =>
-      `<button class="agent-pick-btn" onclick="selectAgent('${a.id}', '${a.nom.replace(/'/g, "\\'")}')">${a.nom} <span>›</span></button>`
-    ).join('');
+    list.innerHTML = data.map(a => {
+      const n = fullName(a).replace(/'/g, "\\'");
+      return `<button class="agent-pick-btn" onclick="selectAgent('${a.id}')">${fullName(a)} <span>›</span></button>`;
+    }).join('');
   } catch (err) {
     list.innerHTML = `<div style="text-align:center;color:#dc2626;font-size:13px;padding:20px 0">Erreur de connexion.<br>${err.message}</div>`;
   }
@@ -243,7 +249,7 @@ function backToIdent() {
   showIdentScreen();
 }
 
-async function selectAgent(id, nom) {
+async function selectAgent(id) {
   try {
     const { data, error } = await sb.from('agents').select('*').eq('id', id).single();
     if (error) throw error;
@@ -279,7 +285,7 @@ function updateDots(prefix, len) {
 function openPinScreen(agent, message) {
   pinCurrentAgent = agent;
   pinBuffer = '';
-  document.getElementById('pin-agent-name').textContent = agent.nom;
+  document.getElementById('pin-agent-name').textContent = fullName(agent);
   document.getElementById('pin-msg').className = 'pin-msg' + (message ? ' warn' : '');
   document.getElementById('pin-msg').textContent = message || 'Entrez votre code PIN';
   updateDots('pin', 0);
@@ -295,8 +301,8 @@ async function onPinDigit(d) {
   if (pinBuffer.length === 4) {
     const hash = await hashPin(pinBuffer);
     if (hash === pinCurrentAgent.pin_hash) {
-      setLocalSession(pinCurrentAgent.id, pinCurrentAgent.nom, hash);
-      renderMenu(pinCurrentAgent.nom);
+      setLocalSession(pinCurrentAgent.id, fullName(pinCurrentAgent), hash);
+      renderMenu(fullName(pinCurrentAgent));
     } else {
       const dotsEl = document.getElementById('pin-dots');
       dotsEl.classList.add('shake');
@@ -321,7 +327,7 @@ function openCreatePinScreen(agent) {
   createPinStep = 1;
   createPinFirst = '';
   pinBuffer = '';
-  document.getElementById('create-pin-agent-name').textContent = agent.nom;
+  document.getElementById('create-pin-agent-name').textContent = fullName(agent);
   document.getElementById('create-pin-msg').textContent = 'Choisissez un code PIN à 4 chiffres';
   document.getElementById('create-pin-msg').className = 'pin-msg';
   updateDots('create-pin', 0);
@@ -346,8 +352,8 @@ async function onCreatePinDigit(d) {
         const hash = await hashPin(pinBuffer);
         const { error } = await sb.from('agents').update({ pin_hash: hash, updated_at: new Date().toISOString() }).eq('id', createPinAgent.id);
         if (error) { alert('Erreur : ' + error.message); return; }
-        setLocalSession(createPinAgent.id, createPinAgent.nom, hash);
-        renderMenu(createPinAgent.nom);
+        setLocalSession(createPinAgent.id, fullName(createPinAgent), hash);
+        renderMenu(fullName(createPinAgent));
       } else {
         const dotsEl = document.getElementById('create-pin-dots');
         dotsEl.classList.add('shake');
@@ -395,7 +401,7 @@ async function init() {
     }
     if (data.pin_hash === session.hash) {
       // Reconnexion silencieuse : même code, on ne redemande rien
-      return renderMenu(data.nom);
+      return renderMenu(fullName(data));
     }
     // Le PIN a été changé côté admin : on force la ressaisie
     return openPinScreen(data, 'Votre code d\'accès a été modifié. Merci de le ressaisir.');
