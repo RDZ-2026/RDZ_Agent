@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); overflow-x: hidden; }
+
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.on { display: flex; }
+
+  /* HEADER commun */
+  .app-header { background: var(--rdz-red); padding: 18px 20px; display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+
+  /* ── SPLASH / LOADING ── */
+  #screen-loading { align-items: center; justify-content: center; background: var(--rdz-red); gap: 16px; }
+  .splash-title { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: .08em; text-transform: uppercase; }
+  .splash-sub { font-size: 12px; color: rgba(255,255,255,.7); }
+  .spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── IDENTIFICATION (choix agent) ── */
+  #screen-ident .content { flex: 1; padding: 24px 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .ident-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .ident-sub { font-size: 12.5px; color: var(--rdz-gray); margin-bottom: 12px; line-height: 1.5; }
+  .agent-pick-btn { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-red); border-radius: 2px; padding: 16px 18px; font-size: 15px; font-weight: 600; color: var(--rdz-black); text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .agent-pick-btn:active { background: var(--rdz-red-light); }
+  .notice-banner { background: #fef9c3; border: 1px solid #fde68a; color: #854d0e; font-size: 12px; padding: 10px 14px; border-radius: 2px; margin-bottom: 14px; line-height: 1.5; }
+
+  /* ── PIN ── */
+  #screen-pin .content, #screen-create-pin .content { flex: 1; padding: 30px 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .pin-agent-name { font-size: 16px; font-weight: 700; }
+  .pin-msg { font-size: 12.5px; color: var(--rdz-gray); text-align: center; line-height: 1.5; }
+  .pin-msg.warn { color: #854d0e; background: #fef9c3; border: 1px solid #fde68a; padding: 10px 14px; border-radius: 2px; }
+  .pin-msg.err { color: #dc2626; }
+  .pin-dots { display: flex; gap: 14px; margin: 10px 0; }
+  .pin-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--rdz-red); background: transparent; transition: background .1s; }
+  .pin-dot.filled { background: var(--rdz-red); }
+  .pin-dots.shake { animation: shake .35s; }
+  @keyframes shake { 20%,60% { transform: translateX(-8px);} 40%,80% { transform: translateX(8px);} }
+  .keypad { display: grid; grid-template-columns: repeat(3, 74px); gap: 14px; }
+  .key { width: 74px; height: 74px; border-radius: 50%; border: 1px solid var(--rdz-border); background: #fff; font-size: 24px; font-weight: 600; color: var(--rdz-black); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .key:active { background: var(--rdz-red-light); }
+  .key.fn { border: none; background: none; font-size: 13px; color: var(--rdz-gray); font-weight: 700; }
+  .link-btn { background: none; border: none; color: var(--rdz-gray); font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 6px; }
+
+  /* ── MENU ── */
+  #screen-menu .app-header { flex-direction: row; align-items: center; justify-content: space-between; }
+  .menu-greeting { font-size: 13px; font-weight: 700; color: #fff; }
+  .menu-change { font-size: 11px; color: rgba(255,255,255,.75); text-decoration: underline; background: none; border: none; cursor: pointer; }
+  .menu-content { flex: 1; padding: 18px 16px 40px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .menu-section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rdz-gray); margin: 14px 0 2px; }
+  .menu-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-red); border-radius: 2px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
+  .menu-card:active { background: var(--rdz-red-light); }
+  .menu-icon { width: 38px; height: 38px; background: var(--rdz-red-light); border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
+  .menu-txt { flex: 1; }
+  .menu-name { font-size: 14px; font-weight: 700; }
+  .menu-desc { font-size: 11px; color: var(--rdz-gray); margin-top: 2px; line-height: 1.4; }
+  .menu-chevron { color: var(--rdz-gray); font-size: 16px; }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div class="screen on" id="screen-loading">
+  <div class="splash-title">RDZ Agent</div>
+  <div class="spinner"></div>
+  <div class="splash-sub">Connexion en cours…</div>
+</div>
+
+<!-- IDENTIFICATION -->
+<div class="screen" id="screen-ident">
+  <div class="app-header">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Identification</div>
+  </div>
+  <div class="content">
+    <div class="ident-title">Qui êtes-vous ?</div>
+    <div class="ident-sub">Sélectionnez votre nom dans la liste. Cette sélection ne sera demandée qu'une seule fois sur cet appareil.</div>
+    <div id="ident-notice"></div>
+    <div id="agent-pick-list"></div>
+  </div>
+</div>
+
+<!-- PIN (saisie / vérification) -->
+<div class="screen" id="screen-pin">
+  <div class="app-header">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Code d'accès</div>
+  </div>
+  <div class="content">
+    <div class="pin-agent-name" id="pin-agent-name"></div>
+    <div class="pin-msg" id="pin-msg">Entrez votre code PIN</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="pin-keypad"></div>
+    <button class="link-btn" onclick="backToIdent()">Ce n'est pas moi — changer d'agent</button>
+  </div>
+</div>
+
+<!-- CRÉATION PIN (premier usage, aucun PIN encore défini) -->
+<div class="screen" id="screen-create-pin">
+  <div class="app-header">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Créer votre code d'accès</div>
+  </div>
+  <div class="content">
+    <div class="pin-agent-name" id="create-pin-agent-name"></div>
+    <div class="pin-msg" id="create-pin-msg">Choisissez un code PIN à 4 chiffres</div>
+    <div class="pin-dots" id="create-pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <div class="keypad" id="create-pin-keypad"></div>
+    <button class="link-btn" onclick="backToIdent()">Ce n'est pas moi — changer d'agent</button>
+  </div>
+</div>
+
+<!-- MENU -->
+<div class="screen" id="screen-menu">
+  <div class="app-header">
+    <div class="menu-greeting" id="menu-greeting">Bonjour</div>
+    <button class="menu-change" onclick="logout()">Changer d'agent</button>
+  </div>
+  <div class="menu-content" id="menu-content"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── HASH (identique à parametrage.html) ──────────────────────────────────────
+async function hashPin(pin) {
+  const enc = new TextEncoder().encode('RDZ-PIN-2026-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── STOCKAGE LOCAL ────────────────────────────────────────────────────────────
+const LS_ID = 'rdz_agent_id';
+const LS_NOM = 'rdz_agent_nom';
+const LS_HASH = 'rdz_agent_pin_hash';
+
+function getLocalSession() {
+  return {
+    id: localStorage.getItem(LS_ID),
+    nom: localStorage.getItem(LS_NOM),
+    hash: localStorage.getItem(LS_HASH)
+  };
+}
+function setLocalSession(id, nom, hash) {
+  localStorage.setItem(LS_ID, id);
+  localStorage.setItem(LS_NOM, nom);
+  localStorage.setItem(LS_HASH, hash || '');
+}
+function clearLocalSession() {
+  localStorage.removeItem(LS_ID);
+  localStorage.removeItem(LS_NOM);
+  localStorage.removeItem(LS_HASH);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+// ── MODULES DU MENU ───────────────────────────────────────────────────────────
+const MENU_ITEMS = [
+  { section: 'Modules Loge', icon: '📅', name: 'Événements', desc: "Planification des événements par site", href: 'evenements.html' },
+  { section: 'Modules Loge', icon: '📋', name: 'Consignes particulières', desc: "Consignes par site avec dates de validité", href: 'consignes.html' },
+  { section: 'Modules Loge', icon: '⚠️', name: 'Registre des constats', desc: "Anomalies et incidents terrain", href: 'constats.html' },
+  { section: 'Modules Loge', icon: '👥', name: 'Résidents & Accès', desc: "Recherche par nom, chambre, plaque, casier", href: 'residents.html' },
+  { section: 'Modules Loge', icon: '🚗', name: 'Véhicules & Flotte', desc: "État, anomalies, kilométrage", href: 'https://rdz-2026.github.io/RDZ_Agent/Fleet_Agent_v2.html' },
+  { section: 'Modules Loge', icon: '🕐', name: 'Feuilles de route', desc: "Rondes et déplacements agents", href: 'RouteOps_Supervision_v2.html' },
+  { section: 'Applications terrain', icon: '🅿️', name: 'Contrôle Parking', desc: "Contrôle et surveillance des parkings", href: 'https://rdz-2026.github.io/RDZ_Agent/parkguard-rdz.html' },
+  { section: 'Applications terrain', icon: '📦', name: 'Gestion Matériel / Stock', desc: "Stocks, mouvements, état des articles", href: 'https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-terrain.html' },
+  { section: 'Applications terrain', icon: '🖨️', name: 'Impression du jour', desc: "Tout imprimer en un clic", href: 'impression_du_jour.html' }
+];
+
+function renderMenu(nom) {
+  document.getElementById('menu-greeting').textContent = 'Bonjour, ' + nom;
+  let lastSection = null;
+  let html = '';
+  MENU_ITEMS.forEach(item => {
+    if (item.section !== lastSection) {
+      html += `<div class="menu-section-label">${item.section}</div>`;
+      lastSection = item.section;
+    }
+    const target = item.href.startsWith('http') ? ' target="_blank" rel="noopener"' : '';
+    html += `<a class="menu-card" href="${item.href}"${target}>
+      <div class="menu-icon">${item.icon}</div>
+      <div class="menu-txt">
+        <div class="menu-name">${item.name}</div>
+        <div class="menu-desc">${item.desc}</div>
+      </div>
+      <div class="menu-chevron">›</div>
+    </a>`;
+  });
+  document.getElementById('menu-content').innerHTML = html;
+  showScreen('screen-menu');
+}
+
+// ── IDENTIFICATION ────────────────────────────────────────────────────────────
+async function showIdentScreen(notice) {
+  document.getElementById('ident-notice').innerHTML = notice
+    ? `<div class="notice-banner">${notice}</div>` : '';
+  const list = document.getElementById('agent-pick-list');
+  list.innerHTML = '<div style="text-align:center;color:#9a9a9a;font-size:13px;padding:20px 0">Chargement des agents…</div>';
+  showScreen('screen-ident');
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('actif', true).order('nom');
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:#9a9a9a;font-size:13px;padding:20px 0">Aucun agent actif. Contactez votre responsable.</div>';
+      return;
+    }
+    list.innerHTML = data.map(a =>
+      `<button class="agent-pick-btn" onclick="selectAgent('${a.id}', '${a.nom.replace(/'/g, "\\'")}')">${a.nom} <span>›</span></button>`
+    ).join('');
+  } catch (err) {
+    list.innerHTML = `<div style="text-align:center;color:#dc2626;font-size:13px;padding:20px 0">Erreur de connexion.<br>${err.message}</div>`;
+  }
+}
+
+function backToIdent() {
+  clearLocalSession();
+  showIdentScreen();
+}
+
+async function selectAgent(id, nom) {
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('id', id).single();
+    if (error) throw error;
+    if (data.pin_hash) {
+      openPinScreen(data, null);
+    } else {
+      openCreatePinScreen(data);
+    }
+  } catch (err) {
+    alert('Erreur : ' + err.message);
+  }
+}
+
+// ── PIN (VÉRIFICATION) ────────────────────────────────────────────────────────
+let pinBuffer = '';
+let pinCurrentAgent = null;
+
+function buildKeypad(containerId, onDigit) {
+  const el = document.getElementById(containerId);
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  el.innerHTML = keys.map(k => {
+    if (k === '') return '<div></div>';
+    if (k === '⌫') return `<div class="key fn" onclick="${onDigit}(null)">Effacer</div>`;
+    return `<div class="key" onclick="${onDigit}('${k}')">${k}</div>`;
+  }).join('');
+}
+
+function updateDots(prefix, len) {
+  const dots = document.querySelectorAll('#' + prefix + '-dots .pin-dot');
+  dots.forEach((d, i) => d.classList.toggle('filled', i < len));
+}
+
+function openPinScreen(agent, message) {
+  pinCurrentAgent = agent;
+  pinBuffer = '';
+  document.getElementById('pin-agent-name').textContent = agent.nom;
+  document.getElementById('pin-msg').className = 'pin-msg' + (message ? ' warn' : '');
+  document.getElementById('pin-msg').textContent = message || 'Entrez votre code PIN';
+  updateDots('pin', 0);
+  buildKeypad('pin-keypad', 'onPinDigit');
+  showScreen('screen-pin');
+}
+
+async function onPinDigit(d) {
+  if (d === null) { pinBuffer = pinBuffer.slice(0, -1); updateDots('pin', pinBuffer.length); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updateDots('pin', pinBuffer.length);
+  if (pinBuffer.length === 4) {
+    const hash = await hashPin(pinBuffer);
+    if (hash === pinCurrentAgent.pin_hash) {
+      setLocalSession(pinCurrentAgent.id, pinCurrentAgent.nom, hash);
+      renderMenu(pinCurrentAgent.nom);
+    } else {
+      const dotsEl = document.getElementById('pin-dots');
+      dotsEl.classList.add('shake');
+      document.getElementById('pin-msg').className = 'pin-msg err';
+      document.getElementById('pin-msg').textContent = 'Code incorrect, réessayez';
+      setTimeout(() => {
+        dotsEl.classList.remove('shake');
+        pinBuffer = '';
+        updateDots('pin', 0);
+      }, 400);
+    }
+  }
+}
+
+// ── PIN (CRÉATION — premier usage) ────────────────────────────────────────────
+let createPinStep = 1; // 1 = premier saisie, 2 = confirmation
+let createPinFirst = '';
+let createPinAgent = null;
+
+function openCreatePinScreen(agent) {
+  createPinAgent = agent;
+  createPinStep = 1;
+  createPinFirst = '';
+  pinBuffer = '';
+  document.getElementById('create-pin-agent-name').textContent = agent.nom;
+  document.getElementById('create-pin-msg').textContent = 'Choisissez un code PIN à 4 chiffres';
+  document.getElementById('create-pin-msg').className = 'pin-msg';
+  updateDots('create-pin', 0);
+  buildKeypad('create-pin-keypad', 'onCreatePinDigit');
+  showScreen('screen-create-pin');
+}
+
+async function onCreatePinDigit(d) {
+  if (d === null) { pinBuffer = pinBuffer.slice(0, -1); updateDots('create-pin', pinBuffer.length); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updateDots('create-pin', pinBuffer.length);
+  if (pinBuffer.length === 4) {
+    if (createPinStep === 1) {
+      createPinFirst = pinBuffer;
+      createPinStep = 2;
+      pinBuffer = '';
+      document.getElementById('create-pin-msg').textContent = 'Confirmez votre code PIN';
+      updateDots('create-pin', 0);
+    } else {
+      if (pinBuffer === createPinFirst) {
+        const hash = await hashPin(pinBuffer);
+        const { error } = await sb.from('agents').update({ pin_hash: hash, updated_at: new Date().toISOString() }).eq('id', createPinAgent.id);
+        if (error) { alert('Erreur : ' + error.message); return; }
+        setLocalSession(createPinAgent.id, createPinAgent.nom, hash);
+        renderMenu(createPinAgent.nom);
+      } else {
+        const dotsEl = document.getElementById('create-pin-dots');
+        dotsEl.classList.add('shake');
+        document.getElementById('create-pin-msg').className = 'pin-msg err';
+        document.getElementById('create-pin-msg').textContent = 'Les codes ne correspondent pas, recommencez';
+        setTimeout(() => {
+          dotsEl.classList.remove('shake');
+          createPinStep = 1;
+          createPinFirst = '';
+          pinBuffer = '';
+          document.getElementById('create-pin-msg').className = 'pin-msg';
+          document.getElementById('create-pin-msg').textContent = 'Choisissez un code PIN à 4 chiffres';
+          updateDots('create-pin', 0);
+        }, 900);
+      }
+    }
+  }
+}
+
+// ── DÉCONNEXION ────────────────────────────────────────────────────────────────
+function logout() {
+  clearLocalSession();
+  showIdentScreen();
+}
+
+// ── DÉMARRAGE ──────────────────────────────────────────────────────────────────
+async function init() {
+  const session = getLocalSession();
+  if (!session.id) {
+    return showIdentScreen();
+  }
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('id', session.id).single();
+    if (error || !data) {
+      clearLocalSession();
+      return showIdentScreen();
+    }
+    if (data.actif === false) {
+      clearLocalSession();
+      return showIdentScreen("Votre accès a été désactivé. Contactez votre responsable.");
+    }
+    if (!data.pin_hash) {
+      // Aucun PIN encore défini côté serveur : création
+      return openCreatePinScreen(data);
+    }
+    if (data.pin_hash === session.hash) {
+      // Reconnexion silencieuse : même code, on ne redemande rien
+      return renderMenu(data.nom);
+    }
+    // Le PIN a été changé côté admin : on force la ressaisie
+    return openPinScreen(data, 'Votre code d\'accès a été modifié. Merci de le ressaisir.');
+  } catch (err) {
+    showIdentScreen('Connexion impossible pour le moment. Réessayez.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
