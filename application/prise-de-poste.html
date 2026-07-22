@@ -84,6 +84,17 @@
   .ct-meta { font-size: 10.5px; color: var(--rdz-gray); display: flex; flex-wrap: wrap; gap: 8px; }
 
   .empty-sub { padding: 14px; font-size: 12px; color: #9a9a9a; font-style: italic; }
+
+  /* VALIDATION CONSIGNES */
+  .valid-banner { margin: 10px 14px; padding: 10px 12px; border-radius: 2px; font-size: 11.5px; display: flex; align-items: center; gap: 8px; }
+  .valid-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .valid-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .valid-btn { display: block; width: calc(100% - 28px); margin: 4px 14px 14px; background: var(--rdz-red); color: #fff; border: none; padding: 12px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; }
+  .valid-btn:active { background: var(--rdz-red-dark); }
+
+  /* VERROU */
+  .lock-block { padding: 22px 14px; text-align: center; color: #9a9a9a; font-size: 12.5px; background: #fafafa; }
+  .lock-block .big { font-size: 24px; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -118,6 +129,13 @@
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── SESSION AGENT ─────────────────────────────────────────────────────────────
+const AGENT_ID = localStorage.getItem('rdz_agent_id');
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom');
+if (!AGENT_ID) {
+  window.location.href = 'mobile.html';
+}
 
 const LS_SITE = 'rdz_agent_last_site';
 
@@ -197,8 +215,40 @@ function onFilterChange() {
   render();
 }
 
-function render() {
+async function validateSite(siteId) {
   const ref = document.getElementById('date-select').value || today();
+  const site = sites.find(s => s.id === siteId);
+  const consList = consignes.filter(c => c.site_id === siteId && isActive(c, ref));
+  const snapshot = consList.map(c => ({ id: c.id, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
+
+  const btn = document.getElementById('valid-btn-' + siteId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
+
+  const { error } = await sb.from('consignes_lectures').insert({
+    agent_id: AGENT_ID,
+    agent_nom: AGENT_NOM,
+    site_id: siteId,
+    site_nom: site ? site.nom : '',
+    date_lecture: ref,
+    consignes_json: snapshot,
+    nb_consignes: snapshot.length
+  });
+
+  if (error) {
+    alert('Erreur lors de l\'enregistrement de la validation : ' + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = "✓ J'ai lu et je valide les consignes"; }
+    return;
+  }
+  render();
+}
+
+function lockBlock(label) {
+  return `<div class="lock-block"><div class="big">🔒</div>Validez la lecture des consignes ci-dessus pour accéder ${label}.</div>`;
+}
+
+async function render() {
+  const ref = document.getElementById('date-select').value || today();
+  const isToday = ref === today();
   const siteVal = document.getElementById('site-select').value;
   const filteredSites = siteVal === 'all' ? sites : sites.filter(s => s.id === siteVal);
   const el = document.getElementById('content');
@@ -206,6 +256,25 @@ function render() {
   if (filteredSites.length === 0) {
     el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun site disponible.</div>`;
     return;
+  }
+
+  // Récupère les validations déjà enregistrées pour l'agent, ce jour, ces sites
+  let validations = {};
+  if (isToday) {
+    try {
+      const { data, error } = await sb.from('consignes_lectures')
+        .select('*')
+        .eq('agent_id', AGENT_ID)
+        .eq('date_lecture', ref)
+        .in('site_id', filteredSites.map(s => s.id));
+      if (!error && data) {
+        data.forEach(v => {
+          if (!validations[v.site_id] || v.validated_at > validations[v.site_id].validated_at) {
+            validations[v.site_id] = v;
+          }
+        });
+      }
+    } catch (err) { /* silencieux : si ça échoue, on considère non-validé */ }
   }
 
   let html = '';
@@ -218,6 +287,9 @@ function render() {
 
     if (consList.length === 0 && evList.length === 0 && ctList.length === 0) return;
     anySite = true;
+
+    const validation = validations[site.id];
+    const isLocked = isToday && !validation;
 
     html += `<div class="site-block">
       <div class="site-hdr"><div class="site-name">${escHtml(site.nom)}</div></div>
@@ -235,8 +307,13 @@ function render() {
               </div>
             </div>
           </div>`).join('')}
+        ${!isToday ? '' : (validation
+          ? `<div class="valid-banner valid-ok">✓ Consignes validées à ${new Date(validation.validated_at).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'})} par ${escHtml(validation.agent_nom || AGENT_NOM)}</div>`
+          : `<div class="valid-banner valid-pending">⚠️ Lecture non encore validée pour aujourd'hui</div>
+             <button class="valid-btn" id="valid-btn-${site.id}" onclick="validateSite('${site.id}')">✓ J'ai lu et je valide les consignes</button>`)}
       </div>
 
+      ${isLocked ? lockBlock('aux événements et constats de ce site') : `
       <div class="sub-section">
         <div class="sub-hdr"><div class="sub-title">📅 Événements du jour</div><div class="sub-count">${evList.length}</div></div>
         ${evList.length === 0 ? `<div class="empty-sub">Aucun événement le ${fmt(ref)}.</div>` : evList.map(e => {
@@ -287,6 +364,7 @@ function render() {
             </div>
           </div>`).join('')}
       </div>
+      `}
     </div>`;
   });
 
