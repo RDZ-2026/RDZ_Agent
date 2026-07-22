@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Résidents & Accès</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .content { padding: 16px; padding-bottom: 40px; }
+
+  /* SEARCH BOX */
+  .search-box { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 16px; margin-bottom: 16px; }
+  .search-title { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 12px; }
+  .search-row { display: flex; flex-direction: column; gap: 8px; }
+  .search-input { padding: 11px 13px; border-radius: 2px; border: 1.5px solid var(--rdz-border); font-size: 15px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+  .search-input:focus { outline: none; border-color: var(--rdz-red); }
+  .search-btns { display: flex; gap: 8px; }
+  .search-btn { flex: 1; padding: 11px; background: var(--rdz-red); color: #fff; border: none; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+  .search-btn:active { background: var(--rdz-red-dark); }
+  .search-clear { padding: 11px 16px; background: var(--rdz-bg); color: var(--rdz-gray); border: 1px solid var(--rdz-border); border-radius: 2px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .search-hints { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .hint-chip { font-size: 10.5px; color: var(--rdz-gray); background: var(--rdz-bg); border: 1px solid var(--rdz-border); border-radius: 2px; padding: 3px 8px; }
+
+  .result-count { font-size: 12px; color: var(--rdz-gray); margin-bottom: 12px; }
+
+  /* RESULT CARD */
+  .res-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-black); border-radius: 2px; margin-bottom: 12px; overflow: hidden; }
+  .res-card-header { padding: 13px 14px; display: flex; align-items: flex-start; gap: 12px; border-bottom: 1px solid var(--rdz-border); background: #fff; }
+  .res-avatar { width: 38px; height: 38px; background: var(--rdz-black); color: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; letter-spacing: .03em; }
+  .res-main { flex: 1; min-width: 0; }
+  .res-name { font-size: 14.5px; font-weight: 700; color: var(--rdz-black); line-height: 1.3; }
+  .res-room { font-size: 11.5px; color: var(--rdz-gray); margin-top: 3px; }
+  .res-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+  .rbadge { font-size: 9.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; white-space: nowrap; }
+  .rbadge-building { background: var(--rdz-black); color: #fff; }
+  .rbadge-type { background: #f3f4f6; color: #374151; }
+  .rbadge-parking { background: #dbeafe; color: #1e3a8a; }
+  .rbadge-fitness { background: #dcfce7; color: #14532d; }
+  .rbadge-locker { background: #fef9c3; color: #713f12; }
+  .rbadge-sublease { background: #ede9fe; color: #3b0764; }
+  .rbadge-shortstay { background: #fee2e2; color: #7f1d1d; }
+  .rbadge-contract { background: var(--rdz-red-light); color: var(--rdz-red-dark); }
+
+  .res-grid { display: flex; flex-direction: column; background: var(--rdz-bg); border-top: 1px solid var(--rdz-border); }
+  .res-section { padding: 12px 14px; border-bottom: 1px solid var(--rdz-border); }
+  .res-section:last-child { border-bottom: none; }
+  .res-section-title { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid var(--rdz-border); }
+  .res-field { margin-bottom: 6px; }
+  .res-field-lbl { font-size: 9.5px; color: #9a9a9a; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 2px; }
+  .res-field-val { font-size: 12.5px; color: var(--rdz-black); line-height: 1.4; font-weight: 600; }
+  .res-field-val.muted { font-weight: 400; color: var(--rdz-gray); }
+  .res-field-val.highlight { color: var(--rdz-red); }
+
+  /* ÉTAT VIDE / CHARGEMENT */
+  .state-msg { text-align: center; padding: 50px 20px; }
+  .state-msg .ico { font-size: 32px; margin-bottom: 12px; }
+  .state-msg p { font-size: 13.5px; color: var(--rdz-gray); }
+  .state-msg small { font-size: 11.5px; color: #bbb; display: block; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Résidents & Accès</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="content">
+  <div class="search-box">
+    <div class="search-title">Rechercher un résident ou un occupant</div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="search-input"
+        placeholder="Nom, chambre, plaque, place parking, casier…"
+        onkeydown="if(event.key==='Enter') doSearch()">
+      <div class="search-btns">
+        <button class="search-btn" onclick="doSearch()">Rechercher</button>
+        <button class="search-clear" onclick="clearSearch()">Effacer</button>
+      </div>
+    </div>
+    <div class="search-hints">
+      <span class="hint-chip">Nom partiel : « dupont »</span>
+      <span class="hint-chip">Chambre : « 8001 »</span>
+      <span class="hint-chip">Plaque : « GE 123 »</span>
+      <span class="hint-chip">Casier : « 110 »</span>
+    </div>
+  </div>
+
+  <div id="search-results">
+    <div class="state-msg">
+      <div class="ico">🔍</div>
+      <p>Entrez un nom, un numéro de chambre, une plaque ou un numéro de casier.</p>
+      <small>La recherche est partielle — « dup » trouve « Dupont »</small>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let data = { residents: [], short_stays: [], parkings: [], fitness_passes: [], lockers: [] };
+
+function fmt(d) {
+  if (!d) return '—';
+  if (typeof d === 'string' && d.includes('-')) {
+    const [y,m,dd] = d.split('T')[0].split('-');
+    return `${dd}.${m}.${y}`;
+  }
+  return d;
+}
+function initials(first, last) {
+  const f = (first||'').trim()[0]||'';
+  const l = (last||'').trim()[0]||'';
+  return (f + l).toUpperCase() || '?';
+}
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── CHARGEMENT (paginé — Supabase limite à 1000 lignes par défaut) ────────────
+async function fetchAll(table) {
+  let all = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data: rows, error } = await sb.from(table).select('*').range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!rows || rows.length === 0) break;
+    all = all.concat(rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+async function loadAll() {
+  try {
+    const [residents, short_stays, parkings, fitness_passes, lockers] = await Promise.all([
+      fetchAll('residents'),
+      fetchAll('short_stays'),
+      fetchAll('parkings'),
+      fetchAll('fitness_passes'),
+      fetchAll('lockers'),
+    ]);
+    data.residents = residents;
+    data.short_stays = short_stays;
+    data.parkings = parkings;
+    data.fitness_passes = fitness_passes;
+    data.lockers = lockers;
+  } catch (err) {
+    document.getElementById('search-results').innerHTML =
+      `<div class="state-msg"><div class="ico">⚠️</div><p>Impossible de charger les données.</p><small>${err.message}</small></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// RECHERCHE
+// ══════════════════════════════════════════════════════════════
+function doSearch() {
+  const q = normalize(document.getElementById('search-input').value);
+  if (!q || q.length < 2) {
+    document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🔍</div><p>Entrez au moins 2 caractères.</p></div>`;
+    return;
+  }
+
+  const results = [];
+
+  data.residents.forEach(r => {
+    const name = normalize(r.name_last + ' ' + r.name_first);
+    const room = normalize(r.room_space || '');
+    const sublease = normalize(r.sublease_tenant || '');
+    if (name.includes(q) || room.includes(q) || sublease.includes(q)) {
+      results.push({ type: 'resident', score: name.includes(q) ? 2 : 1, data: r });
+    }
+  });
+
+  data.short_stays.forEach(ss => {
+    const name = normalize(ss.entry_name || '');
+    const room = normalize(ss.room_space || '');
+    if (name.includes(q) || room.includes(q)) {
+      results.push({ type: 'shortstay', score: name.includes(q) ? 2 : 1, data: ss });
+    }
+  });
+
+  data.parkings.forEach(p => {
+    const name  = normalize((p.name_first || '') + ' ' + (p.name_last || ''));
+    const plate = normalize(p.license_plate || '');
+    const space = normalize(p.parking_space || '');
+    const alt   = normalize(p.alt_vehicle_info || '');
+    if (name.includes(q) || plate.includes(q) || space.includes(q) || alt.includes(q)) {
+      results.push({ type: 'parking', score: plate.includes(q) ? 3 : space.includes(q) ? 2 : 1, data: p });
+    }
+  });
+
+  data.fitness_passes.forEach(f => {
+    const name = normalize((f.name_first||'') + ' ' + (f.name_last||''));
+    const room = normalize(f.room_active || '');
+    if (name.includes(q) || room.includes(q)) {
+      results.push({ type: 'fitness', score: 1, data: f });
+    }
+  });
+
+  data.lockers.forEach(l => {
+    const name = normalize(l.entry_name || '');
+    const locker = normalize(l.locker_number || '');
+    const room = normalize(l.room_active || '');
+    if (name.includes(q) || locker.includes(q) || room.includes(q)) {
+      results.push({ type: 'locker', score: locker.includes(q) ? 3 : 1, data: l });
+    }
+  });
+
+  if (results.length === 0) {
+    document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🤷</div><p>Aucun résultat pour « ${escHtml(document.getElementById('search-input').value)} »</p><small>Essayez avec moins de lettres ou un autre champ</small></div>`;
+    return;
+  }
+
+  const grouped = groupSearchResults(results, q);
+  renderSearchResults(grouped);
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIAISON RÉSIDENTS ↔ ACCÈS — stratégie à 3 niveaux (identique au module admin)
+// ══════════════════════════════════════════════════════════════
+function normalize(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ');
+}
+function normRoom(r) {
+  return normalize(r||'').replace(/[\s\-\.]/g,'');
+}
+function matchByRoom(room_space, room_active) {
+  if (!room_space || !room_active) return false;
+  const r1 = normRoom(room_space);
+  const r2 = normRoom(room_active);
+  return r1.length >= 4 && r1 === r2;
+}
+function matchByNameExact(first1, last1, first2, last2) {
+  const f1 = normalize(first1||''), l1 = normalize(last1||'');
+  const f2 = normalize(first2||''), l2 = normalize(last2||'');
+  if (l1.length < 3 || l2.length < 3) return false;
+  const full1 = (f1+' '+l1).trim();
+  const full2 = (f2+' '+l2).trim();
+  return (full2.includes(l1) && full1.includes(l2)) ||
+         (full2.includes(f1) && f1.length >= 3 && full1.includes(f2) && f2.length >= 3);
+}
+function matchByNamePartial(last1, last2) {
+  const l1 = normalize(last1||'');
+  const l2 = normalize(last2||'');
+  if (l1.length < 4 || l2.length < 4) return false;
+  return l1 === l2;
+}
+
+function findAccesses(resident) {
+  const room = resident.room_space || '';
+
+  let fitness = data.fitness_passes.filter(f => matchByRoom(room, f.room_active));
+  if (!fitness.length) {
+    fitness = data.fitness_passes.filter(f =>
+      matchByNameExact(resident.name_first, resident.name_last, f.name_first, f.name_last));
+  }
+  if (!fitness.length) {
+    fitness = data.fitness_passes.filter(f =>
+      matchByNamePartial(resident.name_last, f.name_last));
+  }
+
+  let lockers = data.lockers.filter(l => matchByRoom(room, l.room_active));
+  if (!lockers.length) {
+    lockers = data.lockers.filter(l => {
+      const en = parseEntryName(l.entry_name);
+      return matchByNameExact(resident.name_first, resident.name_last, en.first, en.last);
+    });
+  }
+  if (!lockers.length) {
+    lockers = data.lockers.filter(l => {
+      const en = parseEntryName(l.entry_name);
+      return matchByNamePartial(resident.name_last, en.last);
+    });
+  }
+
+  let parkings = data.parkings.filter(p =>
+    matchByNameExact(resident.name_first, resident.name_last, p.name_first, p.name_last));
+  if (!parkings.length) {
+    parkings = data.parkings.filter(p =>
+      matchByNamePartial(resident.name_last, p.name_last));
+  }
+
+  const shortStays = room ? data.short_stays.filter(ss =>
+    ss.room_space && normRoom(ss.room_space) === normRoom(room)) : [];
+
+  return { parkings, fitness, lockers, shortStays };
+}
+
+function parseEntryName(entryName) {
+  if (!entryName) return { first: '', last: '' };
+  const parts = entryName.split(',').map(s => s.trim());
+  return parts.length >= 2
+    ? { last: parts[0], first: parts[1] }
+    : { last: entryName, first: '' };
+}
+
+function groupSearchResults(results, q) {
+  const map = new Map();
+
+  results.forEach(r => {
+    let key = '';
+    if (r.type === 'resident') {
+      key = 'res_' + normalize(r.data.room_space||'') + '_' + normalize(r.data.name_last||'') + '_' + normalize(r.data.name_first||'');
+    } else if (r.type === 'shortstay') {
+      key = 'ss_' + r.data.entry_id + '_' + r.data.room_space;
+    } else if (r.type === 'parking') {
+      key = 'pk_' + r.data.entry_id + '_' + r.data.name_last;
+    } else if (r.type === 'fitness') {
+      key = 'fit_' + r.data.entry_id;
+    } else if (r.type === 'locker') {
+      key = 'lk_' + r.data.entry_id + '_' + r.data.locker_number;
+    }
+    if (!map.has(key)) map.set(key, { mainType: r.type, rows: [r.data] });
+    else if (r.type === 'resident') map.get(key).rows.push(r.data);
+  });
+
+  const final = [];
+  map.forEach((val) => {
+    if (val.mainType === 'resident') {
+      const rows = val.rows.sort((a, b) => (b.contract_start||'').localeCompare(a.contract_start||''));
+      const primary = rows[0];
+      const subleases = [...new Set(
+        rows.map(r => (r.sublease_tenant||'').trim()).filter(s => s.length > 0)
+      )];
+      const enriched = { ...primary, sublease_tenants_all: subleases };
+      const accesses = findAccesses(primary);
+      final.push({ type: 'resident', data: enriched, ...accesses });
+    } else {
+      final.push({ type: val.mainType, data: val.rows[0] });
+    }
+  });
+
+  return final;
+}
+
+function renderSearchResults(grouped) {
+  const el = document.getElementById('search-results');
+
+  if (grouped.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="ico">🤷</div><p>Aucun résultat.</p></div>`;
+    return;
+  }
+
+  const total = grouped.length;
+  let html = `<div class="result-count">${total} résultat${total>1?'s':''} pour « <strong>${escHtml(document.getElementById('search-input').value)}</strong> »</div>`;
+
+  grouped.forEach(item => {
+    html += buildResultCard(item);
+  });
+
+  el.innerHTML = html;
+}
+
+function buildResultCard(item) {
+  const t = item.type;
+
+  if (t === 'resident') {
+    const r = item.data;
+    const name = ((r.name_first||'') + ' ' + (r.name_last||'')).trim();
+    const hasParking = item.parkings && item.parkings.length > 0;
+    const hasFitness = item.fitness && item.fitness.length > 0;
+    const hasLocker = item.lockers && item.lockers.length > 0;
+    const hasSublease = (r.sublease_tenants_all && r.sublease_tenants_all.length > 0) || r.sublease_tenant;
+    const hasShortStay = item.shortStays && item.shortStays.length > 0;
+
+    let parkingHtml = '', fitnessHtml = '', lockerHtml = '';
+
+    if (hasParking) {
+      parkingHtml = `<div class="res-section">
+        <div class="res-section-title">🚗 Parking</div>
+        ${item.parkings.map(p => `
+          <div class="res-field"><div class="res-field-lbl">Place</div><div class="res-field-val">${escHtml(p.parking_space)}</div></div>
+          ${p.license_plate ? `<div class="res-field"><div class="res-field-lbl">Plaque</div><div class="res-field-val highlight">${escHtml(p.license_plate)}</div></div>` : ''}
+          ${p.vehicle_make ? `<div class="res-field"><div class="res-field-lbl">Véhicule</div><div class="res-field-val muted">${escHtml(p.vehicle_make)}${p.vehicle_details?' — '+escHtml(p.vehicle_details):''}</div></div>` : ''}
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(p.date_start)} → ${fmt(p.date_end)}</div></div>
+        `).join('<hr style="border:none;border-top:1px dashed var(--rdz-border);margin:8px 0">')}
+      </div>`;
+    }
+    if (hasFitness) {
+      fitnessHtml = `<div class="res-section">
+        <div class="res-section-title">💪 Pass Fitness</div>
+        ${item.fitness.map(f => `
+          <div class="res-field"><div class="res-field-lbl">Type</div><div class="res-field-val">${escHtml(f.description)}</div></div>
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(f.start_date)} → ${fmt(f.end_date)}</div></div>
+        `).join('')}
+      </div>`;
+    }
+    if (hasLocker) {
+      lockerHtml = `<div class="res-section">
+        <div class="res-section-title">🔒 Casier</div>
+        ${item.lockers.map(l => `
+          <div class="res-field"><div class="res-field-lbl">Casier</div><div class="res-field-val highlight">${escHtml(l.locker_number)}</div></div>
+          <div class="res-field"><div class="res-field-lbl">Validité</div><div class="res-field-val muted">${fmt(l.date_start)} → ${fmt(l.date_end)}</div></div>
+        `).join('')}
+      </div>`;
+    }
+
+    const hasExtras = hasParking || hasFitness || hasLocker;
+
+    return `<div class="res-card" style="border-left-color:var(--rdz-red)">
+      <div class="res-card-header">
+        <div class="res-avatar">${initials(r.name_first, r.name_last)}</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(name)}</div>
+          <div class="res-room">${r.room_space ? '📍 ' + escHtml(r.room_space) : '<em style="color:#bbb">Chambre non précisée</em>'} · ${escHtml(r.room_type || '')}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-building">${escHtml(r.building)}</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(r.contract_start)} → ${fmt(r.contract_end)}</span>
+            ${hasParking ? '<span class="rbadge rbadge-parking">🚗 Parking</span>' : ''}
+            ${hasFitness ? '<span class="rbadge rbadge-fitness">💪 Fitness</span>' : ''}
+            ${hasLocker ? '<span class="rbadge rbadge-locker">🔒 Locker</span>' : ''}
+            ${hasSublease ? (r.sublease_tenants_all && r.sublease_tenants_all.length > 0
+              ? r.sublease_tenants_all.map(s => `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(s)}</span>`).join('')
+              : `<span class="rbadge rbadge-sublease">🔄 Sous-loc : ${escHtml(r.sublease_tenant)}</span>`) : ''}
+            ${hasShortStay ? '<span class="rbadge rbadge-shortstay">🛎 Court séjour en cours</span>' : ''}
+          </div>
+        </div>
+      </div>
+      ${hasExtras ? `<div class="res-grid">${parkingHtml}${fitnessHtml}${lockerHtml}</div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'shortstay') {
+    const ss = item.data;
+    return `<div class="res-card" style="border-left-color:#7f1d1d">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#7f1d1d">🛎</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(ss.entry_name)}</div>
+          <div class="res-room">📍 ${escHtml(ss.room_space||'—')} · Court séjour · ${escHtml(ss.building)}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-shortstay">Court séjour</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(ss.checkin_date)} → ${fmt(ss.checkout_date)}</span>
+            <span class="rbadge rbadge-type">${escHtml(ss.entry_status)}</span>
+          </div>
+        </div>
+      </div>
+      ${(ss.key_code || ss.notes || ss.email || ss.mobile) ? `
+      <div class="res-grid">
+        <div class="res-section">
+          <div class="res-section-title">Informations accès</div>
+          ${ss.key_code ? `<div class="res-field"><div class="res-field-lbl">Code clé</div><div class="res-field-val highlight">${escHtml(ss.key_code)}</div></div>` : ''}
+          ${ss.nb_guests ? `<div class="res-field"><div class="res-field-lbl">Nb. occupants</div><div class="res-field-val">${ss.nb_guests}</div></div>` : ''}
+          ${ss.group ? `<div class="res-field"><div class="res-field-lbl">Groupe</div><div class="res-field-val muted">${escHtml(ss.group)}</div></div>` : ''}
+          ${ss.email ? `<div class="res-field"><div class="res-field-lbl">Email</div><div class="res-field-val muted">${escHtml(ss.email)}</div></div>` : ''}
+          ${ss.mobile ? `<div class="res-field"><div class="res-field-lbl">Mobile</div><div class="res-field-val">${escHtml(ss.mobile)}</div></div>` : ''}
+          ${ss.notes ? `<div class="res-field"><div class="res-field-lbl">Notes</div><div class="res-field-val muted" style="font-size:11px">${escHtml(ss.notes)}</div></div>` : ''}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'parking') {
+    const p = item.data;
+    const name = ((p.name_first||'') + ' ' + (p.name_last||'')).trim();
+    return `<div class="res-card" style="border-left-color:#1e3a8a">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#1e3a8a">🚗</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(name)}</div>
+          <div class="res-room">🅿 ${escHtml(p.parking_space)} · ${p.parking_type === 'assigned' ? 'Place assignée' : 'Réservation en cours'}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-parking">Parking</span>
+            ${p.license_plate ? `<span class="rbadge" style="background:#eff6ff;color:#1e3a8a;font-size:11px;padding:4px 9px">${escHtml(p.license_plate)}</span>` : ''}
+            <span class="rbadge rbadge-contract">📅 ${fmt(p.date_start)} → ${fmt(p.date_end)}</span>
+          </div>
+        </div>
+      </div>
+      ${(p.vehicle_make || p.vehicle_details || p.alt_vehicle_info) ? `
+      <div class="res-grid">
+        <div class="res-section">
+          <div class="res-section-title">Informations véhicule</div>
+          ${p.vehicle_make ? `<div class="res-field"><div class="res-field-lbl">Marque / modèle</div><div class="res-field-val">${escHtml(p.vehicle_make)}</div></div>` : ''}
+          ${p.vehicle_details ? `<div class="res-field"><div class="res-field-lbl">Détails</div><div class="res-field-val muted">${escHtml(p.vehicle_details)}</div></div>` : ''}
+          ${p.alt_vehicle_info ? `<div class="res-field"><div class="res-field-lbl">Infos alt.</div><div class="res-field-val muted" style="font-size:11px;white-space:pre-wrap">${escHtml(p.alt_vehicle_info)}</div></div>` : ''}
+        </div>
+      </div>` : ''}
+    </div>`;
+  }
+
+  if (t === 'locker') {
+    const l = item.data;
+    return `<div class="res-card" style="border-left-color:#713f12">
+      <div class="res-card-header">
+        <div class="res-avatar" style="background:#713f12">🔒</div>
+        <div class="res-main">
+          <div class="res-name">${escHtml(l.entry_name)}</div>
+          <div class="res-room">🔒 ${escHtml(l.locker_number)} · ${escHtml(l.room_active||'—')}</div>
+          <div class="res-badges">
+            <span class="rbadge rbadge-locker">Casier</span>
+            <span class="rbadge rbadge-contract">📅 ${fmt(l.date_start)} → ${fmt(l.date_end)}</span>
+            <span class="rbadge rbadge-type">${escHtml(l.entry_status)}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return '';
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🔍</div><p>Entrez un nom, un numéro de chambre, une plaque ou un numéro de casier.</p><small>La recherche est partielle — « dup » trouve « Dupont »</small></div>`;
+}
+
+loadAll();
+</script>
+</body>
+</html>
