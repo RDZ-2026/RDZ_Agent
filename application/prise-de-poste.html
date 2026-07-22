@@ -81,7 +81,14 @@
   .stat-surveiller { background: #ffedd5; color: #9a3412; }
   .stat-transmis { background: #f3e8ff; color: #6b21a8; }
   .ct-desc { font-size: 12.5px; color: var(--rdz-black); line-height: 1.5; margin-bottom: 6px; white-space: pre-wrap; }
+  .ct-procedure { font-size: 11.5px; color: #92400e; background: #fffbeb; border-left: 3px solid #f59e0b; padding: 7px 10px; line-height: 1.5; border-radius: 0 2px 2px 0; margin-bottom: 6px; white-space: pre-wrap; }
+  .ct-procedure-lbl { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #92400e; margin-bottom: 3px; }
   .ct-meta { font-size: 10.5px; color: var(--rdz-gray); display: flex; flex-wrap: wrap; gap: 8px; }
+  .ct-journal { margin-top: 8px; border-top: 1px dashed var(--rdz-border); padding-top: 8px; }
+  .ct-journal-lbl { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rdz-gray); margin-bottom: 5px; }
+  .ct-journal-entry { display: flex; gap: 7px; font-size: 11.5px; color: var(--rdz-black); line-height: 1.5; margin-bottom: 5px; }
+  .ct-journal-entry:last-child { margin-bottom: 0; }
+  .ct-journal-date { flex-shrink: 0; font-size: 10px; font-weight: 700; color: #9a9a9a; white-space: nowrap; }
 
   .empty-sub { padding: 14px; font-size: 12px; color: #9a9a9a; font-style: italic; }
 
@@ -139,6 +146,12 @@ let sites = [];
 let consignes = [];
 let evenements = [];
 let constats = [];
+let journaux = {}; // constat_id -> [entrées]
+
+function typeIcon(t) {
+  const map = { 'note': '📝', 'reparation': '🔧', 'client': '📨', 'surveillance': '👁', 'cloture': '✅' };
+  return map[t] || '📝';
+}
 
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmt(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; }
@@ -166,17 +179,23 @@ function statBadge(s) {
 
 async function loadAll() {
   try {
-    const [{ data: s, error: se }, { data: c, error: ce }, { data: e, error: ee }, { data: k, error: ke }] = await Promise.all([
+    const [{ data: s, error: se }, { data: c, error: ce }, { data: e, error: ee }, { data: k, error: ke }, { data: j, error: je }] = await Promise.all([
       sb.from('sites').select('*').eq('actif', true).order('nom'),
       sb.from('consignes').select('*'),
       sb.from('evenements').select('*').order('heure_debut'),
-      sb.from('constats').select('*').order('date_rapport', { ascending: false })
+      sb.from('constats').select('*').order('date_rapport', { ascending: false }),
+      sb.from('constats_journal').select('*').order('date_entree', { ascending: false })
     ]);
-    if (se || ce || ee || ke) throw se || ce || ee || ke;
+    if (se || ce || ee || ke || je) throw se || ce || ee || ke || je;
     sites = s || [];
     consignes = c || [];
     evenements = e || [];
     constats = k || [];
+    journaux = {};
+    (j || []).forEach(entry => {
+      if (!journaux[entry.constat_id]) journaux[entry.constat_id] = [];
+      journaux[entry.constat_id].push(entry);
+    });
     buildSiteSelect();
     render();
   } catch (err) {
@@ -220,7 +239,10 @@ async function validateSite(siteId) {
 
   const consSnap = consList.map(c => ({ id: c.id, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
   const evSnap = evList.map(e => ({ id: e.id, titre: e.titre, heure_debut: e.heure_debut, heure_fin: e.heure_fin }));
-  const ctSnap = ctList.map(c => ({ id: c.id, description: c.description, categorie: c.categorie, statut: c.statut }));
+  const ctSnap = ctList.map(c => ({
+    id: c.id, description: c.description, categorie: c.categorie, statut: c.statut, procedure: c.procedure || null,
+    journal: (journaux[c.id] || []).map(j => ({ date_entree: j.date_entree, texte: j.texte, auteur: j.auteur }))
+  }));
 
   const btn = document.getElementById('valid-btn-' + siteId);
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
@@ -343,8 +365,9 @@ async function render() {
 
       <div class="sub-section">
         <div class="sub-hdr"><div class="sub-title">⚠️ Constats non résolus</div><div class="sub-count">${ctList.length}</div></div>
-        ${ctList.length === 0 ? '<div class="empty-sub">Aucun constat en cours.</div>' : ctList.map(c => `
-          <div class="ct-card">
+        ${ctList.length === 0 ? '<div class="empty-sub">Aucun constat en cours.</div>' : ctList.map(c => {
+          const journal = (journaux[c.id] || []);
+          return `<div class="ct-card">
             <div class="ct-top">
               <div class="ct-badges">
                 <span class="badge-cat">${escHtml(c.categorie || '—')}</span>
@@ -352,12 +375,23 @@ async function render() {
               </div>
             </div>
             <div class="ct-desc">${escHtml(c.description)}</div>
+            ${c.procedure ? `<div class="ct-procedure"><div class="ct-procedure-lbl">⚡ Procédure / Attitude</div>${escHtml(c.procedure)}</div>` : ''}
             <div class="ct-meta">
               <span>📅 ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</span>
               ${c.localisation ? `<span>📍 ${escHtml(c.localisation)}</span>` : ''}
               ${c.agent ? `<span>👤 ${escHtml(c.agent)}</span>` : ''}
             </div>
-          </div>`).join('')}
+            ${journal.length > 0 ? `
+            <div class="ct-journal">
+              <div class="ct-journal-lbl">📋 Journal de suivi (${journal.length})</div>
+              ${journal.map(j => `
+                <div class="ct-journal-entry">
+                  <span class="ct-journal-date">${typeIcon(j.type_entree)} ${fmt(j.date_entree)}</span>
+                  <span>${escHtml(j.texte)}${j.auteur ? ` <span style="color:#9a9a9a">— ${escHtml(j.auteur)}</span>` : ''}</span>
+                </div>`).join('')}
+            </div>` : ''}
+          </div>`;
+        }).join('')}
       </div>
 
       ${!isToday ? '' : (validation
