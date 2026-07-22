@@ -529,7 +529,7 @@ let deleteAgentId = null;
 
 // Nom complet affiché (le schéma existant sépare prénom et nom)
 function fullName(a) {
-  return [a.prenom, a.nom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
+  return [a.nom, a.prenom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
 }
 
 // Doit être identique au hash utilisé dans mobile.html
