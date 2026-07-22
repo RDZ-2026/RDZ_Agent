@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Prise de poste</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .filter-bar { background: #fff; border-bottom: 1px solid var(--rdz-border); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .filter-row { display: flex; align-items: center; gap: 10px; }
+  .filter-row label { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; width: 38px; }
+  .filter-row select, .filter-row input[type="date"] { flex: 1; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); }
+  .today-btn { background: var(--rdz-bg); border: 1px solid var(--rdz-border); color: var(--rdz-gray); font-size: 11px; font-weight: 700; padding: 8px 10px; border-radius: 2px; white-space: nowrap; }
+  .today-btn:active { background: #ebe9e6; }
+
+  .content { padding: 16px; padding-bottom: 40px; }
+  .state-msg { text-align: center; padding: 60px 20px; font-size: 13.5px; color: var(--rdz-gray); }
+  .state-msg .big { font-size: 32px; margin-bottom: 10px; }
+
+  .site-block { margin-bottom: 20px; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; background: #fff; }
+  .site-hdr { background: var(--rdz-black); padding: 10px 14px; }
+  .site-name { font-size: 12.5px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+
+  .sub-section { border-top: 1px solid var(--rdz-border); }
+  .sub-hdr { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; background: var(--rdz-bg); }
+  .sub-title { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); display: flex; align-items: center; gap: 6px; }
+  .sub-count { font-size: 10px; color: #9a9a9a; background: #fff; border: 1px solid var(--rdz-border); padding: 1px 7px; border-radius: 2px; }
+
+  /* CONSIGNES */
+  .cons-card { padding: 12px 14px; border-bottom: 1px solid var(--rdz-border); display: flex; gap: 9px; align-items: flex-start; }
+  .cons-card:last-child { border-bottom: none; }
+  .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #1e5c2e; margin-top: 5px; flex-shrink: 0; }
+  .cons-text { font-size: 13px; color: var(--rdz-black); line-height: 1.5; margin-bottom: 5px; white-space: pre-wrap; }
+  .cons-dates { display: flex; gap: 7px; flex-wrap: wrap; font-size: 10px; color: var(--rdz-gray); font-weight: 600; }
+  .badge-perm { font-size: 9px; background: #dbeafe; color: #1e3a5f; padding: 2px 6px; border-radius: 2px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+
+  /* EVENEMENTS */
+  .ev-card { padding: 12px 14px; border-bottom: 1px solid var(--rdz-border); display: flex; gap: 10px; }
+  .ev-card:last-child { border-bottom: none; }
+  .ev-time { flex-shrink: 0; width: 52px; text-align: center; font-size: 11px; font-weight: 700; color: var(--rdz-black); }
+  .ev-time .sep { color: #bbb; font-size: 9px; margin: 1px 0; }
+  .ev-title { font-size: 13px; font-weight: 700; color: var(--rdz-black); margin-bottom: 4px; }
+  .ev-meta { font-size: 10.5px; color: var(--rdz-gray); margin-bottom: 5px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .ev-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ebadge { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 2px; letter-spacing: .02em; }
+  .ebadge-agent { background: #fef9c3; color: #854d0e; }
+  .ebadge-info { background: #e8edf5; color: #1e3a5f; }
+  .ebadge-ok { background: #dcfce7; color: #166534; }
+  .ev-detail { margin-top: 6px; font-size: 11px; color: var(--rdz-gray); background: var(--rdz-bg); padding: 6px 8px; border-radius: 2px; line-height: 1.5; }
+  .ev-detail-lbl { font-weight: 700; color: var(--rdz-black); font-size: 9.5px; text-transform: uppercase; letter-spacing: .03em; display: block; margin-bottom: 2px; }
+
+  /* CONSTATS */
+  .ct-card { padding: 12px 14px; border-bottom: 1px solid var(--rdz-border); }
+  .ct-card:last-child { border-bottom: none; }
+  .ct-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .ct-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+  .badge-cat { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 2px; background: #e8edf5; color: #1e3a5f; letter-spacing: .02em; text-transform: uppercase; }
+  .badge-stat { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 2px; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
+  .stat-attente { background: #fef9c3; color: #854d0e; }
+  .stat-cours { background: #e8edf5; color: #1e3a5f; }
+  .stat-surveiller { background: #ffedd5; color: #9a3412; }
+  .stat-transmis { background: #f3e8ff; color: #6b21a8; }
+  .ct-desc { font-size: 12.5px; color: var(--rdz-black); line-height: 1.5; margin-bottom: 6px; white-space: pre-wrap; }
+  .ct-meta { font-size: 10.5px; color: var(--rdz-gray); display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .empty-sub { padding: 14px; font-size: 12px; color: #9a9a9a; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Prise de poste</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="filter-bar">
+  <div class="filter-row">
+    <label for="site-select">Site</label>
+    <select id="site-select" onchange="onFilterChange()">
+      <option value="">Chargement…</option>
+    </select>
+  </div>
+  <div class="filter-row">
+    <label for="date-select">Date</label>
+    <input type="date" id="date-select" onchange="onFilterChange()">
+    <button class="today-btn" onclick="goToday()">Aujourd'hui</button>
+  </div>
+</div>
+
+<div class="content" id="content">
+  <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const LS_SITE = 'rdz_agent_last_site';
+
+let sites = [];
+let consignes = [];
+let evenements = [];
+let constats = [];
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmt(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; }
+function fmtFull(d) {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+function isActive(c, ref) {
+  if (c.date_debut && c.date_debut > ref) return false;
+  if (c.date_fin && c.date_fin < ref) return false;
+  return true;
+}
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function statBadge(s) {
+  const map = {
+    'En attente': 'stat-attente',
+    'En cours': 'stat-cours',
+    'A surveiller': 'stat-surveiller',
+    'Transmis au client': 'stat-transmis'
+  };
+  return `<span class="badge-stat ${map[s] || 'stat-attente'}">${escHtml(s || '—')}</span>`;
+}
+
+async function loadAll() {
+  try {
+    const [{ data: s, error: se }, { data: c, error: ce }, { data: e, error: ee }, { data: k, error: ke }] = await Promise.all([
+      sb.from('sites').select('*').eq('actif', true).order('nom'),
+      sb.from('consignes').select('*'),
+      sb.from('evenements').select('*').order('heure_debut'),
+      sb.from('constats').select('*').order('date_rapport', { ascending: false })
+    ]);
+    if (se || ce || ee || ke) throw se || ce || ee || ke;
+    sites = s || [];
+    consignes = c || [];
+    evenements = e || [];
+    constats = k || [];
+    buildSiteSelect();
+    render();
+  } catch (err) {
+    document.getElementById('content').innerHTML =
+      `<div class="state-msg"><div class="big">⚠️</div>Impossible de charger les données.<br><small style="color:#9a9a9a">${err.message}</small></div>`;
+  }
+}
+
+function buildSiteSelect() {
+  const sel = document.getElementById('site-select');
+  if (sites.length === 0) {
+    sel.innerHTML = '<option value="">Aucun site actif</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="all">Tous les sites</option>' +
+    sites.map(s => `<option value="${s.id}">${escHtml(s.nom)}</option>`).join('');
+  const saved = localStorage.getItem(LS_SITE);
+  sel.value = (saved && (saved === 'all' || sites.some(s => s.id === saved))) ? saved : 'all';
+
+  if (!document.getElementById('date-select').value) {
+    document.getElementById('date-select').value = today();
+  }
+}
+
+function goToday() {
+  document.getElementById('date-select').value = today();
+  render();
+}
+
+function onFilterChange() {
+  localStorage.setItem(LS_SITE, document.getElementById('site-select').value);
+  render();
+}
+
+function render() {
+  const ref = document.getElementById('date-select').value || today();
+  const siteVal = document.getElementById('site-select').value;
+  const filteredSites = siteVal === 'all' ? sites : sites.filter(s => s.id === siteVal);
+  const el = document.getElementById('content');
+
+  if (filteredSites.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun site disponible.</div>`;
+    return;
+  }
+
+  let html = '';
+  let anySite = false;
+
+  filteredSites.forEach(site => {
+    const consList = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
+    const evList = evenements.filter(e => e.site_id === site.id && e.date === ref);
+    const ctList = constats.filter(c => c.site_id === site.id && c.statut !== 'Résolu');
+
+    if (consList.length === 0 && evList.length === 0 && ctList.length === 0) return;
+    anySite = true;
+
+    html += `<div class="site-block">
+      <div class="site-hdr"><div class="site-name">${escHtml(site.nom)}</div></div>
+
+      <div class="sub-section">
+        <div class="sub-hdr"><div class="sub-title">📋 Consignes actives</div><div class="sub-count">${consList.length}</div></div>
+        ${consList.length === 0 ? '<div class="empty-sub">Aucune consigne active.</div>' : consList.map(c => `
+          <div class="cons-card">
+            <div class="dot-green"></div>
+            <div>
+              <div class="cons-text">${escHtml(c.texte)}</div>
+              <div class="cons-dates">
+                <span>📅 Dès le ${fmt(c.date_debut)}</span>
+                ${c.date_fin ? `<span>⛔ Jusqu'au ${fmt(c.date_fin)}</span>` : `<span class="badge-perm">Permanente</span>`}
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="sub-section">
+        <div class="sub-hdr"><div class="sub-title">📅 Événements du jour</div><div class="sub-count">${evList.length}</div></div>
+        ${evList.length === 0 ? `<div class="empty-sub">Aucun événement le ${fmt(ref)}.</div>` : evList.map(e => {
+          const hasAgent = e.nb_agents > 0;
+          return `<div class="ev-card">
+            <div class="ev-time">
+              <div>${e.heure_debut ? e.heure_debut.slice(0,5) : '?:??'}</div>
+              <div class="sep">↓</div>
+              <div>${e.heure_fin ? e.heure_fin.slice(0,5) : '—'}</div>
+            </div>
+            <div style="flex:1">
+              <div class="ev-title">${escHtml(e.titre)}</div>
+              <div class="ev-meta">
+                ${e.lieu ? `<span>🚪 ${escHtml(e.lieu)}</span>` : ''}
+                ${e.contact ? `<span>📞 ${escHtml(e.contact)}</span>` : ''}
+              </div>
+              <div class="ev-badges">
+                ${hasAgent ? `<span class="ebadge ebadge-agent">👮 ${e.nb_agents} agent${e.nb_agents > 1 ? 's' : ''}</span>` : `<span class="ebadge ebadge-info">ℹ Info</span>`}
+                ${e.tenue ? `<span class="ebadge ebadge-info">👔 ${escHtml(e.tenue)}</span>` : ''}
+                ${e.agents ? `<span class="ebadge ebadge-ok">✓ ${escHtml(e.agents)}</span>` : ''}
+              </div>
+              ${(e.consignes || e.heure_service_debut || e.remarques) ? `
+              <div class="ev-detail">
+                ${e.heure_service_debut ? `<span class="ev-detail-lbl">Prise de service</span>${e.heure_service_debut.slice(0,5)}${e.heure_service_fin ? ' → ' + e.heure_service_fin.slice(0,5) : ''}<br>` : ''}
+                ${e.consignes ? `<span class="ev-detail-lbl">Consignes sécurité</span>${escHtml(e.consignes)}<br>` : ''}
+                ${e.remarques ? `<span class="ev-detail-lbl">Remarques</span>${escHtml(e.remarques)}` : ''}
+              </div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="sub-section">
+        <div class="sub-hdr"><div class="sub-title">⚠️ Constats non résolus</div><div class="sub-count">${ctList.length}</div></div>
+        ${ctList.length === 0 ? '<div class="empty-sub">Aucun constat en cours.</div>' : ctList.map(c => `
+          <div class="ct-card">
+            <div class="ct-top">
+              <div class="ct-badges">
+                <span class="badge-cat">${escHtml(c.categorie || '—')}</span>
+                ${statBadge(c.statut)}
+              </div>
+            </div>
+            <div class="ct-desc">${escHtml(c.description)}</div>
+            <div class="ct-meta">
+              <span>📅 ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</span>
+              ${c.localisation ? `<span>📍 ${escHtml(c.localisation)}</span>` : ''}
+              ${c.agent ? `<span>👤 ${escHtml(c.agent)}</span>` : ''}
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  });
+
+  if (!anySite) {
+    html = `<div class="state-msg"><div class="big">✅</div>Rien à signaler${siteVal !== 'all' ? ' pour ce site' : ''} le ${fmt(ref)}.</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+loadAll();
+</script>
+</body>
+</html>
