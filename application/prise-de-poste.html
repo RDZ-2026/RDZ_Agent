@@ -91,10 +91,6 @@
   .valid-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
   .valid-btn { display: block; width: calc(100% - 28px); margin: 4px 14px 14px; background: var(--rdz-red); color: #fff; border: none; padding: 12px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; }
   .valid-btn:active { background: var(--rdz-red-dark); }
-
-  /* VERROU */
-  .lock-block { padding: 22px 14px; text-align: center; color: #9a9a9a; font-size: 12.5px; background: #fafafa; }
-  .lock-block .big { font-size: 24px; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -219,7 +215,12 @@ async function validateSite(siteId) {
   const ref = document.getElementById('date-select').value || today();
   const site = sites.find(s => s.id === siteId);
   const consList = consignes.filter(c => c.site_id === siteId && isActive(c, ref));
-  const snapshot = consList.map(c => ({ id: c.id, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
+  const evList = evenements.filter(e => e.site_id === siteId && e.date === ref);
+  const ctList = constats.filter(c => c.site_id === siteId && c.statut !== 'Résolu');
+
+  const consSnap = consList.map(c => ({ id: c.id, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
+  const evSnap = evList.map(e => ({ id: e.id, titre: e.titre, heure_debut: e.heure_debut, heure_fin: e.heure_fin }));
+  const ctSnap = ctList.map(c => ({ id: c.id, description: c.description, categorie: c.categorie, statut: c.statut }));
 
   const btn = document.getElementById('valid-btn-' + siteId);
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
@@ -230,20 +231,20 @@ async function validateSite(siteId) {
     site_id: siteId,
     site_nom: site ? site.nom : '',
     date_lecture: ref,
-    consignes_json: snapshot,
-    nb_consignes: snapshot.length
+    consignes_json: consSnap,
+    nb_consignes: consSnap.length,
+    evenements_json: evSnap,
+    nb_evenements: evSnap.length,
+    constats_json: ctSnap,
+    nb_constats: ctSnap.length
   });
 
   if (error) {
     alert('Erreur lors de l\'enregistrement de la validation : ' + error.message);
-    if (btn) { btn.disabled = false; btn.textContent = "✓ J'ai lu et je valide les consignes"; }
+    if (btn) { btn.disabled = false; btn.textContent = "✓ J'ai pris connaissance de l'ensemble"; }
     return;
   }
   render();
-}
-
-function lockBlock(label) {
-  return `<div class="lock-block"><div class="big">🔒</div>Validez la lecture des consignes ci-dessus pour accéder ${label}.</div>`;
 }
 
 async function render() {
@@ -289,7 +290,6 @@ async function render() {
     anySite = true;
 
     const validation = validations[site.id];
-    const isLocked = isToday && !validation;
 
     html += `<div class="site-block">
       <div class="site-hdr"><div class="site-name">${escHtml(site.nom)}</div></div>
@@ -307,13 +307,8 @@ async function render() {
               </div>
             </div>
           </div>`).join('')}
-        ${!isToday ? '' : (validation
-          ? `<div class="valid-banner valid-ok">✓ Consignes validées à ${new Date(validation.validated_at).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'})} par ${escHtml(validation.agent_nom || AGENT_NOM)}</div>`
-          : `<div class="valid-banner valid-pending">⚠️ Lecture non encore validée pour aujourd'hui</div>
-             <button class="valid-btn" id="valid-btn-${site.id}" onclick="validateSite('${site.id}')">✓ J'ai lu et je valide les consignes</button>`)}
       </div>
 
-      ${isLocked ? lockBlock('aux événements et constats de ce site') : `
       <div class="sub-section">
         <div class="sub-hdr"><div class="sub-title">📅 Événements du jour</div><div class="sub-count">${evList.length}</div></div>
         ${evList.length === 0 ? `<div class="empty-sub">Aucun événement le ${fmt(ref)}.</div>` : evList.map(e => {
@@ -364,7 +359,11 @@ async function render() {
             </div>
           </div>`).join('')}
       </div>
-      `}
+
+      ${!isToday ? '' : (validation
+        ? `<div class="valid-banner valid-ok">✓ Prise de poste validée à ${new Date(validation.validated_at).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'})} par ${escHtml(validation.agent_nom || AGENT_NOM)}</div>`
+        : `<div class="valid-banner valid-pending">⚠️ Validation non encore effectuée pour aujourd'hui</div>
+           <button class="valid-btn" id="valid-btn-${site.id}" onclick="validateSite('${site.id}')">✓ J'ai pris connaissance de l'ensemble</button>`)}
     </div>`;
   });
 
