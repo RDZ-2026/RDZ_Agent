@@ -203,7 +203,7 @@ const MAIN_ITEMS = [
 const POSTE_ITEMS = [
   { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
   { icon: '🚗', name: 'Prise de véhicule', desc: "État, dégâts, assurance", href: 'fleet-agent.html' },
-  { icon: '📦', name: 'Matériel', desc: "Stocks, mouvements, état des articles", href: 'https://rdz-2026.github.io/RDZ_Agent/stocks-materiel/stock-terrain.html', external: true }
+  { icon: '📦', name: 'Matériel', desc: "Sortie matériel & clés, maintenance", href: 'materiel-agent.html' }
 ];
 
 let currentAgentName = '';
@@ -227,7 +227,7 @@ function renderMenu(nom) {
       <div class="menu-icon featured-icon">🟢</div>
       <div class="menu-txt">
         <div class="menu-name">Prise de poste</div>
-        <div class="menu-desc">Consignes, événements, constats, véhicule, matériel, feuille de route</div>
+        <div class="menu-desc">Consignes, événements, constats, véhicule, matériel</div>
       </div>
       <div class="menu-chevron">›</div>
     </a>`;
