@@ -79,6 +79,12 @@
   .occupant-pick:active { background: var(--rdz-bg); }
   .occupant-name { font-size: 13.5px; font-weight: 700; color: var(--rdz-black); }
   .occupant-tag { font-size: 10.5px; color: var(--rdz-gray); }
+
+  .person-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .person-chip { background: var(--rdz-bg); border: 1px solid var(--rdz-border); color: var(--rdz-black); font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 20px; cursor: pointer; font-family: Arial, sans-serif; }
+  .person-chip.on { background: var(--rdz-red); border-color: var(--rdz-red); color: #fff; }
+  .person-chip.other { background: #fff; border-style: dashed; color: var(--rdz-gray); }
+  .person-chip:active { opacity: .8; }
 </style>
 </head>
 <body>
@@ -130,11 +136,13 @@
     <div class="field-group">
       <label class="field-label">Identité de la personne</label>
       <input type="text" class="field-input" id="f-personne" placeholder="Nom Prénom" autocomplete="off">
+      <div id="person-alt-choices"></div>
     </div>
     <div class="field-group">
       <label class="field-label">Motif</label>
       <select class="field-select" id="f-motif">
         <option>Ouverture, carte oubliée</option>
+        <option>Ouverture, carte perdue, édition d'un nouveau badge</option>
         <option>Autre</option>
       </select>
     </div>
@@ -252,6 +260,9 @@ function pickOccupant(i) {
   }
   document.getElementById('room-search-results').innerHTML =
     `<div class="prefill-banner" style="margin-top:8px;margin-bottom:0">✓ <strong>${escHtml(c.name)}</strong> sélectionné(e) — vérifiez les champs ci-dessous.</div>`;
+
+  const choices = window._occupantCandidates.map(o => ({ name: o.name, label: o.type }));
+  renderPersonChips(choices, i);
 }
 
 function toast(msg) {
@@ -321,15 +332,56 @@ function applyPrefill() {
   const personne = params.get('personne');
   const localisation = params.get('localisation');
   const site = params.get('site');
+  const subleaseRaw = params.get('sublease');
 
   if (!personne && !localisation && !site) return;
 
-  if (personne) document.getElementById('f-personne').value = personne;
   if (localisation) document.getElementById('f-localisation').value = localisation;
   if (site) document.getElementById('site-select').value = site;
 
+  // Construit la liste des personnes possibles : locataire principal + sous-locataire(s) + tiers
+  const choices = [];
+  if (personne) choices.push({ name: personne, label: 'Locataire' });
+  if (subleaseRaw) {
+    subleaseRaw.split('|').map(s => s.trim()).filter(Boolean).forEach(s => {
+      if (!choices.some(c => c.name.toLowerCase() === s.toLowerCase())) {
+        choices.push({ name: s, label: 'Sous-locataire' });
+      }
+    });
+  }
+
+  if (choices.length > 0) document.getElementById('f-personne').value = choices[0].name;
+
+  renderPersonChips(choices, choices.length ? 0 : -1);
+
   document.getElementById('prefill-banner').innerHTML =
-    `<div class="prefill-banner">📋 Pré-rempli depuis la fiche de <strong>${personne || '—'}</strong>. Vérifiez les informations avant d'enregistrer.</div>`;
+    `<div class="prefill-banner">📋 Pré-rempli depuis la fiche résident. Vérifiez les informations, ou changez de personne ci-dessous si un tiers est autorisé.</div>`;
+}
+
+function renderPersonChips(choices, activeIndex) {
+  const el = document.getElementById('person-alt-choices');
+  let html = '<div class="person-chips">';
+  choices.forEach((c, i) => {
+    html += `<button type="button" class="person-chip${i === activeIndex ? ' on' : ''}" onclick="choosePersonChip(${i})">${escHtml(c.name)} <span style="opacity:.65">(${escHtml(c.label)})</span></button>`;
+  });
+  html += `<button type="button" class="person-chip other${activeIndex === -1 ? ' on' : ''}" onclick="choosePersonChip(-1)">✎ Autre / tiers autorisé</button>`;
+  html += '</div>';
+  el.innerHTML = html;
+  window._personChoices = choices;
+}
+
+function choosePersonChip(i) {
+  const choices = window._personChoices || [];
+  if (i === -1) {
+    document.getElementById('f-personne').value = '';
+    document.getElementById('f-personne').focus();
+    renderPersonChips(choices, -1);
+    return;
+  }
+  const c = choices[i];
+  if (!c) return;
+  document.getElementById('f-personne').value = c.name;
+  renderPersonChips(choices, i);
 }
 
 function initForm() {
@@ -425,6 +477,9 @@ async function saveOuverture() {
   photoDataUrl = null;
   renderPhotoZone();
   document.getElementById('prefill-banner').innerHTML = '';
+  document.getElementById('person-alt-choices').innerHTML = '';
+  document.getElementById('room-search-results').innerHTML = '';
+  document.getElementById('f-room-search').value = '';
   document.getElementById('f-personne').focus();
   loadTodayList();
 }

@@ -385,12 +385,13 @@ function buildingToSite(b) {
   const map = { 'REGM': 'IHEID - REGM', 'MDE': 'IHEID - MDE', 'BARTON': 'IHEID - Barton Pavillons' };
   return map[(b || '').toUpperCase()] || '';
 }
-function ouvertureLink(personne, localisation, building) {
+function ouvertureLink(personne, localisation, building, sublease) {
   const params = new URLSearchParams();
   if (personne) params.set('personne', personne);
   if (localisation) params.set('localisation', localisation);
   const site = buildingToSite(building);
   if (site) params.set('site', site);
+  if (sublease) params.set('sublease', sublease);
   return 'ouverture-agent.html?' + params.toString();
 }
 
@@ -460,7 +461,7 @@ function buildResultCard(item) {
         </div>
       </div>
       ${hasExtras ? `<div class="res-grid">${parkingHtml}${fitnessHtml}${lockerHtml}</div>` : ''}
-      <a class="ouverture-btn" href="${ouvertureLink(name, r.room_space, r.building)}">🔓 Générer une ouverture</a>
+      <a class="ouverture-btn" href="${ouvertureLink(name, r.room_space, r.building, (r.sublease_tenants_all && r.sublease_tenants_all.length ? r.sublease_tenants_all.join('|') : r.sublease_tenant))}">🔓 Générer une ouverture</a>
     </div>`;
   }
 
