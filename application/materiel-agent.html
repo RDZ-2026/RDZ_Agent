@@ -172,6 +172,9 @@ let cart=[]; // {kind:'materiel'|'acces', id, nom, icon, qty, max, item_type, si
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
 function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function normalizeName(s){
+  return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');
+}
 
 function goScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
@@ -208,8 +211,8 @@ async function init(){
 
     // Retrouver l'agent du module Stock correspondant à l'agent connecté
     const list=stockAgents.data||[];
-    const target=normalize(AGENT_NOM_SESSION);
-    STOCK_AGENT=list.find(a=>normalize(a.nom)===target) || null;
+    const target=normalizeName(AGENT_NOM_SESSION);
+    STOCK_AGENT=list.find(a=>normalizeName(a.nom)===target) || null;
 
     document.getElementById('agent-badge').textContent = '👤 '+(STOCK_AGENT ? STOCK_AGENT.nom : AGENT_NOM_SESSION);
   }catch(e){
@@ -481,42 +484,41 @@ function setEncoursFiltre(f){
 
 function drawEnCours(){
   const el=document.getElementById('encours-body');
-  const meNorm=normalize(currentAgent().nom);
+  const meNorm=normalizeName(currentAgent().nom);
 
-  let attrsShown = encoursFiltre==='mine' ? encoursData.attrs.filter(a=>normalize(a.agent_nom)===meNorm) : encoursData.attrs;
-  let accesShown = encoursFiltre==='mine' ? encoursData.acces.filter(a=>normalize(a.receptionnaire_nom||a.agent_nom)===meNorm) : encoursData.acces;
+  let attrsShown = encoursFiltre==='mine' ? encoursData.attrs.filter(a=>normalizeName(a.agent_nom)===meNorm) : encoursData.attrs;
+  let accesShown = encoursFiltre==='mine' ? encoursData.acces.filter(a=>normalizeName(a.receptionnaire_nom||a.agent_nom)===meNorm) : encoursData.acces;
 
   const rows=[];
   attrsShown.forEach(a=>{
     const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
     rows.push(`<div class="panier-item" style="align-items:flex-start;flex-wrap:wrap">
+      <input type="checkbox" class="ret-check" data-kind="materiel" data-id="${a.id}" data-mat="${a.materiel_id}" data-qty="${a.quantite}" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" onchange="onRetCheck(this)">
       <div class="pi-icon">📦</div>
       <div class="pi-info">
         <div class="pi-name">${esc(a.materiel_nom)} ${a.quantite>1?'×'+a.quantite:''}</div>
         <div class="pi-sub">👤 ${esc(a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_sortie)+')':'depuis '+ago(a.date_sortie)}</div>
         ${a.note?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.note)}</div>`:''}
-        <div id="ret-form-${a.id}" style="display:none;margin-top:8px">
-          <div class="chips" style="margin-bottom:8px">
+        <div id="ret-etat-${a.id}" style="display:none;margin-top:8px">
+          <div class="chips">
             <span class="chip sel" data-v="ok" onclick="selRetChip(this)">✅ Bon état</span>
             <span class="chip" data-v="defectueux" onclick="selRetChip(this)">⚠️ Défectueux</span>
             <span class="chip" data-v="hs" onclick="selRetChip(this)">🔴 Hors service</span>
           </div>
-          <button class="btn-add" style="width:100%;border-radius:2px;padding:9px" onclick="confirmReturnMateriel('${a.id}','${a.materiel_id}',${a.quantite})">Confirmer le retour</button>
         </div>
       </div>
-      <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="toggleRetForm('${a.id}')">↩️ Rendre</button>
     </div>`);
   });
   accesShown.forEach(a=>{
     const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
     rows.push(`<div class="panier-item" style="align-items:flex-start">
+      <input type="checkbox" class="ret-check" data-kind="acces" data-id="${a.id}" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" onchange="onRetCheck(this)">
       <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
       <div class="pi-info">
         <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
         <div class="pi-sub">👤 ${esc(a.receptionnaire_nom||a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
         ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
       </div>
-      <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="returnAcces('${a.id}')">↩️ Rendre</button>
     </div>`);
   });
 
@@ -529,46 +531,58 @@ function drawEnCours(){
     el.innerHTML=filterBar+`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours${encoursFiltre==='mine'?' pour vous':''} — tout est rentré.</div>`;
     return;
   }
-  el.innerHTML=filterBar+`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s)</div><div class="panier">${rows.join('')}</div>`;
+  el.innerHTML=filterBar
+    +`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s) — cochez ce qui revient</div>`
+    +`<div class="panier">${rows.join('')}</div>`
+    +`<button class="btn-submit" id="btn-ret-groupe" onclick="confirmReturnGroupe()" disabled style="opacity:.5">↩️ Confirmer le retour (0)</button>`;
 }
 
-function toggleRetForm(attrId){
-  const f=document.getElementById('ret-form-'+attrId);
-  if(f) f.style.display = f.style.display==='none' ? 'block' : 'none';
+function onRetCheck(cb){
+  if(cb.dataset.kind==='materiel'){
+    const etat=document.getElementById('ret-etat-'+cb.dataset.id);
+    if(etat) etat.style.display = cb.checked ? 'block' : 'none';
+  }
+  const n=document.querySelectorAll('.ret-check:checked').length;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled = n===0;
+  btn.style.opacity = n===0 ? '.5' : '1';
+  btn.textContent = `↩️ Confirmer le retour (${n})`;
 }
+
+async function confirmReturnGroupe(){
+  const checks=[...document.querySelectorAll('.ret-check:checked')];
+  if(!checks.length)return;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  const ag=currentAgent();
+  let ok=0, fail=0;
+  for(const cb of checks){
+    try{
+      if(cb.dataset.kind==='materiel'){
+        const attrId=cb.dataset.id, materielId=cb.dataset.mat, qty=parseInt(cb.dataset.qty);
+        const etat=document.querySelector(`#ret-etat-${attrId} .chip.sel`)?.dataset.v || 'ok';
+        if(etat!=='hs'){
+          const {data:item}=await sb.from('stock_materiel_items').select('quantite_dispo').eq('id',materielId).single();
+          if(item) await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo+qty}).eq('id',materielId);
+        }
+        await sb.from('stock_attributions').update({statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat}).eq('id',attrId);
+        if(etat==='hs'){
+          const attr=encoursData.attrs.find(a=>a.id===attrId);
+          await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
+        }
+      } else {
+        await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',cb.dataset.id);
+      }
+      ok++;
+    }catch(e){ fail++; console.warn(e.message); }
+  }
+  toast(fail ? `📥 ${ok} retour(s) enregistré(s), ${fail} échec(s)` : `📥 ${ok} retour(s) enregistré(s)`, fail?'err':'ok');
+  renderEnCours();
+}
+
 function selRetChip(el){
   el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
-}
-
-async function confirmReturnMateriel(attrId, materielId, qty){
-  const form=document.getElementById('ret-form-'+attrId);
-  const etat=form.querySelector('.chip.sel')?.dataset.v || 'ok';
-  const ag=currentAgent();
-  try{
-    if(etat!=='hs'){
-      const {data:item}=await sb.from('stock_materiel_items').select('quantite_dispo').eq('id',materielId).single();
-      if(item) await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo+qty}).eq('id',materielId);
-    }
-    await sb.from('stock_attributions').update({statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat}).eq('id',attrId);
-    if(etat==='hs'){
-      const attr=encoursData.attrs.find(a=>a.id===attrId);
-      await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
-    }
-    // Pas de stock_log : la table stock_attributions sert déjà de trace complète
-    toast('📥 Retour enregistré');
-    renderEnCours();
-  }catch(e){ toast('❌ '+e.message,'err'); }
-}
-
-async function returnAcces(accesId){
-  const ag=currentAgent();
-  try{
-    await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',accesId);
-    // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
-    toast('↩️ Clé/badge rendu');
-    renderEnCours();
-  }catch(e){ toast('❌ '+e.message,'err'); }
 }
 
 init();
