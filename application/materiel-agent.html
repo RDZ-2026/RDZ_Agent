@@ -413,7 +413,7 @@ async function doMaint(){
   }
 }
 
-// ═══ EN COURS (lecture seule) ═══
+// ═══ EN COURS (avec réintégration possible par n'importe quel agent) ═══
 function ago(d){
   const m=Math.floor((Date.now()-new Date(d))/60000);
   if(m<1)return 'à l\'instant';
@@ -421,45 +421,104 @@ function ago(d){
   if(m<1440)return Math.floor(m/60)+' h';
   return Math.floor(m/1440)+' j';
 }
+let encoursData={attrs:[],acces:[]};
+
 async function renderEnCours(){
   const el=document.getElementById('encours-body');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>';
   try{
-    const [{data:attrs},{data:acces}]=await Promise.all([
+    const [{data:attrs,error:e1},{data:acces,error:e2}]=await Promise.all([
       sb.from('stock_attributions').select('*').eq('statut','actif').order('date_sortie',{ascending:false}),
       sb.from('stock_acces').select('*').eq('statut','actif').order('date_remise',{ascending:false})
     ]);
-    const rows=[];
-    (attrs||[]).forEach(a=>{
-      const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
-      rows.push(`<div class="panier-item" style="align-items:flex-start">
-        <div class="pi-icon">📦</div>
-        <div class="pi-info">
-          <div class="pi-name">${esc(a.materiel_nom)} ${a.quantite>1?'×'+a.quantite:''}</div>
-          <div class="pi-sub">👤 ${esc(a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_sortie)+')':'depuis '+ago(a.date_sortie)}</div>
-          ${a.note?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.note)}</div>`:''}
-        </div>
-      </div>`);
-    });
-    (acces||[]).forEach(a=>{
-      const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
-      rows.push(`<div class="panier-item" style="align-items:flex-start">
-        <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
-        <div class="pi-info">
-          <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
-          <div class="pi-sub">👤 ${esc(a.receptionnaire_nom||a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
-          ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
-        </div>
-      </div>`);
-    });
-    if(!rows.length){
-      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours — tout est rentré.</div>';
-      return;
-    }
-    el.innerHTML=`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s)</div><div class="panier">${rows.join('')}</div>`;
+    if(e1||e2) throw (e1||e2);
+    encoursData.attrs=attrs||[];
+    encoursData.acces=acces||[];
+    drawEnCours();
   }catch(e){
-    el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⚠️ Erreur de chargement.</div>';
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⚠️ Erreur de chargement.<br><small>${esc(e.message||String(e))}</small></div>`;
   }
+}
+
+function drawEnCours(){
+  const el=document.getElementById('encours-body');
+  const rows=[];
+  encoursData.attrs.forEach(a=>{
+    const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
+    rows.push(`<div class="panier-item" style="align-items:flex-start;flex-wrap:wrap">
+      <div class="pi-icon">📦</div>
+      <div class="pi-info">
+        <div class="pi-name">${esc(a.materiel_nom)} ${a.quantite>1?'×'+a.quantite:''}</div>
+        <div class="pi-sub">👤 ${esc(a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_sortie)+')':'depuis '+ago(a.date_sortie)}</div>
+        ${a.note?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.note)}</div>`:''}
+        <div id="ret-form-${a.id}" style="display:none;margin-top:8px">
+          <div class="chips" style="margin-bottom:8px">
+            <span class="chip sel" data-v="ok" onclick="selRetChip(this)">✅ Bon état</span>
+            <span class="chip" data-v="defectueux" onclick="selRetChip(this)">⚠️ Défectueux</span>
+            <span class="chip" data-v="hs" onclick="selRetChip(this)">🔴 Hors service</span>
+          </div>
+          <button class="btn-add" style="width:100%;border-radius:2px;padding:9px" onclick="confirmReturnMateriel('${a.id}','${a.materiel_id}',${a.quantite})">Confirmer le retour</button>
+        </div>
+      </div>
+      <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="toggleRetForm('${a.id}')">↩️ Rendre</button>
+    </div>`);
+  });
+  encoursData.acces.forEach(a=>{
+    const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
+    rows.push(`<div class="panier-item" style="align-items:flex-start">
+      <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
+      <div class="pi-info">
+        <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
+        <div class="pi-sub">👤 ${esc(a.receptionnaire_nom||a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
+        ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
+      </div>
+      <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="returnAcces('${a.id}')">↩️ Rendre</button>
+    </div>`);
+  });
+  if(!rows.length){
+    el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours — tout est rentré.</div>';
+    return;
+  }
+  el.innerHTML=`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s)</div><div class="panier">${rows.join('')}</div>`;
+}
+
+function toggleRetForm(attrId){
+  const f=document.getElementById('ret-form-'+attrId);
+  if(f) f.style.display = f.style.display==='none' ? 'block' : 'none';
+}
+function selRetChip(el){
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+async function confirmReturnMateriel(attrId, materielId, qty){
+  const form=document.getElementById('ret-form-'+attrId);
+  const etat=form.querySelector('.chip.sel')?.dataset.v || 'ok';
+  const ag=currentAgent();
+  try{
+    if(etat!=='hs'){
+      const {data:item}=await sb.from('stock_materiel_items').select('quantite_dispo').eq('id',materielId).single();
+      if(item) await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo+qty}).eq('id',materielId);
+    }
+    await sb.from('stock_attributions').update({statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat}).eq('id',attrId);
+    if(etat==='hs'){
+      const attr=encoursData.attrs.find(a=>a.id===attrId);
+      await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
+    }
+    await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'retour',p_agent_nom:ag.nom,p_article_nom:'',p_quantite:qty,p_note:'état:'+etat,p_par:'Terrain'});
+    toast('📥 Retour enregistré');
+    renderEnCours();
+  }catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+async function returnAcces(accesId){
+  const ag=currentAgent();
+  try{
+    await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',accesId);
+    await sb.rpc('stock_log',{p_module:'acces',p_type_op:'retour',p_agent_nom:ag.nom,p_article_nom:'',p_par:'Terrain'});
+    toast('↩️ Clé/badge rendu');
+    renderEnCours();
+  }catch(e){ toast('❌ '+e.message,'err'); }
 }
 
 init();
