@@ -230,7 +230,7 @@ function onDateChange() {
 
 function renderSheetsList() {
   const date = document.getElementById('date-picker').value || todayStr();
-  const sheets = getInstancesForDate(date);
+  const sheets = getInstancesForDate(date).slice().sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
   const el = document.getElementById('sheets-list');
 
   if (sheets.length === 0) {
