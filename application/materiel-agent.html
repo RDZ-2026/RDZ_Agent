@@ -49,6 +49,13 @@ button,input,select,textarea{font-family:inherit}
 .btn-add{flex-shrink:0;background:var(--anth);color:#fff;border:none;border-radius:2px;padding:0 16px;font-size:18px;cursor:pointer}
 
 .sec-lbl{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px}
+
+.section-box{background:var(--white);border:1px solid var(--border);border-radius:2px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
+.section-box-title{font-size:11px;font-weight:800;letter-spacing:.05em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.section-mat{border-left:4px solid var(--anth)}
+.section-mat .section-box-title{color:var(--anth);border-bottom-color:var(--anth)}
+.section-acc{border-left:4px solid var(--red)}
+.section-acc .section-box-title{color:var(--red);border-bottom-color:var(--red)}
 .panier{background:var(--white);border:1px solid var(--border);border-radius:2px;box-shadow:var(--sh);min-height:50px}
 .panier-empty{padding:16px;text-align:center;color:var(--text3);font-size:12.5px}
 .panier-item{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)}
@@ -225,7 +232,8 @@ async function renderSortie(){
   document.getElementById('sortie-body').innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>`;
   await refreshCatalogs();
   document.getElementById('sortie-body').innerHTML=`
-    <div class="fg">
+    <div class="section-box section-mat">
+      <div class="section-box-title">📦 MATÉRIEL</div>
       <label class="fl">🔍 Filtrer le matériel</label>
       <input class="fi" id="flt-mat" placeholder="Tapez un nom…" oninput="fillMatSelect()">
       <div class="add-row" style="margin-top:8px">
@@ -233,8 +241,9 @@ async function renderSortie(){
         <button class="btn-add" onclick="addMat()">➕</button>
       </div>
     </div>
-    <div class="fg">
-      <label class="fl">📍 Filtrer par site (clés/badges)</label>
+    <div class="section-box section-acc">
+      <div class="section-box-title">🔑 CLÉS / BADGES</div>
+      <label class="fl">📍 Filtrer par site</label>
       <select class="fi" id="flt-site" onchange="fillAccesSelect()">
         <option value="">Tous les sites</option>
         ${accesSites.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join('')}
@@ -304,26 +313,37 @@ function removeCart(i){cart.splice(i,1);renderPanier();}
 
 function renderPanier(){
   const el=document.getElementById('panier');
-  if(!cart.length){el.innerHTML='<div class="panier-empty">Panier vide — ajoutez du matériel ou une clé/badge ci-dessus</div>';return;}
-  el.innerHTML=cart.map((c,i)=>{
-    if(c.kind==='materiel'){
-      return `<div class="panier-item">
-        <div class="pi-icon">${c.icon}</div>
-        <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">Matériel · max ${c.max}</div></div>
-        <div class="pi-qty">
-          <button class="pi-qbtn" onclick="chQty(${i},-1)">−</button>
-          <div class="pi-qval">${c.qty}</div>
-          <button class="pi-qbtn" onclick="chQty(${i},1)">+</button>
-        </div>
-        <button class="pi-del" onclick="removeCart(${i})">✕</button>
-      </div>`;
-    }
+  const mats=cart.map((c,i)=>({...c,i})).filter(c=>c.kind==='materiel');
+  const accs=cart.map((c,i)=>({...c,i})).filter(c=>c.kind==='acces');
+
+  function rowMat(c){
+    return `<div class="panier-item">
+      <div class="pi-icon">${c.icon}</div>
+      <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">max ${c.max}</div></div>
+      <div class="pi-qty">
+        <button class="pi-qbtn" onclick="chQty(${c.i},-1)">−</button>
+        <div class="pi-qval">${c.qty}</div>
+        <button class="pi-qbtn" onclick="chQty(${c.i},1)">+</button>
+      </div>
+      <button class="pi-del" onclick="removeCart(${c.i})">✕</button>
+    </div>`;
+  }
+  function rowAcc(c){
     return `<div class="panier-item">
       <div class="pi-icon">${c.icon}</div>
       <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">${c.item_type==='badge'?'Badge':'Clé'}${c.site_nom?' · '+esc(c.site_nom):''}</div></div>
-      <button class="pi-del" onclick="removeCart(${i})">✕</button>
+      <button class="pi-del" onclick="removeCart(${c.i})">✕</button>
     </div>`;
-  }).join('');
+  }
+
+  if(!cart.length){ el.innerHTML='<div class="panier-empty">Panier vide — ajoutez du matériel ou une clé/badge ci-dessus</div>'; return; }
+
+  el.innerHTML=`
+    <div style="background:var(--anth);color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px">📦 Matériel${mats.length?' ('+mats.length+')':''}</div>
+    ${mats.length?mats.map(rowMat).join(''):'<div class="panier-empty" style="font-size:11.5px">Aucun matériel ajouté</div>'}
+    <div style="background:var(--anth);color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px">🔑 Clés / Badges${accs.length?' ('+accs.length+')':''}</div>
+    ${accs.length?accs.map(rowAcc).join(''):'<div class="panier-empty" style="font-size:11.5px">Aucune clé/badge ajoutée</div>'}
+  `;
 }
 
 async function doSortie(){
@@ -435,6 +455,7 @@ function ago(d){
   return Math.floor(m/1440)+' j';
 }
 let encoursData={attrs:[],acces:[]};
+let encoursFiltre='mine';
 
 async function renderEnCours(){
   const el=document.getElementById('encours-body');
@@ -453,10 +474,20 @@ async function renderEnCours(){
   }
 }
 
+function setEncoursFiltre(f){
+  encoursFiltre=f;
+  drawEnCours();
+}
+
 function drawEnCours(){
   const el=document.getElementById('encours-body');
+  const meNorm=normalize(currentAgent().nom);
+
+  let attrsShown = encoursFiltre==='mine' ? encoursData.attrs.filter(a=>normalize(a.agent_nom)===meNorm) : encoursData.attrs;
+  let accesShown = encoursFiltre==='mine' ? encoursData.acces.filter(a=>normalize(a.receptionnaire_nom||a.agent_nom)===meNorm) : encoursData.acces;
+
   const rows=[];
-  encoursData.attrs.forEach(a=>{
+  attrsShown.forEach(a=>{
     const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
     rows.push(`<div class="panier-item" style="align-items:flex-start;flex-wrap:wrap">
       <div class="pi-icon">📦</div>
@@ -476,7 +507,7 @@ function drawEnCours(){
       <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="toggleRetForm('${a.id}')">↩️ Rendre</button>
     </div>`);
   });
-  encoursData.acces.forEach(a=>{
+  accesShown.forEach(a=>{
     const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
     rows.push(`<div class="panier-item" style="align-items:flex-start">
       <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
@@ -488,11 +519,17 @@ function drawEnCours(){
       <button class="pi-del" style="font-size:12px;font-weight:700;color:var(--red);white-space:nowrap" onclick="returnAcces('${a.id}')">↩️ Rendre</button>
     </div>`);
   });
+
+  const filterBar = `<div class="chips" style="margin-bottom:14px">
+    <span class="chip${encoursFiltre==='mine'?' sel':''}" onclick="setEncoursFiltre('mine')">👤 Mes articles</span>
+    <span class="chip${encoursFiltre==='all'?' sel':''}" onclick="setEncoursFiltre('all')">👥 Tous</span>
+  </div>`;
+
   if(!rows.length){
-    el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours — tout est rentré.</div>';
+    el.innerHTML=filterBar+`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours${encoursFiltre==='mine'?' pour vous':''} — tout est rentré.</div>`;
     return;
   }
-  el.innerHTML=`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s)</div><div class="panier">${rows.join('')}</div>`;
+  el.innerHTML=filterBar+`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s)</div><div class="panier">${rows.join('')}</div>`;
 }
 
 function toggleRetForm(attrId){
