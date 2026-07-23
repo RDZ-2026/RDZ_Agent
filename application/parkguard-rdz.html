@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ParkGuard RDZ">
+<meta name="theme-color" content="#D0021B">
+<title>ParkGuard RDZ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --red:#D0021B;--red-dark:#A80016;--red-light:#FFF0F1;
+  --black:#111;--gray-dark:#444;--gray-mid:#888;
+  --gray-light:#F4F4F4;--gray-border:#E2E2E2;--white:#FFF;
+  --green:#1A7A4A;--green-light:#EDF7F2;
+  --amber:#B45309;--amber-light:#FFFBEB;
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-light);color:var(--black)}
+#app{height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;background:var(--white);overflow:hidden}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
+
+.topbar{background:var(--white);border-bottom:1px solid var(--gray-border);padding:0 16px;height:56px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-logo{font-size:18px;font-weight:900;letter-spacing:-.5px;color:var(--black)}
+.topbar-logo span{color:var(--red)}
+.topbar-title{font-size:15px;font-weight:600;flex:1}
+.topbar-sub{font-size:11px;color:var(--gray-mid);margin-top:1px}
+.back-btn{background:none;border:none;cursor:pointer;padding:8px;margin-left:-8px;color:var(--red);font-size:26px;line-height:1;display:flex;align-items:center}
+
+.sync-banner{padding:7px 16px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sync-banner.offline{background:var(--amber-light);color:var(--amber)}
+.sync-banner.online{background:var(--green-light);color:var(--green)}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-banner.offline .sync-dot{background:var(--amber)}
+.sync-banner.online .sync-dot{background:var(--green)}
+
+.content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.bottom-bar{padding:12px 16px;background:var(--white);border-top:1px solid var(--gray-border);flex-shrink:0}
+.topbar-btn{background:var(--red);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.topbar-btn:disabled{background:var(--gray-border);color:var(--gray-mid);cursor:not-allowed}
+.topbar-btn.green{background:var(--green)}
+.topbar-btn.gray{background:var(--gray-dark)}
+.topbar-btn.blue{background:#1d4ed8}
+
+.card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:border-color .15s}
+.card:active{border-color:var(--gray-mid)}
+.card-icon{width:42px;height:42px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:var(--gray-light)}
+.card-icon.red{background:var(--red-light)}
+.card-name{font-size:14px;font-weight:600}
+.card-meta{font-size:12px;color:var(--gray-mid);margin-top:2px}
+.card-arrow{color:var(--gray-mid);font-size:20px;margin-left:auto;flex-shrink:0}
+
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0;white-space:nowrap}
+.badge-red{background:var(--red-light);color:var(--red-dark)}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-gray{background:var(--gray-light);color:var(--gray-dark)}
+
+.section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:20px}
+.section-label:first-child{margin-top:0}
+
+.action-btn{border:none;border-radius:var(--radius);padding:18px 20px;width:100%;display:flex;align-items:center;gap:16px;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;text-align:left}
+.action-btn:active{opacity:.82}
+.action-btn-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.action-btn-label{font-size:17px;font-weight:700}
+.action-btn-sub{font-size:12px;opacity:.8;margin-top:3px}
+.btn-inf{background:var(--red);color:var(--white)}
+.btn-aut{background:var(--green);color:var(--white)}
+
+.progress-wrap{height:3px;background:var(--gray-light);border-radius:3px;margin-bottom:20px}
+.progress-fill{height:3px;background:var(--red);border-radius:3px;transition:width .3s}
+.progress-fill.green{background:var(--green)}
+
+.step-eyebrow{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.step-eyebrow.green{color:var(--green)}
+.step-title{font-size:20px;font-weight:800;margin-bottom:6px}
+.step-sub{font-size:14px;color:var(--gray-dark);line-height:1.5;margin-bottom:20px}
+
+.photo-zone{border:2px dashed var(--gray-border);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;margin-bottom:14px;position:relative;overflow:hidden}
+.photo-zone:active{border-color:var(--red)}
+.photo-zone.taken{border-style:solid;border-color:var(--green);padding:0}
+.photo-zone.taken img{width:100%;height:160px;object-fit:cover;border-radius:10px;display:block}
+.photo-zone-inner{display:flex;flex-direction:column;align-items:center;gap:8px}
+.photo-zone-icon{font-size:36px}
+.photo-zone-label{font-size:14px;font-weight:600}
+.photo-zone-sub{font-size:12px;color:var(--gray-mid)}
+.photo-taken-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(26,122,74,.88);padding:8px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:white}
+.photo-retake{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:white;border:none;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer}
+
+.field-group{margin-bottom:14px}
+.field-label{font-size:11px;font-weight:700;color:var(--gray-dark);margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.05em}
+.field-input{width:100%;padding:12px 14px;font-size:16px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);color:var(--black);font-family:inherit;transition:border-color .15s}
+.field-input:focus{outline:none;border-color:var(--red)}
+.field-select{width:100%;padding:12px 14px;font-size:15px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);color:var(--black);font-family:inherit;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+
+.primary-btn{width:100%;padding:15px;font-size:16px;font-weight:700;background:var(--red);color:var(--white);border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit;transition:opacity .15s}
+.primary-btn:disabled{background:var(--gray-border);color:var(--gray-mid);cursor:not-allowed}
+.primary-btn:not(:disabled):active{opacity:.85}
+.primary-btn.green{background:var(--green)}
+
+.outline-btn{width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--white);color:var(--black);border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:border-color .15s}
+.outline-btn:active{border-color:var(--gray-mid)}
+.outline-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.vehicle-row{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.vehicle-plate{font-size:14px;font-weight:700;font-family:'Courier New',monospace;flex:1;letter-spacing:.05em}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-box{background:var(--gray-light);border-radius:var(--radius-sm);padding:14px}
+.stat-val{font-size:28px;font-weight:800}
+.stat-val.red{color:var(--red)}
+.stat-val.green{color:var(--green)}
+.stat-lbl{font-size:12px;color:var(--gray-mid);margin-top:2px}
+
+.recap-check{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-light);font-size:14px}
+.recap-icon{font-size:20px;flex-shrink:0}
+
+.agent-chip{background:var(--gray-light);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;color:var(--black)}
+.agent-chip.active{background:var(--red);color:var(--white)}
+
+.db-ok{background:var(--green-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-err{background:var(--red-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-warn{background:var(--amber-light);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px}
+.db-icon{font-size:24px;flex-shrink:0}
+.db-label{font-size:14px;font-weight:700}
+.db-sub{font-size:12px;margin-top:2px}
+
+.ia-vehicle-card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px}
+.ia-vehicle-card.inf{border-left:3px solid var(--red)}
+.ia-vehicle-card.aut{border-left:3px solid var(--green)}
+.ia-plate{font-size:18px;font-weight:800;font-family:'Courier New',monospace;letter-spacing:.08em}
+.ia-details{font-size:12px;color:var(--gray-mid);margin-top:4px}
+.ia-conf{font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px}
+.ia-conf.ok{background:var(--green-light);color:var(--green)}
+.ia-conf.nok{background:var(--amber-light);color:var(--amber)}
+
+.rdz-bar{background:var(--black);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px}
+.rdz-bar-logo{font-size:16px;font-weight:900;color:var(--white);letter-spacing:.05em}
+.rdz-bar-logo span{color:var(--red)}
+.rdz-bar-sub{font-size:11px;color:#666}
+.rdz-bar-back{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;font-weight:700;padding:6px 11px;border-radius:6px;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.rdz-bar-back:active{background:rgba(255,255,255,.25)}
+
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--black);color:var(--white);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+input[type="file"]{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════ SÉLECTION AGENT ══════ -->
+<div id="s-select-agent" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-home')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title">Qui êtes-vous ?</div>
+      <div class="topbar-sub">Identification</div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow">RDZ Security Management SA</div>
+    <div class="step-title" style="margin-bottom:8px">Qui êtes-vous ?</div>
+    <div class="step-sub">Sélectionnez votre nom pour commencer la ronde.</div>
+    <div id="agents-list-home">
+      <div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Chargement...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ HOME ══════ -->
+<div id="s-home" class="screen active">
+  <div class="rdz-bar">
+    <a class="rdz-bar-back" href="mobile.html">‹ Retour</a>
+    <div style="text-align:right"><div class="rdz-bar-logo">PARK<span>GUARD</span></div><div class="rdz-bar-sub">RDZ Security</div></div>
+    <div id="home-sync-badge" class="badge badge-amber">● Hors ligne</div>
+  </div>
+  <div id="home-sync-banner" class="sync-banner offline">
+    <div class="sync-dot"></div><span id="home-sync-text">Hors ligne — données sauvegardées localement</span>
+  </div>
+  <div class="content">
+    <div class="section-label">Choisir un site</div>
+    <div id="sites-list-home">
+      <div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Chargement des sites...</div>
+    </div>
+    <div id="active-round-wrap" style="display:none">
+      <div class="section-label">Ronde en cours</div>
+      <div class="card" onclick="showScreen('s-round')">
+        <div class="card-icon red">🅿️</div>
+        <div><div class="card-name" id="active-round-name">—</div><div class="card-meta" id="active-round-meta">Ronde en cours</div></div>
+        <div class="card-arrow">›</div>
+      </div>
+    </div>
+    <div id="pending-info" style="font-size:12px;color:var(--gray-mid);text-align:center;margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- ══════ RONDE ══════ -->
+<div id="s-round" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="confirmEndRound()">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title" id="round-site-name">—</div>
+      <div class="topbar-sub" id="round-sub">Ronde en cours</div>
+    </div>
+    <button onclick="confirmEndRound()" style="background:var(--red);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:700;padding:7px 14px;border-radius:var(--radius-sm)">Terminer ›</button>
+  </div>
+  <div class="content">
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-val red" id="r-inf">0</div><div class="stat-lbl">Infractions</div></div>
+      <div class="stat-box"><div class="stat-val green" id="r-aut">0</div><div class="stat-lbl">Autorisés</div></div>
+    </div>
+    <p style="font-size:14px;color:var(--gray-dark);margin-bottom:16px;font-weight:500">Statut du prochain véhicule :</p>
+    <button id="btn-infraction" class="action-btn btn-inf" onclick="startFlow('infraction')">
+      <div class="action-btn-icon">⚠️</div>
+      <div><div class="action-btn-label">Infraction</div><div class="action-btn-sub">B31A · B37A · Sans macaron</div></div>
+    </button>
+    <button id="btn-autorise" class="action-btn btn-aut" onclick="startFlow('autorise')">
+      <div class="action-btn-icon">✅</div>
+      <div><div class="action-btn-label">Autorisé</div><div class="action-btn-sub">Macaron valide</div></div>
+    </button>
+    <button id="btn-parking-vide" class="action-btn" style="background:var(--gray-light);color:var(--black)" onclick="showScreen('s-parking-vide')">
+      <div class="action-btn-icon" style="background:rgba(0,0,0,0.08)">🅿️</div>
+      <div><div class="action-btn-label">Parking vide</div><div class="action-btn-sub" style="color:var(--gray-dark)">Aucun véhicule — photo(s) de preuve</div></div>
+    </button>
+    <button id="btn-comptage" class="action-btn" style="background:#1d4ed8;color:#fff;display:none" onclick="showComptageScreen()">
+      <div class="action-btn-icon" style="background:rgba(255,255,255,0.2)">🔢</div>
+      <div><div class="action-btn-label">Relevé de comptage</div><div class="action-btn-sub" style="color:rgba(255,255,255,0.8)">Saisir le nombre de véhicules par zone</div></div>
+    </button>
+    <div class="section-label" style="margin-top:20px">Véhicules traités</div>
+    <div id="vehicle-list"><p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p></div>
+  </div>
+</div>
+
+<!-- ══════ FLOW ══════ -->
+<div id="s-flow" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="prevFlowStep()">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title" id="flow-title">—</div>
+      <div class="topbar-sub" id="flow-step-label">Étape 1</div>
+    </div>
+    <span class="badge" id="flow-badge" style="margin-right:8px">—</span>
+    <button class="topbar-btn" id="flow-next-btn" onclick="nextFlowStep()">Continuer</button>
+  </div>
+  <div class="content" id="flow-content"></div>
+</div>
+
+<!-- ══════ COMPTAGE DLCC ══════ -->
+<div id="s-comptage" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title">Relevé de comptage</div>
+      <div class="topbar-sub" id="comptage-site-name">—</div>
+    </div>
+    <button class="topbar-btn blue" id="btn-save-comptage" onclick="saveComptage()">💾 Enregistrer</button>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow">Comptage visuel</div>
+    <div class="step-title">Véhicules présents</div>
+    <div class="step-sub">Saisissez le nombre de véhicules actuellement stationnés dans chaque zone.</div>
+    <div id="comptage-zones-list" style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px"></div>
+    <div class="field-group">
+      <label class="field-label">Remarque (optionnel)</label>
+      <input class="field-input" type="text" id="comptage-remarque" placeholder="Ex: zone DLCC saturée, travaux zone B...">
+    </div>
+  </div>
+</div>
+
+<!-- ══════ RECAP COMPTAGE ══════ -->
+<div id="s-recap-comptage" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge" style="background:#1d4ed8;color:#fff">🔢 Comptage</div>
+    <button class="topbar-btn blue" style="margin-left:auto" onclick="showScreen('s-round')">Continuer ›</button>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px">🔢</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px">Relevé enregistré</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-comptage-meta">—</div>
+    </div>
+    <div id="recap-comptage-details" style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.8;margin-bottom:16px"></div>
+    <div class="recap-check"><div class="recap-icon">✅</div><span>Relevé enregistré dans Supabase</span></div>
+  </div>
+</div>
+
+<!-- ══════ PARKING VIDE ══════ -->
+<div id="s-parking-vide" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('s-round')">‹</button>
+    <div style="flex:1">
+      <div class="topbar-title">Parking vide</div>
+      <div class="topbar-sub">Preuve de passage</div>
+    </div>
+    <button class="topbar-btn gray" id="btn-save-vide" disabled onclick="saveVideRonde()">Enregistrer</button>
+  </div>
+  <div class="content">
+    <div class="step-eyebrow" style="color:var(--gray-dark)">Aucun véhicule constaté</div>
+    <div class="step-title">Photos de preuve</div>
+    <div class="step-sub">Prenez 1 à 6 photos d'emplacements vides pour prouver votre passage sur le site.</div>
+
+    <div id="vide-photos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"></div>
+
+    <button class="outline-btn" id="btn-add-vide-photo" onclick="addVidePhoto()" style="margin-bottom:12px">
+      📷 Ajouter une photo d'emplacement
+    </button>
+
+    <div class="field-group">
+      <label class="field-label">Remarque (optionnel)</label>
+      <input class="field-input" type="text" id="vide-remarque" placeholder="Ex: parking entièrement libre, vérifié à 09h30">
+    </div>
+  </div>
+</div>
+
+<!-- ══════ RECAP PARKING VIDE ══════ -->
+<div id="s-recap-vide" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge badge-gray">🅿️ Vide</div>
+    <button class="topbar-btn gray" style="margin-left:auto" onclick="showScreen('s-round')">Continuer ›</button>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px">🅿️</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px">Parking vide enregistré</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-vide-meta">—</div>
+    </div>
+    <div class="recap-check"><div class="recap-icon">📸</div><span id="recap-vide-photos">Photos enregistrées</span></div>
+    <div class="recap-check"><div class="recap-icon">✅</div><span>Preuve de passage enregistrée dans Supabase</span></div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
+      Ce passage sera inclus dans le rapport de ronde. La preuve de présence sur site est enregistrée avec horodatage.
+    </div>
+  </div>
+</div>
+<div id="s-recap" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge" id="recap-sync-badge">⏳ Sync</div>
+    <button class="primary-btn" id="recap-next-btn" onclick="showScreen('s-round')" style="margin-left:auto;width:auto;padding:8px 16px;font-size:14px">Véhicule suivant ›</button>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:24px 0 28px">
+      <div style="font-size:56px" id="recap-icon">📋</div>
+      <div style="font-size:19px;font-weight:800;margin-top:10px" id="recap-title">—</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="recap-meta">—</div>
+    </div>
+    <div id="recap-checks"></div>
+    <div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--gray-dark);margin-top:16px;line-height:1.6">
+      🤖 <strong>Extraction IA</strong> en fin de ronde — plaque, N° dénonciation, N° macaron.
+    </div>
+  </div>
+</div>
+
+<!-- ══════ FIN DE RONDE ══════ -->
+<div id="s-end-round" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">PARK<span>GUARD</span></div>
+    <div class="badge badge-gray" id="end-round-site">—</div>
+    <button class="topbar-btn" style="margin-left:auto;background:var(--green)" onclick="closeRound()">Nouvelle ronde ›</button>
+  </div>
+  <div class="content">
+    <div style="text-align:center;padding:16px 0 20px">
+      <div style="font-size:44px">🏁</div>
+      <div style="font-size:20px;font-weight:800;margin-top:8px">Ronde terminée</div>
+      <div style="font-size:13px;color:var(--gray-mid);margin-top:4px" id="end-round-meta">—</div>
+    </div>
+    <div class="stats-grid" id="end-stats-grid"></div>
+
+    <!-- 1. SYNC -->
+    <div class="section-label">1 · Synchronisation</div>
+    <div id="db-confirm-box" style="margin-bottom:8px">
+      <div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification en cours...</div></div></div>
+    </div>
+    <button class="outline-btn" id="btn-force-sync" onclick="forceSync()">
+      🔄 Forcer la synchronisation
+    </button>
+
+
+  </div>
+</div>
+
+</div>
+<div id="toast" class="toast"></div>
+<input type="file" id="file-input" accept="image/*" capture="environment">
+
+<script>
+// ═══ CONFIG ═══
+const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const OPENAI_KEY = 'VOTRE_CLE_API_OPENAI_ICI';
+var db;
+function initDB() {
+  if (typeof supabase !== 'undefined' && !db) {
+    db = supabase.createClient(SUPA_URL, SUPA_KEY);
+  }
+  return !!db;
+}
+initDB();
+
+// ═══ STATE ═══
+let currentAgent = null;
+let currentSite = null;
+let currentSiteType = 'standard'; // 'standard' ou 'guidage'
+let currentRoundId = null;
+let roundVehicles = [];
+let isOnline = navigator.onLine;
+let pendingFileCallback = null;
+let flowType = null;
+let flowStep = 0;
+let flowPhotos = {};
+let flowBlobs = {};
+let flowFields = {};
+
+// ═══ STEP DEFINITIONS ═══
+const STEPS = {
+  infraction: [
+    { key:'vehicule',     label:'Véhicule',     sub:'Photographiez le véhicule. Plaque et couleur visibles.',         photo:{key:'vehicule',    hint:'Plaque + couleur visibles'} },
+    { key:'motif',        label:'Infraction',   sub:'Sélectionnez le motif et ajoutez une remarque si nécessaire.',   fields:[
+      {key:'motif',    label:'Motif',              type:'select', opts:['B31A - Stationner sans vignette','B37A - Interdiction de circuler','Macaron expiré','Mauvaise zone','Autre']},
+      {key:'remarque', label:'Remarque (optionnel)',type:'text',   placeholder:'Ex: présent depuis 3 jours...'}
+    ]},
+    { key:'denonciation', label:'Dénonciation',  sub:'Remplissez la dénonciation papier, puis photographiez-la.',     photo:{key:'denonciation', hint:'Texte entièrement lisible'} },
+    { key:'parebrise',    label:'Pare-brise',    sub:'Photographiez le pare-brise — 4 coins visibles, aucun macaron.',photo:{key:'parebrise',    hint:'4 coins visibles'} }
+  ],
+  autorise: [
+    { key:'vehicule', label:'Véhicule', sub:'Photographiez le véhicule. La plaque doit être lisible.', photo:{key:'vehicule', hint:'Plaque entière visible'} },
+    { key:'macaron',  label:'Macaron',  sub:"Photographiez le macaron. L'IA extraira le numéro.",     photo:{key:'macaron',  hint:'Numéro lisible'} }
+  ]
+};
+
+// ═══ RAPPELS ═══
+var _refCache = { codes: [], categories: [] };
+
+async function loadReferences() {
+  try {
+    const [{ data: codes }, { data: cats }, { data: marques }] = await Promise.all([
+      db.from('codes_infraction').select('code,libelle').eq('actif', true).order('ordre'),
+      db.from('categories_vehicule').select('code,libelle').eq('actif', true).order('ordre'),
+      db.from('marques_vehicule').select('nom,logo_url').eq('actif', true).order('ordre')
+    ]);
+    if (codes   && codes.length)   { _refCache.codes      = codes;   localStorage.setItem('pg_codes_inf',   JSON.stringify(codes)); }
+    if (cats    && cats.length)    { _refCache.categories = cats;    localStorage.setItem('pg_cats_veh',    JSON.stringify(cats)); }
+    if (marques && marques.length) { _refCache.marques    = marques; localStorage.setItem('pg_marques',     JSON.stringify(marques)); }
+    // Mettre à jour MARQUES_LOGOS
+    if (marques) {
+      MARQUES_LOGOS = marques.filter(function(m){ return m.logo_url; })
+        .map(function(m){ return {nom: m.nom, src: m.logo_url}; });
+    }
+    updateCodesInfraction(codes || []);
+  } catch(e) {
+    _refCache.codes      = JSON.parse(localStorage.getItem('pg_codes_inf') || '[]');
+    _refCache.categories = JSON.parse(localStorage.getItem('pg_cats_veh')  || '[]');
+    _refCache.marques    = JSON.parse(localStorage.getItem('pg_marques')    || '[]');
+    if (_refCache.codes.length) updateCodesInfraction(_refCache.codes);
+    if (_refCache.marques.length) {
+      MARQUES_LOGOS = _refCache.marques.filter(function(m){ return m.logo_url; })
+        .map(function(m){ return {nom: m.nom, src: m.logo_url}; });
+    }
+  }
+}
+
+var MARQUES_LOGOS=[];
+function buildRappelBlock() {
+  // Site courant — adresse depuis le cache
+  var sites = window._sitesCache || [];
+  var site  = sites.find(function(s) { return s.nom === currentSite; });
+  var adresseSite = site && site.adresse ? site.adresse : currentSite || '—';
+
+  // Catégories véhicules
+  var cats = _refCache.categories.length ? _refCache.categories : [
+    { code: 'AUT', libelle: 'Automobile' },
+    { code: 'VU',  libelle: 'Véhicule utilitaire' }
+  ];
+  var catsHtml = cats.map(function(c) {
+    return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #eee">' +
+      '<span style="font-family:monospace;font-weight:700;font-size:13px;color:var(--black);min-width:40px">' + c.code + '</span>' +
+      '<span style="font-size:13px;color:var(--gray-dark)">' + c.libelle + '</span>' +
+    '</div>';
+  }).join('');
+
+  // Marques logos
+  var marquesHtml='';
+  MARQUES_LOGOS.forEach(function(m){
+    marquesHtml+='<div data-marque="'+m.nom+'" onclick="copyToClipboard(this.dataset.marque)" '+
+      'style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;'+
+      'padding:6px;border-radius:8px;border:1px solid #e0e0e0;background:#fff">'+
+      '<img src="'+m.src+'" style="width:36px;height:36px;border-radius:4px">'+
+      '<span style="font-size:9px;color:#555;font-weight:600;text-align:center">'+m.nom+'</span>'+
+    '</div>';
+  });
+
+  return '<div style="margin-top:20px;border-top:2px solid var(--gray-border);padding-top:16px">' +
+
+    // Titre rappel
+    '<div style="font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;' +
+      'color:var(--gray-mid);margin-bottom:12px">&#9432; Rappels formulaire</div>' +
+
+    // Catégories véhicules
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:8px">Catégories véhicules</div>' +
+      catsHtml +
+    '</div>' +
+
+    // Agent en service
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Agent en service</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--black)">' + (currentAgent||'—') + '</div>' +
+      ((window._currentAgentData&&window._currentAgentData.matricule)?'<div style="font-size:12px;color:var(--gray-dark);margin-top:2px">Matricule : ' + window._currentAgentData.matricule + '</div>':'') +
+    '</div>' +
+
+    // Dénonciateur
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Dénonciateur</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--black)">RDZ Security Management SA</div>' +
+      '<div style="font-size:12px;color:var(--gray-dark)">Quai du Seujet 22 — 1201 Genève</div>' +
+    '</div>' +
+
+    // Site
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Lieu de l\u2019infraction</div>' +
+      '<div style="font-size:13px;font-weight:700;color:var(--black)">' + adresseSite + '</div>' +
+    '</div>' +
+
+    // Marques
+    '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px">' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:8px">Marques (appuyer pour copier)</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' +
+        marquesHtml +
+      '</div>' +
+      '<div id="copy-confirm" style="font-size:11px;color:var(--green);text-align:center;margin-top:8px;height:16px"></div>' +
+    '</div>' +
+
+  '</div>';
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var el = document.getElementById('copy-confirm');
+      if (el) { el.textContent = '✓ Copié : ' + text; setTimeout(function(){ el.textContent=''; }, 2000); }
+    });
+  }
+}
+
+// ═══ UTILS ═══
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function toast(msg, ms=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+function nowStr() { return new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function uid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ═══ ONLINE/OFFLINE ═══
+function updateOnlineStatus() {
+  isOnline = navigator.onLine;
+  const banner = document.getElementById('home-sync-banner');
+  const text   = document.getElementById('home-sync-text');
+  const badge  = document.getElementById('home-sync-badge');
+  if (isOnline) {
+    banner.className = 'sync-banner online';
+    text.textContent = 'En ligne — synchronisation automatique active';
+    badge.className = 'badge badge-green'; badge.textContent = '● En ligne';
+    syncPending();
+  } else {
+    banner.className = 'sync-banner offline';
+    text.textContent = 'Hors ligne — données sauvegardées localement';
+    badge.className = 'badge badge-amber'; badge.textContent = '● Hors ligne';
+  }
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// ═══ LOCAL STORAGE ═══
+function savePending(entry) {
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  p.push(entry);
+  localStorage.setItem('pg_pending', JSON.stringify(p));
+  updatePendingInfo();
+}
+function updatePendingInfo() {
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  const el = document.getElementById('pending-info');
+  if (el) el.textContent = p.length > 0 ? p.length + ' entrée(s) en attente de synchronisation' : '';
+}
+async function syncPending() {
+  if (!isOnline) return;
+  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  if (!p.length) return;
+  const remaining = [];
+  for (const entry of p) {
+    try {
+      const { error } = await db.from('vehicles').insert(entry);
+      if (error) remaining.push(entry);
+    } catch(e) { remaining.push(entry); }
+  }
+  localStorage.setItem('pg_pending', JSON.stringify(remaining));
+  if (remaining.length < p.length) toast('☁️ ' + (p.length - remaining.length) + ' entrée(s) synchronisée(s)');
+  updatePendingInfo();
+}
+
+// ═══ SITE & ROUND ═══
+function selectSite(site, type) {
+  currentSite = site;
+  currentSiteType = type || 'standard';
+  currentAgent = null;
+  window._currentAgentData = null;
+  showScreen('s-select-agent');
+}
+
+function startRonde() {
+  currentRoundId = uid();
+  roundVehicles = [];
+  document.getElementById('round-site-name').textContent = currentSite;
+  document.getElementById('round-sub').textContent = 'Démarré à ' + nowStr() + ' · ' + (currentAgent||'—');
+  document.getElementById('active-round-wrap').style.display = 'block';
+  document.getElementById('active-round-name').textContent = currentSite;
+  updateRoundStats();
+  updateCodesInfraction(_refCache.codes || []);
+  adaptRoundScreen();
+  showScreen('s-round');
+}
+
+function adaptRoundScreen() {
+  const isGuidage = currentSiteType === 'guidage';
+  // Boutons standard
+  document.getElementById('btn-infraction').style.display = isGuidage ? 'none' : 'flex';
+  document.getElementById('btn-autorise').style.display   = 'flex'; // toujours visible
+  document.getElementById('btn-parking-vide').style.display = isGuidage ? 'none' : 'flex';
+  // Bouton comptage DLCC
+  document.getElementById('btn-comptage').style.display   = isGuidage ? 'flex' : 'none';
+}
+
+function confirmEndRound() {
+  if (!roundVehicles.length || confirm('Terminer la ronde sur ' + currentSite + ' ?')) {
+    showEndRound();
+  }
+}
+
+async function showEndRound() {
+  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('end-round-site').textContent = currentSite;
+  document.getElementById('end-round-meta').textContent = nowStr() + ' · ' + currentAgent + ' · ' + roundVehicles.length + ' véhicule(s)';
+  document.getElementById('end-stats-grid').innerHTML =
+    '<div class="stat-box"><div class="stat-val red">' + inf + '</div><div class="stat-lbl">Infractions</div></div>' +
+    '<div class="stat-box"><div class="stat-val green">' + aut + '</div><div class="stat-lbl">Autorisés</div></div>';
+  var iaR = document.getElementById('ia-results');
+  if (iaR) iaR.style.display = 'none';
+  var jei = document.getElementById('json-export-info');
+  if (jei) jei.style.display = 'none';
+  showScreen('s-end-round');
+  await confirmSupabaseSync();
+}
+
+// ═══ SYNC FORCÉE ═══
+async function forceSync() {
+  const btn = document.getElementById('btn-force-sync');
+  btn.disabled = true;
+  btn.textContent = '⏳ Synchronisation en cours...';
+  if (!navigator.onLine) {
+    toast('❌ Pas de réseau disponible');
+    btn.disabled = false;
+    btn.textContent = '🔄 Forcer la synchronisation';
+    return;
+  }
+  isOnline = true;
+  await syncPending();
+  await confirmSupabaseSync();
+  btn.disabled = false;
+  btn.textContent = '🔄 Forcer la synchronisation';
+}
+
+// ═══ CONFIRMATION SUPABASE ═══
+async function confirmSupabaseSync() {
+  const box = document.getElementById('db-confirm-box');
+  box.innerHTML = '<div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification dans Supabase...</div></div></div>';
+
+  if (!navigator.onLine) {
+    box.innerHTML = '<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Sync impossible — retentez avec le réseau.</div></div></div>';
+    return;
+  }
+
+  await syncPending();
+
+  try {
+    const { data, error } = await db
+      .from('vehicles')
+      .select('id, statut, plaque, created_at')
+      .eq('round_id', currentRoundId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const found    = data ? data.length : 0;
+    const expected = roundVehicles.length;
+
+    if (found >= expected) {
+      box.innerHTML = '<div class="db-ok"><div class="db-icon">✅</div><div><div class="db-label" style="color:var(--green)">' + found + ' / ' + expected + ' entrées confirmées</div><div class="db-sub" style="color:var(--green)">Toutes les données sont dans Supabase.</div></div></div>';
+      await runIAPipeline();
+    } else {
+      box.innerHTML = '<div class="db-err"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--red-dark)">' + found + ' / ' + expected + ' entrées trouvées</div><div class="db-sub" style="color:var(--red-dark)">' + (expected - found) + ' manquante(s) — forcez la sync.</div></div></div>';
+    }
+  } catch(e) {
+    box.innerHTML = '<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur</div><div class="db-sub" style="color:var(--red-dark)">' + e.message + '</div></div></div>';
+  }
+}
+
+// ═══ EXPORT JSON ═══
+function exportJSON() {
+  const payload = {
+    meta: {
+      app: 'ParkGuard RDZ', version: '1.0',
+      export_at: new Date().toISOString(),
+      site: currentSite, agent: currentAgent,
+      round_id: currentRoundId,
+      total: roundVehicles.length,
+      infractions: roundVehicles.filter(v => v.statut === 'infraction').length,
+      autorises: roundVehicles.filter(v => v.statut === 'autorise').length
+    },
+    instructions_ia: 'Tu es un assistant RDZ Security (Suisse). Analyse cette ronde de surveillance parking sur "' + currentSite + '". Pour chaque véhicule, les photos ont été prises sur le terrain. Extrais les plaques, N° de dénonciation et N° de macaron. Génère un rapport JSON enrichi.',
+    vehicules: roundVehicles.map(function(v, i) {
+      return {
+        numero: i + 1,
+        statut: v.statut,
+        heure: v.time,
+        site: v.site,
+        agent: v.agent_name,
+        motif: v.motif || null,
+        remarque: v.remarque || null,
+        plaque: v.plaque || 'À extraire des photos',
+        num_denonciation: v.statut === 'infraction' ? (v.num_denonciation || 'À extraire photo dénonciation') : null,
+        num_macaron: v.statut === 'autorise' ? (v.num_macaron || 'À extraire photo macaron') : null,
+        photos_count: v.photos_count || 0,
+        synced: v.synced || false
+      };
+    })
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const name = 'parkguard-' + (currentSite || 'ronde').toLowerCase().replace(/\s+/g, '-') + '-' + date + '.json';
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+
+  var _info = document.getElementById('json-export-info');
+  if (_info) { _info.style.display = 'block'; _info.innerHTML = '✅ <strong>' + name + '</strong> téléchargé.<br>Envoie ce fichier + les photos par WhatsApp à l\'administratif.<br>Dans Claude.ai : colle le JSON + photos → extraction automatique des plaques.'; }
+}
+
+// ═══ PIPELINE IA GPT-4o ═══
+async function runIAPipeline() {
+  const iaBox = document.getElementById('ia-box');
+  if (!iaBox) return; // section IA supprimée
+
+  if (!OPENAI_KEY || OPENAI_KEY.startsWith('VOTRE')) {
+    iaBox.innerHTML = '<div class="db-warn"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--amber)">Clé API non configurée</div><div class="db-sub" style="color:var(--amber)">Remplacez VOTRE_CLE_API_OPENAI_ICI dans le code.</div></div></div>';
+    return;
+  }
+
+  const vehiclesWithPhotos = roundVehicles.filter(v => v._photos && Object.keys(v._photos).length);
+  if (!vehiclesWithPhotos.length) {
+    iaBox.innerHTML = '<div class="db-warn"><div class="db-icon">ℹ️</div><div><div class="db-label" style="color:var(--amber)">Aucune photo en mémoire</div><div class="db-sub" style="color:var(--amber)">Photos disponibles uniquement dans la même session.</div></div></div>';
+    return;
+  }
+
+  const results = [];
+  for (let i = 0; i < vehiclesWithPhotos.length; i++) {
+    const vehicle = vehiclesWithPhotos[i];
+    iaBox.innerHTML = '<div style="padding:4px 0"><div style="font-weight:600;font-size:14px">🤖 Analyse ' + (i+1) + ' / ' + vehiclesWithPhotos.length + '</div><div style="font-size:12px;color:var(--gray-mid);margin-top:4px">' + (vehicle.statut === 'infraction' ? vehicle.motif || 'Infraction' : 'Autorisé') + '</div><div class="progress-wrap" style="margin-top:10px;margin-bottom:0"><div class="progress-fill" style="width:' + Math.round(((i+1)/vehiclesWithPhotos.length)*100) + '%"></div></div></div>';
+    try {
+      const extracted = await analyzeWithGPT(vehicle, vehicle._photos);
+      results.push({ vehicle, ...extracted });
+      if (extracted.plaque || extracted.num_denonciation || extracted.num_macaron) {
+        await db.from('vehicles').update({
+          plaque: extracted.plaque,
+          num_denonciation: extracted.num_denonciation,
+          num_macaron: extracted.num_macaron,
+          ia_pending: false,
+          ia_processed_at: new Date().toISOString()
+        }).eq('round_id', currentRoundId).eq('created_at', vehicle.created_at);
+      }
+    } catch(e) {
+      results.push({ vehicle, plaque: null, error: e.message });
+    }
+  }
+
+  const ok = results.filter(r => r.plaque).length;
+  iaBox.innerHTML = '<div class="db-ok"><div class="db-icon">🤖</div><div><div class="db-label" style="color:var(--green)">Analyse terminée</div><div class="db-sub" style="color:var(--green)">' + ok + ' / ' + results.length + ' plaque(s) extraite(s)</div></div></div>';
+
+  var _rl = document.getElementById('ia-results-list');
+  if (_rl) _rl.innerHTML = results.map(function(r) {
+    const isInf = r.vehicle.statut === 'infraction';
+    return '<div class="ia-vehicle-card ' + (isInf ? 'inf' : 'aut') + '">' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+      '<div class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'INF' : 'AUT') + '</div>' +
+      '<div class="ia-plate">' + (r.plaque || '— non détectée') + '</div>' +
+      '<span class="ia-conf ' + (r.plaque ? 'ok' : 'nok') + '">' + (r.plaque ? 'OK' : '?') + '</span>' +
+      '</div><div class="ia-details">' +
+      (r.num_denonciation ? '📋 ' + r.num_denonciation + ' · ' : '') +
+      (r.num_macaron ? '🏷️ ' + r.num_macaron + ' · ' : '') +
+      (isInf ? (r.vehicle.motif || '') : 'Autorisé') +
+      (r.error ? ' · ⚠️ ' + r.error : '') +
+      '</div></div>';
+  }).join('');
+  var _rr = document.getElementById('ia-results');
+  if (_rr) _rr.style.display = 'block';
+}
+
+async function analyzeWithGPT(vehicle, photos) {
+  const isInf = vehicle.statut === 'infraction';
+  const imageContents = Object.values(photos)
+    .filter(v => v && v.startsWith('data:'))
+    .map(function(dataUrl) {
+      const parts = dataUrl.split(',');
+      const mime  = parts[0].match(/:(.*?);/)[1];
+      return { type: 'image_url', image_url: { url: 'data:' + mime + ';base64,' + parts[1], detail: 'high' } };
+    });
+  if (!imageContents.length) throw new Error('Aucune image valide');
+
+  const prompt = isInf
+    ? 'Tu analyses des photos d\'un véhicule en infraction pour RDZ Security (Suisse). Réponds UNIQUEMENT avec ce JSON:\n{"plaque":"GE 123 456","num_denonciation":"2024-001234","couleur":"blanc","confiance":"haute"}\nFormat plaque CH: XX 000 000. null si illisible.'
+    : 'Tu analyses des photos d\'un véhicule autorisé pour RDZ Security (Suisse). Réponds UNIQUEMENT avec ce JSON:\n{"plaque":"GE 123 456","num_macaron":"A-1234","couleur":"blanc","confiance":"haute"}\nFormat plaque CH: XX 000 000. null si illisible.';
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + OPENAI_KEY },
+    body: JSON.stringify({
+      model: 'gpt-4o', max_tokens: 200,
+      messages: [{ role: 'user', content: [...imageContents, { type: 'text', text: prompt }] }]
+    })
+  });
+  if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || 'Erreur API ' + resp.status); }
+  const data = await resp.json();
+  const parsed = JSON.parse(data.choices[0].message.content.trim().replace(/```json|```/g,''));
+  return { plaque: parsed.plaque || null, num_denonciation: parsed.num_denonciation || null, num_macaron: parsed.num_macaron || null };
+}
+
+// ═══ ROUND STATS ═══
+function updateRoundStats() {
+  const inf = roundVehicles.filter(v => v.statut === 'infraction').length;
+  const aut = roundVehicles.filter(v => v.statut === 'autorise').length;
+  document.getElementById('r-inf').textContent = inf;
+  document.getElementById('r-aut').textContent = aut;
+  document.getElementById('round-sub').textContent = roundVehicles.length + ' véhicule(s) · ' + currentAgent;
+  document.getElementById('active-round-meta').textContent = roundVehicles.length + ' véhicule(s) traité(s)';
+  const list = document.getElementById('vehicle-list');
+  if (!roundVehicles.length) { list.innerHTML = '<p style="font-size:13px;color:var(--gray-mid)">Aucun véhicule encore.</p>'; return; }
+  list.innerHTML = roundVehicles.slice().reverse().map(function(v) {
+    return '<div class="vehicle-row">' +
+      '<div class="badge ' + (v.statut === 'infraction' ? 'badge-red' : 'badge-green') + '">' + (v.statut === 'infraction' ? 'INF' : 'AUT') + '</div>' +
+      '<div class="vehicle-plate">' + (v.plaque || '— IA') + '</div>' +
+      '<div style="margin-left:auto;text-align:right">' +
+      '<div style="font-size:11px;color:var(--gray-mid)">' + v.time + '</div>' +
+      '<div style="font-size:10px;color:' + (v.synced ? 'var(--green)' : 'var(--amber)') + '">' + (v.synced ? '☁️ sync' : '📱 local') + '</div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function closeRound() {
+  currentSite = null; currentRoundId = null; roundVehicles = [];
+  document.getElementById('active-round-wrap').style.display = 'none';
+  showScreen('s-home');
+}
+
+function waitAndLoadTerrain(n) {
+  initDB();
+  if (window.db) {
+    loadSitesAndAgents();
+    loadReferences();
+  } else if (n > 0) {
+    setTimeout(function() { waitAndLoadTerrain(n-1); }, 150);
+  } else {
+    loadSitesAndAgents(); // fallback hors ligne cache
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { waitAndLoadTerrain(20); });
+} else {
+  waitAndLoadTerrain(20);
+}
+
+// ═══ PHOTO INPUT ═══
+document.getElementById('file-input').addEventListener('change', function() {
+  if (this.files[0] && pendingFileCallback) {
+    const file = this.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) { pendingFileCallback(e.target.result, file); };
+    reader.readAsDataURL(file);
+    this.value = '';
+  }
+});
+function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
+
+// ═══ COMPTAGE DLCC ═══
+let comptageZones = []; // zones chargées depuis Supabase
+
+async function showComptageScreen() {
+  // Charger le site depuis Supabase directement pour avoir l'UUID fiable
+  let siteData = null;
+  try {
+    const { data: sites } = await db.from('sites').select('id,nom,type').eq('nom', currentSite).limit(1);
+    if (sites && sites.length) siteData = sites[0];
+  } catch(e) {
+    // Fallback cache
+    const cached = window._sitesCache || [];
+    siteData = cached.find(function(s) { return s.nom === currentSite; }) || null;
+  }
+
+  if (!siteData || !siteData.id) {
+    toast('Site introuvable — vérifiez la connexion');
+    showScreen('s-round');
+    return;
+  }
+
+  // Charger les zones avec les vrais UUIDs
+  try {
+    const { data: zones } = await db.from('zones')
+      .select('id,nom,places_totales,site_id,question_type')
+      .eq('site_id', siteData.id)
+      .eq('actif', true)
+      .order('nom');
+    comptageZones = zones || [];
+  } catch(e) {
+    comptageZones = JSON.parse(localStorage.getItem('pg_zones_' + siteData.id) || '[]');
+  }
+
+  // Sauvegarder en cache
+  if (comptageZones.length) {
+    localStorage.setItem('pg_zones_' + siteData.id, JSON.stringify(comptageZones));
+  }
+
+  // Fallback si pas de zones configurées
+  if (!comptageZones.length) {
+    comptageZones = [
+      { id: null, site_id: siteData.id, nom: 'DLCC', places_totales: 80 },
+      { id: null, site_id: siteData.id, nom: 'CLX',  places_totales: 35 }
+    ];
+  }
+
+  // Stocker site_id pour saveComptage
+  window._currentSiteId = siteData.id;
+
+  document.getElementById('comptage-site-name').textContent = currentSite;
+  renderComptageZones();
+  showScreen('s-comptage');
+}
+
+function renderComptageZones() {
+  const el = document.getElementById('comptage-zones-list');
+  el.innerHTML = comptageZones.map(function(z, i) {
+    // Question et type de mesure selon la zone
+    // DLCC → places disponibles (libres), CLX → véhicules stationnés
+    var isDisponible = z.question_type === 'disponibles' ||
+      z.nom.toUpperCase().indexOf('DLCC') >= 0;
+    var question = z.question ||
+      (isDisponible
+        ? 'Combien de places sont disponibles sur ' + z.nom + ' ?'
+        : 'Combien de v\u00e9hicules stationnent sur ' + z.nom + ' ?');
+    var unitLabel = isDisponible ? 'places libres' : 'v\u00e9hicules';
+    var icon = isDisponible ? '\uD83D\uDD35' : '\uD83D\uDE97'; // 🔵 ou 🚗
+
+    return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:4px">' +
+      // Zone nom + capacité
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div style="font-size:15px;font-weight:700">' + icon + ' ' + z.nom + '</div>' +
+        '<span style="font-size:11px;color:var(--gray-mid);background:#fff;padding:3px 8px;border-radius:10px;border:1px solid var(--gray-border)">' + z.places_totales + ' places au total</span>' +
+      '</div>' +
+      // Question
+      '<div style="font-size:13px;color:var(--gray-dark);margin-bottom:12px;font-style:italic">' + question + '</div>' +
+      // Saisie
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<button onclick="adjustComptage(' + i + ',-1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">\u2212</button>' +
+        '<input type="number" id="comptage-input-' + i + '" value="0" min="0" max="' + (z.places_totales + 10) + '"' +
+          ' oninput="onComptageInput(' + i + ')"' +
+          ' style="flex:1;text-align:center;font-size:36px;font-weight:800;color:var(--black);border:2px solid var(--gray-border);border-radius:var(--radius-sm);padding:8px 0;background:#fff;-moz-appearance:textfield;appearance:textfield;width:100%">' +
+        '<button onclick="adjustComptage(' + i + ',+1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">+</button>' +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--gray-mid);margin-top:4px;text-align:center">' + unitLabel + '</div>' +
+      // Barre + taux
+      '<div style="margin-top:10px;height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden">' +
+        '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:5px;width:0%;transition:width .3s"></div>' +
+      '</div>' +
+      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' \u2014 0%</div>' +
+    '</div>';
+  }).join('');
+  window._comptageVals = comptageZones.map(function() { return 0; });
+  // Stocker le type de mesure pour saveComptage
+  window._comptageTypes = comptageZones.map(function(z) {
+    return (z.question_type === 'disponibles' || z.nom.toUpperCase().indexOf('DLCC') >= 0)
+      ? 'disponibles' : 'vehicules';
+  });
+}
+
+function updateComptageDisplay(idx) {
+  const max   = comptageZones[idx].places_totales || 999;
+  const saisi = window._comptageVals[idx] || 0;
+  const types = window._comptageTypes || [];
+  const isDisp = types[idx] === 'disponibles';
+
+  // Pour DLCC (places libres) : taux d'occupation = (max - saisi) / max
+  // Pour CLX (véhicules) : taux d'occupation = saisi / max
+  const vehicules = isDisp ? Math.max(0, max - saisi) : saisi;
+  const pct = Math.min(100, Math.round(vehicules / max * 100));
+
+  const bar = document.getElementById('comptage-bar-' + idx);
+  bar.style.width = pct + '%';
+  bar.style.background = pct >= 90 ? 'var(--red)' : pct >= 70 ? 'var(--amber)' : '#1d4ed8';
+
+  const label = isDisp
+    ? saisi + ' libres → ' + vehicules + ' véhicules / ' + max + ' — ' + pct + '% occupé'
+    : vehicules + ' / ' + max + ' — ' + pct + '%';
+  document.getElementById('comptage-taux-' + idx).textContent = label;
+}
+
+function onComptageInput(idx) {
+  if (!window._comptageVals) window._comptageVals = comptageZones.map(function() { return 0; });
+  const input = document.getElementById('comptage-input-' + idx);
+  const val = Math.max(0, parseInt(input.value) || 0);
+  input.value = val;
+  window._comptageVals[idx] = val;
+  updateComptageDisplay(idx);
+}
+
+function adjustComptage(idx, delta) {
+  if (!window._comptageVals) window._comptageVals = comptageZones.map(function() { return 0; });
+  const max = comptageZones[idx].places_totales || 999;
+  const newVal = Math.max(0, Math.min(max + 10, (window._comptageVals[idx] || 0) + delta));
+  window._comptageVals[idx] = newVal;
+  const input = document.getElementById('comptage-input-' + idx);
+  if (input) input.value = newVal;
+  updateComptageDisplay(idx);
+}
+
+async function saveComptage() {
+  const vals     = window._comptageVals || [];
+  const now      = new Date().toISOString();
+  const remarque = document.getElementById('comptage-remarque').value.trim();
+
+  // site_id depuis showComptageScreen (le plus fiable)
+  const siteId = window._currentSiteId ||
+    (comptageZones.length && comptageZones[0].site_id ? comptageZones[0].site_id : null);
+
+  if (!siteId) { toast('Site non identifié — reconnectez-vous'); return; }
+
+  let details = '';
+  const entries = [];
+  comptageZones.forEach(function(z, i) {
+    var saisi   = parseInt(vals[i]) || 0;
+    // Détection fiable : DLCC par nom OU places=80, sinon vehicules directs
+    var isDisp  = (z.question_type === 'disponibles') ||
+                  (z.nom && z.nom.toUpperCase().indexOf('DLCC') >= 0) ||
+                  (window._comptageTypes && window._comptageTypes[i] === 'disponibles');
+    // Si on a saisi des places disponibles, on calcule les véhicules présents
+    var vehicules = isDisp ? Math.max(0, z.places_totales - saisi) : saisi;
+    var pct = Math.round(vehicules / (z.places_totales || 1) * 100);
+    var label = isDisp
+      ? z.nom + ' : ' + saisi + ' places libres / ' + vehicules + ' véhicules (' + pct + '%)'
+      : z.nom + ' : ' + vehicules + '/' + z.places_totales + ' véhicules (' + pct + '%)';
+    details += label + '\n';
+    entries.push({
+      site_id:            siteId,
+      zone_id:            (z.id && z.id.length > 10) ? z.id : null,
+      agent_name:         currentAgent || 'Agent RDZ',
+      vehicules_presents: vehicules,
+      places_totales:     z.places_totales || 0,
+      created_at:         now
+    });
+  });
+
+  let synced = false;
+  if (isOnline) {
+    try {
+      const { error } = await db.from('comptages').insert(entries);
+      if (error) { console.error(error); toast('Erreur: ' + error.message); }
+      else synced = true;
+    } catch(e) { console.warn('Erreur comptage:', e); }
+  }
+  if (!synced) {
+    const p = JSON.parse(localStorage.getItem('pg_pending_comptages') || '[]');
+    entries.forEach(function(e) { p.push(e); });
+    localStorage.setItem('pg_pending_comptages', JSON.stringify(p));
+  }
+
+  // Recap
+  document.getElementById('recap-comptage-meta').textContent =
+    nowStr() + ' · ' + currentAgent + (remarque ? ' · ' + remarque : '');
+  document.getElementById('recap-comptage-details').textContent = details;
+
+  // Reset
+  document.getElementById('comptage-remarque').value = '';
+  showScreen('s-recap-comptage');
+}
+
+// ═══ PARKING VIDE ═══
+let videPhotos = [];
+
+function addVidePhoto() {
+  if (videPhotos.length >= 6) { toast('Maximum 6 photos'); return; }
+  triggerCamera(function(dataUrl, file) {
+    videPhotos.push({ dataUrl, file });
+    renderVidePhotos();
+  });
+}
+
+function renderVidePhotos() {
+  const grid = document.getElementById('vide-photos-grid');
+  const btn  = document.getElementById('btn-add-vide-photo');
+  const save = document.getElementById('btn-save-vide');
+
+  grid.innerHTML = videPhotos.map((p, i) =>
+    '<div style="position:relative">' +
+    '<img src="' + p.dataUrl + '" style="width:100%;height:110px;object-fit:cover;border-radius:var(--radius-sm);border:1.5px solid var(--green);display:block">' +
+    '<button onclick="removeVidePhoto(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(208,2,27,.85);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1">×</button>' +
+    '<div style="font-size:10px;color:var(--gray-mid);text-align:center;margin-top:3px">Emplacement ' + (i+1) + '</div>' +
+    '</div>'
+  ).join('');
+
+  btn.style.display  = videPhotos.length >= 6 ? 'none' : 'flex';
+  btn.textContent    = '📷 Ajouter une photo (' + videPhotos.length + '/6)';
+  var saveBtn = document.getElementById('btn-save-vide');
+  if (saveBtn) { saveBtn.disabled = videPhotos.length === 0; saveBtn.style.opacity = videPhotos.length === 0 ? '.35' : '1'; }
+}
+
+function removeVidePhoto(i) {
+  videPhotos.splice(i, 1);
+  renderVidePhotos();
+}
+
+async function saveVideRonde() {
+  const time     = nowStr();
+  const remarque = document.getElementById('vide-remarque').value.trim();
+  const entry = {
+    id: uid(),
+    round_id: currentRoundId,
+    site: currentSite,
+    agent_name: currentAgent,
+    statut: 'parking_vide',
+    motif: 'PARKING_VIDE',
+    remarque: remarque || null,
+    plaque: null,
+    photos_count: videPhotos.length,
+    ia_pending: false,
+    created_at: new Date().toISOString()
+  };
+
+  // Upload photos si en ligne
+  if (isOnline) {
+    for (let i = 0; i < videPhotos.length; i++) {
+      const filename = entry.id + '_vide_' + (i+1) + '.jpg';
+      try {
+        const resp = await db.storage.from('parkguard-photos').upload(filename, videPhotos[i].file, { contentType: 'image/jpeg', upsert: true });
+        if (i === 0) entry.photo_vehicule_url     = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 1) entry.photo_denonciation_url = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 2) entry.photo_parebrise_url    = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+        if (i === 3) entry.photo_macaron_url      = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
+      } catch(e) {}
+    }
+  }
+
+  let synced = false;
+  if (isOnline) {
+    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
+  }
+  if (!synced) savePending(entry);
+
+  roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: {} }));
+  updateRoundStats();
+
+  document.getElementById('recap-vide-meta').textContent = videPhotos.length + ' photo(s) · ' + time + (remarque ? ' · ' + remarque : '');
+  document.getElementById('recap-vide-photos').textContent = videPhotos.length + ' photo(s) d\'emplacements vides';
+
+  // Reset
+  videPhotos = [];
+  document.getElementById('vide-remarque').value = '';
+  renderVidePhotos();
+
+  showScreen('s-recap-vide');
+}
+function startFlow(type) {
+  flowType = type; flowStep = 0; flowPhotos = {}; flowBlobs = {}; flowFields = {};
+  if (type === 'infraction') flowFields.motif = STEPS.infraction[1].fields[0].opts[0];
+  renderFlowStep();
+  showScreen('s-flow');
+}
+
+function renderFlowStep() {
+  const steps = STEPS[flowType];
+  const s     = steps[flowStep];
+  const pct   = Math.round(((flowStep + 1) / steps.length) * 100);
+  const isInf = flowType === 'infraction';
+
+  document.getElementById('flow-title').textContent     = s.label;
+  document.getElementById('flow-step-label').textContent = 'Étape ' + (flowStep+1) + ' / ' + steps.length;
+  const badge = document.getElementById('flow-badge');
+  badge.textContent = isInf ? 'INFRACTION' : 'AUTORISÉ';
+  badge.className   = 'badge ' + (isInf ? 'badge-red' : 'badge-green');
+
+  let html = '<div class="progress-wrap"><div class="progress-fill' + (isInf ? '' : ' green') + '" style="width:' + pct + '%"></div></div>' +
+    '<div class="step-eyebrow' + (isInf ? '' : ' green') + '">Étape ' + (flowStep+1) + ' / ' + steps.length + '</div>' +
+    '<div class="step-title">' + s.label + '</div>' +
+    '<div class="step-sub">' + s.sub + '</div>';
+
+  let canNext = true;
+
+  if (s.photo) {
+    const taken = flowPhotos[s.photo.key];
+    canNext = !!taken;
+    if (taken) {
+      html += '<div class="photo-zone taken" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
+        '<img src="' + taken + '">' +
+        '<button class="photo-retake" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\')">Reprendre</button>' +
+        '<div class="photo-taken-bar">✅ Photo enregistrée</div></div>';
+    } else {
+      html += '<div class="photo-zone" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
+        '<div class="photo-zone-inner">' +
+        '<div class="photo-zone-icon">📷</div>' +
+        '<div class="photo-zone-label">' + s.label + '</div>' +
+        '<div class="photo-zone-sub">' + s.photo.hint + '</div>' +
+        '</div></div>';
+    }
+  }
+
+  if (s.fields) {
+    s.fields.forEach(function(f) {
+      html += '<div class="field-group"><label class="field-label">' + f.label + '</label>';
+      if (f.type === 'select') {
+        html += '<select class="field-select" onchange="flowFields[\'' + f.key + '\']=this.value">';
+        f.opts.forEach(function(o) { html += '<option' + (flowFields[f.key]===o?' selected':'') + '>' + o + '</option>'; });
+        html += '</select>';
+      } else {
+        html += '<input class="field-input" type="text" placeholder="' + (f.placeholder||'') + '" value="' + (flowFields[f.key]||'') + '" oninput="flowFields[\'' + f.key + '\']=this.value">';
+      }
+      html += '</div>';
+    });
+  }
+
+  // Injecter le bloc rappel sur l'étape motif
+  if (s.key === 'motif') {
+    html += buildRappelBlock();
+  }
+  document.getElementById('flow-content').innerHTML = html;
+  const isLast = flowStep === steps.length - 1;
+  const label  = isLast ? (flowType === 'infraction' ? "Enregistrer l'infraction" : 'Enregistrer') : 'Continuer';
+  var btn = document.getElementById('flow-next-btn');
+  if (btn) {
+    btn.textContent = label;
+    btn.disabled = !canNext;
+    btn.className = 'topbar-btn' + (isInf ? '' : ' green');
+  }
+}
+
+function takeFlowPhoto(key) {
+  triggerCamera(function(dataUrl, file) {
+    flowPhotos[key] = dataUrl;
+    if (file) flowBlobs[key] = file;
+    renderFlowStep();
+  });
+}
+
+async function nextFlowStep() {
+  if (flowStep < STEPS[flowType].length - 1) { flowStep++; renderFlowStep(); }
+  else await saveEntry();
+}
+
+// ═══ UPLOAD PHOTO ═══
+async function uploadPhoto(blob, filename) {
+  try {
+    const { data, error } = await db.storage
+      .from('parkguard-photos')
+      .upload(filename, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+    if (error) throw error;
+    const { data: urlData } = db.storage.from('parkguard-photos').getPublicUrl(filename);
+    return urlData.publicUrl;
+  } catch(e) {
+    console.warn('Upload photo failed:', e.message);
+    return null;
+  }
+}
+
+async function uploadAllPhotos(entryId) {
+  const urls = {};
+  const photoMap = {
+    vehicule:     'photo_vehicule_url',
+    denonciation: 'photo_denonciation_url',
+    parebrise:    'photo_parebrise_url',
+    macaron:      'photo_macaron_url'
+  };
+  for (const [key, col] of Object.entries(photoMap)) {
+    if (!flowBlobs[key] && !flowPhotos[key]) continue;
+    const filename = entryId + '_' + key + '.jpg';
+    let url = null;
+    if (flowBlobs[key]) {
+      url = await uploadPhoto(flowBlobs[key], filename);
+    } else if (flowPhotos[key]) {
+      // Convertir dataUrl en blob
+      const res  = await fetch(flowPhotos[key]);
+      const blob = await res.blob();
+      url = await uploadPhoto(blob, filename);
+    }
+    if (url) urls[col] = url;
+  }
+  return urls;
+}
+
+// ═══ SAVE ENTRY ═══
+async function saveEntry() {
+  const now  = new Date().toISOString();
+  const time = nowStr();
+  const entryId = uid();
+
+  // Upload photos si en ligne
+  let photoUrls = {};
+  if (isOnline) {
+    toast('📸 Upload photos en cours...', 5000);
+    photoUrls = await uploadAllPhotos(entryId);
+  }
+
+  const entry = {
+    id: entryId,
+    round_id: currentRoundId, site: currentSite, agent_name: currentAgent,
+    statut: flowType,
+    motif: flowFields.motif || null, remarque: flowFields.remarque || null,
+    plaque: null, num_denonciation: null, num_macaron: null,
+    photos_count: Object.keys(flowPhotos).length,
+    ia_pending: true, created_at: now,
+    ...photoUrls
+  };
+
+  let synced = false;
+  if (isOnline) {
+    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
+  }
+  if (!synced) savePending(entry);
+
+  roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: Object.assign({}, flowPhotos) }));
+  updateRoundStats();
+
+  const isInf = flowType === 'infraction';
+  document.getElementById('recap-icon').textContent  = isInf ? '📋' : '✅';
+  document.getElementById('recap-title').textContent = isInf ? 'Dénonciation enregistrée' : 'Véhicule autorisé enregistré';
+  document.getElementById('recap-meta').textContent  = Object.keys(flowPhotos).length + ' photos · ' + time;
+  const badge = document.getElementById('recap-sync-badge');
+  badge.textContent = synced ? '☁️ Synchronisé' : '⏳ En attente sync';
+  badge.className   = 'badge ' + (synced ? 'badge-green' : 'badge-amber');
+  var rnb=document.getElementById('recap-next-btn'); if(rnb){rnb.style.background=isInf?'var(--red)':'var(--green)';}
+
+  let checks = isInf
+    ? '<div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">📋</div>Dénonciation photographiée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🪟</div>Pare-brise (4 coins) photographié</div>' +
+      '<div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° dénonciation : extraction IA en fin de ronde</div>'
+    : '<div class="recap-check"><div class="recap-icon">📸</div>Photo du véhicule enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🏷️</div>Photo du macaron enregistrée</div>' +
+      '<div class="recap-check"><div class="recap-icon">🤖</div>Plaque + N° macaron : extraction IA en fin de ronde</div>';
+  document.getElementById('recap-checks').innerHTML = checks;
+  showScreen('s-recap');
+}
+
+// ═══ CHARGEMENT SITES & AGENTS DEPUIS SUPABASE ═══
+async function loadSitesAndAgents() {
+  try {
+    const [{ data: sites }, { data: agents }] = await Promise.all([
+      db.from('sites').select('id,nom,type,adresse,codes_infraction,heure_jour_debut,heure_jour_fin,parking_actif').eq('parking_actif', true).order('nom'),
+      db.from('agents').select('id,nom,prenom,matricule,actif').eq('actif', true).order('nom')
+    ]);
+
+    // Sauvegarder en cache localStorage pour usage hors ligne
+    if (agents && agents.length) localStorage.setItem('pg_agents_cache', JSON.stringify(agents));
+    if (sites  && sites.length)  localStorage.setItem('pg_sites_cache',  JSON.stringify(sites));
+
+    renderAgentsList(agents || []);
+    renderSitesList(sites || []);
+
+  } catch(e) {
+    console.warn('Supabase inaccessible — lecture du cache local:', e);
+
+    // Lire le cache localStorage
+    const agents = JSON.parse(localStorage.getItem('pg_agents_cache') || '[]');
+    const sites  = JSON.parse(localStorage.getItem('pg_sites_cache')  || '[]');
+
+    // Fallback codé en dur si cache vide
+    const sitesFinaux = sites.length ? sites : [
+      {nom:'Grange Canal', type:'standard'},
+      {nom:'Clair Matin',  type:'standard'}
+    ];
+
+    renderAgentsList(agents);
+    renderSitesList(sitesFinaux);
+
+    // Bannière hors ligne
+    const banner = document.getElementById('home-sync-banner');
+    if (banner) {
+      banner.className = 'sync-banner offline';
+      banner.querySelector('#home-sync-text').textContent =
+        agents.length
+          ? 'Hors ligne — agents et sites chargés depuis le cache'
+          : 'Hors ligne — données sauvegardées localement';
+    }
+  }
+}
+
+function updateCodesInfraction(allCodes) {
+  // Filtrer selon les codes actifs du site courant
+  var sites = window._sitesCache || [];
+  var site  = sites.find(function(s){ return s.nom === currentSite; });
+  var actifs = site && site.codes_infraction && site.codes_infraction.length
+    ? site.codes_infraction
+    : null; // null = tous les codes
+  var filtered = actifs
+    ? allCodes.filter(function(c){ return actifs.includes(c.code); })
+    : allCodes;
+  if (!filtered.length) filtered = allCodes; // fallback
+  STEPS.infraction[1].fields[0].opts = filtered.map(function(c){ return c.code + ' - ' + c.libelle; });
+  // Valeur par défaut = premier code
+  if (filtered.length) flowFields.motif = filtered[0].code + ' - ' + filtered[0].libelle;
+}
+
+function renderAgentsList(agents) {
+  const el = document.getElementById('agents-list-home');
+  if (!el) return;
+  if (!agents.length) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun agent actif.<br>Configurez les agents dans la page Config.</div>';
+    return;
+  }
+  window._agentsCache = agents;
+  el.innerHTML = agents.map(function(a, i) {
+    var safeNom = a.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return '<div class="card" onclick="selectAgentIdx(' + i + ')" data-agent="' + safeNom + '">' +
+      '<div class="card-icon">\uD83D\uDC64</div>' +
+      '<div><div class="card-name">' + a.nom + '</div>' +
+      '<div class="card-meta">' + (a.matricule || 'Agent de surveillance') + '</div></div>' +
+      '<div class="card-arrow">&#8250;</div></div>';
+  }).join('');
+}
+
+function renderSitesList(sites) {
+  const el = document.getElementById('sites-list-home');
+  if (!el) return;
+  if (!sites.length) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-mid);font-size:13px">Aucun site actif.<br>Configurez les sites dans la page Config.</div>';
+    return;
+  }
+  window._sitesCache = sites;
+  const icons = { standard: '\uD83C\uDFE2', guidage: '\uD83D\uDE97' };
+  const metas = { standard: 'R\u00e9sidence priv\u00e9e', guidage: 'Guidage & surveillance' };
+  el.innerHTML = sites.map(function(s, i) {
+    return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
+      '<div class="card-icon">' + (icons[s.type] || '\uD83C\uDFE2') + '</div>' +
+      '<div><div class="card-name">' + s.nom + '</div>' +
+      '<div class="card-meta">' + (s.adresse || metas[s.type] || '') + '</div></div>' +
+      '<div class="card-arrow">&#8250;</div></div>';
+  }).join('');
+}
+
+function selectAgentIdx(i) {
+  const a = window._agentsCache && window._agentsCache[i];
+  if (!a) return;
+  currentAgent = ((a.prenom||'').trim()+' '+(a.nom||'').trim()).trim() || a.nom;
+  window._currentAgentData = a;
+  const agentBadge = document.getElementById('agent-badge');
+  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + currentAgent;
+  startRonde();
+}
+function selectAgent(nom) {
+  currentAgent = nom;
+  window._currentAgentData = {nom: nom};
+  const agentBadge = document.getElementById('agent-badge');
+  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + nom;
+  startRonde();
+}
+function selectSiteIdx(i) {
+  const s = window._sitesCache && window._sitesCache[i];
+  if (!s) return;
+  selectSite(s.nom, s.type || 'standard');
+}
+
+// ═══ INIT ═══
+updateOnlineStatus();
+updatePendingInfo();
+</script>
+</body>
+</html>
