@@ -75,6 +75,10 @@
   .real-time-input:focus { outline: none; border-bottom-color: var(--rdz-red); }
   .save-ok { color: #1e5c2e; font-size: 10px; opacity: 0; transition: opacity .3s; }
   .save-ok.show { opacity: 1; }
+  .note-field { border-top: 1px dashed var(--rdz-border); padding-top: 8px; margin-top: 8px; }
+  .note-input { width: 100%; padding: 6px 8px; border: 1px solid var(--rdz-border); border-radius: 2px; background: var(--rdz-bg); font-family: Arial, sans-serif; font-size: 12.5px; color: var(--rdz-black); resize: vertical; min-height: 40px; }
+  .note-input:focus { outline: none; border-color: var(--rdz-red); background: #fff; }
+  .saved-by-line { font-size: 9.5px; color: #9a9a9a; margin-top: 6px; text-align: right; }
 </style>
 </head>
 <body>
@@ -84,7 +88,10 @@
     <div class="app-header-name">RDZ Security Management</div>
     <div class="app-header-sub" id="header-sub">Feuille de route</div>
   </div>
-  <a class="back-btn" href="mobile.html">‹ Retour</a>
+  <div style="text-align:right;flex-shrink:0">
+    <a class="back-btn" href="mobile.html">‹ Retour</a>
+    <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:5px" id="agent-badge"></div>
+  </div>
 </div>
 
 <div class="content">
@@ -323,6 +330,8 @@ function renderSheetDetail(sh, date) {
     const pointage = pointagesMap[idx] || {};
     const arrivee = (pointage.heure_arrivee_reelle || '').slice(0,5);
     const depart = (pointage.heure_depart_reelle || '').slice(0,5);
+    const noteVal = pointage.note || '';
+    const savedBy = pointage.agent_nom ? `Dernière saisie par ${escHtml(pointage.agent_nom)}` : '';
     return `<div class="task-card ${cls}">
       <div class="task-top">
         ${site ? `<span class="task-dot" style="background:${site.color}"></span>` : ''}
@@ -344,6 +353,12 @@ function renderSheetDetail(sh, date) {
             onchange="saveRealTime(${idx}, 'heure_depart_reelle', this.value)">
         </div>
       </div>
+      <div class="note-field">
+        <div class="real-time-lbl">Note (optionnel) <span class="save-ok" id="ok-note-${idx}">✓</span></div>
+        <textarea class="note-input" id="note-${idx}" placeholder="Remarque pour cette mission…"
+          onchange="saveNote(${idx}, this.value)">${escHtml(noteVal)}</textarea>
+      </div>
+      <div class="saved-by-line" id="saved-by-${idx}">${savedBy}</div>
     </div>`;
   }).join('');
 
@@ -371,20 +386,61 @@ async function saveRealTime(taskIndex, field, value) {
     const { error } = await sb.from('feuille_pointages')
       .upsert(payload, { onConflict: 'sheet_id,task_index,sheet_date' });
     if (error) throw error;
-    pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), [field]: payload[field] };
+    pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), [field]: payload[field], agent_nom: AGENT_NOM };
     const okId = field === 'heure_arrivee_reelle' ? 'ok-arr-' + taskIndex : 'ok-dep-' + taskIndex;
     const okEl = document.getElementById(okId);
     if (okEl) {
       okEl.classList.add('show');
       setTimeout(() => okEl.classList.remove('show'), 1500);
     }
+    updateSavedByCaption(taskIndex);
   } catch (err) {
     alert('Erreur d\'enregistrement : ' + err.message);
   }
 }
 
+// ═══ NOTE PAR LIGNE ═══
+async function saveNote(taskIndex, value) {
+  if (!currentSheet) return;
+  const date = document.getElementById('date-picker').value || todayStr();
+  const m = getMission(currentSheet.tasks[taskIndex]?.mId);
+
+  const payload = {
+    sheet_id: currentSheet.id,
+    sheet_date: date,
+    task_index: taskIndex,
+    mission_name: m ? m.name : null,
+    agent_id: AGENT_ID,
+    agent_nom: AGENT_NOM,
+    note: value || null,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const { error } = await sb.from('feuille_pointages')
+      .upsert(payload, { onConflict: 'sheet_id,task_index,sheet_date' });
+    if (error) throw error;
+    pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), note: value || null, agent_nom: AGENT_NOM };
+    const okEl = document.getElementById('ok-note-' + taskIndex);
+    if (okEl) {
+      okEl.classList.add('show');
+      setTimeout(() => okEl.classList.remove('show'), 1500);
+    }
+    updateSavedByCaption(taskIndex);
+  } catch (err) {
+    alert('Erreur d\'enregistrement : ' + err.message);
+  }
+}
+
+function updateSavedByCaption(taskIndex) {
+  const el = document.getElementById('saved-by-' + taskIndex);
+  const nom = pointagesMap[taskIndex]?.agent_nom;
+  if (el && nom) el.textContent = 'Dernière saisie par ' + nom;
+}
+
 // ═══ INIT ═══
 async function init() {
+  document.getElementById('agent-badge').textContent = '👤 ' + (AGENT_NOM || '—');
   document.getElementById('date-picker').value = todayStr();
   await loadRouteOps();
   renderSheetsList();
