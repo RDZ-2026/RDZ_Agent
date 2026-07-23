@@ -380,6 +380,13 @@ async function doSortie(){
         // Pas de stock_log : la table stock_attributions sert déjà de trace complète
         item.quantite_dispo-=c.qty;
       } else {
+        // Sécurité : neutraliser toute autre ligne déjà marquée "active" pour cette même clé/badge
+        // (résidu éventuel d'anciens essais), pour éviter un conflit de contrainte d'unicité
+        await sb.from('stock_acces')
+          .update({ statut:'rendu', date_retour_reel:new Date().toISOString() })
+          .eq('item_id', c.id)
+          .eq('statut', 'actif');
+
         const { data: existing } = await sb.from('stock_acces')
           .select('id')
           .eq('item_id', c.id)
