@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Véhicules</title>
+<style>
+:root{
+  --red:#8B1A1A;--red-d:#6B1212;--red-l:#f5e8e8;
+  --anth:#1a1a1a;--anth2:#2d2d2d;
+  --bg:#f5f4f2;--white:#fff;
+  --border:#d0ccc5;--text:#1a1a1a;--text2:#4a4a4a;--text3:#9a9a9a;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --sh:0 2px 8px rgba(0,0,0,.08);--sh-md:0 4px 20px rgba(0,0,0,.12);
+  --r:10px;--r-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:Arial,Helvetica,sans-serif;color:var(--text);}
+button,input,select,textarea{font-family:inherit;}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .25s ease,opacity .25s;overflow:hidden;}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
+
+.app-header{flex-shrink:0;background:var(--red);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.app-header-txt{display:flex;flex-direction:column;gap:2px;}
+.app-header-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase;}
+.app-header-sub{font-size:10.5px;color:rgba(255,255,255,.65);}
+.back-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;font-weight:700;padding:7px 12px;border-radius:2px;cursor:pointer;white-space:nowrap;}
+.back-btn:active{background:rgba(255,255,255,.3);}
+
+.body{flex:1;overflow-y:auto;padding:16px;padding-bottom:40px;}
+
+/* VEHICLE CARDS */
+.vcard{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:2px;padding:14px 16px;margin-bottom:12px;cursor:pointer;box-shadow:var(--sh);}
+.vcard:active{background:var(--bg);}
+.vc-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.vc-plate{font-family:monospace;font-size:15px;font-weight:700;background:var(--anth);color:#fff;padding:5px 10px;border-radius:2px;letter-spacing:.03em;}
+.vc-status{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.vc-status.dispo{background:var(--green-l);color:#166534;}
+.vc-status.service{background:#fef9c3;color:#854d0e;}
+.vc-model{font-size:13px;color:var(--text2);margin-top:8px;}
+.vc-km{font-size:12px;color:var(--text3);font-family:monospace;margin-top:2px;}
+
+/* VEHICLE MENU (boutons) */
+.vmenu-hero{background:var(--anth);color:#fff;padding:16px;}
+.vmenu-plate{font-family:monospace;font-size:19px;font-weight:700;}
+.vmenu-model{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;}
+.vmenu-km{font-size:11.5px;color:rgba(255,255,255,.45);font-family:monospace;margin-top:3px;}
+.menu-btn{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:2px;padding:16px;margin-bottom:12px;cursor:pointer;box-shadow:var(--sh);}
+.menu-btn:active{background:var(--bg);}
+.menu-btn-ico{font-size:24px;flex-shrink:0;}
+.menu-btn-txt{flex:1;}
+.menu-btn-name{font-size:14.5px;font-weight:700;}
+.menu-btn-desc{font-size:11.5px;color:var(--text3);margin-top:2px;}
+.menu-btn-chevron{color:var(--text3);font-size:18px;}
+
+/* PRISE DE VEHICULE */
+.status-box{background:var(--white);border-radius:2px;box-shadow:var(--sh-md);padding:18px;text-align:center;margin-bottom:16px;}
+.status-ico{font-size:36px;margin-bottom:8px;}
+.status-txt{font-size:15px;font-weight:700;}
+.status-sub{font-size:12px;color:var(--text3);margin-top:4px;}
+.btn-action{width:100%;padding:14px;border:none;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;color:#fff;}
+.btn-action.prise{background:var(--red);}
+.btn-action.restit{background:var(--green);}
+.btn-action:active{opacity:.85;}
+
+.fg{margin-bottom:14px;}
+.fl{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;}
+.fi{width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:2px;padding:10px 12px;font-size:14.5px;color:var(--text);}
+.fi:focus{outline:none;border-color:var(--red);}
+.fi-ta{min-height:70px;resize:vertical;}
+.clean-chips{display:flex;gap:8px;}
+.clean-chip{flex:1;padding:10px 6px;border:2px solid var(--border);border-radius:2px;text-align:center;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--white);}
+.clean-chip.on-propre{border-color:var(--green);background:var(--green-l);color:#166534;}
+.clean-chip.on-acceptable{border-color:#ca8a04;background:#fefce8;color:#713f12;}
+.clean-chip.on-sale{border-color:var(--red);background:var(--red-l);color:var(--red-d);}
+.photo-box{width:100%;height:100px;border:2px dashed var(--border);border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--white);gap:4px;overflow:hidden;}
+.photo-box img{width:100%;height:100%;object-fit:cover;}
+
+/* DEGATS */
+.schema-wrap{background:var(--white);border-radius:2px;box-shadow:var(--sh);overflow:hidden;margin-bottom:14px;}
+.schema-hdr{padding:10px 13px;background:var(--bg);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.svg-wrap{position:relative;touch-action:none;user-select:none;}
+.svg-wrap img{width:100%;display:block;pointer-events:none;}
+.svg-wrap svg{position:absolute;inset:0;width:100%;height:100%;}
+
+.dmg-item{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-bottom:1px solid var(--border);background:var(--white);cursor:pointer;}
+.dmg-item:last-child{border-bottom:none;}
+.dmg-item:active{background:var(--bg);}
+.dmg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.dmg-label{font-size:13px;font-weight:700;}
+.dmg-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.dmg-list-wrap{background:var(--white);border-radius:2px;box-shadow:var(--sh);overflow:hidden;}
+.dmg-empty{padding:24px;text-align:center;color:var(--text3);font-size:12.5px;background:var(--white);border-radius:2px;box-shadow:var(--sh);}
+
+.sev-chips{display:flex;gap:8px;}
+.sev-chip{flex:1;padding:10px 6px;border:2px solid var(--border);border-radius:2px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;background:var(--white);}
+.sev-chip.on-mineur{border-color:#ca8a04;background:#fefce8;color:#713f12;}
+.sev-chip.on-modere{border-color:#ea580c;background:#fff7ed;color:#7c2d12;}
+.sev-chip.on-grave{border-color:var(--red);background:var(--red-l);color:var(--red-d);}
+.photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.photo-thumb-wrap{position:relative;}
+.photo-thumb{width:64px;height:64px;border-radius:2px;object-fit:cover;border:2px solid var(--border);}
+.photo-add{width:64px;height:64px;border-radius:2px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--white);font-size:22px;}
+.photo-del{position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:var(--red);border:none;border-radius:50%;color:#fff;font-size:11px;cursor:pointer;}
+.btn-submit{width:100%;padding:13px;background:var(--red);color:#fff;border:none;border-radius:2px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:4px;}
+.btn-submit:disabled{opacity:.5;}
+
+/* INFOS */
+.fsec{background:var(--white);border-radius:2px;box-shadow:var(--sh);overflow:hidden;margin-bottom:12px;}
+.fsec-title{padding:10px 13px;font-size:11.5px;font-weight:700;background:var(--bg);border-bottom:1px solid var(--border);}
+.frow{display:flex;gap:8px;padding:9px 13px;border-bottom:1px solid var(--border);}
+.frow:last-child{border-bottom:none;}
+.fkey{font-size:10.5px;font-weight:600;color:var(--text3);min-width:78px;flex-shrink:0;}
+.fval{font-size:12.5px;flex:1;}
+.fval a{color:#166534;font-weight:700;text-decoration:none;}
+.fval.mono{font-family:monospace;font-size:11.5px;}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;align-items:flex-end;justify-content:center;}
+.modal-bg.on{display:flex;}
+.modal{background:var(--white);border-radius:14px 14px 0 0;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;padding-bottom:16px;}
+.modal-drag{width:40px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;}
+.modal-hdr{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:15px;font-weight:700;}
+.modal-close{font-size:20px;color:var(--text3);background:none;border:none;cursor:pointer;}
+.modal-body{padding:14px 18px;}
+.photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.photos-grid img{width:100%;border-radius:2px;object-fit:cover;aspect-ratio:4/3;cursor:pointer;}
+.detail-row{display:flex;gap:8px;margin-bottom:7px;font-size:13px;}
+.detail-key{color:var(--text3);font-weight:600;min-width:80px;flex-shrink:0;}
+.sev-badge{display:inline-flex;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.sev-mineur{background:#fefce8;color:#713f12;}
+.sev-modere{background:#fff7ed;color:#7c2d12;}
+.sev-grave{background:var(--red-l);color:var(--red-d);}
+.btn-resolve{width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:2px;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px;}
+
+.state-msg{text-align:center;padding:50px 20px;color:var(--text3);font-size:13px;}
+.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;z-index:999;width:calc(100% - 32px);max-width:380px;pointer-events:none;}
+.toast{background:var(--anth);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;box-shadow:var(--sh-md);}
+.toast.ok{background:#15803d;}.toast.err{background:#991b1b;}
+
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.96);z-index:600;align-items:center;justify-content:center;flex-direction:column;}
+#lightbox img{max-width:100%;max-height:90vh;object-fit:contain;}
+</style>
+</head>
+<body>
+
+<!-- HOME : liste des 3 véhicules -->
+<div class="screen" id="s-home">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Véhicules RDZ</div>
+    </div>
+    <a class="back-btn" href="mobile.html">‹ Retour</a>
+  </div>
+  <div class="body" id="home-body">
+    <div class="state-msg">Chargement…</div>
+  </div>
+</div>
+
+<!-- MENU VEHICULE (boutons) -->
+<div class="screen hidden" id="s-vmenu">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Véhicule</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="vmenu-hero" id="vmenu-hero"></div>
+  <div class="body">
+    <div class="menu-btn" onclick="goScreen('s-prise')">
+      <div class="menu-btn-ico">🔑</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Prise de véhicule</div><div class="menu-btn-desc">Statut actuel et prise / restitution</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-degats')">
+      <div class="menu-btn-ico">💥</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Carte des dégâts</div><div class="menu-btn-desc">Consulter ou signaler un dégât</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-infos')">
+      <div class="menu-btn-ico">📋</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Infos & Assurance</div><div class="menu-btn-desc">Garage, pneus, assurance</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRISE DE VEHICULE -->
+<div class="screen hidden" id="s-prise">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Prise de véhicule</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-vmenu')">‹ Retour</button>
+  </div>
+  <div class="body" id="prise-body"></div>
+</div>
+
+<!-- DEGATS -->
+<div class="screen hidden" id="s-degats">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Carte des dégâts</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-vmenu')">‹ Retour</button>
+  </div>
+  <div class="body" id="degats-body"></div>
+</div>
+
+<!-- INFOS -->
+<div class="screen hidden" id="s-infos">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Infos & Assurance</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-vmenu')">‹ Retour</button>
+  </div>
+  <div class="body" id="infos-body"></div>
+</div>
+
+<!-- MODAL DETAIL DEGAT -->
+<div class="modal-bg" id="dmg-modal-bg" onclick="closeDmgModal(event)">
+  <div class="modal">
+    <div class="modal-drag"></div>
+    <div class="modal-hdr"><div class="modal-title" id="dmg-modal-title">Dégât</div><button class="modal-close" onclick="closeDmgModal()">✕</button></div>
+    <div class="modal-body" id="dmg-modal-body"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" onclick="event.stopPropagation()">
+</div>
+<input type="file" id="photo-input" accept="image/*" capture="environment" multiple style="display:none">
+<input type="file" id="mv-photo-input" accept="image/*" capture="environment" style="display:none">
+
+<script>
+// ══ CONFIG (même Supabase que Fleet_Agent_v2) ══
+const SB='https://trdhtlcenmjlcvzuplid.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const AEMAIL='surveillance@rdz-security-management.ch';
+const APASS='RDZ2026?/';
+const TOK_K='flt_tok_v2';
+const BUCKET='fleet-damages';
+
+const AGENT_ID = localStorage.getItem('rdz_agent_id');
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || '';
+if (!AGENT_ID) { window.location.href = 'mobile.html'; }
+
+const DMG_TYPES={
+  rayure:{label:'Rayure',color:'#ef4444'},
+  enfoncement:{label:'Enfoncement/Bosse',color:'#f97316'},
+  bris_vitre:{label:'Bris de vitre',color:'#3b82f6'},
+  deterioration:{label:'Détérioration',color:'#eab308'},
+  autre:{label:'Autre',color:'#6b7280'},
+};
+const SEV_COLOR={mineur:'#ca8a04',modere:'#ea580c',grave:'#8B1A1A'};
+const SCHEMA_IMG='data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACkALQDASIAAhEBAxEB/8QAHAABAQEAAwEBAQAAAAAAAAAAAAYFAwQHAgEI/8QASxAAAgEEAQICBgQJBwoHAQAAAQIDAAQFEQYSIRMxBxQiQVFhMnGBkRUWIzNCYnOhsyY2UpKxssIXNUVydYKio7TBQ1N0g5XS0+P/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQL/xAAYEQEBAQEBAAAAAAAAAAAAAAAAASERMf/aAAwDAQACEQMRAD8A/sulKUClKUClKUClKUClKUClKUClKUClKUClKUClKUClKUClKUClKUClKnuZZ24xQt7axiga6nSWZnn6vDhgiAMkhC92O2RQo1suO4oKGunmcnY4fHvfZCcQwIQN9JZmYnSqqgEsxJACgEknQFSmOy/Ir/MTYU5jGWd/HCJmhkws3V0E6BBNx0nvWBNeZbJ86ucJmLyOR8O8KwXFvCYBu5MamQAs2nVDIitvt4u/OgopOaXpdzDhYIo0JDJd5JI5l0Nnaorqh+TupHv1W3x3kdlmWe3WOa0vYkWSS1nC9fQ30XUqSsiHR06EjYI7EEVqWltBa20dvbQpDDGNIiDSqPkBXm/pMccYklz+MWOOexUXUUfT7HVI4hlTQI9mTqRio0C0Qbz70HptK8+ssjy64LRG8uhNEiGZRhoz0ll3r8/XObvlgOvXr3/4Af8A60F1Sob1vlAXb5O8X5fi8Sf3SGvoXfIunqbNXS/L8WpSf3MaC3pULb5LNTvIkXIrhjE5ST+TM3ssADo9/gR99c0d1nHk6ByWQH9bjcyj7ydUFpUvmOYW9tdy2WNtTfTQyeFNK0yw28Umt+GZG7s+vNUVyPeB2qa5ZyTO4XHSXVvyC1vmjlkt5Yzimi8N/AkcbYsQCCqHuO4Pzqm4HhrLH2shiTqe3keziZ+7pHG3Se/xdg0jHzYvs70KDq23N1hkP4asI7SBQDJc290J4oATrqlBVJEXf6ZTpHvYVYKQwBUgg+RFY3MrWKXBXN4Qq3FlE9xBKR9BlUkg/qsAVYeRBINS3D8xlbdsjxrC4q3vYsLM0atPfmIpEzuYol9h99Cr09yPogfOg9DpWTx/ORZU3NvJbTWN/aMq3VpPrrj6htWBUkMjaOmB0dEdiCBrUClKUClKUClKUCoblss1vzrG3UM4LmOGxNo6B0uI7ic+KPiCqRdex20hBB2NXNSnNuMXmTvI8zhb6O0zFvaTWsLTKWj6ZNbII7o4IGnG9dwQwOqDYxuBwuPyEuQsMXaW11LEInliiCsUBJC9vdsk6qH9JuGvMfnRyzHxtJbyWwt8jGh6WCqQyydWiV0Qp69EIUQkdBcjpLnuSYSWOzzV7kbSUgKj3CQyRyn5MQFcn4LIG/UWu3fcsu7i+gxWXtpXtGYesiC3ltGkGx9LxtL4fmW6XJI7eWwQ0cZzstjUeRVuHKApI0Fwhk7eeo4pEb643dT5jtU0Ib7n/JIrYq7YqC5SbI3DJ0q/hbKQKuz0j2j7JPXt2dwmkVr5ON8Lv5PHjw+FuGbuWSGMhvmddj9tb1tbwWtslvbQxwwxr0pHGgVVHwAHYUGdx8mS5y0zAe3fsoOvcqIn+E1raHwrE47cwJd5GweaMXC3szrEWHWVPS3VrzI9vzrb2PjQND4Cvw615V+SuI42kIYhQSQqlidfADuansZzLDZC+isYxfxXEx1Gk1lKhJ1vvtfZ8v0tUHc4xpkyMm9lshPvfybp/wANa9ZHGe34Si0B0ZCby/WIb/FWvQSPpI45LlsNdTY5R670KWjI2s/QwZQQPeCO3xBZf0tiR4Lyi6sUNu0U0jJGnjI6SSsQAFR38NWdH6QAZOhopAgYMrFlHrh7DvUnk8JiWzccORx1teWN87NA0qBjbXOtt0HzUSAE9iPaU/0qCe5pzJpMcVESJas6r+VhmSKZtjpV3kRCwLaHhRLJI/ZewJNUHovwFzhsLNc5LrOSyU7XNz4mutd+Strt1ebEDsGZgCQAa08bxXjuOZntMPZrIyGNpGj63KHzXqbZ0fhvVdFVv7XJy4jE3qCxiiDzyXA6zZb+iiE/S2NkK30Bo7IIWgc7gS1Ww5BbdUWRtby3t0kTzkimnjjeJh+kpDb0fJgrDuKqBUNh8bFneVy30l9dXmOw8qLb9d2zpc3RQOZWUHoKoHQKAAA3U3mF1c0ClKUClKUCh7UqM9ISR3GQtYLqJbq1gxt9fG0kYiOaSIRBOsbGwPEbse3ffmAQFJkMziMcdX+VsbQj/wA+4RP7TX1iMvi8vFJLisjaX0cb9DvbzLIFbW9Eg+eiDUp6MrS2uLK6mvOLYnF3ttciIm3sVhLDoRwSNbBHXr4dtjtXHzu4NhyGLI4d0tsha2jtfytH1I9uQ3RGygjqfrHUnf2dP7m0QuJ4YriF4Z4klicdLo6gqw+BB86wG4di4f8ANE9/he++iwuCkQ/9luqL/grbxzXJsLdr0ItyYl8YJ9EPodWvlvdfOSyWPxkHj5G+trOLeuu4lWNfvYigl5eIZIybOWxd4oJKm/wkUjffG0f9gqc5Bi+Q2Vrc2mQxMUmOf6F5hL6aBkXe/bt5CU+9+n5irCbnPHVhmmt7m5v44VLO9lZzToAPM9aKVA+ZOq+MdzO0vrNbtMRmoon7r49r4bke49BbqG/mBQeTYYxY7K+tzwXuXgjTdx03kkMqldeHNJH3YdILr1KShDnTHQFVGCGaucVbTwc1yLuI1DlJI7hAR7tldn7e5rdz1tw7L9NxO11i7uNvES5jhlgkjc+bBta38SO/zqRvcLe2l341ndY7Pa7+sY67SyyGv1lH5OX7VBPxoqke45er9UPJoWXt7M2PQj7wQa5RmebxAqk2Cu+/smSKWMn5HRIqdwmTyd3dT2NnfW1zeWxQSWWVi9Tuh1AkaIJSTy8wTr36rXe8zFrJ0X3FsvEw2S8CLcJ27+amouOzY8hzlpbS30dhZXDX1xBIIupoSDLAp8yWHYoyn51305jll14/FpiNH8xeI/f7QKl7bK4+PGu8pktwkilI5oyjhY7osPZPfuk7dvMhDryrs/jLhPIXoY+WhE5/7USNfMcjxOXsTZ53imXkhDLIEMAcdQ8iCrbBGzWUcnxCwx0wxNpe4+eW4tQfWI5emMrL1K5BJCqOlySPgRX3HmoJZGjtLLJ3MgB9mKyf3e7uBWf+CeSZLKyZGXBiO1QN0LkZVjRewAZh3JAG/tJ+RoY9SyWRtrHEy5KR+uCOPrHh+0X39ELrzJ2APiSK8d5FfWyWckuTW5yMt7cM7W0MhkN1OSB6tapvpYj2UaU7CAfSB+j1sjlgtxZcEtsricgLZfXneO58SNGaRljhCBlD9PS7ESOqgsmw2gDtcVbEYy6OYZHy2QZemCV541ViBoASP0hj5gBFWNQSFA2WNHoXCsRJhcBFb3IgW7lZp7rwF1GJHOyqD+go0i/qqK7FnyDA3l21paZrG3FwjdLRRXSM6n4EA73U5YC+5x4M+VsZcfgkj2bFp1ZryXZBWXoP5tNaKH6TE7BCjqyeaY9ExuSscVgrO5mkzFna26GxjlWBGig6mClSqgKCN+Q3v3UR6ZulSC42049y3ExYdGtLa/FxHcWqO3gnpQOrBCelWBBG1A2GO96Gq+gUpSgVK8o9U/Gu09fJFp+A8j4+t76Ou16vLv5b8qqqjedELnYNjYODyCkfIy2g/wC9BoQ3KWeFhkxU73VxkLkKkt2p2XY6YuoC66VQ+yAPo67edRGayN6nKbiS8x0bl/bitjMdSXkfq8UcLHp/N9Uyyg+8EHQ0RVbhmdouPRAnQmuZW+fSHUf36neZwCb0tcUhO/DOV8Rx7iVsbhwf60Uf9WgqhgMxfd81yW7ZSe9vjU9Ui/rAtL9zj6q7WN4rx3Hyie2xFr6wDv1iVPFmJ+cj7Y/aa2h2FKCW53KZZLDFeccztcTgnsyR60pHwLsn2Ais3667HJXLcuZD/wCHj0I7f0pX3/cFdepWo/QSPIkfVXHNFFMupoo5R8HQN/bX3QeYqK4sPwTh/IMTLcZfAY+/kkvLjbyQ+0AJGXp2PcAuvsr7tfRFwixdnxdtmMWzHqPqOdvbdd/6qTAfure4AxbjMRPmbi5/jyVv1phHRcD8Dr9V5hzCLqGh1ZUzdP1eKrVyy8QyjQmOP0g8rh9nQKmzYj57a3JqspQQH+TrKt+f9KHN7gfBp7aMf8qFK/E9GFoCDLmbm6ceUl5aW1y/9aWNjXoFKDza0sXsMrlLCa6a8ELwhHkhjj0piB6emNVUAEnyHvNczqtkHu7aFNqOqWED2J0H0kZfI9t6Otg6+e+e9/nTmv2kH8EV9AAsAe4J0fqqNTxzcMxsi4m5u8LfNbFslelYn3JbuvrMgX2CdqNAfQK/Ua1+KTPcz5W4kQRvLcROyhthSbaEkb7brM9DvV+IkIf6SXt6h/3buVR+4VocM/0j+2h/6aGqy+eQfzv43+0uf4Jqiqd5B/O/jf7S5/gmqKgUpSgVGc7BbPW4A2fwJf8A8a0qzqV5RavfcrtLONxG8+DyMaufJSZLUA0HxhG6Tx9vczXab+ZJb/Caw+Vy+H6X+KqSAJMiVO/9n3hqjSB7PBYm5ikS8FpciSRrWMyAq/Wr9AGyQvie7vpah+RTXuS5lBcrjbpbvGM+Tij6R1MUFv0266O2kMDTMV15vob0dB69SsrDciwmWkMFhkoJbhRt7cnomT/WjbTr9oFau6CK5GP5ZSn446HX2Sy7/tFcNd7maGHN4667+HPFJbMd9uvtIn7lkFdGpWp4V+jzFflKitz0ffzXi/8AUXP/AFElb9YXBtDAlA4fou7kHXu/LOdfZut3Y+f3VpgpXFc3NvbL1XE8US/F3Cj99Z1zybjlqSLnPYqEgbIkvI10Ptag1qViR8u4rIvVHyXCuvxW/iI/vV+HmHEwdHk+EB+Bv4v/ALUE/ffzpzX7SD+CK+l+kv1iuql9ZZHkGZusfeW93AZYVEsEqyISIV2Ng63X3eSPHbOYlLzN7ESjzaRuyj79fvqNRo+h1g/BYnHk2Qv2Hf3G8mIrQ4Z/pH9tD/00NdLhE9jhOKNDc3CxxxZC8hTfdnK3Mg0oHdideQBNd3hgYfhESRvG4mh6kYaKn1WHsfnVZfPIP538b/aXP8E1RVO8g/nfxv8AaXP8E1RUClKUCo/nKu2aiWJXeZ8Dk0jRPpMxNuQB8+1WFZ2bwthmBCbtZllt2LQzQTvDLGSNHpdCCAR2I3o++gxPRjeT3+LvrqXGfg+J7wmGMIyqR4abKggdurq7gaPfVZPpCj/BWT9fDlPXSrW0igs0V3EjFSQBvpZF0T5AKQ3ZqoE41eQgiz5Zn4R7lkkhnH/MjZv31y4fj72+U/CuVyU2Vv0jMMEkkaxrBGdFgiKNAsQOpu5OgOwGqDnnx2H5JjLa4yWKt7lJIlkRbmAM0fUAe2xtSN+7VdIcV9V/zRns1jgBoR+s+sx/1Zw+h8gRVHXzJIkaF3ZVVRssToD7aCRzWF5dd49rNsriL1Nho3ks3t5UdTtXDq7LsED9DR7jyNdfHYflRtEXI2mIW7A9tre7kMRPxAaPqH1d9fE1tXHM+JwP0ScjxXX/AEVukY/VoE1iX/PWuUkHHcNkbyNAS9/cWzW9quveHl6A4+YOvgT5UOu0+DyaRNLc5DHWiKu2bwmcL9pZRr7KmL7N40zz22HusryC4i9mX1CKKK3hP687r0r9prDvLjMcov44GjuM07qzLHGWWzQKQGJPsGXXUo7CNTvR6/Ou7YWuDubG1kyeSiuU6QYbWV0ghh+SwIelfL57qLtZVsi3t3d/hHkGaRJJFkix3Hr+WZlYj2zJL+b2Tr6Hbzr8m4Zhr8IZeG5C9Ye0Jc3yK4k0fnEr68vdqqj8YuN2sYiTK2MaDySI9vuUUPJsSpQxtdT9Q6lENpI+x91F5GDjOIcejtAw4NwdPBZ4zGcQs2/y6wr+UkJJBPiE9t+x28676cSxYjeNuJ8E6CNKBgY9D7Nd67tlPK+LVbbHZK5nhktBcRx2z72A8z6JAU6km15/Ou8r56Vd2/Fsiw3oeLJHFv56Jok4wk47awgAcJ4WQvYep2ptH18mXyr6sL/HW949kLHkeJlj2XFjfm8QAEAnolDDWz5AH7qoPUuXPGpTA2sTEnYmvh2H+6KzczxvkcRXL3D46xkR4w0tvK7tGrHoZgCvtdivbY+h57PamMO9y93Y8jN2mXnu8BcWqu121lHCUmjcrIkjhCsekaL2mRVPV3Ya3W/go8zJ4lzaTNkriDZ3GkaXEQYEheiVuhOodg69QI7gkbqru+K20XF4cdj+sXNm3j20xkKu03fZLDR9rbKfk3wqDitr/FSW+V4yqpcLswWb6igutnb2/wAIJG0QNajZwPZRu5Cl9HRix94cZmMNcY3N3CyXiyXUqStcdblpRG6sw0jMAV2OzBtd+3JybO3nHIsvlLW3imjXNWkdyH32heKBGIIPY+0NE9vjW80OG5hx+0umRpbeXpuLdwxjmgce9WUho5F7g6II7g+8V0IuHTB7kT8rz08VxIrvH1QJshFQbZIgx7KPfRHNn2B5lxpNjq6rpte/Qh0T9WyPvFUlZWH49i8VdyXltDLJdyII3ubm4knmK7309cjEhd99DQ37q1aBSlKBSlKBWZyLPYvj9l61lLoRKd+GiqXklIGyERQWY676AOh38q06gOZmKDn2LuvERrh44rEWr9/WoJ5isyhff0hUl2PIRnfYmg/Lzk2dyY3aeDhLNhtXcpLcuPPffcafZ4v2VlLh5L/LRRXMEGSM22hkyCyXLjWuoqZj4O++9Ig7e7zNemW9jZQN1wWlvG/9JIwD99SHpTzsNrDbYG1gNzl71uu2VO7waPaVQCD1bB6RtR2YsyorkBvQYJorYW4zF8kY8lhEMIH1dCCvjI8Uw2RtHtsgl3dxuACJryV/L3gFtD7BUFb2vL7+FL057Iytr85AJXjPbz3H4SN/uRuPgWrS4pzPJWuatsFyZklF6SlnerrTyA6KMQqgnZC90RlYhWX2ldg5+OcEwQz19krdJ7ZIZ2too4pnQqiKo0rg9aqSTtQQG0u+ygVS2fEOL2iKsHH8YoUaG7ZWOvrIrl42SPwlER3jyEv/ABacf3q16DqCwtYISLSytEZVPQPDCrv7B2G6yMaOaNeQHInAxWob8ssCys5Gj2UkgA713I+yqKh8jQZHHSXny0jbPXkH1sf0URf8Na+hWRxfYhvwTsjIXH2bckfuIrXoOjm8YmVsvVZLq9tl6w5e1naJzr3Ej3H3j31gJiIIMtFi7W6vrjqaO5vnuLlpAqI240APsqXcb7AbCNv3Vscqzlpx/DzZC6O+hT0IPN2AJ0PuJPyFeXYu95Fm2lKXU1t6zIZJRA7q0jA9LfmvyknSQEJDxRKR0BpCC1B7N21UHmMdgrfPX1reOYIb78vJPbuV9XdtAibzUKxAZWf9Lq+VT1/Jy3Co72+SvkkdSxSTxpOwG21HMZSwABJ8GXrUe14cmuk3nAb7F5XjMV1joBEjswuI2kEjCX9Lqfv1k9iH/SUqR2IoOrwkjG5XL8fnuZJZVm9et3k6QZ4ZgCzgDt+dEnVodiwPbqFVdRfNcLi8bb2GYsLRLa+tclai3aIsoHizxxSIFB1p0ZgRrv2PmBq0HlQKUpQKUpQKUpQKj+bR3NhmrPkFpA5Isrmwknjt2maAydDxuVVWYr1R9J0D9MEjQNWFKDzjCcis7Pkkt3kORNHZvbCIQXMs7EyAg9fS8SBO2wdfHvWJHd2Ge9J+avlnhu7Bo7SzgnR+pWiMkQnUEe7bqp+UjD3mvYtfX99YHMuPnNWsUtrKkN/bBxC0oLRyI4AeKQDuUYAeR2CqsO66IbyqAoAAAA8tV5Z6b7aIY69mtti8jW2uouk9xOspVWHbzMfign4Rj4VuQZPl1pB6rLiMi8gGkPgQ3IP1SiePqHwLoh+OzXPxvj1/Pl1zmdHhyRuZLe2aUSP4hUp4srKAvUEJVUT2UDMdsW2AzMP6QOPR3F3dS8l4osd2Y5lUZqMlW8NVbfs/qj99dpvSVguvS5/h5X4nPqD93h1dUoIN/STher2eQcM1887/APzr8/ykYYqf5ScMQ/7b6v8AAKvaUHnOG5zgbSS8M3LuHdNxcNOAmTB6dhRruB7wTv51zt6Q8OZD08y4WE927/Z/tq/pQeJc95DaZS2kNny7j+WupX1Fb2L9UsUccbzeyA5/TiRmbXfQHYAV6ZwezsrWyultEjUJObdQp30xRALCoPw8PpYf65PvrfkRZEaN1VkYaZWGwR8DUHFiM9xafw8RDLfY9VCQmEI8iRr9COWN3TxAg9lZEcN0hVZW6eohT8yjibjN/JIehoIWnikHnHIg6kYfMMBqofg9xcYDM8jW3w+SusbcX7G1WyhVkSRHdZV8wF0ekd+2l7eVal7+NXIZEhhs7iwhDh1mvIUijiIOw/hCR3mcHuFboTYBPVoCq7B4u1w+Kt8baBzFAug0jdTuSdszH3sSSSfeSTQY+NxuQy2XTN8gg9XS2YnHY4ur+AdEGaQqSrSkEgaJCDyJJY1S0pQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQKUpQf/9k=';
+
+// ══ STATE ══
+let vehicles=[],damages=[],movements=[],authToken=null;
+let currentVeh=null,pinX=null,pinY=null,dmgSeverity='',pendingPhotos=[];
+let mvType='',mvClean='',mvPhotoFile=null;
+
+// ══ UTILS ══
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>{if(!d)return'—';const[y,m,j]=d.split('-');return`${j}.${m}.${y}`;};
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const uid=()=>crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);});
+function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
+function parsePhotos(val){
+  if(!val)return[];
+  if(Array.isArray(val))return val.filter(Boolean);
+  if(typeof val==='string'){
+    if(val.startsWith('{'))return val.slice(1,-1).split(',').map(s=>s.trim().replace(/^"|"$/g,'')).filter(Boolean);
+    try{return JSON.parse(val)||[];}catch(_){return[];}
+  }
+  return[];
+}
+
+// ══ AUTH SILENCIEUSE (compte de service Fleet) ══
+async function silentLogin(){
+  try{const s=JSON.parse(localStorage.getItem(TOK_K)||'{}');if(s.t&&s.e&&Date.now()/1000<s.e-60){authToken=s.t;return;}}catch(_){}
+  const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:AEMAIL,password:APASS})});
+  if(!r.ok)throw new Error('Auth échouée');
+  const d=await r.json();
+  authToken=d.access_token;
+  localStorage.setItem(TOK_K,JSON.stringify({t:d.access_token,e:Math.floor(Date.now()/1000)+(d.expires_in||3600)}));
+}
+async function sbApi(path,opts={}){
+  const r=await fetch(`${SB}/rest/v1/${path}`,{...opts,headers:{'apikey':KEY,'Content-Type':'application/json',...(authToken?{'Authorization':`Bearer ${authToken}`}:{}),...(opts.headers||{})}});
+  if(!r.ok){const t=await r.text();throw new Error(t||`HTTP ${r.status}`);}
+  if(r.status===204)return null;
+  const txt=await r.text();return txt?JSON.parse(txt):null;
+}
+async function uploadPhoto(file){
+  const name=`${uid()}.${file.name.split('.').pop()||'jpg'}`;
+  const r=await fetch(`${SB}/storage/v1/object/${BUCKET}/${name}`,{method:'POST',headers:{'apikey':KEY,'Authorization':`Bearer ${authToken}`,'Content-Type':file.type||'image/jpeg'},body:file});
+  if(!r.ok)throw new Error('Upload échoué');
+  return `${SB}/storage/v1/object/public/${BUCKET}/${name}`;
+}
+
+// ══ NAVIGATION ══
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// ══ INIT ══
+async function init(){
+  try{await silentLogin();}catch(e){console.warn(e.message);}
+  await loadData();
+}
+async function loadData(){
+  try{
+    const[vd,dd,mv]=await Promise.all([
+      sbApi('fleet_vehicles?select=*&active=eq.true&order=plate.asc'),
+      sbApi('fleet_damages?select=*&order=created_at.desc'),
+      sbApi('fleet_movements?select=*&order=created_at.desc').catch(()=>[]),
+    ]);
+    vehicles=(vd||[]).filter(v=>v.category==='operational');
+    damages=dd||[];
+    movements=mv||[];
+  }catch(err){
+    document.getElementById('home-body').innerHTML=`<div class="state-msg">⚠️ Impossible de charger les véhicules.<br><small>${esc(err.message)}</small></div>`;
+    return;
+  }
+  renderHome();
+}
+
+// ══ HOME ══
+function lastMovement(vid){return movements.filter(m=>m.vehicle_id===vid).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))[0];}
+function renderHome(){
+  if(!vehicles.length){document.getElementById('home-body').innerHTML='<div class="state-msg">Aucun véhicule.</div>';return;}
+  document.getElementById('home-body').innerHTML=vehicles.map(v=>{
+    const lm=lastMovement(v.id);
+    const enService=lm&&lm.type==='prise';
+    return `<div class="vcard" onclick="openVehicle('${v.id}')">
+      <div class="vc-top">
+        <div class="vc-plate">${esc(v.plate)}</div>
+        <div class="vc-status ${enService?'service':'dispo'}">${enService?'🟠 En service':'🟢 Disponible'}</div>
+      </div>
+      <div class="vc-model">${esc(v.brand)} ${esc(v.model)}</div>
+      <div class="vc-km">${v.km_current?Number(v.km_current).toLocaleString('fr-CH')+' km':'Km inconnu'}</div>
+    </div>`;
+  }).join('');
+}
+
+function openVehicle(id){
+  currentVeh=vehicles.find(v=>v.id===id);
+  if(!currentVeh)return;
+  document.getElementById('vmenu-hero').innerHTML=`
+    <div class="vmenu-plate">${esc(currentVeh.plate)}</div>
+    <div class="vmenu-model">${esc(currentVeh.brand)} ${esc(currentVeh.model)}</div>
+    <div class="vmenu-km">${currentVeh.km_current?Number(currentVeh.km_current).toLocaleString('fr-CH')+' km':'Km inconnu'}</div>`;
+  goScreen('s-vmenu');
+}
+
+// ══ PRISE DE VEHICULE (sans historique) ══
+function renderPrise(){
+  const lm=lastMovement(currentVeh.id);
+  const enService=lm&&lm.type==='prise';
+  let html=`<div class="status-box">
+    <div class="status-ico">${enService?'🟠':'🟢'}</div>
+    <div class="status-txt">${enService?'Véhicule en service':'Véhicule disponible'}</div>
+    ${enService?`<div class="status-sub">Pris par ${esc(lm.agent_name||'—')}</div>`:''}
+  </div>`;
+  if(enService){
+    html+=`<button class="btn-action restit" onclick="openMvForm('restitution')">✅ Restituer le véhicule</button>`;
+  }else{
+    html+=`<button class="btn-action prise" onclick="openMvForm('prise')">🔑 Prendre le véhicule</button>`;
+  }
+  html+=`<div id="mv-form-wrap"></div>`;
+  document.getElementById('prise-body').innerHTML=html;
+}
+
+function openMvForm(type){
+  mvType=type;mvClean='';mvPhotoFile=null;
+  const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById('mv-form-wrap').innerHTML=`
+    <div class="fg" style="margin-top:16px">
+      <label class="fl">Nom de l'agent</label>
+      <input class="fi" id="mv-agent" value="${esc(AGENT_NOM)}" readonly style="background:var(--bg)">
+    </div>
+    <div class="fg">
+      <label class="fl">Date et heure</label>
+      <input type="datetime-local" class="fi" id="mv-datetime" value="${now.toISOString().slice(0,16)}">
+    </div>
+    <div class="fg">
+      <label class="fl">État propreté / rangement</label>
+      <div class="clean-chips">
+        <div class="clean-chip" id="clean-propre" onclick="setClean('propre')">✅ Propre</div>
+        <div class="clean-chip" id="clean-acceptable" onclick="setClean('acceptable')">⚠️ Acceptable</div>
+        <div class="clean-chip" id="clean-sale" onclick="setClean('sale')">🔴 Sale</div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Photo tableau de bord</label>
+      <div class="photo-box" id="mv-photo-box" onclick="document.getElementById('mv-photo-input').click()">📷 Prendre une photo</div>
+    </div>
+    <div class="fg">
+      <label class="fl">Notes / Remarques</label>
+      <textarea class="fi fi-ta" id="mv-notes" placeholder="Observations…"></textarea>
+    </div>
+    <button class="btn-submit" id="mv-submit-btn" onclick="saveMvEntry()">💾 Enregistrer ${type==='prise'?'la prise':'la restitution'}</button>`;
+}
+
+function setClean(val){
+  mvClean=val;
+  ['propre','acceptable','sale'].forEach(s=>{
+    document.getElementById('clean-'+s).className='clean-chip'+(s===val?' on-'+s:'');
+  });
+}
+document.getElementById('mv-photo-input').addEventListener('change',function(){
+  const file=this.files[0];if(!file)return;
+  mvPhotoFile=file;
+  const r=new FileReader();
+  r.onload=e=>{document.getElementById('mv-photo-box').innerHTML=`<img src="${e.target.result}">`;};
+  r.readAsDataURL(file);
+  this.value='';
+});
+
+async function saveMvEntry(){
+  if(!mvClean){toast("Indiquez l'état de propreté",'err');return;}
+  const btn=document.getElementById('mv-submit-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi…';
+  try{
+    let photoUrl='';
+    if(mvPhotoFile){try{photoUrl=await uploadPhoto(mvPhotoFile);}catch(e){console.warn(e.message);}}
+    const payload={
+      id:uid(),vehicle_id:currentVeh.id,type:mvType,agent_name:AGENT_NOM,
+      datetime:document.getElementById('mv-datetime').value||new Date().toISOString(),
+      cleanliness:mvClean,photo_dashboard:photoUrl||null,
+      notes:document.getElementById('mv-notes').value.trim()||null,
+      created_at:new Date().toISOString()
+    };
+    await sbApi('fleet_movements',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    movements.unshift(payload);
+    toast(mvType==='prise'?'Prise enregistrée ✓':'Restitution enregistrée ✓');
+    renderHome();
+    renderPrise();
+  }catch(e){toast('Erreur : '+e.message,'err');btn.disabled=false;btn.innerHTML='💾 Enregistrer';}
+}
+
+// ══ DEGATS ══
+function renderDegats(){
+  let html=`<div class="schema-wrap">
+    <div class="schema-hdr"><span>💥 Carrosserie</span><span style="font-size:10px;color:var(--text3);font-weight:400">Touchez un point rouge pour le détail</span></div>
+    <div class="svg-wrap" id="schema-wrap-el">
+      <img src="${SCHEMA_IMG}">
+      <svg id="dmg-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+  <button class="btn-submit" id="btn-open-dmg-form" onclick="openDmgForm()" style="margin-bottom:14px">＋ Signaler un nouveau dégât</button>
+  <div id="dmg-form-panel" style="display:none"></div>
+  <div id="dmg-list-title" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Dégâts signalés</div>
+  <div id="dmg-list-wrap"></div>`;
+  document.getElementById('degats-body').innerHTML=html;
+  renderDmgOverlay();
+  renderDmgList();
+}
+
+function renderDmgOverlay(){
+  const svg=document.getElementById('dmg-overlay');
+  if(!svg)return;
+  svg.innerHTML='';
+  const vDmgs=damages.filter(d=>d.vehicle_id===currentVeh.id&&!d.resolved);
+  vDmgs.forEach(d=>{
+    const col=SEV_COLOR[d.severity]||'#6b7280';
+    const cx=`${d.location_x}%`,cy=`${d.location_y}%`;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('style','cursor:pointer');
+    g.setAttribute('onclick',`showDmgDetail('${d.id}')`);
+    const halo=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    halo.setAttribute('cx',cx);halo.setAttribute('cy',cy);halo.setAttribute('r','3%');halo.setAttribute('fill',col);halo.setAttribute('opacity','.25');
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','2%');dot.setAttribute('fill',col);dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
+    g.appendChild(halo);g.appendChild(dot);
+    svg.appendChild(g);
+  });
+  if(pinX!==null&&pinY!==null){
+    const cx=`${pinX}%`,cy=`${pinY}%`;
+    const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ring.setAttribute('cx',cx);ring.setAttribute('cy',cy);ring.setAttribute('r','2.8%');ring.setAttribute('fill','none');ring.setAttribute('stroke','#8B1A1A');ring.setAttribute('stroke-width','1%');
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',cx);dot.setAttribute('cy',cy);dot.setAttribute('r','1.8%');dot.setAttribute('fill','#8B1A1A');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
+    svg.appendChild(ring);svg.appendChild(dot);
+  }
+}
+
+function renderDmgList(){
+  const vDmg=damages.filter(d=>d.vehicle_id===currentVeh.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  const el=document.getElementById('dmg-list-wrap');
+  if(!vDmg.length){el.innerHTML='<div class="dmg-empty">Aucun dégât signalé pour ce véhicule.</div>';return;}
+  el.innerHTML=`<div class="dmg-list-wrap">${vDmg.map(d=>{
+    const cfg=DMG_TYPES[d.type]||{label:d.type,color:'#6b7280'};
+    const photoCount=parsePhotos(d.photos).length;
+    return `<div class="dmg-item" onclick="showDmgDetail('${d.id}')">
+      <div class="dmg-dot" style="background:${d.resolved?'#9ca3af':SEV_COLOR[d.severity]||cfg.color}"></div>
+      <div style="flex:1">
+        <div class="dmg-label">${esc(cfg.label)}${d.resolved?' <span style=\"color:var(--text3);font-weight:400;font-size:10.5px\">(résolu)</span>':''}</div>
+        <div class="dmg-sub">${fmtD(d.date)} · ${d.severity||'—'}${photoCount?' · 📸 '+photoCount:''}</div>
+        ${d.description?`<div class="dmg-sub">${esc(d.description.slice(0,70))}</div>`:''}
+      </div>
+      <div style="color:var(--text3)">›</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function showDmgDetail(id){
+  const d=damages.find(x=>x.id===id);if(!d)return;
+  const cfg=DMG_TYPES[d.type]||{label:d.type};
+  const sevClass={mineur:'sev-mineur',modere:'sev-modere',grave:'sev-grave'}[d.severity]||'sev-mineur';
+  let h=`
+    <div class="detail-row"><span class="detail-key">Type</span><span>${esc(cfg.label)}</span></div>
+    <div class="detail-row"><span class="detail-key">Sévérité</span><span class="sev-badge ${sevClass}">${d.severity||'—'}</span></div>
+    <div class="detail-row"><span class="detail-key">Date</span><span>${fmtD(d.date)}</span></div>
+    <div class="detail-row"><span class="detail-key">Agent</span><span>${esc(d.created_by||'—')}</span></div>
+    ${d.description?`<div class="detail-row"><span class="detail-key">Description</span><span>${esc(d.description)}</span></div>`:''}`;
+  const photos=parsePhotos(d.photos);
+  if(photos.length){
+    window._dmgPhotos=photos;
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px">📸 Photos</div>
+    <div class="photos-grid">${photos.map((url,i)=>`<img src="${esc(url)}" onclick="openLightbox(${i})">`).join('')}</div>`;
+  }
+  if(!d.resolved) h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
+  document.getElementById('dmg-modal-title').textContent=cfg.label;
+  document.getElementById('dmg-modal-body').innerHTML=h;
+  document.getElementById('dmg-modal-bg').classList.add('on');
+}
+function closeDmgModal(e){if(!e||e.target===document.getElementById('dmg-modal-bg'))document.getElementById('dmg-modal-bg').classList.remove('on');}
+async function resolveDmg(id){
+  try{
+    await sbApi(`fleet_damages?id=eq.${id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({resolved:true,resolved_at:today()})});
+    const d=damages.find(x=>x.id===id);if(d){d.resolved=true;}
+    toast('Dégât marqué comme résolu');
+    closeDmgModal();renderDmgOverlay();renderDmgList();
+  }catch(e){toast('Erreur : '+e.message,'err');}
+}
+
+function openDmgForm(){
+  pinX=null;pinY=null;dmgSeverity='';pendingPhotos=[];
+  document.getElementById('btn-open-dmg-form').style.display='none';
+  const panel=document.getElementById('dmg-form-panel');
+  panel.style.display='block';
+  panel.innerHTML=`
+    <div class="fg">
+      <label class="fl">Type de dégât</label>
+      <select class="fi" id="d-type">
+        <option value="">— Sélectionner —</option>
+        <option value="rayure">🔴 Rayure</option>
+        <option value="enfoncement">🟠 Enfoncement / Bosse</option>
+        <option value="bris_vitre">🔵 Bris de vitre</option>
+        <option value="deterioration">🟡 Détérioration</option>
+        <option value="autre">⚫ Autre</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Sévérité</label>
+      <div class="sev-chips">
+        <div class="sev-chip" id="sev-mineur" onclick="setSev('mineur')">Mineur</div>
+        <div class="sev-chip" id="sev-modere" onclick="setSev('modere')">Modéré</div>
+        <div class="sev-chip" id="sev-grave" onclick="setSev('grave')">Grave</div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Description</label>
+      <textarea class="fi fi-ta" id="d-desc" placeholder="Décrivez le dégât…"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">Photos</label>
+      <div class="photo-row" id="photo-row">
+        <div class="photo-add" onclick="document.getElementById('photo-input').click()">📷</div>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="d-date" value="${today()}"></div>
+    <button class="btn-submit" id="btn-submit-dmg" onclick="submitDamage()">📸 Enregistrer le dégât</button>
+    <button class="btn-submit" style="background:var(--bg);color:var(--text2);border:1px solid var(--border);margin-top:8px" onclick="closeDmgForm()">Annuler</button>`;
+  toast('👆 Tapez sur le schéma ci-dessus pour localiser le dégât');
+  document.getElementById('schema-wrap-el').onclick=onSchemaTap;
+}
+function closeDmgForm(){
+  pinX=null;pinY=null;
+  document.getElementById('dmg-form-panel').style.display='none';
+  document.getElementById('btn-open-dmg-form').style.display='block';
+  document.getElementById('schema-wrap-el').onclick=null;
+  renderDmgOverlay();
+}
+function onSchemaTap(e){
+  const wrap=document.getElementById('schema-wrap-el');
+  const rect=wrap.getBoundingClientRect();
+  pinX=((e.clientX-rect.left)/rect.width)*100;
+  pinY=((e.clientY-rect.top)/rect.height)*100;
+  renderDmgOverlay();
+}
+function setSev(s){
+  dmgSeverity=s;
+  ['mineur','modere','grave'].forEach(x=>{
+    const el=document.getElementById('sev-'+x);
+    if(el)el.className='sev-chip'+(s===x?' on-'+x:'');
+  });
+}
+document.getElementById('photo-input').addEventListener('change',function(){
+  const files=Array.from(this.files);
+  if(pendingPhotos.length+files.length>5){toast('Maximum 5 photos','err');return;}
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=e=>{pendingPhotos.push({dataUrl:e.target.result,file:f});renderPhotoRow();};
+    r.readAsDataURL(f);
+  });
+  this.value='';
+});
+function removePhoto(i){pendingPhotos.splice(i,1);renderPhotoRow();}
+function renderPhotoRow(){
+  const row=document.getElementById('photo-row');if(!row)return;
+  let h=pendingPhotos.map((p,i)=>`<div class="photo-thumb-wrap"><img class="photo-thumb" src="${p.dataUrl}"><button class="photo-del" onclick="removePhoto(${i})">×</button></div>`).join('');
+  if(pendingPhotos.length<5)h+=`<div class="photo-add" onclick="document.getElementById('photo-input').click()">📷</div>`;
+  row.innerHTML=h;
+}
+async function submitDamage(){
+  if(pinX===null){toast('Localisez le dégât sur le schéma','err');return;}
+  if(!document.getElementById('d-type').value){toast('Sélectionnez un type','err');return;}
+  if(!dmgSeverity){toast('Sélectionnez la sévérité','err');return;}
+  const btn=document.getElementById('btn-submit-dmg');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi…';
+  try{
+    const photoUrls=[];
+    for(const p of pendingPhotos){try{photoUrls.push(await uploadPhoto(p.file));}catch(e){console.warn(e.message);}}
+    const payload={
+      id:uid(),vehicle_id:currentVeh.id,date:document.getElementById('d-date').value||today(),
+      type:document.getElementById('d-type').value,severity:dmgSeverity,view:'top',
+      location_x:Math.round(pinX*100)/100,location_y:Math.round(pinY*100)/100,
+      description:document.getElementById('d-desc').value.trim(),photos:photoUrls,
+      created_by:AGENT_NOM,resolved:false
+    };
+    await sbApi('fleet_damages',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    damages.unshift(payload);
+    toast('Dégât enregistré ✓');
+    closeDmgForm();renderDmgList();
+  }catch(e){toast('Erreur : '+e.message,'err');btn.disabled=false;btn.innerHTML='📸 Enregistrer le dégât';}
+}
+
+// ══ INFOS & ASSURANCE ══
+function renderInfos(){
+  const v=currentVeh;
+  const police=v.insurance_policy_number||v.police_number||v.insurance_policy||v.numero_police||'';
+  const phone=v.insurance_phone||v.insurance_tel||'';
+  let h=`<div class="fsec">
+    <div class="fsec-title">🚗 Identification</div>
+    <div class="frow"><span class="fkey">Immatric.</span><span class="fval mono">${esc(v.plate)}</span></div>
+    <div class="frow"><span class="fkey">Véhicule</span><span class="fval">${esc(v.brand)} ${esc(v.model)}</span></div>
+    ${v.vin?`<div class="frow"><span class="fkey">VIN</span><span class="fval mono" style="font-size:11px">${esc(v.vin)}</span></div>`:''}
+    ${v.ct_date?`<div class="frow"><span class="fkey">CT</span><span class="fval">${fmtD(v.ct_date)}</span></div>`:''}
+  </div>`;
+  h+=`<div class="fsec">
+    <div class="fsec-title">🔒 Assurance</div>
+    <div class="frow"><span class="fkey">Compagnie</span><span class="fval">${esc(v.insurance_name)||'—'}</span></div>
+    <div class="frow"><span class="fkey">N° police</span><span class="fval mono">${esc(police)||'—'}</span></div>
+    <div class="frow"><span class="fkey">Téléphone</span><span class="fval">${phone?`<a href="tel:${esc(phone)}">${esc(phone)}</a>`:'—'}</span></div>
+  </div>`;
+  if(v.garage_name)h+=`<div class="fsec">
+    <div class="fsec-title">🏭 Garage</div>
+    <div class="frow"><span class="fkey">Nom</span><span class="fval">${esc(v.garage_name)}</span></div>
+  </div>`;
+  if(v.tires_size||v.tires_winter||v.tires_summer)h+=`<div class="fsec">
+    <div class="fsec-title">🔵 Pneumatiques</div>
+    ${v.tires_size?`<div class="frow"><span class="fkey">Taille</span><span class="fval mono">${esc(v.tires_size)}</span></div>`:''}
+    ${v.tires_winter?`<div class="frow"><span class="fkey">❄️ Hiver</span><span class="fval">${esc(v.tires_winter)}</span></div>`:''}
+    ${v.tires_summer?`<div class="frow"><span class="fkey">☀️ Été</span><span class="fval">${esc(v.tires_summer)}</span></div>`:''}
+  </div>`;
+  document.getElementById('infos-body').innerHTML=h;
+}
+
+// ══ LIGHTBOX ══
+function openLightbox(idx){
+  const photos=window._dmgPhotos||[];
+  document.getElementById('lightbox-img').src=photos[idx]||'';
+  document.getElementById('lightbox').style.display='flex';
+}
+function closeLightbox(){document.getElementById('lightbox').style.display='none';}
+
+// ══ HOOK NAVIGATION SCREENS -> render ══
+const _origGoScreen=goScreen;
+goScreen=function(id){
+  _origGoScreen(id);
+  if(id==='s-prise')renderPrise();
+  if(id==='s-degats')renderDegats();
+  if(id==='s-infos')renderInfos();
+};
+
+init();
+</script>
+</body>
+</html>
