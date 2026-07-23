@@ -380,18 +380,10 @@ async function doSortie(){
         // Pas de stock_log : la table stock_attributions sert déjà de trace complète
         item.quantite_dispo-=c.qty;
       } else {
-        // Sécurité : neutraliser toute autre ligne déjà marquée "active" pour cette même clé/badge
-        // (résidu éventuel d'anciens essais), pour éviter un conflit de contrainte d'unicité
-        await sb.from('stock_acces')
-          .update({ statut:'rendu', date_retour_reel:new Date().toISOString() })
-          .eq('item_id', c.id)
-          .eq('statut', 'actif');
-
-        const { data: existing } = await sb.from('stock_acces')
-          .select('id')
-          .eq('item_id', c.id)
-          .order('date_remise', { ascending: false })
-          .limit(1);
+        // Méthode robuste : supprimer toute ancienne ligne pour cette clé/badge,
+        // puis en recréer une neuve — élimine tout risque de conflit de contrainte
+        const { error: delErr } = await sb.from('stock_acces').delete().eq('item_id', c.id);
+        if (delErr) console.warn('Nettoyage stock_acces:', delErr.message);
 
         const payload = {
           site_id:c.site_id||null, site_nom:c.site_nom||'—',
@@ -402,14 +394,8 @@ async function doSortie(){
           date_remise:new Date().toISOString(), date_retour_reel:null,
           statut:'actif', notes:note||null
         };
-
-        if (existing && existing.length) {
-          const { error: accesErr } = await sb.from('stock_acces').update(payload).eq('id', existing[0].id);
-          if (accesErr) throw accesErr;
-        } else {
-          const { error: accesErr } = await sb.from('stock_acces').insert(payload);
-          if (accesErr) throw accesErr;
-        }
+        const { error: accesErr } = await sb.from('stock_acces').insert(payload);
+        if (accesErr) throw accesErr;
         // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
       }
     }
