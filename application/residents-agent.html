@@ -71,6 +71,9 @@
   .res-field-val.muted { font-weight: 400; color: var(--rdz-gray); }
   .res-field-val.highlight { color: var(--rdz-red); }
 
+  .ouverture-btn { display: block; text-align: center; background: var(--rdz-black); color: #fff; text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 11px; }
+  .ouverture-btn:active { background: #333; }
+
   /* ÉTAT VIDE / CHARGEMENT */
   .state-msg { text-align: center; padding: 50px 20px; }
   .state-msg .ico { font-size: 32px; margin-bottom: 12px; }
@@ -378,6 +381,19 @@ function renderSearchResults(grouped) {
   el.innerHTML = html;
 }
 
+function buildingToSite(b) {
+  const map = { 'REGM': 'IHEID - REGM', 'MDE': 'IHEID - MDE', 'BARTON': 'IHEID - Barton Pavillons' };
+  return map[(b || '').toUpperCase()] || '';
+}
+function ouvertureLink(personne, localisation, building) {
+  const params = new URLSearchParams();
+  if (personne) params.set('personne', personne);
+  if (localisation) params.set('localisation', localisation);
+  const site = buildingToSite(building);
+  if (site) params.set('site', site);
+  return 'ouverture-agent.html?' + params.toString();
+}
+
 function buildResultCard(item) {
   const t = item.type;
 
@@ -444,6 +460,7 @@ function buildResultCard(item) {
         </div>
       </div>
       ${hasExtras ? `<div class="res-grid">${parkingHtml}${fitnessHtml}${lockerHtml}</div>` : ''}
+      <a class="ouverture-btn" href="${ouvertureLink(name, r.room_space, r.building)}">🔓 Générer une ouverture</a>
     </div>`;
   }
 
@@ -474,6 +491,7 @@ function buildResultCard(item) {
           ${ss.notes ? `<div class="res-field"><div class="res-field-lbl">Notes</div><div class="res-field-val muted" style="font-size:11px">${escHtml(ss.notes)}</div></div>` : ''}
         </div>
       </div>` : ''}
+      <a class="ouverture-btn" href="${ouvertureLink(ss.entry_name, ss.room_space, ss.building)}">🔓 Générer une ouverture</a>
     </div>`;
   }
 

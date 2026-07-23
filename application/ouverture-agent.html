@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Ouvertures</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .content { padding: 16px; padding-bottom: 40px; }
+
+  .site-bar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 14px; margin-bottom: 16px; }
+  .site-bar label { font-size: 10.5px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 6px; }
+  .site-select { width: 100%; padding: 10px 12px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14.5px; background: #fff; color: var(--rdz-black); }
+
+  .form-box { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 16px; margin-bottom: 16px; }
+  .field-group { margin-bottom: 14px; }
+  .field-group:last-child { margin-bottom: 0; }
+  .field-label { font-size: 10.5px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 6px; }
+  .field-input, .field-select { width: 100%; padding: 11px 13px; border-radius: 2px; border: 1.5px solid var(--rdz-border); font-size: 15px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+  .field-input:focus, .field-select:focus { outline: none; border-color: var(--rdz-red); }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field-group { flex: 1; }
+
+  .submit-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; padding: 14px; border-radius: 2px; font-size: 14px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; margin-top: 4px; }
+  .submit-btn:active { background: var(--rdz-red-dark); }
+  .submit-btn:disabled { background: var(--rdz-border); color: var(--rdz-gray); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--rdz-black); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 999; opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  .today-section { margin-top: 4px; }
+  .today-label { font-size: 10.5px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .today-row { background: #fff; border: 1px solid var(--rdz-border); border-left: 3px solid var(--rdz-red); border-radius: 2px; padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  .today-time { font-size: 12px; font-weight: 700; color: var(--rdz-black); flex-shrink: 0; width: 44px; }
+  .today-info { flex: 1; min-width: 0; }
+  .today-name { font-size: 13px; font-weight: 700; }
+  .today-meta { font-size: 11px; color: var(--rdz-gray); margin-top: 1px; }
+  .empty-today { font-size: 12px; color: #9a9a9a; font-style: italic; padding: 10px 0; }
+
+  textarea.field-input { resize: vertical; min-height: 60px; font-family: Arial, sans-serif; }
+
+  .photo-zone { border: 2px dashed var(--rdz-border); border-radius: 2px; padding: 22px 14px; text-align: center; cursor: pointer; position: relative; overflow: hidden; }
+  .photo-zone.taken { border-style: solid; border-color: #1e5c2e; padding: 0; }
+  .photo-zone.taken img { width: 100%; height: 150px; object-fit: cover; display: block; }
+  .photo-zone-icon { font-size: 30px; margin-bottom: 6px; }
+  .photo-zone-label { font-size: 13px; font-weight: 600; color: var(--rdz-black); }
+  .photo-zone-sub { font-size: 11px; color: var(--rdz-gray); margin-top: 2px; }
+  .photo-retake { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); color: #fff; border: none; padding: 4px 9px; border-radius: 4px; font-size: 10.5px; cursor: pointer; }
+  .photo-taken-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(30,92,46,.88); color: #fff; text-align: center; font-size: 11.5px; font-weight: 600; padding: 6px; }
+  input[type="file"] { display: none; }
+
+  .prefill-banner { background: #dbeafe; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 12px; padding: 9px 12px; border-radius: 2px; margin-bottom: 14px; line-height: 1.5; }
+
+  .room-search-row { display: flex; gap: 8px; }
+  .room-search-row input { flex: 1; }
+  .room-search-btn { flex-shrink: 0; background: var(--rdz-black); color: #fff; border: none; padding: 0 16px; border-radius: 2px; font-size: 16px; cursor: pointer; }
+  .room-search-btn:active { background: #333; }
+  .occupant-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; background: #fff; border: 1px solid var(--rdz-border); border-left: 3px solid var(--rdz-black); border-radius: 2px; padding: 10px 12px; margin-top: 8px; cursor: pointer; font-family: Arial, sans-serif; }
+  .occupant-pick:active { background: var(--rdz-bg); }
+  .occupant-name { font-size: 13.5px; font-weight: 700; color: var(--rdz-black); }
+  .occupant-tag { font-size: 10.5px; color: var(--rdz-gray); }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Ouvertures — carte oubliée</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="content">
+
+  <div id="prefill-banner"></div>
+
+  <div class="form-box">
+    <div class="field-group" style="margin-bottom:0">
+      <label class="field-label">Rechercher l'occupant par chambre / local</label>
+      <div class="room-search-row">
+        <input type="text" class="field-input" id="f-room-search" placeholder="Ex : 8611, Pavillon D1"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();searchByRoom();}">
+        <button type="button" class="room-search-btn" onclick="searchByRoom()">🔍</button>
+      </div>
+      <div id="room-search-results"></div>
+    </div>
+  </div>
+
+  <div class="site-bar">
+    <label for="site-select">Site</label>
+    <select class="site-select" id="site-select" onchange="onSiteChange()">
+      <option value="IHEID - REGM">IHEID - REGM</option>
+      <option value="IHEID - MDE">IHEID - MDE</option>
+      <option value="IHEID - Barton Pavillons">IHEID - Barton Pavillons</option>
+    </select>
+  </div>
+
+  <div class="form-box">
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Localisation</label>
+        <input type="text" class="field-input" id="f-localisation" placeholder="Ex : 8611, Pavillon D1" autocomplete="off">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Heure</label>
+        <input type="time" class="field-input" id="f-heure">
+      </div>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Identité de la personne</label>
+      <input type="text" class="field-input" id="f-personne" placeholder="Nom Prénom" autocomplete="off">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Motif</label>
+      <select class="field-select" id="f-motif">
+        <option>Ouverture, carte oubliée</option>
+        <option>Autre</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Date <span style="text-transform:none;font-weight:400">(modifiable pour un rapport en différé)</span></label>
+      <input type="date" class="field-input" id="f-date">
+    </div>
+    <div class="field-group">
+      <label class="field-label">Note (optionnel)</label>
+      <textarea class="field-input" id="f-note" placeholder="Précisions utiles pour le rapport…"></textarea>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Photo de la pièce de légitimation</label>
+      <div class="photo-zone" id="photo-zone" onclick="triggerPhoto()">
+        <div class="photo-zone-icon">📷</div>
+        <div class="photo-zone-label">Prendre une photo</div>
+        <div class="photo-zone-sub">Carte d'identité, passeport, carte étudiante…</div>
+      </div>
+      <input type="file" id="photo-input" accept="image/*" capture="environment">
+    </div>
+    <button class="submit-btn" id="btn-submit" onclick="saveOuverture()">✓ Enregistrer l'ouverture</button>
+  </div>
+
+  <div class="today-section">
+    <div class="today-label">Enregistrées aujourd'hui sur ce site</div>
+    <div id="today-list"><div class="empty-today">Chargement…</div></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const LS_SITE = 'rdz_ouv_last_site';
+const AGENT_ID = localStorage.getItem('rdz_agent_id');
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom');
+if (!AGENT_ID) { window.location.href = 'mobile.html'; }
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function nowHM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function buildingToSite(b) {
+  const map = { 'REGM': 'IHEID - REGM', 'MDE': 'IHEID - MDE', 'BARTON': 'IHEID - Barton Pavillons' };
+  return map[(b || '').toUpperCase()] || '';
+}
+
+async function searchByRoom() {
+  const term = document.getElementById('f-room-search').value.trim();
+  const resultsEl = document.getElementById('room-search-results');
+  if (!term || term.length < 2) {
+    resultsEl.innerHTML = '<div class="empty-today">Entrez au moins 2 caractères.</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="empty-today">Recherche…</div>';
+  try {
+    const [{ data: residents, error: re }, { data: shortstays, error: se }] = await Promise.all([
+      sb.from('residents').select('name_first,name_last,room_space,building,sublease_tenant').ilike('room_space', `%${term}%`),
+      sb.from('short_stays').select('entry_name,room_space,building').ilike('room_space', `%${term}%`)
+    ]);
+    if (re || se) throw re || se;
+
+    const candidates = [];
+    const seen = new Set();
+    function addCandidate(name, room, building, type) {
+      if (!name) return;
+      const key = name.toLowerCase().trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ name: name.trim(), room, building, type });
+    }
+    (residents || []).forEach(r => {
+      const full = ((r.name_first || '') + ' ' + (r.name_last || '')).trim();
+      addCandidate(full, r.room_space, r.building, 'Résident');
+      if (r.sublease_tenant) addCandidate(r.sublease_tenant, r.room_space, r.building, 'Sous-locataire');
+    });
+    (shortstays || []).forEach(ss => {
+      addCandidate(ss.entry_name, ss.room_space, ss.building, 'Court séjour');
+    });
+
+    if (candidates.length === 0) {
+      resultsEl.innerHTML = '<div class="empty-today">Aucun occupant trouvé pour cette chambre. Saisissez le nom manuellement ci-dessous.</div>';
+      return;
+    }
+
+    window._occupantCandidates = candidates;
+    resultsEl.innerHTML = candidates.map((c, i) =>
+      `<button type="button" class="occupant-pick" onclick="pickOccupant(${i})">
+        <span class="occupant-name">${escHtml(c.name)}</span>
+        <span class="occupant-tag">${escHtml(c.type)} · ${escHtml(c.room || '')}</span>
+      </button>`
+    ).join('');
+  } catch (err) {
+    resultsEl.innerHTML = `<div class="empty-today">Erreur de recherche.</div>`;
+  }
+}
+
+function pickOccupant(i) {
+  const c = window._occupantCandidates[i];
+  if (!c) return;
+  document.getElementById('f-personne').value = c.name;
+  document.getElementById('f-localisation').value = c.room || document.getElementById('f-room-search').value.trim();
+  const site = buildingToSite(c.building);
+  if (site) {
+    document.getElementById('site-select').value = site;
+    localStorage.setItem(LS_SITE, site);
+  }
+  document.getElementById('room-search-results').innerHTML =
+    `<div class="prefill-banner" style="margin-top:8px;margin-bottom:0">✓ <strong>${escHtml(c.name)}</strong> sélectionné(e) — vérifiez les champs ci-dessous.</div>`;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── PHOTO ──────────────────────────────────────────────────────────────────
+let photoFile = null;
+let photoDataUrl = null;
+
+function triggerPhoto() {
+  document.getElementById('photo-input').click();
+}
+document.getElementById('photo-input').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  photoFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    photoDataUrl = e.target.result;
+    renderPhotoZone();
+  };
+  reader.readAsDataURL(file);
+  this.value = '';
+});
+function renderPhotoZone() {
+  const zone = document.getElementById('photo-zone');
+  if (photoDataUrl) {
+    zone.className = 'photo-zone taken';
+    zone.innerHTML = `<img src="${photoDataUrl}">
+      <button class="photo-retake" onclick="event.stopPropagation();triggerPhoto()">Reprendre</button>
+      <div class="photo-taken-bar">✅ Photo prise</div>`;
+  } else {
+    zone.className = 'photo-zone';
+    zone.innerHTML = `<div class="photo-zone-icon">📷</div>
+      <div class="photo-zone-label">Prendre une photo</div>
+      <div class="photo-zone-sub">Carte d'identité, passeport, carte étudiante…</div>`;
+  }
+}
+async function uploadPhotoIfAny(entryId) {
+  if (!photoFile) return null;
+  try {
+    const filename = entryId + '.jpg';
+    const { error } = await sb.storage.from('ouvertures-photos').upload(filename, photoFile, { contentType: photoFile.type || 'image/jpeg', upsert: true });
+    if (error) throw error;
+    const { data } = sb.storage.from('ouvertures-photos').getPublicUrl(filename);
+    return data.publicUrl;
+  } catch (err) {
+    console.warn('Upload photo échoué:', err.message);
+    return null;
+  }
+}
+
+function uid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ── PRÉREMPLISSAGE DEPUIS RÉSIDENTS & ACCÈS ─────────────────────────────────
+function applyPrefill() {
+  const params = new URLSearchParams(window.location.search);
+  const personne = params.get('personne');
+  const localisation = params.get('localisation');
+  const site = params.get('site');
+
+  if (!personne && !localisation && !site) return;
+
+  if (personne) document.getElementById('f-personne').value = personne;
+  if (localisation) document.getElementById('f-localisation').value = localisation;
+  if (site) document.getElementById('site-select').value = site;
+
+  document.getElementById('prefill-banner').innerHTML =
+    `<div class="prefill-banner">📋 Pré-rempli depuis la fiche de <strong>${personne || '—'}</strong>. Vérifiez les informations avant d'enregistrer.</div>`;
+}
+
+function initForm() {
+  const savedSite = localStorage.getItem(LS_SITE);
+  if (savedSite) document.getElementById('site-select').value = savedSite;
+  document.getElementById('f-heure').value = nowHM();
+  document.getElementById('f-date').value = today();
+  applyPrefill();
+  loadTodayList();
+}
+
+function onSiteChange() {
+  localStorage.setItem(LS_SITE, document.getElementById('site-select').value);
+  loadTodayList();
+}
+
+async function loadTodayList() {
+  const site = document.getElementById('site-select').value;
+  const el = document.getElementById('today-list');
+  el.innerHTML = '<div class="empty-today">Chargement…</div>';
+  try {
+    const { data, error } = await sb.from('ouvertures')
+      .select('*')
+      .eq('site', site)
+      .eq('date_ouverture', today())
+      .order('heure_ouverture', { ascending: false });
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      el.innerHTML = '<div class="empty-today">Aucune ouverture enregistrée aujourd\'hui pour ce site.</div>';
+      return;
+    }
+    el.innerHTML = data.map(o => `
+      <div class="today-row">
+        <div class="today-time">${(o.heure_ouverture || '').slice(0,5)}</div>
+        <div class="today-info">
+          <div class="today-name">${escHtml(o.personne)}</div>
+          <div class="today-meta">${escHtml(o.localisation || '—')} · ${escHtml(o.motif)}</div>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = `<div class="empty-today">Erreur de chargement.</div>`;
+  }
+}
+
+async function saveOuverture() {
+  const site = document.getElementById('site-select').value;
+  const localisation = document.getElementById('f-localisation').value.trim();
+  const personne = document.getElementById('f-personne').value.trim();
+  const motif = document.getElementById('f-motif').value;
+  const heure = document.getElementById('f-heure').value;
+  const date = document.getElementById('f-date').value;
+  const note = document.getElementById('f-note').value.trim();
+
+  if (!personne) { alert('Veuillez indiquer le nom de la personne.'); return; }
+  if (!heure) { alert('Veuillez indiquer une heure.'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Enregistrement…';
+
+  const entryId = uid();
+  const photo_url = await uploadPhotoIfAny(entryId);
+
+  const { error } = await sb.from('ouvertures').insert({
+    id: entryId,
+    date_ouverture: date || today(),
+    heure_ouverture: heure + ':00',
+    site,
+    localisation: localisation || null,
+    personne,
+    motif,
+    note: note || null,
+    photo_url,
+    agent_id: AGENT_ID,
+    agent_nom: AGENT_NOM
+  });
+
+  btn.disabled = false;
+  btn.textContent = "✓ Enregistrer l'ouverture";
+
+  if (error) {
+    alert('Erreur : ' + error.message);
+    return;
+  }
+
+  toast('✓ Ouverture enregistrée');
+  document.getElementById('f-localisation').value = '';
+  document.getElementById('f-personne').value = '';
+  document.getElementById('f-motif').value = 'Ouverture, carte oubliée';
+  document.getElementById('f-heure').value = nowHM();
+  document.getElementById('f-note').value = '';
+  photoFile = null;
+  photoDataUrl = null;
+  renderPhotoZone();
+  document.getElementById('prefill-banner').innerHTML = '';
+  document.getElementById('f-personne').focus();
+  loadTodayList();
+}
+
+initForm();
+</script>
+</body>
+</html>
