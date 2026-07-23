@@ -380,14 +380,16 @@ async function doSortie(){
         // Pas de stock_log : la table stock_attributions sert déjà de trace complète
         item.quantite_dispo-=c.qty;
       } else {
-        await sb.from('stock_acces').insert({
+        const { error: accesErr } = await sb.from('stock_acces').upsert({
           site_id:c.site_id||null, site_nom:c.site_nom||'—',
           agent_id:ag.id, agent_nom:ag.nom,
           item_id:c.id, item_nom:c.nom, item_type:c.item_type,
           receptionnaire_id:ag.id, receptionnaire_nom:ag.nom,
           receptionnaire_type:'agent',
-          date_remise:new Date().toISOString(), statut:'actif', notes:note||null
-        });
+          date_remise:new Date().toISOString(), date_retour_reel:null,
+          statut:'actif', notes:note||null
+        }, { onConflict:'item_id' });
+        if(accesErr) throw accesErr;
         // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
       }
     }
