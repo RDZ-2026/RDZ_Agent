@@ -341,7 +341,7 @@ async function doSortie(){
           agent_id:ag.id, agent_nom:ag.nom,
           materiel_id:c.id, materiel_nom:c.nom, quantite:c.qty, note:note||null, statut:'actif'
         });
-        await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'sortie',p_agent_nom:ag.nom,p_article_nom:c.nom,p_quantite:c.qty,p_note:note,p_par:'Terrain'});
+        try{ await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'sortie',p_agent_nom:ag.nom,p_article_nom:c.nom,p_quantite:c.qty,p_note:note,p_par:'Terrain'}); }catch(logErr){ console.warn('stock_log:',logErr.message); }
         item.quantite_dispo-=c.qty;
       } else {
         await sb.from('stock_acces').insert({
@@ -352,7 +352,7 @@ async function doSortie(){
           receptionnaire_type:'agent',
           date_remise:new Date().toISOString(), statut:'actif', notes:note||null
         });
-        await sb.rpc('stock_log',{p_module:'acces',p_type_op:'remise',p_agent_nom:ag.nom,p_article_nom:c.nom,p_note:note,p_par:'Terrain'});
+        // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
       }
     }
     toast('✅ '+cart.length+' article(s) sorti(s)');
@@ -505,7 +505,7 @@ async function confirmReturnMateriel(attrId, materielId, qty){
       const attr=encoursData.attrs.find(a=>a.id===attrId);
       await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
     }
-    await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'retour',p_agent_nom:ag.nom,p_article_nom:'',p_quantite:qty,p_note:'état:'+etat,p_par:'Terrain'});
+    try{ await sb.rpc('stock_log',{p_module:'materiel',p_type_op:'retour',p_agent_nom:ag.nom,p_article_nom:encoursData.attrs.find(a=>a.id===attrId)?.materiel_nom||'—',p_quantite:qty,p_note:'état:'+etat,p_par:'Terrain'}); }catch(logErr){ console.warn('stock_log:',logErr.message); }
     toast('📥 Retour enregistré');
     renderEnCours();
   }catch(e){ toast('❌ '+e.message,'err'); }
@@ -515,7 +515,7 @@ async function returnAcces(accesId){
   const ag=currentAgent();
   try{
     await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',accesId);
-    await sb.rpc('stock_log',{p_module:'acces',p_type_op:'retour',p_agent_nom:ag.nom,p_article_nom:'',p_par:'Terrain'});
+    // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
     toast('↩️ Clé/badge rendu');
     renderEnCours();
   }catch(e){ toast('❌ '+e.message,'err'); }
