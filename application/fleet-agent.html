@@ -265,8 +265,23 @@ const DMG_TYPES={
   autre:{label:'Autre',color:'#6b7280'},
 };
 const SEV_COLOR={mineur:'#ca8a04',modere:'#ea580c',grave:'#8B1A1A'};
+const SIDE_BODY=`
+    <circle cx="75" cy="140" r="27" fill="#374151"/><circle cx="75" cy="140" r="14" fill="#6b7280"/>
+    <circle cx="255" cy="140" r="27" fill="#374151"/><circle cx="255" cy="140" r="14" fill="#6b7280"/>
+    <path d="M22,138 C22,118 24,102 36,93 Q48,86 68,86 L96,86 L120,34 Q128,28 145,28 L195,28 Q212,28 220,34 L244,86 L272,86 Q292,86 304,93 C316,102 318,118 318,138 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.4"/>
+    <rect x="22" y="133" width="296" height="7" rx="2.5" fill="#c4c8d0"/>
+    <path d="M100,84 L122,38 L218,38 L240,84 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/>
+    <line x1="170" y1="37" x2="170" y2="85" stroke="#d8dbe0" stroke-width="7"/>
+    <line x1="170" y1="86" x2="170" y2="133" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,2"/>
+    <rect x="140" y="98" width="17" height="5" rx="2.5" fill="#9ca3af"/>
+    <rect x="203" y="98" width="17" height="5" rx="2.5" fill="#9ca3af"/>
+    <rect x="24" y="91" width="20" height="15" rx="4" fill="#fef3c7" stroke="#d97706" stroke-width="1"/>
+    <rect x="24" y="88" width="20" height="5" rx="2" fill="#ffffff" opacity=".85"/>
+    <rect x="296" y="91" width="18" height="15" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width="1"/>
+    <path d="M92,71 L92,82 L109,82 L113,76 L109,71 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>`;
+
 const CAR_VIEWS={
-  top:{w:160,h:330,label:'Dessus',body:`
+  top:{w:160,h:330,label:'Dessus',flip:false,body:`
     <text x="80" y="9" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="Arial,sans-serif" font-weight="600" letter-spacing=".5">AVANT</text>
     <text x="80" y="328" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="Arial,sans-serif" font-weight="600" letter-spacing=".5">ARRIÈRE</text>
     <path d="M32,45 Q31,28 44,21 L58,16 L102,16 L116,21 Q129,28 128,45 L128,285 Q128,302 115,308 L102,313 L58,313 L45,308 Q32,302 32,285 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
@@ -292,52 +307,8 @@ const CAR_VIEWS={
     <rect x="127" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
     <path d="M11,128 L11,140 L28,140 L32,134 L28,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
     <path d="M149,128 L149,140 L132,140 L128,134 L132,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>`},
-  left:{w:340,h:170,label:'Côté gauche',body:`
-    <text x="170" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="Arial,sans-serif" font-weight="600" letter-spacing=".5">CÔTÉ GAUCHE</text>
-    <path d="M24,148 L24,86 Q26,62 40,50 L72,30 L110,20 L232,20 L268,30 L296,48 Q316,64 316,86 L316,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
-    <path d="M84,148 L84,20 L232,20 L280,44 L316,84 L316,148 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-    <polygon points="110,22 92,92 156,92 154,22" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <polygon points="92,92 110,22 96,22 80,92" fill="#c4c8d0"/>
-    <rect x="158" y="24" width="70" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="231" y="22" width="8" height="70" rx="2" fill="#c4c8d0"/>
-    <rect x="241" y="24" width="55" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="297" y="24" width="8" height="70" rx="2" fill="#c4c8d0"/>
-    <polygon points="305,22 316,60 316,92 305,92" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="24" y="146" width="292" height="8" rx="3" fill="#c4c8d0" stroke="#9ca3af" stroke-width=".7"/>
-    <rect x="156" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
-    <rect x="240" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
-    <rect x="24" y="90" width="42" height="36" rx="5" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
-    <rect x="27" y="93" width="36" height="30" rx="3" fill="#fef08a" opacity=".8"/>
-    <rect x="24" y="86" width="42" height="6" rx="2" fill="white" opacity=".9"/>
-    <rect x="296" y="90" width="20" height="36" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
-    <path d="M14,128 Q14,152 26,155 L68,155 L68,128 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
-    <path d="M296,128 L316,128 L316,155 L300,155 Q293,152 293,145 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
-    <path d="M90,76 L90,88 L108,88 L112,82 L108,76 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-    <circle cx="72" cy="158" r="28" fill="#374151"/><circle cx="72" cy="158" r="19" fill="#4b5563"/><circle cx="72" cy="158" r="8" fill="#6b7280"/>
-    <circle cx="264" cy="158" r="28" fill="#374151"/><circle cx="264" cy="158" r="19" fill="#4b5563"/><circle cx="264" cy="158" r="8" fill="#6b7280"/>`},
-  right:{w:340,h:170,label:'Côté droit',body:`
-    <text x="170" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="Arial,sans-serif" font-weight="600" letter-spacing=".5">CÔTÉ DROIT</text>
-    <path d="M316,148 L316,86 Q314,62 300,50 L268,30 L230,20 L108,20 L72,30 L44,48 Q24,64 24,86 L24,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
-    <path d="M256,148 L256,20 L108,20 L60,44 L24,84 L24,148 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-    <polygon points="230,22 248,92 184,92 186,22" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <polygon points="248,92 230,22 244,22 260,92" fill="#c4c8d0"/>
-    <rect x="112" y="24" width="70" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="101" y="22" width="8" height="70" rx="2" fill="#c4c8d0"/>
-    <rect x="44" y="24" width="55" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="35" y="24" width="8" height="70" rx="2" fill="#c4c8d0"/>
-    <polygon points="35,22 24,60 24,92 35,92" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-    <rect x="24" y="146" width="292" height="8" rx="3" fill="#c4c8d0" stroke="#9ca3af" stroke-width=".7"/>
-    <rect x="179" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
-    <rect x="95" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
-    <rect x="274" y="90" width="42" height="36" rx="5" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
-    <rect x="277" y="93" width="36" height="30" rx="3" fill="#fef08a" opacity=".8"/>
-    <rect x="274" y="86" width="42" height="6" rx="2" fill="white" opacity=".9"/>
-    <rect x="24" y="90" width="20" height="36" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
-    <path d="M326,128 Q326,152 314,155 L272,155 L272,128 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
-    <path d="M44,128 L24,128 L24,155 L40,155 Q47,152 47,145 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
-    <path d="M232,76 L232,88 L250,88 L254,82 L250,76 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-    <circle cx="268" cy="158" r="28" fill="#374151"/><circle cx="268" cy="158" r="19" fill="#4b5563"/><circle cx="268" cy="158" r="8" fill="#6b7280"/>
-    <circle cx="76" cy="158" r="28" fill="#374151"/><circle cx="76" cy="158" r="19" fill="#4b5563"/><circle cx="76" cy="158" r="8" fill="#6b7280"/>`}
+  left:{w:340,h:170,label:'Côté gauche',flip:false,body:SIDE_BODY},
+  right:{w:340,h:170,label:'Côté droit',flip:true,body:SIDE_BODY}
 };
 let dmgView='top';
 const SUPPLIERS={
@@ -547,7 +518,7 @@ function renderDegats(){
       ${Object.keys(CAR_VIEWS).map(v=>`<div onclick="setDmgView('${v}')" style="flex:1;text-align:center;padding:8px 4px;font-size:11px;font-weight:700;cursor:pointer;color:${dmgView===v?'var(--red)':'var(--text3)'};border-bottom:2px solid ${dmgView===v?'var(--red)':'transparent'};margin-bottom:-1px">${CAR_VIEWS[v].label}</div>`).join('')}
     </div>
     <div class="svg-wrap" id="schema-wrap-el">
-      <svg id="dmg-overlay" viewBox="0 0 ${CAR_VIEWS[dmgView].w} ${CAR_VIEWS[dmgView].h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">${CAR_VIEWS[dmgView].body}<g id="dmg-markers"></g></svg>
+      <svg id="dmg-overlay" viewBox="0 0 ${CAR_VIEWS[dmgView].w} ${CAR_VIEWS[dmgView].h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block${CAR_VIEWS[dmgView].flip?';transform:scaleX(-1)':''}">${CAR_VIEWS[dmgView].body}<g id="dmg-markers"></g></svg>
     </div>
   </div>
   <button class="btn-submit" id="btn-open-dmg-form" onclick="openDmgForm()" style="margin-bottom:14px">＋ Signaler un nouveau dégât</button>
