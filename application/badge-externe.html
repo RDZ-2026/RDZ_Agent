@@ -14,7 +14,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--bg)}
-body{font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+body{font-family:Arial,Helvetica,sans-serif;color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh}
 button,input,select,textarea{font-family:inherit}
 
 .app-header{flex-shrink:0;background:var(--red);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -25,7 +25,7 @@ button,input,select,textarea{font-family:inherit}
 .back-btn:active{background:rgba(255,255,255,.3)}
 .agent-badge{font-size:10px;color:rgba(255,255,255,.65);margin-top:5px;text-align:right}
 
-.body{padding:16px;padding-bottom:40px;overflow-y:auto;height:calc(100vh - 68px)}
+.body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;padding-bottom:40px}
 
 .section-box{background:var(--white);border:1px solid var(--border);border-radius:2px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
 .section-box-title{font-size:11px;font-weight:800;letter-spacing:.05em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
