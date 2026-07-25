@@ -221,7 +221,7 @@
       </a>
 
       <!-- VÉHICULES & FLOTTE -->
-      <a class="module-card active" href="https://rdz-2026.github.io/RDZ_Agent/Fleet_Agent_v2.html" target="_blank" rel="noopener">
+      <a class="module-card active" href="centraliste/fleet-agent.html" target="_blank" rel="noopener">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -435,31 +435,6 @@
     const now = new Date();
     document.getElementById('current-date').textContent = formatDate(now);
     document.getElementById('footer-date').textContent = 'Version 1.6 — ' + now.getFullYear();
-
-    // Initialiser le champ date sur aujourd'hui
-    const todayStr = now.toISOString().split('T')[0];
-    document.getElementById('print-date').value = todayStr;
-    updateDateLabel();
-
-  function updateDateLabel() {
-    const v = document.getElementById('print-date').value;
-    const d = v ? new Date(v + 'T00:00:00') : now;
-    document.getElementById('print-date-label').textContent = d.toLocaleDateString('fr-CH', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  }
-
-  function openAllModules() {
-    const date = document.getElementById('print-date').value || todayStr;
-    const params = '?date=' + date + '&autoprint=1';
-    const modules = [
-      'centraliste/evenements.html' + params,
-      'centraliste/consignes.html' + params,
-      'centraliste/constats.html' + params,
-      'centraliste/RouteOps_Supervision.html' + params
-    ];
-    modules.forEach(function(url) {
-      window.open(url, '_blank');
-    });
-  }
   </script>
 
 </body>
