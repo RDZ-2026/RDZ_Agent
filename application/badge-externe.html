@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Badges tiers externes</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A;--red-d:#6B1212;--red-l:#f5e8e8;
+  --anth:#1a1a1a;--bg:#f5f4f2;--white:#fff;
+  --border:#d0ccc5;--text:#1a1a1a;--text2:#4a4a4a;--text3:#9a9a9a;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --sh:0 2px 8px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+button,input,select,textarea{font-family:inherit}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .25s ease,opacity .25s;overflow:hidden}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
+
+.app-header{flex-shrink:0;background:var(--red);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-header-txt{display:flex;flex-direction:column;gap:2px}
+.app-header-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase}
+.app-header-sub{font-size:10.5px;color:rgba(255,255,255,.65)}
+.back-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;font-weight:700;padding:7px 12px;border-radius:2px;cursor:pointer;white-space:nowrap}
+.back-btn:active{background:rgba(255,255,255,.3)}
+.agent-badge{font-size:10px;color:rgba(255,255,255,.65);margin-top:5px;text-align:right}
+
+.body{flex:1;overflow-y:auto;padding:16px;padding-bottom:40px}
+
+.menu-btn{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:2px;padding:18px;margin-bottom:14px;cursor:pointer;box-shadow:var(--sh)}
+.menu-btn:active{background:var(--bg)}
+.menu-btn-ico{font-size:26px;flex-shrink:0}
+.menu-btn-txt{flex:1}
+.menu-btn-name{font-size:15px;font-weight:700}
+.menu-btn-desc{font-size:12px;color:var(--text3);margin-top:2px}
+.menu-btn-chevron{color:var(--text3);font-size:18px}
+
+.fg{margin-bottom:14px}
+.fl{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px}
+.fi{width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:2px;padding:10px 12px;font-size:14.5px;color:var(--text)}
+.fi:focus{outline:none;border-color:var(--red)}
+.fi-ta{min-height:70px;resize:vertical}
+.add-row{display:flex;gap:8px}
+.add-row .fi{flex:1}
+.btn-add{flex-shrink:0;background:var(--anth);color:#fff;border:none;border-radius:2px;padding:0 16px;font-size:18px;cursor:pointer}
+
+.section-box{background:var(--white);border:1px solid var(--border);border-radius:2px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
+.section-box-title{font-size:11px;font-weight:800;letter-spacing:.05em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.section-ext{border-left:4px solid var(--red)}
+.section-ext .section-box-title{color:var(--red);border-bottom-color:var(--red)}
+
+.sec-lbl{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px}
+.panier{background:var(--white);border:1px solid var(--border);border-radius:2px;box-shadow:var(--sh);min-height:50px}
+.panier-empty{padding:16px;text-align:center;color:var(--text3);font-size:12.5px}
+.panier-item{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)}
+.panier-item:last-child{border-bottom:none}
+.pi-icon{font-size:20px;flex-shrink:0}
+.pi-info{flex:1;min-width:0}
+.pi-name{font-size:13px;font-weight:700}
+.pi-sub{font-size:11px;color:var(--text3)}
+.pi-del{background:none;border:none;font-size:17px;cursor:pointer;color:var(--text3);padding:0 2px}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:9px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--white)}
+.chip.sel{border-color:var(--red);background:var(--red);color:#fff}
+
+.btn-submit{width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;margin-top:14px}
+.btn-submit:active{background:var(--red-d)}
+.btn-submit:disabled{opacity:.5}
+
+#toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;z-index:999;width:calc(100% - 32px);max-width:380px;pointer-events:none}
+.toast{background:var(--anth);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.toast.ok{background:#15803d}.toast.err{background:#991b1b}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Badges — Tiers externes</div>
+    </div>
+    <div style="text-align:right">
+      <a class="back-btn" href="mobile.html">‹ Retour</a>
+      <div class="agent-badge" id="agent-badge"></div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="menu-btn" onclick="goScreen('s-remise')">
+      <div class="menu-btn-ico">🪪</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Remettre un badge / clé</div><div class="menu-btn-desc">À un prestataire, visiteur, société externe</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-encours')">
+      <div class="menu-btn-ico">📋</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Remises en cours</div><div class="menu-btn-desc">Qui a reçu quoi, et le rendre</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+  </div>
+</div>
+
+<!-- REMISE -->
+<div class="screen hidden" id="s-remise">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Remettre un badge / clé</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="remise-body"></div>
+</div>
+
+<!-- EN COURS -->
+<div class="screen hidden" id="s-encours">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Remises en cours</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="encours-body"></div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const SUPABASE_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const AGENT_ID_SESSION=localStorage.getItem('rdz_agent_id');
+const AGENT_NOM_SESSION=localStorage.getItem('rdz_agent_nom')||'';
+if(!AGENT_ID_SESSION){window.location.href='mobile.html';}
+
+let STOCK_AGENT=null; // agent RDZ tel que reconnu dans stock_agents (peut rester null)
+
+let accesItems=[], accesSites=[], accesRecept=[], accesActifs=[];
+let cart=[]; // {id, nom, icon, item_type, site_id, site_nom}
+let manualRecept=false;
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
+function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function normalizeName(s){return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');}
+function ago(d){
+  const m=Math.floor((Date.now()-new Date(d))/60000);
+  if(m<1)return 'à l\'instant';
+  if(m<60)return m+' min';
+  if(m<1440)return Math.floor(m/60)+' h';
+  return Math.floor(m/1440)+' j';
+}
+function currentAgent(){
+  return STOCK_AGENT ? {id:STOCK_AGENT.id, nom:STOCK_AGENT.nom} : {id:null, nom:AGENT_NOM_SESSION};
+}
+
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  if(id==='s-remise')renderRemise();
+  if(id==='s-encours')renderEnCours();
+}
+
+async function init(){
+  try{
+    const [stockAgents, aItems, aSites, aRecept, aActifs]=await Promise.all([
+      sb.from('stock_agents').select('*').eq('actif',true),
+      sb.from('stock_acces_items').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces_sites').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces_recept').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces').select('*').eq('statut','actif'),
+    ]);
+    accesItems=aItems.data||[];
+    accesSites=aSites.data||[];
+    accesRecept=aRecept.data||[];
+    accesActifs=aActifs.data||[];
+
+    const list=stockAgents.data||[];
+    const target=normalizeName(AGENT_NOM_SESSION);
+    STOCK_AGENT=list.find(a=>normalizeName(a.nom)===target) || null;
+
+    document.getElementById('agent-badge').textContent = '👤 '+(STOCK_AGENT ? STOCK_AGENT.nom : AGENT_NOM_SESSION);
+  }catch(e){
+    toast('Erreur de chargement : '+e.message,'err');
+  }
+}
+
+async function refreshCatalogs(){
+  try{
+    const acc=await sb.from('stock_acces').select('*').eq('statut','actif');
+    if(acc.data) accesActifs=acc.data;
+  }catch(e){ console.warn('refreshCatalogs:',e.message); }
+}
+
+// ═══ REMISE À UN TIERS EXTERNE ═══
+async function renderRemise(){
+  cart=[]; manualRecept=false;
+  document.getElementById('remise-body').innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>`;
+  await refreshCatalogs();
+  document.getElementById('remise-body').innerHTML=`
+    <div class="section-box section-ext">
+      <div class="section-box-title">👤 RÉCEPTIONNAIRE EXTERNE</div>
+      <label class="fl">Rechercher un réceptionnaire enregistré</label>
+      <select class="fi" id="sel-recept" onchange="onSelectRecept()">
+        <option value="">— Choisir dans la liste —</option>
+        ${accesRecept.map(r=>`<option value="${r.id}">${esc(r.nom)}${r.societe?' ('+esc(r.societe)+')':''}</option>`).join('')}
+        <option value="__manuel__">✎ Autre / non listé — saisir manuellement</option>
+      </select>
+      <div id="recept-manuel-wrap" style="display:none;margin-top:10px">
+        <label class="fl">Nom du réceptionnaire</label>
+        <input class="fi" id="recept-nom" placeholder="Prénom Nom">
+        <label class="fl">Société (optionnel)</label>
+        <input class="fi" id="recept-societe" placeholder="Nom de la société">
+      </div>
+    </div>
+
+    <div class="section-box section-ext">
+      <div class="section-box-title">🪪 BADGE / CLÉ À REMETTRE</div>
+      <label class="fl">📍 Filtrer par site</label>
+      <select class="fi" id="flt-site" onchange="fillAccesSelect()">
+        <option value="">Tous les sites</option>
+        ${accesSites.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join('')}
+      </select>
+      <label class="fl" style="margin-top:10px">🔍 Filtrer clé / badge</label>
+      <input class="fi" id="flt-acces" placeholder="Tapez un nom…" oninput="fillAccesSelect()">
+      <div class="add-row" style="margin-top:8px">
+        <select class="fi" id="sel-acces"><option value="">Choisir une clé / badge…</option></select>
+        <button class="btn-add" onclick="addAcces()">➕</button>
+      </div>
+    </div>
+
+    <div class="sec-lbl">Panier</div>
+    <div class="panier" id="panier"></div>
+
+    <div class="fg" style="margin-top:14px">
+      <label class="fl">Date et heure de remise</label>
+      <input type="datetime-local" class="fi" id="remise-datetime">
+    </div>
+    <div class="fg">
+      <label class="fl">Note (optionnel)</label>
+      <input class="fi" id="remise-note" placeholder="Informations complémentaires…">
+    </div>
+    <button class="btn-submit" id="btn-remise" onclick="doRemise()">✅ Confirmer la remise</button>`;
+
+  const now=new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById('remise-datetime').value=now.toISOString().slice(0,16);
+  fillAccesSelect();
+  renderPanier();
+}
+
+function onSelectRecept(){
+  const v=document.getElementById('sel-recept').value;
+  manualRecept = (v==='__manuel__');
+  document.getElementById('recept-manuel-wrap').style.display = manualRecept ? 'block' : 'none';
+}
+
+function fillAccesSelect(){
+  const q=normalize(document.getElementById('flt-acces').value);
+  const siteFlt=document.getElementById('flt-site').value;
+  const sel=document.getElementById('sel-acces');
+  const takenIds=new Set(accesActifs.map(a=>a.item_id));
+  const avail=accesItems.filter(it=>!takenIds.has(it.id) && (!siteFlt||it.site_nom===siteFlt) && (!q||normalize(it.nom).includes(q)));
+  sel.innerHTML='<option value="">Choisir une clé / badge…</option>'+
+    avail.map(it=>`<option value="${it.id}">${it.type==='badge'?'🪪':'🔑'} ${esc(it.nom)}${it.site_nom?' — '+esc(it.site_nom):''}</option>`).join('');
+}
+
+function addAcces(){
+  const id=document.getElementById('sel-acces').value;
+  if(!id){toast('⚠️ Choisissez une clé / badge','err');return;}
+  if(cart.find(c=>c.id===id)){toast('⚠️ Déjà dans le panier','err');return;}
+  const item=accesItems.find(i=>i.id===id);
+  cart.push({id:item.id,nom:item.nom,icon:item.type==='badge'?'🪪':'🔑',item_type:item.type||'clé',site_id:item.site_id,site_nom:item.site_nom});
+  document.getElementById('sel-acces').value='';
+  renderPanier();
+}
+function removeCart(i){cart.splice(i,1);renderPanier();}
+
+function renderPanier(){
+  const el=document.getElementById('panier');
+  if(!cart.length){el.innerHTML='<div class="panier-empty">Panier vide — ajoutez une clé/badge ci-dessus</div>';return;}
+  el.innerHTML=cart.map((c,i)=>`<div class="panier-item">
+    <div class="pi-icon">${c.icon}</div>
+    <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">${c.item_type==='badge'?'Badge':'Clé'}${c.site_nom?' · '+esc(c.site_nom):''}</div></div>
+    <button class="pi-del" onclick="removeCart(${i})">✕</button>
+  </div>`).join('');
+}
+
+async function doRemise(){
+  if(!cart.length){toast('⚠️ Ajoutez au moins une clé/badge','err');return;}
+
+  let receptId=null, receptNom='', receptSociete=null;
+  if(manualRecept){
+    receptNom=document.getElementById('recept-nom').value.trim();
+    receptSociete=document.getElementById('recept-societe').value.trim()||null;
+    if(!receptNom){toast('⚠️ Indiquez le nom du réceptionnaire','err');return;}
+  } else {
+    const v=document.getElementById('sel-recept').value;
+    if(!v){toast('⚠️ Sélectionnez un réceptionnaire','err');return;}
+    const r=accesRecept.find(x=>x.id===v);
+    if(!r){toast('⚠️ Réceptionnaire invalide','err');return;}
+    receptId=r.id; receptNom=r.nom; receptSociete=r.societe||null;
+  }
+
+  const dateStr=document.getElementById('remise-datetime').value;
+  const note=document.getElementById('remise-note').value.trim();
+  const btn=document.getElementById('btn-remise');
+  btn.disabled=true;btn.textContent='Enregistrement…';
+
+  // Revérifie qu'aucune clé n'a été prise entre-temps
+  await refreshCatalogs();
+  const takenIds=new Set(accesActifs.map(a=>a.item_id));
+  const conflict=cart.find(c=>takenIds.has(c.id));
+  if(conflict){
+    toast('🔴 '+conflict.nom+' vient d\'être pris par quelqu\'un d\'autre','err');
+    btn.disabled=false;btn.textContent='✅ Confirmer la remise';
+    renderRemise();
+    return;
+  }
+
+  const ag=currentAgent();
+  try{
+    for(const c of cart){
+      // Supprime toute ancienne ligne pour cette clé/badge avant d'en recréer une neuve
+      // (évite tout conflit de contrainte, quelle que soit la structure exacte de l'index)
+      const { error: delErr } = await sb.from('stock_acces').delete().eq('item_id', c.id);
+      if (delErr) console.warn('Nettoyage stock_acces:', delErr.message);
+
+      const payload = {
+        site_id:c.site_id||null, site_nom:c.site_nom||'—',
+        agent_id:ag.id, agent_nom:ag.nom,
+        item_id:c.id, item_nom:c.nom, item_type:c.item_type,
+        receptionnaire_id:receptId, receptionnaire_nom:receptNom, receptionnaire_societe:receptSociete,
+        receptionnaire_type:'externe',
+        date_remise:new Date(dateStr).toISOString(), date_retour_reel:null,
+        statut:'actif', notes:note||null
+      };
+      const { error: accesErr } = await sb.from('stock_acces').insert(payload);
+      if (accesErr) throw accesErr;
+    }
+    toast('✅ '+cart.length+' remise(s) enregistrée(s) → '+receptNom);
+    goScreen('s-home');
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    btn.disabled=false;btn.textContent='✅ Confirmer la remise';
+  }
+}
+
+// ═══ EN COURS (externe) ═══
+let encoursData=[];
+
+async function renderEnCours(){
+  const el=document.getElementById('encours-body');
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>';
+  try{
+    const {data,error}=await sb.from('stock_acces').select('*').eq('statut','actif').eq('receptionnaire_type','externe').order('date_remise',{ascending:false});
+    if(error) throw error;
+    encoursData=data||[];
+    drawEnCours();
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⚠️ Erreur de chargement.<br><small>${esc(e.message||String(e))}</small></div>`;
+  }
+}
+
+function drawEnCours(){
+  const el=document.getElementById('encours-body');
+  if(!encoursData.length){
+    el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours — tout est rentré.</div>';
+    return;
+  }
+  const rows=encoursData.map(a=>{
+    const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
+    return `<div class="panier-item" style="align-items:flex-start">
+      <input type="checkbox" class="ret-check" data-id="${a.id}" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" onchange="onRetCheck()">
+      <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
+      <div class="pi-info">
+        <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
+        <div class="pi-sub">👤 ${esc(a.receptionnaire_nom)}${a.receptionnaire_societe?' ('+esc(a.receptionnaire_societe)+')':''} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
+        <div class="pi-sub">Remis par 👮 ${esc(a.agent_nom)}</div>
+        ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="sec-lbl" style="margin-top:0">${encoursData.length} remise(s) en cours — cochez ce qui revient</div>`
+    +`<div class="panier">${rows}</div>`
+    +`<button class="btn-submit" id="btn-ret-groupe" onclick="confirmReturnGroupe()" disabled style="opacity:.5">↩️ Confirmer le retour (0)</button>`;
+}
+
+function onRetCheck(){
+  const n=document.querySelectorAll('.ret-check:checked').length;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled = n===0;
+  btn.style.opacity = n===0 ? '.5' : '1';
+  btn.textContent = `↩️ Confirmer le retour (${n})`;
+}
+
+async function confirmReturnGroupe(){
+  const checks=[...document.querySelectorAll('.ret-check:checked')];
+  if(!checks.length)return;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  let ok=0, fail=0;
+  for(const cb of checks){
+    try{
+      await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',cb.dataset.id);
+      ok++;
+    }catch(e){ fail++; console.warn(e.message); }
+  }
+  toast(fail ? `📥 ${ok} retour(s) enregistré(s), ${fail} échec(s)` : `📥 ${ok} retour(s) enregistré(s)`, fail?'err':'ok');
+  renderEnCours();
+}
+
+init();
+</script>
+</body>
+</html>
