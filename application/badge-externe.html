@@ -10,12 +10,16 @@
   --red:#8B1A1A;--red-d:#6B1212;--red-l:#f5e8e8;
   --anth:#1a1a1a;--bg:#f5f4f2;--white:#fff;
   --border:#d0ccc5;--text:#1a1a1a;--text2:#4a4a4a;--text3:#9a9a9a;
+  --green:#16a34a;--green-l:#f0fdf4;
   --sh:0 2px 8px rgba(0,0,0,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--bg)}
-body{font-family:Arial,Helvetica,sans-serif;color:var(--text);display:flex;flex-direction:column;height:100vh;height:100dvh}
+body{font-family:Arial,Helvetica,sans-serif;color:var(--text)}
 button,input,select,textarea{font-family:inherit}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .25s ease,opacity .25s;overflow:hidden}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
 
 .app-header{flex-shrink:0;background:var(--red);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .app-header-txt{display:flex;flex-direction:column;gap:2px}
@@ -26,6 +30,14 @@ button,input,select,textarea{font-family:inherit}
 .agent-badge{font-size:10px;color:rgba(255,255,255,.65);margin-top:5px;text-align:right}
 
 .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;padding-bottom:40px}
+
+.menu-btn{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:2px;padding:18px;margin-bottom:14px;cursor:pointer;box-shadow:var(--sh)}
+.menu-btn:active{background:var(--bg)}
+.menu-btn-ico{font-size:26px;flex-shrink:0}
+.menu-btn-txt{flex:1}
+.menu-btn-name{font-size:15px;font-weight:700}
+.menu-btn-desc{font-size:12px;color:var(--text3);margin-top:2px}
+.menu-btn-chevron{color:var(--text3);font-size:18px}
 
 .section-box{background:var(--white);border:1px solid var(--border);border-radius:2px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
 .section-box-title{font-size:11px;font-weight:800;letter-spacing:.05em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
@@ -46,6 +58,18 @@ button,input,select,textarea{font-family:inherit}
 
 .state-msg{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px}
 
+/* RETOUR */
+.ret-item{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--anth);border-radius:2px;padding:13px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:var(--sh)}
+.ret-ico{font-size:22px;flex-shrink:0}
+.ret-info{flex:1;min-width:0}
+.ret-name{font-size:13.5px;font-weight:700}
+.ret-sub{font-size:11.5px;color:var(--text3);margin-top:2px}
+.ret-sub.late{color:#b45309;font-weight:700}
+.ret-btn{flex-shrink:0;background:var(--green);color:#fff;border:none;padding:10px 14px;border-radius:2px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ret-btn:active{background:#0f7a30}
+.ret-btn:disabled{opacity:.5}
+.ret-filter{margin-bottom:14px}
+
 #toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;z-index:999;width:calc(100% - 32px);max-width:380px;pointer-events:none}
 .toast{background:var(--anth);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
 .toast.ok{background:#15803d}.toast.err{background:#991b1b}
@@ -53,19 +77,54 @@ button,input,select,textarea{font-family:inherit}
 </head>
 <body>
 
-<div class="app-header">
-  <div class="app-header-txt">
-    <div class="app-header-name">RDZ Security Management</div>
-    <div class="app-header-sub">Remise badge — tiers externe</div>
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Badges tiers externes</div>
+    </div>
+    <div style="text-align:right">
+      <a class="back-btn" href="mobile.html">‹ Retour</a>
+      <div class="agent-badge" id="agent-badge"></div>
+    </div>
   </div>
-  <div style="text-align:right">
-    <a class="back-btn" href="mobile.html">‹ Retour</a>
-    <div class="agent-badge" id="agent-badge"></div>
+  <div class="body">
+    <div class="menu-btn" onclick="goScreen('s-remise')">
+      <div class="menu-btn-ico">📤</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Remise de badge</div><div class="menu-btn-desc">Donner une clé/badge à un tiers externe</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-retour')">
+      <div class="menu-btn-ico">📥</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Retour de badge</div><div class="menu-btn-desc">Enregistrer la restitution d'une clé/badge</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
   </div>
 </div>
 
-<div class="body" id="body-content">
-  <div class="state-msg">Chargement…</div>
+<!-- REMISE -->
+<div class="screen hidden" id="s-remise">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Remise de badge</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="remise-body"></div>
+</div>
+
+<!-- RETOUR -->
+<div class="screen hidden" id="s-retour">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Retour de badge</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="retour-body"></div>
 </div>
 
 <div id="toasts"></div>
@@ -93,6 +152,21 @@ function formatRecept(r){
   if (r.telephone) s += ` (${r.telephone})`;
   return s;
 }
+function ago(d){
+  const m=Math.floor((Date.now()-new Date(d))/60000);
+  if(m<1)return "à l'instant";
+  if(m<60)return m+' min';
+  if(m<1440)return Math.floor(m/60)+' h';
+  return Math.floor(m/1440)+' j';
+}
+
+// ══ NAVIGATION ══
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  if(id==='s-remise')renderRemise();
+  if(id==='s-retour')renderRetour();
+}
 
 async function loadAll(){
   const [stockAgents, aItems, aSites, aActifs, aRecept] = await Promise.all([
@@ -118,8 +192,11 @@ async function refreshActifs(){
   accesActifs=data||[];
 }
 
-function render(){
-  document.getElementById('body-content').innerHTML=`
+// ══════════════════════════════════════════════════════════════
+// REMISE
+// ══════════════════════════════════════════════════════════════
+function renderRemise(){
+  document.getElementById('remise-body').innerHTML=`
     <div class="section-box section-acc">
       <div class="section-box-title">🪪 CLÉ / BADGE À REMETTRE</div>
       <label class="fl">📍 Filtrer par site</label>
@@ -221,7 +298,6 @@ async function doRemise(){
       return;
     }
 
-    // N'ajoute une fiche permanente que si la case a été cochée
     if(receptSel==='__new__' && saveToList){
       const {data:newRecept,error:newErr}=await sb.from('stock_acces_recept').insert({nom:receptNom,societe:receptSociete,telephone:receptTelephone,actif:true}).select().single();
       if(newErr) throw newErr;
@@ -246,24 +322,96 @@ async function doRemise(){
     if(insErr) throw insErr;
 
     toast('✅ Remise enregistrée → '+receptNom);
-    document.getElementById('sel-item').value='';
-    document.getElementById('sel-recept').value='';
-    document.getElementById('new-recept-fields').style.display='none';
-    document.getElementById('f-notes').value='';
-    if(saveToList) render(); else fillItemSelect();
+    goScreen('s-home');
   }catch(e){
     toast('❌ '+e.message,'err');
-  }finally{
     btn.disabled=false;btn.textContent='✅ Enregistrer la remise';
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// RETOUR — simple : une liste, un bouton par ligne
+// ══════════════════════════════════════════════════════════════
+let retourExternes=[];
+
+async function renderRetour(){
+  document.getElementById('retour-body').innerHTML='<div class="state-msg">Chargement…</div>';
+  try{
+    const {data,error}=await sb.from('stock_acces')
+      .select('*')
+      .eq('statut','actif')
+      .eq('receptionnaire_type','externe')
+      .order('date_remise',{ascending:false});
+    if(error) throw error;
+    retourExternes=data||[];
+    drawRetour();
+  }catch(e){
+    document.getElementById('retour-body').innerHTML=`<div class="state-msg">⚠️ Erreur de chargement.<br><small>${esc(e.message)}</small></div>`;
+  }
+}
+
+function drawRetour(){
+  const el=document.getElementById('retour-body');
+  if(!retourExternes.length){
+    el.innerHTML='<div class="state-msg">✅ Aucun badge/clé actuellement chez un tiers externe.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <input class="fi ret-filter" id="ret-filter" placeholder="🔍 Filtrer par nom, société, badge…" oninput="drawRetourList()">
+    <div id="ret-list"></div>`;
+  drawRetourList();
+}
+
+function drawRetourList(){
+  const q = normalize(document.getElementById('ret-filter')?.value || '');
+  const el = document.getElementById('ret-list');
+  const filtered = retourExternes.filter(a => !q ||
+    normalize(a.item_nom).includes(q) ||
+    normalize(a.receptionnaire_nom).includes(q) ||
+    normalize(a.receptionnaire_societe||'').includes(q)
+  );
+  if(!filtered.length){
+    el.innerHTML = '<div class="state-msg">Aucun résultat.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(a=>{
+    const lateH = Math.floor((Date.now()-new Date(a.date_remise))/3600000);
+    const late = lateH > 24;
+    return `<div class="ret-item">
+      <div class="ret-ico">${a.item_type==='badge'?'🪪':'🔑'}</div>
+      <div class="ret-info">
+        <div class="ret-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
+        <div class="ret-sub">👤 ${esc(a.receptionnaire_nom)}${a.receptionnaire_societe?' ('+esc(a.receptionnaire_societe)+')':''}</div>
+        <div class="ret-sub${late?' late':''}">${late?'⚠️ ':''}depuis ${ago(a.date_remise)}</div>
+      </div>
+      <button class="ret-btn" onclick="doRetour('${a.id}', this)">✅ Rendu</button>
+    </div>`;
+  }).join('');
+}
+
+async function doRetour(id, btn){
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const {error}=await sb.from('stock_acces')
+      .update({statut:'rendu', date_retour_reel:new Date().toISOString()})
+      .eq('id', id);
+    if(error) throw error;
+    toast('📥 Badge/clé rendu ✓');
+    retourExternes = retourExternes.filter(a=>a.id!==id);
+    drawRetourList();
+    if(!retourExternes.length) drawRetour();
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    btn.disabled=false; btn.textContent='✅ Rendu';
+  }
+}
+
+// ══ INIT ══
 async function init(){
   try{
     await loadAll();
-    render();
   }catch(e){
-    document.getElementById('body-content').innerHTML=`<div class="state-msg">⚠️ Erreur de chargement.<br><small>${esc(e.message)}</small></div>`;
+    toast('Erreur de chargement : '+e.message,'err');
   }
 }
 init();
