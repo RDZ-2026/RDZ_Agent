@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Journal des comptes agents</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1000px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 1000px; margin: 0 auto; padding: 32px 28px; }
+    .page-header { margin-bottom: 24px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--rdz-black); }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 14px 20px; flex: 1; min-width: 140px; }
+    .stat-num { font-size: 24px; font-weight: 700; color: var(--rdz-black); }
+    .stat-lbl { font-size: 11px; color: var(--rdz-gray); margin-top: 3px; letter-spacing: .03em; text-transform: uppercase; }
+
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel, .tsearch { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsearch { min-width: 200px; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    table.jtable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.jtable thead th { background: var(--rdz-black); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 10px 12px; text-align: left; white-space: nowrap; }
+    table.jtable tbody td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--rdz-border); vertical-align: top; }
+    table.jtable tbody tr:hover { background: var(--rdz-bg); }
+    table.jtable tbody tr:last-child td { border-bottom: none; }
+
+    .action-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; }
+    .act-creation { background: #dbeafe; color: #1e3a8a; }
+    .act-modification { background: #eff6ff; color: #1e3a5f; }
+    .act-pin_defini, .act-pin_reinitialise { background: #fef9c3; color: #854d0e; }
+    .act-activation { background: #dcfce7; color: #166534; }
+    .act-desactivation { background: #f3f4f6; color: #6b7280; }
+    .act-suppression { background: #fee2e2; color: #7f1d1d; }
+
+    .cell-agent { font-weight: 700; }
+
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 32px; margin-bottom: 12px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Journal des comptes agents</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="../admin/comptes-agents.html">👤 Comptes agents</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Journal des modifications — Agents &amp; PIN</div>
+    <div class="page-sub">Historique de chaque création, modification, activation/désactivation, réinitialisation de PIN et suppression effectuée sur les comptes agents.</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Actions (période)</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-pin">—</div><div class="stat-lbl">PIN définis/réinitialisés</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-suppr">—</div><div class="stat-lbl">Suppressions</div></div>
+  </div>
+
+  <div class="toolbar">
+    <span class="tlabel">Période</span>
+    <select class="tsel" id="filter-period" onchange="render()">
+      <option value="7">7 derniers jours</option>
+      <option value="30" selected>30 derniers jours</option>
+      <option value="all">Tout</option>
+    </select>
+    <span class="tlabel">Action</span>
+    <select class="tsel" id="filter-action" onchange="render()">
+      <option value="all">Toutes</option>
+      <option value="creation">Création</option>
+      <option value="modification">Modification</option>
+      <option value="pin_defini">PIN défini</option>
+      <option value="pin_reinitialise">PIN réinitialisé</option>
+      <option value="activation">Activation</option>
+      <option value="desactivation">Désactivation</option>
+      <option value="suppression">Suppression</option>
+    </select>
+    <input type="text" class="tsearch" id="filter-search" placeholder="Rechercher un agent…" oninput="render()">
+    <div class="save-status">
+      <div class="save-dot" id="save-dot"></div>
+      <span id="save-text">Chargement…</span>
+    </div>
+  </div>
+
+  <div id="content-table">
+    <div class="state-msg"><div class="big">⏳</div>Chargement du journal…</div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let entries = [];
+
+const ACTION_LABELS = {
+  creation: '✚ Création',
+  modification: '✎ Modification',
+  pin_defini: '🔑 PIN défini',
+  pin_reinitialise: '⟳ PIN réinitialisé',
+  activation: '▶ Activation',
+  desactivation: '⏸ Désactivation',
+  suppression: '✕ Suppression'
+};
+
+function escHtml(s) { return (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDateTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('fr-CH', { day:'2-digit', month:'2-digit', year:'numeric' }) + ' à ' + d.toLocaleTimeString('fr-CH', { hour:'2-digit', minute:'2-digit' });
+}
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot ' + state;
+  document.getElementById('save-text').textContent = msg;
+}
+
+async function loadAll() {
+  try {
+    const { data, error } = await sb.from('agents_journal').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    entries = data || [];
+    setSave('saved', `${entries.length} action${entries.length > 1 ? 's' : ''} enregistrée${entries.length > 1 ? 's' : ''}`);
+    render();
+  } catch (err) {
+    setSave('error', 'Erreur de connexion');
+    document.getElementById('content-table').innerHTML =
+      `<div class="state-msg">Impossible de charger le journal.<br><small>${escHtml(err.message)}</small><br><small>La table "agents_journal" existe-t-elle dans Supabase ?</small></div>`;
+  }
+}
+
+function periodStart(period) {
+  if (period === 'all') return null;
+  const d = new Date();
+  d.setDate(d.getDate() - parseInt(period, 10) + 1);
+  return d;
+}
+
+function detailText(e) {
+  const d = e.details;
+  if (!d) return '';
+  if (e.action === 'modification' && d.avant && d.apres) {
+    return `${escHtml(d.avant.prenom || '')} ${escHtml(d.avant.nom || '')} → ${escHtml(d.apres.prenom || '')} ${escHtml(d.apres.nom || '')}`;
+  }
+  if ((e.action === 'creation' || e.action === 'suppression') && (d.prenom || d.nom)) {
+    return `${escHtml(d.prenom || '')} ${escHtml(d.nom || '')}`;
+  }
+  return '';
+}
+
+function render() {
+  const period = document.getElementById('filter-period').value;
+  const actionVal = document.getElementById('filter-action').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+  const from = periodStart(period);
+
+  let filtered = entries.filter(e => {
+    if (from && new Date(e.created_at) < from) return false;
+    if (actionVal !== 'all' && e.action !== actionVal) return false;
+    if (search && !(e.agent_nom || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById('stat-total').textContent = filtered.length;
+  document.getElementById('stat-pin').textContent = filtered.filter(e => e.action === 'pin_defini' || e.action === 'pin_reinitialise').length;
+  document.getElementById('stat-suppr').textContent = filtered.filter(e => e.action === 'suppression').length;
+
+  const el = document.getElementById('content-table');
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune action pour ces filtres.</div>`;
+    return;
+  }
+
+  el.innerHTML = `<table class="jtable">
+    <thead><tr>
+      <th>Date</th>
+      <th>Action</th>
+      <th>Agent</th>
+      <th>Détail</th>
+    </tr></thead>
+    <tbody>
+      ${filtered.map(e => `<tr>
+        <td>${fmtDateTime(e.created_at)}</td>
+        <td><span class="action-badge act-${e.action}">${ACTION_LABELS[e.action] || e.action}</span></td>
+        <td class="cell-agent">${escHtml(e.agent_nom)}</td>
+        <td>${detailText(e)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>

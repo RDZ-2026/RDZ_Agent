@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Validations agents</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1280px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    /* STATS */
+    .stats-bar { max-width: 1280px; margin: 0 auto; padding: 22px 28px 0; display: flex; gap: 14px; flex-wrap: wrap; }
+    .stat-card { flex: 1; min-width: 150px; background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 14px 16px; }
+    .stat-num { font-size: 24px; font-weight: 700; color: var(--rdz-black); line-height: 1; }
+    .stat-lbl { font-size: 11px; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
+
+    /* ALERT */
+    .alert-block { max-width: 1280px; margin: 18px auto 0; padding: 0 28px; }
+    .alert { background: #fff8ed; border: 1px solid #f0c975; border-left: 4px solid #b8860b; border-radius: 2px; padding: 14px 18px; }
+    .alert-title { font-size: 12px; font-weight: 700; color: #7a5b00; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    .alert-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .alert-chip { font-size: 11.5px; background: #fff; border: 1px solid #f0c975; color: #7a5b00; padding: 3px 10px; border-radius: 2px; font-weight: 600; }
+    .alert-ok { background: #f0fdf4; border-color: #86d19d; border-left-color: #16803c; }
+    .alert-ok .alert-title { color: #166534; }
+
+    /* TOOLBAR */
+    .toolbar { background: #fff; border-bottom: 2px solid var(--rdz-black); padding: 10px 28px; margin-top: 20px; }
+    .toolbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .tsel, .tsearch { padding: 6px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsearch { min-width: 180px; }
+    .tsep { width: 1px; height: 18px; background: var(--rdz-border); margin: 0 4px; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* CONTENT */
+    .content { max-width: 1280px; margin: 0 auto; padding: 20px 28px 40px; }
+
+    table.vtable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.vtable thead th { background: var(--rdz-black); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 10px 12px; text-align: left; white-space: nowrap; }
+    table.vtable tbody td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--rdz-border); vertical-align: middle; }
+    table.vtable tbody tr:hover { background: var(--rdz-bg); }
+    table.vtable tbody tr:last-child td { border-bottom: none; }
+    .cell-agent { font-weight: 700; }
+    .cell-site { color: var(--rdz-gray); }
+    .cnt-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--rdz-light, #f0f0f0); }
+    .cnt-cons { background: #e8f0fb; color: #1e3a5f; }
+    .cnt-ev { background: #fdf2e8; color: #7a4a12; }
+    .cnt-ct { background: #f5e8e8; color: #6b1212; }
+    .btn-detail { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 5px 12px; border-radius: 2px; border: 1px solid var(--rdz-border); background: transparent; color: var(--rdz-gray); cursor: pointer; transition: all .15s; }
+    .btn-detail:hover { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 32px; margin-bottom: 12px; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 60px 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 28px; width: 100%; max-width: 620px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 12px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 6px; }
+    .modal-sub { font-size: 11.5px; color: var(--rdz-gray); margin-bottom: 18px; }
+    .modal-section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--rdz-black); background: var(--rdz-bg); padding: 6px 10px; margin: 16px 0 8px; border-left: 3px solid var(--rdz-red); }
+    .snap-item { font-size: 12.5px; padding: 8px 10px; border-bottom: 1px solid var(--rdz-border); line-height: 1.5; }
+    .snap-item:last-child { border-bottom: none; }
+    .snap-empty { font-size: 12px; color: #9a9a9a; font-style: italic; padding: 8px 10px; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--rdz-border); background: var(--rdz-bg); color: var(--rdz-gray); transition: all .15s; }
+    .mbtn:hover { background: #ebe9e6; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Validations agents — Consignes · Événements · Constats</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="index.html">← Accueil</a>
+      <a class="btn-nav" href="consignes.html">📋 Consignes</a>
+      <a class="btn-nav" href="evenements.html">📅 Événements</a>
+      <a class="btn-nav" href="constats.html">⚠ Constats</a>
+    </nav>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Validations (période)</div></div>
+  <div class="stat-card"><div class="stat-num" id="stat-today">—</div><div class="stat-lbl">Sites validés aujourd'hui</div></div>
+  <div class="stat-card"><div class="stat-num" id="stat-pending">—</div><div class="stat-lbl">Sites en attente aujourd'hui</div></div>
+  <div class="stat-card"><div class="stat-num" id="stat-agents">—</div><div class="stat-lbl">Agents actifs (période)</div></div>
+</div>
+
+<div class="alert-block" id="alert-block"></div>
+
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <span class="tlabel">Période</span>
+    <select class="tsel" id="filter-period" onchange="render()">
+      <option value="today">Aujourd'hui</option>
+      <option value="7" selected>7 derniers jours</option>
+      <option value="30">30 derniers jours</option>
+      <option value="all">Tout</option>
+    </select>
+    <div class="tsep"></div>
+    <span class="tlabel">Site</span>
+    <select class="tsel" id="filter-site" onchange="render()">
+      <option value="all">Tous les sites</option>
+    </select>
+    <div class="tsep"></div>
+    <span class="tlabel">Agent</span>
+    <select class="tsel" id="filter-agent" onchange="render()">
+      <option value="all">Tous les agents</option>
+    </select>
+    <div class="tsep"></div>
+    <input type="text" class="tsearch" id="filter-search" placeholder="Recherche…" oninput="render()">
+    <div class="save-status">
+      <div class="save-dot" id="save-dot"></div>
+      <span id="save-text">Chargement…</span>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="content">
+  <div class="state-msg"><div class="big">⏳</div>Chargement des validations…</div>
+</div>
+
+<!-- MODAL DETAIL -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-title">Détail de la validation</div>
+    <div class="modal-sub" id="detail-sub"></div>
+    <div id="detail-body"></div>
+    <div class="modal-footer">
+      <button class="mbtn" onclick="closeDetail()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SUPABASE ───────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let validations = [];
+let sites = [];
+
+function today() { return new Date().toISOString().slice(0,10); }
+function escHtml(s) { return (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDate(d) { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}.${m}.${y}`; }
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'}); }
+
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot ' + state;
+  document.getElementById('save-text').textContent = msg;
+}
+
+// ─── LOAD ────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const [{ data: v, error: ve }, { data: s, error: se }] = await Promise.all([
+      sb.from('consignes_lectures').select('*').order('validated_at', { ascending: false }),
+      sb.from('sites').select('id,nom,actif').order('nom')
+    ]);
+    if (ve) throw ve;
+    if (se) throw se;
+    validations = v || [];
+    sites = (s || []).filter(x => x.actif !== false);
+    setSave('saved', `${validations.length} validation${validations.length > 1 ? 's' : ''} chargée${validations.length > 1 ? 's' : ''}`);
+    populateFilters();
+    render();
+  } catch (err) {
+    setSave('error', 'Erreur de connexion');
+    document.getElementById('content').innerHTML = `<div class="state-msg">Impossible de charger les données.<br><small>${escHtml(err.message)}</small></div>`;
+  }
+}
+
+function populateFilters() {
+  const siteSel = document.getElementById('filter-site');
+  const siteNames = [...new Set(validations.map(v => v.site_nom).filter(Boolean))].sort((a,b) => a.localeCompare(b,'fr'));
+  siteSel.innerHTML = '<option value="all">Tous les sites</option>' + siteNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+
+  const agentSel = document.getElementById('filter-agent');
+  const agentNames = [...new Set(validations.map(v => v.agent_nom).filter(Boolean))].sort((a,b) => a.localeCompare(b,'fr'));
+  agentSel.innerHTML = '<option value="all">Tous les agents</option>' + agentNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+function periodStart(period) {
+  if (period === 'all') return null;
+  if (period === 'today') return today();
+  const d = new Date();
+  d.setDate(d.getDate() - parseInt(period, 10) + 1);
+  return d.toISOString().slice(0,10);
+}
+
+// ─── STATS + ALERTE SITES EN ATTENTE ────────────────────────────────────────
+function renderStatsAndAlert() {
+  const t = today();
+  const todayValidations = validations.filter(v => v.date_lecture === t);
+  const validatedSiteIds = new Set(todayValidations.map(v => v.site_id));
+  const pendingSites = sites.filter(s => !validatedSiteIds.has(s.id));
+  const agentsPeriodSet = new Set();
+
+  const period = document.getElementById('filter-period').value;
+  const from = periodStart(period);
+  const periodList = validations.filter(v => !from || v.date_lecture >= from);
+  periodList.forEach(v => { if (v.agent_nom) agentsPeriodSet.add(v.agent_nom); });
+
+  document.getElementById('stat-total').textContent = periodList.length;
+  document.getElementById('stat-today').textContent = `${validatedSiteIds.size} / ${sites.length}`;
+  document.getElementById('stat-pending').textContent = pendingSites.length;
+  document.getElementById('stat-agents').textContent = agentsPeriodSet.size;
+
+  const alertEl = document.getElementById('alert-block');
+  if (pendingSites.length === 0) {
+    alertEl.innerHTML = `<div class="alert alert-ok"><div class="alert-title">✓ Tous les sites actifs ont validé aujourd'hui</div></div>`;
+  } else {
+    alertEl.innerHTML = `<div class="alert">
+      <div class="alert-title">⚠ Sites sans validation aujourd'hui (${pendingSites.length})</div>
+      <div class="alert-chips">${pendingSites.map(s => `<span class="alert-chip">${escHtml(s.nom)}</span>`).join('')}</div>
+    </div>`;
+  }
+}
+
+// ─── RENDER TABLE ────────────────────────────────────────────────────────────
+function render() {
+  renderStatsAndAlert();
+
+  const period = document.getElementById('filter-period').value;
+  const from = periodStart(period);
+  const siteVal = document.getElementById('filter-site').value;
+  const agentVal = document.getElementById('filter-agent').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  let filtered = validations.filter(v => {
+    if (from && v.date_lecture < from) return false;
+    if (siteVal !== 'all' && v.site_nom !== siteVal) return false;
+    if (agentVal !== 'all' && v.agent_nom !== agentVal) return false;
+    if (search && !((v.agent_nom||'').toLowerCase().includes(search) || (v.site_nom||'').toLowerCase().includes(search))) return false;
+    return true;
+  });
+
+  const el = document.getElementById('content');
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune validation pour ces filtres.</div>`;
+    return;
+  }
+
+  el.innerHTML = `<table class="vtable">
+    <thead><tr>
+      <th>Date</th>
+      <th>Heure</th>
+      <th>Agent</th>
+      <th>Site</th>
+      <th>Consignes</th>
+      <th>Événements</th>
+      <th>Constats</th>
+      <th></th>
+    </tr></thead>
+    <tbody>
+      ${filtered.map(v => `<tr>
+        <td>${fmtDate(v.date_lecture)}</td>
+        <td>${fmtTime(v.validated_at)}</td>
+        <td class="cell-agent">${escHtml(v.agent_nom || '—')}</td>
+        <td class="cell-site">${escHtml(v.site_nom || '—')}</td>
+        <td><span class="cnt-pill cnt-cons">${v.nb_consignes ?? 0}</span></td>
+        <td><span class="cnt-pill cnt-ev">${v.nb_evenements ?? 0}</span></td>
+        <td><span class="cnt-pill cnt-ct">${v.nb_constats ?? 0}</span></td>
+        <td><button class="btn-detail" onclick="openDetail('${v.id}')">Détails</button></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ─── MODAL DETAIL ────────────────────────────────────────────────────────────
+function openDetail(id) {
+  const v = validations.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('detail-sub').textContent =
+    `${v.agent_nom || '—'} · ${v.site_nom || '—'} · ${fmtDate(v.date_lecture)} à ${fmtTime(v.validated_at)}`;
+
+  const cons = Array.isArray(v.consignes_json) ? v.consignes_json : [];
+  const evs = Array.isArray(v.evenements_json) ? v.evenements_json : [];
+  const cts = Array.isArray(v.constats_json) ? v.constats_json : [];
+
+  let html = '';
+
+  html += `<div class="modal-section">📋 Consignes lues (${cons.length})</div>`;
+  html += cons.length ? cons.map(c => `<div class="snap-item">${escHtml(c.texte || '')}</div>`).join('')
+                       : `<div class="snap-empty">Aucune consigne active à ce moment.</div>`;
+
+  html += `<div class="modal-section">📅 Événements présentés (${evs.length})</div>`;
+  html += evs.length ? evs.map(e => `<div class="snap-item">${escHtml(e.titre || '')}${e.heure_debut ? ' — ' + e.heure_debut.slice(0,5) : ''}</div>`).join('')
+                     : `<div class="snap-empty">Aucun événement à ce moment.</div>`;
+
+  html += `<div class="modal-section">⚠ Constats affichés (${cts.length})</div>`;
+  html += cts.length ? cts.map(c => `<div class="snap-item">${escHtml(c.description || '')}${c.statut ? ' — ' + escHtml(c.statut) : ''}</div>`).join('')
+                     : `<div class="snap-empty">Aucun constat non résolu à ce moment.</div>`;
+
+  document.getElementById('detail-body').innerHTML = html;
+  document.getElementById('modal-detail').classList.add('open');
+}
+function closeDetail() { document.getElementById('modal-detail').classList.remove('open'); }
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+
+</body>
+</html>
