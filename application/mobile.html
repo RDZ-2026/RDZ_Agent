@@ -64,7 +64,7 @@
   .menu-greeting { font-size: 13px; font-weight: 700; color: #fff; }
   .menu-change { font-size: 11px; color: rgba(255,255,255,.75); text-decoration: underline; background: none; border: none; cursor: pointer; }
   .menu-content { flex: 1; padding: 18px 16px 40px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-  .menu-section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rdz-gray); margin: 14px 0 2px; }
+  .menu-section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rdz-gray); margin: 24px 0 2px; }
   .menu-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-red); border-radius: 2px; padding: 14px 16px; display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
   .menu-card:active { background: var(--rdz-red-light); }
   .menu-card.featured { border-left-color: var(--rdz-black); background: var(--rdz-black); margin-bottom: 6px; }
@@ -193,17 +193,32 @@ function showScreen(id) {
 
 // ── MODULES DU MENU ───────────────────────────────────────────────────────────
 // NB : chemins relatifs (fichiers tous dans /application/, sauf ../ vers la racine)
-const MAIN_ITEMS = [
-  { icon: '🕐', name: 'Feuilles de route', desc: "Consultation et heures réelles", href: 'feuille-route-agent.html' },
-  { icon: '👥', name: 'Résidents & Accès IHEID', desc: "Recherche par nom, chambre, plaque, casier", href: 'residents-agent.html' },
-  { icon: '🔓', name: 'Ouvertures Résidences IHEID', desc: "Enregistrer une ouverture de porte", href: 'ouverture-agent.html' },
-  { icon: '🅿️', name: 'Contrôle Parking', desc: "Contrôle et surveillance des parkings", href: 'parkguard-rdz.html' }
+const MAIN_SECTIONS = [
+  {
+    label: null,
+    items: [
+      { icon: '🕐', name: 'Feuilles de route', desc: "Consultation et heures réelles", href: 'feuille-route-agent.html' }
+    ]
+  },
+  {
+    label: 'Multi-site',
+    items: [
+      { icon: '🅿️', name: 'Contrôle Parking', desc: "Contrôle et surveillance des parkings", href: 'parkguard-rdz.html' },
+      { icon: '🪪', name: 'Remise badge — tiers externe', desc: "Visiteur, prestataire, société tierce", href: 'badge-externe.html' }
+    ]
+  },
+  {
+    label: 'IHEID',
+    items: [
+      { icon: '🔓', name: 'Ouvertures Résidences IHEID', desc: "Enregistrer une ouverture de porte", href: 'ouverture-agent.html' },
+      { icon: '👥', name: 'Résidents & Accès IHEID', desc: "Recherche par nom, chambre, plaque, casier", href: 'residents-agent.html' }
+    ]
+  }
 ];
 
 const POSTE_ITEMS = [
   { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
   { icon: '📦', name: 'Matériel & clés', desc: "Sortie combinée, en cours, maintenance", href: 'materiel-agent.html' },
-  { icon: '🪪', name: 'Badges tiers externes', desc: "Remise à un prestataire, visiteur, société", href: 'badge-externe.html' },
   { icon: '🚗', name: 'Prise de véhicule', desc: "État, dégâts, assurance", href: 'fleet-agent.html' }
 ];
 
@@ -232,8 +247,10 @@ function renderMenu(nom) {
       </div>
       <div class="menu-chevron">›</div>
     </a>`;
-  html += `<div class="menu-section-label">Accès direct</div>`;
-  MAIN_ITEMS.forEach(item => { html += cardHtml(item); });
+  MAIN_SECTIONS.forEach(section => {
+    if (section.label) html += `<div class="menu-section-label">${section.label}</div>`;
+    section.items.forEach(item => { html += cardHtml(item); });
+  });
   document.getElementById('menu-content').innerHTML = html;
   showScreen('screen-menu');
 }
