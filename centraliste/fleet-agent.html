@@ -115,8 +115,19 @@ button,input,select,textarea{font-family:inherit;}
 .det-km{font-size:11px;color:rgba(255,255,255,.35);font-family:'DM Mono';margin-top:3px;}
 .det-inds{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;}
 
-/* ── Tabs devenus boutons ── */
-.tab-row{display:flex;flex-wrap:wrap;gap:8px;background:var(--white);border-bottom:1px solid var(--border);padding:10px 12px;flex-shrink:0;}
+/* ── Menu de choix (comme dans l'application mobile) ── */
+.det-menu{padding:14px 12px;}
+.det-menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.det-menu-card{background:var(--white);border-radius:var(--r);box-shadow:var(--sh-md);padding:20px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-align:center;border:1px solid rgba(0,0,0,.04);transition:transform .12s;}
+.det-menu-card:active{transform:scale(.95);}
+.det-menu-ico{font-size:30px;}
+.det-menu-label{font-size:13px;font-weight:700;color:var(--anth);}
+.det-menu-sub{font-size:10.5px;color:var(--text3);line-height:1.3;}
+.body-back{display:flex;align-items:center;gap:6px;padding:11px 14px;font-size:12.5px;font-weight:700;color:var(--red);cursor:pointer;background:var(--white);border-bottom:1px solid var(--border);}
+.body-back:active{background:var(--bg);}
+
+/* ── Tabs devenus boutons (conservés en secours, non affichés) ── */
+.tab-row{display:none;}
 .tab-item{flex-shrink:0;padding:8px 14px;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;border:1.5px solid var(--border2);border-radius:20px;white-space:nowrap;transition:all .15s;background:var(--bg);}
 .tab-item:active{transform:scale(.96);}
 .tab-item.on{color:#fff;background:var(--red);border-color:var(--red);}
@@ -310,12 +321,37 @@ button,input,select,textarea{font-family:inherit;}
   </div>
   <div style="display:flex;flex-direction:column;height:calc(100% - 54px);overflow:hidden;">
     <div class="det-hero" id="det-hero"></div>
+    <div class="det-menu" id="det-menu">
+      <div class="det-menu-grid">
+        <div class="det-menu-card" onclick="showTab('mv')">
+          <div class="det-menu-ico">🔑</div>
+          <div class="det-menu-label">Mouvements</div>
+          <div class="det-menu-sub">Prise / restitution</div>
+        </div>
+        <div class="det-menu-card" onclick="showTab('degats')">
+          <div class="det-menu-ico">💥</div>
+          <div class="det-menu-label">Dégâts</div>
+          <div class="det-menu-sub">Carrosserie, photos</div>
+        </div>
+        <div class="det-menu-card" onclick="showTab('mc')">
+          <div class="det-menu-ico">📝</div>
+          <div class="det-menu-label">Main courante</div>
+          <div class="det-menu-sub">Observations, révisions</div>
+        </div>
+        <div class="det-menu-card" onclick="showTab('fiche')">
+          <div class="det-menu-ico">📋</div>
+          <div class="det-menu-label">Infos</div>
+          <div class="det-menu-sub">Garage, assurance, pneus</div>
+        </div>
+      </div>
+    </div>
     <div class="tab-row">
       <div class="tab-item on" onclick="showTab('mv')">🔑 Mouvements</div>
       <div class="tab-item" onclick="showTab('degats')">💥 Dégâts</div>
       <div class="tab-item" onclick="showTab('mc')">📝 Main courante</div>
       <div class="tab-item" onclick="showTab('fiche')">📋 Infos</div>
     </div>
+    <div class="body-back" id="body-back" onclick="showDetMenu()" style="display:none">← Menu</div>
     <div class="body">
       <div class="tab-pane on" id="tab-fiche"></div>
       <div class="tab-pane" id="tab-degats">
@@ -692,7 +728,7 @@ function openVehicle(id){
   mcFilter='all';
   nav('det');
   renderDetail();
-  showTab('mv');
+  showDetMenu();
 }
 
 // ══════════════════════════════════════════
@@ -756,8 +792,17 @@ function renderDetail(){
   renderMovements();
 }
 
+function showDetMenu(){
+  document.getElementById('det-menu').style.display='block';
+  document.getElementById('body-back').style.display='none';
+  document.querySelectorAll('.tab-pane').forEach(el=>el.classList.remove('on'));
+  document.getElementById('fab-det').style.display='none';
+}
+
 function showTab(t){
   currentTab=t;
+  document.getElementById('det-menu').style.display='none';
+  document.getElementById('body-back').style.display='flex';
   document.querySelectorAll('.tab-item').forEach(el=>{
     const fn=el.getAttribute('onclick')||'';
     el.classList.toggle('on', fn.includes("'"+t+"'"));
