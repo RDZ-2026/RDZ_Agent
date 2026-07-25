@@ -31,11 +31,8 @@
     .btn-nav-accent:hover { background: #f5f5f5; }
 
     /* ── TABS ── */
-    .tabs-bar { background: var(--rdz-black); }
-    .tabs-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; gap: 0; }
-    .tab-btn { padding: 11px 20px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: rgba(255,255,255,.5); border: none; background: transparent; cursor: pointer; border-bottom: 3px solid transparent; transition: all .15s; }
-    .tab-btn:hover { color: rgba(255,255,255,.85); }
-    .tab-btn.active { color: #fff; border-bottom-color: var(--rdz-red); }
+    .tab-btn.active { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .tab-btn.active:hover { background: #f5f5f5; }
 
     /* ── CONTENT PANELS ── */
     .panel { display: none; }
@@ -216,19 +213,12 @@
     </div>
     <nav class="header-nav">
       <a class="btn-nav" href="../index.html">← Accueil</a>
+      <button class="btn-nav tab-btn active" onclick="switchTab('search', this)">🔍 Recherche</button>
+      <button class="btn-nav tab-btn" onclick="switchTab('import', this)">📂 Import Starez</button>
       <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
     </nav>
   </div>
 </header>
-
-<div class="tabs-bar">
-  <div class="tabs-inner">
-    <button class="tab-btn active" onclick="switchTab('search', this)">🔍 Recherche</button>
-    <button class="tab-btn" onclick="switchTab('building', this)">🏢 Par bâtiment</button>
-    <button class="tab-btn" onclick="switchTab('prints', this)">🖨 Impressions</button>
-    <button class="tab-btn" onclick="switchTab('import', this)">📂 Import CSV</button>
-  </div>
-</div>
 
 <!-- ── STATS BAR ── -->
 <div class="stats-bar">
@@ -279,107 +269,13 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     TAB 2 — VUE BÂTIMENT
-══════════════════════════════════════════════════════════════ -->
-<div class="panel" id="panel-building">
-  <div class="bld-toolbar">
-    <div class="bld-toolbar-inner">
-      <span class="tlabel">Bâtiment</span>
-      <select class="tsel" id="bld-filter" onchange="renderBuilding()">
-        <option value="all">Tous les bâtiments</option>
-        <option value="REGM">REGM</option>
-        <option value="MDE">MDE</option>
-        <option value="BARTON">Barton</option>
-      </select>
-      <div class="seg">
-        <button class="seg-btn on" data-s="all" onclick="setBldSeg(this)">Tous</button>
-        <button class="seg-btn" data-s="longstay" onclick="setBldSeg(this)">Long séjour</button>
-        <button class="seg-btn" data-s="shortstay" onclick="setBldSeg(this)">Courts séjours</button>
-      </div>
-      <button class="print-btn" onclick="printBuilding()">🖨 Imprimer ce tableau</button>
-    </div>
-  </div>
-  <div class="content" id="building-content">
-    <div class="state-msg"><div class="ico">⏳</div><p>Chargement…</p></div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     TAB 3 — IMPRESSIONS
-══════════════════════════════════════════════════════════════ -->
-<div class="panel" id="panel-prints">
-  <div class="content">
-    <div style="margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--rdz-black);margin-bottom:4px">Impressions spécialisées</div>
-      <div style="font-size:12px;color:var(--rdz-gray);line-height:1.6">Chaque impression s'ouvre dans une nouvelle fenêtre prête à imprimer.</div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
-
-      <!-- BÂTIMENT -->
-      <div class="import-card">
-        <div class="import-card-title">🏢 Par bâtiment</div>
-        <div class="import-card-desc">Tableau complet trié par bâtiment physique puis par numéro de chambre. Long séjour et courts séjours fusionnés.</div>
-        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Bâtiment</label>
-            <select class="tsel" id="print-bld-filter" style="flex:1">
-              <option value="all">Tous</option>
-              <option value="MDE">MDE (Bat 3)</option>
-              <option value="REGM8">REGM (Bat 8)</option>
-              <option value="REGM10">REGM (Bat 10)</option>
-              <option value="BARTON">Barton</option>
-            </select>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Type</label>
-            <select class="tsel" id="print-bld-seg" style="flex:1">
-              <option value="all">Tous (long + court séjour)</option>
-              <option value="longstay">Long séjour uniquement</option>
-              <option value="shortstay">Courts séjours uniquement</option>
-            </select>
-          </div>
-          <button class="print-btn" style="margin:4px 0 0;width:100%;padding:10px" onclick="printBuildingFromPanel()">🖨 Imprimer par bâtiment</button>
-        </div>
-      </div>
-
-      <!-- PARKING -->
-      <div class="import-card">
-        <div class="import-card-title">🚗 Liste des parkings</div>
-        <div class="import-card-desc">Toutes les places de parking actives, triées par numéro de place. Inclut nom du titulaire, plaque d'immatriculation et validité.</div>
-        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap">Type</label>
-            <select class="tsel" id="print-parking-type" style="flex:1">
-              <option value="all">Toutes les places</option>
-              <option value="inhouse">Résidents (In-house)</option>
-              <option value="assigned">Places assignées</option>
-            </select>
-          </div>
-          <button class="print-btn" style="margin:4px 0 0;width:100%;padding:10px" onclick="printParking()">🖨 Imprimer les parkings</button>
-        </div>
-      </div>
-
-      <!-- FITNESS -->
-      <div class="import-card">
-        <div class="import-card-title">💪 Pass Fitness</div>
-        <div class="import-card-desc">Tous les pass fitness actifs, triés par bâtiment physique puis par numéro de chambre.</div>
-        <div style="margin-top:14px">
-          <button class="print-btn" style="width:100%;padding:10px" onclick="printFitness()">🖨 Imprimer les pass fitness</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════════════
-     TAB 4 — IMPORT CSV
+     TAB 2 — IMPORT STAREZ
 ══════════════════════════════════════════════════════════════ -->
 <div class="panel" id="panel-import">
   <div class="content">
     <div style="margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--rdz-black);margin-bottom:4px">Import des fichiers CSV</div>
-      <div style="font-size:12px;color:var(--rdz-gray);line-height:1.6">Glissez-déposez ou cliquez pour sélectionner les fichiers. L'application reconnaît automatiquement le type de chaque fichier selon son nom. L'import remplace les données existantes pour ce type.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--rdz-black);margin-bottom:4px">Mise à jour Starez — import CSV</div>
+      <div style="font-size:12px;color:var(--rdz-gray);line-height:1.6">Glissez-déposez ou cliquez pour sélectionner les fichiers exportés depuis Starez. L'application reconnaît automatiquement le type de chaque fichier selon son nom. L'import remplace les données existantes pour ce type.</div>
     </div>
 
     <div class="import-grid">
@@ -598,7 +494,6 @@ function switchTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   btn.classList.add('active');
-  if (tab === 'building') renderBuilding();
   if (tab === 'import') loadImportLog();
 }
 
