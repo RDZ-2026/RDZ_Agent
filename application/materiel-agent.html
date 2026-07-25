@@ -524,7 +524,7 @@ function drawEnCours(){
       <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
       <div class="pi-info">
         <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
-        <div class="pi-sub">👤 ${esc(a.receptionnaire_nom||a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
+        <div class="pi-sub">${a.receptionnaire_type==='externe'?'👤':'👮'} ${esc(a.receptionnaire_nom||a.agent_nom)}${a.receptionnaire_societe?' ('+esc(a.receptionnaire_societe)+')':''}${a.receptionnaire_telephone?' — ☎ '+esc(a.receptionnaire_telephone):''} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
         ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
       </div>
     </div>`);

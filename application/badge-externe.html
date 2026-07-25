@@ -87,6 +87,12 @@ function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u
 function normalizeName(s){return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');}
 function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
 function currentAgent(){ return STOCK_AGENT ? {id:STOCK_AGENT.id, nom:STOCK_AGENT.nom} : {id:null, nom:AGENT_NOM_SESSION}; }
+function formatRecept(r){
+  let s = r.nom;
+  if (r.societe) s += ` (${r.societe})`;
+  if (r.telephone) s += ` (${r.telephone})`;
+  return s;
+}
 
 async function loadAll(){
   const [stockAgents, aItems, aSites, aActifs, aRecept] = await Promise.all([
@@ -132,7 +138,7 @@ function render(){
       <label class="fl">Réceptionnaire existant</label>
       <select class="fi" id="sel-recept" onchange="onReceptChange()">
         <option value="">— Sélectionner —</option>
-        ${accesRecept.map(r=>`<option value="${r.id}">${esc(r.nom)}${r.societe?' ('+esc(r.societe)+')':''}</option>`).join('')}
+        ${accesRecept.map(r=>`<option value="${r.id}">${esc(formatRecept(r))}</option>`).join('')}
         <option value="__new__">➕ Nouveau réceptionnaire…</option>
       </select>
       <div id="new-recept-fields" style="display:none;margin-top:10px">
@@ -140,6 +146,12 @@ function render(){
         <input class="fi" id="new-recept-nom" placeholder="Nom Prénom">
         <label class="fl" style="margin-top:10px">Société (optionnel)</label>
         <input class="fi" id="new-recept-societe" placeholder="Nom de la société">
+        <label class="fl" style="margin-top:10px">Téléphone (optionnel)</label>
+        <input class="fi" id="new-recept-telephone" type="tel" placeholder="N° de téléphone">
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:12.5px;color:var(--text2);cursor:pointer">
+          <input type="checkbox" id="new-recept-save" style="width:18px;height:18px;flex-shrink:0;margin-top:1px">
+          <span>Cette personne est susceptible de revenir → l'ajouter à la liste des réceptionnaires (sinon, gardé uniquement pour cette remise)</span>
+        </label>
       </div>
     </div>
 
@@ -179,15 +191,17 @@ async function doRemise(){
   const receptSel=document.getElementById('sel-recept').value;
   if(!receptSel){toast('⚠️ Sélectionnez un réceptionnaire','err');return;}
 
-  let receptId=null, receptNom='', receptSociete=null;
+  let receptId=null, receptNom='', receptSociete=null, receptTelephone=null, saveToList=false;
   if(receptSel==='__new__'){
     receptNom=document.getElementById('new-recept-nom').value.trim();
     receptSociete=document.getElementById('new-recept-societe').value.trim()||null;
+    receptTelephone=document.getElementById('new-recept-telephone').value.trim()||null;
+    saveToList=document.getElementById('new-recept-save').checked;
     if(!receptNom){toast('⚠️ Indiquez le nom du réceptionnaire','err');return;}
   }else{
     const r=accesRecept.find(x=>x.id===receptSel);
     if(!r){toast('⚠️ Réceptionnaire invalide','err');return;}
-    receptId=r.id; receptNom=r.nom; receptSociete=r.societe||null;
+    receptId=r.id; receptNom=r.nom; receptSociete=r.societe||null; receptTelephone=r.telephone||null;
   }
 
   const item=accesItems.find(i=>i.id===itemId);
@@ -207,8 +221,9 @@ async function doRemise(){
       return;
     }
 
-    if(receptSel==='__new__'){
-      const {data:newRecept,error:newErr}=await sb.from('stock_acces_recept').insert({nom:receptNom,societe:receptSociete,actif:true}).select().single();
+    // N'ajoute une fiche permanente que si la case a été cochée
+    if(receptSel==='__new__' && saveToList){
+      const {data:newRecept,error:newErr}=await sb.from('stock_acces_recept').insert({nom:receptNom,societe:receptSociete,telephone:receptTelephone,actif:true}).select().single();
       if(newErr) throw newErr;
       receptId=newRecept.id;
       accesRecept.push(newRecept);
@@ -222,6 +237,7 @@ async function doRemise(){
       agent_id:ag.id, agent_nom:ag.nom,
       item_id:itemId, item_nom:item.nom, item_type:item.type||'clé',
       receptionnaire_id:receptId, receptionnaire_nom:receptNom, receptionnaire_societe:receptSociete,
+      receptionnaire_telephone:receptTelephone,
       receptionnaire_type:'externe',
       date_remise:new Date(datetime).toISOString(), date_retour_reel:null,
       statut:'actif', notes:notes||null
@@ -234,7 +250,7 @@ async function doRemise(){
     document.getElementById('sel-recept').value='';
     document.getElementById('new-recept-fields').style.display='none';
     document.getElementById('f-notes').value='';
-    fillItemSelect();
+    if(saveToList) render(); else fillItemSelect();
   }catch(e){
     toast('❌ '+e.message,'err');
   }finally{
