@@ -129,6 +129,7 @@
     <nav class="header-nav">
       <a class="btn-nav" href="../index.html">← Accueil</a>
       <a class="btn-nav" href="parametrage.html">📍 Sites</a>
+      <a class="btn-nav" href="../direction/journal-agents.html">🕘 Journal</a>
       <button class="btn-nav btn-nav-accent" onclick="openAddAgent()">+ Nouvel agent</button>
     </nav>
   </div>
@@ -251,6 +252,20 @@ async function hashPin(pin) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── JOURNAL ──────────────────────────────────────────────────────────────────
+async function logJournal(action, agentId, agentNom, details) {
+  try {
+    await sb.from('agents_journal').insert({
+      action,
+      agent_id: agentId || null,
+      agent_nom: agentNom || '—',
+      details: details || null
+    });
+  } catch (err) {
+    console.error('Journal non enregistré :', err);
+  }
+}
+
 // ── LOAD ─────────────────────────────────────────────────────────────────────
 async function loadAgents() {
   try {
@@ -345,15 +360,18 @@ async function saveAgent() {
   if (!prenom || !nom) { alert('Veuillez saisir le prénom et le nom.'); return; }
   setASave('saving', 'Enregistrement…');
   if (agentEditId) {
+    const a = agents.find(a => a.id === agentEditId);
+    const avant = { prenom: a.prenom, nom: a.nom };
     const { error } = await sb.from('agents').update({ nom, prenom, updated_at: new Date().toISOString() }).eq('id', agentEditId);
     if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
-    const a = agents.find(a => a.id === agentEditId);
     a.nom = nom; a.prenom = prenom;
+    await logJournal('modification', agentEditId, fullName(a), { avant, apres: { prenom, nom } });
   } else {
     const { data, error } = await sb.from('agents').insert({ nom, prenom, actif: true }).select().single();
     if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
     agents.push(data);
     agents.sort((a, b) => fullName(a).localeCompare(fullName(b)));
+    await logJournal('creation', data.id, fullName(data), { prenom, nom });
   }
   setASave('saved', 'Sauvegardé ✓');
   setTimeout(() => setASave('', 'Prêt'), 3000);
@@ -383,10 +401,13 @@ async function savePin() {
   const pin = document.getElementById('f-pin').value.trim();
   if (!/^\d{4}$/.test(pin)) { alert('Le code PIN doit contenir exactement 4 chiffres.'); return; }
   setASave('saving', 'Enregistrement…');
+  const a = agents.find(a => a.id === pinAgentId);
+  const action = a.pin_hash ? 'pin_reinitialise' : 'pin_defini';
   const pin_hash = await hashPin(pin);
   const { error } = await sb.from('agents').update({ pin_hash, updated_at: new Date().toISOString() }).eq('id', pinAgentId);
   if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
-  agents.find(a => a.id === pinAgentId).pin_hash = pin_hash;
+  a.pin_hash = pin_hash;
+  await logJournal(action, pinAgentId, fullName(a), null);
   setASave('saved', 'PIN enregistré ✓');
   setTimeout(() => setASave('', 'Prêt'), 3000);
   closePinModal();
@@ -402,6 +423,7 @@ async function toggleAgentActif(id) {
   const { error } = await sb.from('agents').update({ actif: newVal }).eq('id', id);
   if (error) { setASave('error', 'Erreur'); return; }
   a.actif = newVal;
+  await logJournal(newVal ? 'activation' : 'desactivation', id, fullName(a), null);
   setASave('saved', 'Sauvegardé ✓');
   setTimeout(() => setASave('', 'Prêt'), 3000);
   updateAgentStats();
@@ -424,9 +446,12 @@ function closeDeleteAgentModal() {
 async function confirmDeleteAgent() {
   if (!deleteAgentId) return;
   setASave('saving', 'Suppression…');
+  const a = agents.find(x => x.id === deleteAgentId);
+  const nomComplet = fullName(a);
   const { error } = await sb.from('agents').delete().eq('id', deleteAgentId);
   if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
   agents = agents.filter(a => a.id !== deleteAgentId);
+  await logJournal('suppression', deleteAgentId, nomComplet, { prenom: a.prenom, nom: a.nom });
   setASave('saved', 'Supprimé ✓');
   setTimeout(() => setASave('', 'Prêt'), 3000);
   closeDeleteAgentModal();
