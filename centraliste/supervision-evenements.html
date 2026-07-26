@@ -125,6 +125,7 @@
     .rpt-ftr-brand{font-size:9px;color:rgba(255,255,255,.45);line-height:1.7;}
     .rpt-ftr-id{font-family:monospace;font-size:9px;color:rgba(255,255,255,.3);padding:2px 7px;background:rgba(255,255,255,.05);border-radius:4px;}
     @media print{
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
       .header,.content > .page-title,.content > .page-sub,#view-list,.back-link,.detail-hero,.detail-card,.footer{display:none!important;}
       body{background:#fff;}
       .rpt-wrap{display:block!important;margin:0;max-width:100%;}
