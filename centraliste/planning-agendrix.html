@@ -210,33 +210,93 @@ function onFile(input){
   if(!file) return;
   setSave('', 'Lecture du fichier…');
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try{
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, { type: 'array', cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
-      shifts = parseAgendrix(rows);
-      if(!shifts.length){ setSave('error','Aucune donnée reconnue dans ce fichier'); return; }
-      setSave('saved', shifts.length + ' service(s) importé(s)');
-
-      const lastDate = new Date(Math.max(...shifts.map(s=>s.debut)));
-      document.getElementById('data-range-info').textContent =
-        '📅 Planning disponible jusqu\'au ' + lastDate.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric', timeZone:'UTC'});
-
-      document.getElementById('view-mode-bar').style.display = 'flex';
-      const dp = document.getElementById('day-picker');
-      dp.min = dateKey(new Date(Math.min(...shifts.map(s=>s.debut))));
-      dp.max = dateKey(lastDate);
-      if (!selectedDay) selectedDay = dateKey(lastDate);
-      dp.value = selectedDay;
-
-      loadPdsaFor(shifts).then(() => { renderGantt(); renderPdsaTables(); });
+      const parsed = parseAgendrix(rows);
+      if(!parsed.length){ setSave('error','Aucune donnée reconnue dans ce fichier'); return; }
+      setSave('', 'Enregistrement du planning…');
+      await savePlanningToDb(parsed);
+      shifts = parsed;
+      setSave('saved', shifts.length + ' service(s) importé(s) et enregistré(s)');
+      afterShiftsReady();
     }catch(err){
-      setSave('error', 'Erreur de lecture : ' + err.message);
+      setSave('error', 'Erreur : ' + err.message);
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ─── SAUVEGARDE DU PLANNING : écrase les jours réimportés, préserve PDSA/heure existantes ──
+async function savePlanningToDb(parsedShifts){
+  const importDates = [...new Set(parsedShifts.map(s => dateKey(s.debut)))].sort();
+  const rangeStart = new Date(importDates[0] + 'T00:00:00Z');
+  const rangeEnd = new Date(importDates[importDates.length-1] + 'T00:00:00Z');
+  rangeEnd.setUTCDate(rangeEnd.getUTCDate()+1);
+
+  // 1) Récupérer ce qui existe déjà pour ces journées
+  const { data: existing, error: e1 } = await sb.from('agendrix_pointages')
+    .select('shift_key, debut_prevu')
+    .gte('debut_prevu', rangeStart.toISOString())
+    .lt('debut_prevu', rangeEnd.toISOString());
+  if(e1) throw e1;
+
+  // 2) Supprimer celles qui ne sont plus dans le nouvel import (remplacées/retirées)
+  const newKeys = new Set(parsedShifts.map(s => s.key));
+  const staleKeys = (existing||[]).map(r=>r.shift_key).filter(k => !newKeys.has(k));
+  if(staleKeys.length){
+    const { error: eDel } = await sb.from('agendrix_pointages').delete().in('shift_key', staleKeys);
+    if(eDel) throw eDel;
+  }
+
+  // 3) Upsert des nouveaux horaires — on ne touche jamais pdsa / heure_prise_service ici,
+  //    pour ne jamais écraser une saisie déjà faite par le centraliste.
+  const payloads = parsedShifts.map(s => ({
+    shift_key: s.key, agent_nom: s.agent, site: s.site, poste: s.poste,
+    debut_prevu: s.debut.toISOString(), fin_prevu: s.fin.toISOString(),
+    updated_at: new Date().toISOString()
+  }));
+  const { error: e2 } = await sb.from('agendrix_pointages').upsert(payloads, { onConflict: 'shift_key' });
+  if(e2) throw e2;
+}
+
+// ─── RECHARGEMENT DU DERNIER PLANNING ENREGISTRÉ (au démarrage, sans fichier) ──
+async function loadSavedPlanning(){
+  try{
+    const { data, error } = await sb.from('agendrix_pointages').select('*').order('debut_prevu', { ascending: false }).limit(1000);
+    if(error) throw error;
+    if(!data || !data.length){ setSave('', 'En attente d\'un fichier'); return; }
+    shifts = data.map(r => ({
+      agent: r.agent_nom, site: r.site, poste: r.poste || '',
+      debut: new Date(r.debut_prevu), fin: new Date(r.fin_prevu),
+      key: r.shift_key
+    }));
+    data.forEach(r => { pdsaMap[r.shift_key] = r; });
+    setSave('saved', shifts.length + ' service(s) — dernier planning enregistré');
+    afterShiftsReady(true);
+  }catch(e){
+    setSave('error', 'Erreur au chargement du planning enregistré');
+  }
+}
+
+// Mise à jour de l'UI une fois `shifts` prêt (import ou rechargement) — pdsaMap déjà rempli si skipPdsaReload
+function afterShiftsReady(skipPdsaReload){
+  const lastDate = new Date(Math.max(...shifts.map(s=>s.debut)));
+  document.getElementById('data-range-info').textContent =
+    '📅 Planning disponible jusqu\'au ' + lastDate.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric', timeZone:'UTC'});
+
+  document.getElementById('view-mode-bar').style.display = 'flex';
+  const dp = document.getElementById('day-picker');
+  dp.min = dateKey(new Date(Math.min(...shifts.map(s=>s.debut))));
+  dp.max = dateKey(lastDate);
+  if (!selectedDay) selectedDay = dateKey(lastDate);
+  dp.value = selectedDay;
+
+  if (skipPdsaReload) { renderGantt(); renderPdsaTables(); }
+  else loadPdsaFor(shifts).then(() => { renderGantt(); renderPdsaTables(); });
 }
 
 // Conversion manuelle et déterministe du numéro de série Excel → Date UTC.
@@ -410,6 +470,7 @@ function onPdsaInput(el){
 }
 
 document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadSavedPlanning();
 </script>
 
 </body>
