@@ -162,19 +162,14 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
       </div>
     </div>
 
-    <div class="card" id="comptages-section" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="card-title" style="margin:0">🔢 Derniers relevés de comptage (aujourd'hui)</div>
-        <select id="comptage-site-filter" class="filter-select" onchange="renderComptages()" style="font-size:12px;padding:5px 10px">
-          <option value="">Tous les sites guidage</option>
-        </select>
-      </div>
-      <table>
-        <thead><tr><th>Date / Heure</th><th>Agent</th><th>Zone</th><th>Véhicules</th><th>Taux</th></tr></thead>
-        <tbody id="comptages-table-body">
-          <tr><td colspan="5" style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</td></tr>
-        </tbody>
-      </table>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">📋 Rapports du jour — dernier passage par site</div>
+      <div id="dash-rapports"><div style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:12px">🔢 Comptages du jour — dernier passage par site</div>
+      <div id="dash-comptages"><div style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</div></div>
     </div>
 
   </div>
@@ -423,6 +418,7 @@ async function loadData() {
     updateStats();
     renderIA();
     renderHistorique();
+    renderDashboardRapports();
     await loadComptagesToday();
     document.getElementById('online-badge').textContent = '● En ligne';
   } catch(e) {
@@ -433,14 +429,20 @@ async function loadData() {
 
 function pad(v) { return String(v).padStart(2,'0'); }
 
-function updateStats() {
+function getTodayWindow() {
   var now = new Date();
   var jourDebut = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 30, 0);
   if (now < jourDebut) jourDebut.setDate(jourDebut.getDate() - 1);
   var jourFin = new Date(jourDebut); jourFin.setDate(jourFin.getDate() + 1);
   var veilleDebut = new Date(jourDebut); veilleDebut.setDate(veilleDebut.getDate() - 1);
+  return { jourDebut: jourDebut, jourFin: jourFin, veilleDebut: veilleDebut };
+}
+function inPeriod(v, from, to) { var t = new Date(v.created_at); return t >= from && t < to; }
 
-  function inPeriod(v, from, to) { var t = new Date(v.created_at); return t >= from && t < to; }
+function updateStats() {
+  var w = getTodayWindow();
+  var jourDebut = w.jourDebut, jourFin = w.jourFin, veilleDebut = w.veilleDebut;
+
   var today  = allVehicles.filter(function(v){ return inPeriod(v, jourDebut, jourFin); });
   var veille = allVehicles.filter(function(v){ return inPeriod(v, veilleDebut, jourDebut); });
 
@@ -468,6 +470,60 @@ function updateStats() {
 
 function makeThumb(url, title) {
   return '<img class="photo-thumb" src="' + url + '" onclick="openPhoto(\'' + url + '\',\'' + title + '\')" title="' + title + ' — clic pour agrandir">';
+}
+
+// ═══ TABLEAU DE BORD — RAPPORTS DU JOUR, DERNIER PASSAGE PAR SITE ═══
+function renderDashboardRapports() {
+  var w = getTodayWindow();
+  var today = allVehicles.filter(function(v){ return inPeriod(v, w.jourDebut, w.jourFin); });
+  var el = document.getElementById('dash-rapports');
+  if (!today.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun rapport aujourd\'hui.</div>'; return; }
+
+  // Regrouper par site
+  var bySite = {};
+  today.forEach(function(v){ (bySite[v.site || '—'] = bySite[v.site || '—'] || []).push(v); });
+
+  var html = '';
+  Object.keys(bySite).sort().forEach(function(site) {
+    var list = bySite[site].slice().sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
+    var lastRound = list[0].round_id || null;
+    var lastPassage = lastRound ? list.filter(function(v){ return v.round_id === lastRound; }) : [list[0]];
+    lastPassage.sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); });
+
+    html += '<div style="margin-bottom:14px;border:1px solid var(--gray-border);border-radius:2px;overflow:hidden">';
+    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between"><span>📍 ' + site + '</span><span style="color:var(--gray-mid);font-weight:400">' + lastPassage.length + ' rapport(s) — dernier passage</span></div>';
+    html += '<table><thead><tr><th>Heure</th><th>Statut</th><th>Plaque</th><th>Motif / Macaron</th><th>Photos</th><th>IA</th><th>Actions</th></tr></thead><tbody>';
+
+    lastPassage.forEach(function(v) {
+      var isInf = v.statut === 'infraction';
+      var dt = new Date(v.created_at);
+      var heure = dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+      var thumbs = [
+        v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'Véhicule') : '',
+        v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'Dénonciation') : '',
+        v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
+        v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
+      ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">—</span>';
+      var plaque = v.plaque ? '<span class="plate">' + v.plaque + '</span>' : '<span style="color:var(--gray-mid);font-size:11px">— IA</span>';
+      var st = v.statut === 'parking_vide' || v.motif === 'PARKING_VIDE' ? 'parking_vide' : v.statut;
+      var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
+      var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
+      var motif = isInf ? (v.motif || '—') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N° ' + v.num_denonciation + '</span>' : '') : (v.num_macaron ? '🏷️ ' + v.num_macaron : '—');
+      var iaBadge = v.ia_pending ? '<span class="badge badge-amber">⏳</span>' : '<span class="badge badge-green">✅</span>';
+      v._statut_display = st;
+      html += '<tr>' +
+        '<td style="font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
+        '<td><span class="badge ' + cls + '">' + lbl + '</span></td>' +
+        '<td>' + plaque + '</td>' +
+        '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
+        '<td><div class="photos-cell">' + thumbs + '</div></td>' +
+        '<td>' + iaBadge + '</td>' +
+        '<td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')">✏️</button> <button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button></td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+  el.innerHTML = html;
 }
 
 // ═══ ONGLET "EN ATTENTE IA" ═══
@@ -1041,34 +1097,57 @@ function renderHistorique() {
 
 // ═══ COMPTAGES DU JOUR (dashboard) ═══
 async function loadComptagesToday() {
+  const el = document.getElementById('dash-comptages');
   try {
     const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage').eq('actif',true);
     const list = sites || [];
-    const sel = document.getElementById('comptage-site-filter');
-    sel.innerHTML = '<option value="">Tous les sites guidage</option>' + list.map(s=>'<option value="'+s.id+'">'+s.nom+'</option>').join('');
-    document.getElementById('comptages-section').style.display = list.length ? 'block' : 'none';
-    if (!list.length) return;
+    if (!list.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun site guidage.</div>'; return; }
+    window._sitesGuidageMap = {};
+    list.forEach(s => window._sitesGuidageMap[s.id] = s.nom);
     const siteIds = list.map(s=>s.id);
-    const { data } = await db.from('comptages').select('*,zones(nom,places_totales)').in('site_id', siteIds).order('created_at',{ascending:false}).limit(50);
+    const w = getTodayWindow();
+    const { data } = await db.from('comptages').select('*,zones(nom,places_totales)')
+      .in('site_id', siteIds)
+      .gte('created_at', w.jourDebut.toISOString())
+      .lt('created_at', w.jourFin.toISOString())
+      .order('created_at',{ascending:false});
     window._comptagesToday = data || [];
     renderComptages();
-  } catch(e) { console.warn('comptages:', e.message); }
+  } catch(e) { console.warn('comptages:', e.message); el.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px">Erreur: '+e.message+'</div>'; }
 }
 function renderComptages() {
-  const siteFilter = document.getElementById('comptage-site-filter').value;
-  const data = (window._comptagesToday||[]).filter(c => !siteFilter || c.site_id === siteFilter).slice(0,20);
-  const tbody = document.getElementById('comptages-table-body');
-  if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray-mid);padding:20px">Aucun relevé</td></tr>'; return; }
-  tbody.innerHTML = data.map(function(c) {
-    var dt = new Date(c.created_at);
-    var dateStr = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+' '+pad(dt.getHours())+'h'+pad(dt.getMinutes());
-    var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
-    var taux = c.taux_occupation !== null && c.taux_occupation !== undefined ? parseFloat(c.taux_occupation) : Math.round((c.vehicules_presents/(c.places_totales||1))*100);
-    var tauxColor = taux>=90?'var(--red)':taux>=70?'var(--amber)':'var(--green)';
-    return '<tr><td style="font-size:12px">'+dateStr+'</td><td style="font-size:12px">'+(c.agent_name||'—')+'</td>' +
-      '<td style="font-weight:700">'+zoneName+'</td><td style="font-weight:700">'+c.vehicules_presents+' / '+c.places_totales+'</td>' +
-      '<td style="color:'+tauxColor+';font-weight:700">'+taux+'%</td></tr>';
-  }).join('');
+  const el = document.getElementById('dash-comptages');
+  const data = window._comptagesToday || [];
+  if (!data.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun comptage aujourd\'hui.</div>'; return; }
+
+  // Regrouper par site, puis par zone : garder uniquement le relevé le plus récent (déjà trié desc)
+  var bySite = {};
+  data.forEach(function(c) {
+    var siteName = window._sitesGuidageMap[c.site_id] || c.site_id;
+    var zoneKey = c.zone_id || c.places_totales;
+    bySite[siteName] = bySite[siteName] || {};
+    if (!bySite[siteName][zoneKey]) bySite[siteName][zoneKey] = c; // premier rencontré = plus récent (tri desc)
+  });
+
+  var html = '';
+  Object.keys(bySite).sort().forEach(function(siteName) {
+    var zones = Object.values(bySite[siteName]).sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
+    html += '<div style="margin-bottom:14px;border:1px solid var(--gray-border);border-radius:2px;overflow:hidden">';
+    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700">📍 ' + siteName + '</div>';
+    html += '<table><thead><tr><th>Heure</th><th>Agent</th><th>Zone</th><th>Véhicules</th><th>Taux</th></tr></thead><tbody>';
+    zones.forEach(function(c) {
+      var dt = new Date(c.created_at);
+      var heure = pad(dt.getHours())+'h'+pad(dt.getMinutes());
+      var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
+      var taux = c.taux_occupation !== null && c.taux_occupation !== undefined ? parseFloat(c.taux_occupation) : Math.round((c.vehicules_presents/(c.places_totales||1))*100);
+      var tauxColor = taux>=90?'var(--red)':taux>=70?'var(--amber)':'var(--green)';
+      html += '<tr><td style="font-size:12px">'+heure+'</td><td style="font-size:12px">'+(c.agent_name||'—')+'</td>' +
+        '<td style="font-weight:700">'+zoneName+'</td><td style="font-weight:700">'+c.vehicules_presents+' / '+c.places_totales+'</td>' +
+        '<td style="color:'+tauxColor+';font-weight:700">'+taux+'%</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+  el.innerHTML = html;
 }
 
 // ═══ VUES (ONGLETS) ═══
