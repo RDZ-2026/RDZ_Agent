@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Supervision événements</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A; --rdz-red-dark: #6B1212; --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a; --rdz-border: #d0ccc5; --rdz-bg: #f5f4f2; --green:#166534; --green-l:#dcfce7;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; margin-bottom: 18px; }
+
+    .toolbar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; }
+    .tsearch { min-width: 200px; }
+
+    table.etable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.etable thead th { background: var(--rdz-black); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 9px 12px; text-align: left; white-space: nowrap; }
+    table.etable tbody td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid var(--rdz-border); }
+    table.etable tbody tr:hover { background: var(--rdz-bg); cursor: pointer; }
+    table.etable tbody tr:last-child td { border-bottom: none; }
+    .badge-pct { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .badge-ok { background: var(--green-l); color: var(--green); }
+    .badge-mid { background: #fef9c3; color: #854d0e; }
+    .badge-low { background: #fee2e2; color: #991b1b; }
+    .badge-rapport { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .rp-ouvert { background: #fef3c7; color: #92400e; }
+    .rp-cloture { background: var(--green-l); color: var(--green); }
+    .rp-aucun { background: var(--rdz-bg); color: var(--rdz-gray); }
+
+    .state-msg { text-align: center; padding: 50px 20px; font-size: 14px; color: var(--rdz-gray); }
+
+    /* DÉTAIL */
+    .detail-wrap { display: none; }
+    .detail-wrap.open { display: block; }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--rdz-red); cursor: pointer; margin-bottom: 14px; }
+    .detail-hero { background: var(--rdz-black); color: #fff; padding: 14px 18px; border-radius: 2px 2px 0 0; }
+    .detail-title { font-size: 15px; font-weight: 700; }
+    .detail-meta { font-size: 11.5px; color: rgba(255,255,255,.6); margin-top: 4px; }
+    .detail-card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 0 0 2px 2px; margin-bottom: 18px; }
+
+    .tabs-row2 { display: flex; gap: 4px; background: #fff; border-bottom: 1px solid var(--rdz-border); }
+    .tab2 { flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 700; border: none; background: none; cursor: pointer; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .03em; border-bottom: 3px solid transparent; }
+    .tab2.active { color: var(--rdz-red); border-bottom-color: var(--rdz-red); }
+    .panel2 { display: none; padding: 14px 18px; }
+    .panel2.active { display: block; }
+
+    .sec-title2 { font-size: 11px; font-weight: 700; color: #fff; background: var(--rdz-anth, #2d2d2d); text-transform: uppercase; letter-spacing: .04em; padding: 8px 12px; margin: 14px -18px 0; }
+    .sec-title2:first-child { margin-top: 0; }
+    .chk-row2 { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rdz-border); cursor: pointer; }
+    .chk-row2:last-child { border-bottom: none; }
+    .chk-box2 { width: 20px; height: 20px; border: 2px solid var(--rdz-border); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; margin-top: 1px; }
+    .chk-box2.on { background: var(--green); border-color: var(--green); }
+    .chk-txt2 { flex: 1; font-size: 12.5px; line-height: 1.4; }
+    .chk-tag2 { display: inline-block; font-size: 9px; font-weight: 700; color: #fff; background: var(--rdz-gray); padding: 1px 6px; border-radius: 2px; margin-right: 5px; text-transform: uppercase; }
+    .chk-meta2 { font-size: 10.5px; color: #9a9a9a; margin-top: 2px; }
+
+    .field2 { margin-bottom: 12px; }
+    .field2 label { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rdz-gray); margin-bottom: 5px; }
+    .field2 input, .field2 textarea { width: 100%; padding: 8px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; font-family: Arial, sans-serif; }
+    .field2 textarea { min-height: 60px; }
+    .field-row2 { display: flex; gap: 12px; }
+    .field-row2 .field2 { flex: 1; }
+    .chip-row2 { display: flex; gap: 8px; }
+    .chip2 { flex: 1; padding: 8px; border: 2px solid var(--rdz-border); border-radius: 4px; text-align: center; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .chip2.on { border-color: var(--green); background: var(--green-l); color: var(--green); }
+    .photo-thumb2 { width: 90px; height: 70px; object-fit: cover; border-radius: 4px; border: 1px solid var(--rdz-border); cursor: pointer; }
+    .btn-save2 { padding: 9px 20px; background: var(--rdz-red); color: #fff; border: none; border-radius: 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; margin-top: 10px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+
+    .lb-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 300; align-items: center; justify-content: center; }
+    .lb-overlay.open { display: flex; }
+    .lb-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Supervision — Gestion d'événements</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="../admin/checklist-evenements-config.html">⚙ Paramétrage checklists</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+  <div class="page-title">Supervision des événements</div>
+  <div class="page-sub">Consulte et corrige les checklists et rapports remontés par les agents.</div>
+
+  <!-- LISTE -->
+  <div id="view-list">
+    <div class="toolbar">
+      <span class="tlabel">Site</span>
+      <select class="tsel" id="filter-site" onchange="renderList()"><option value="all">Tous</option></select>
+      <input type="text" class="tsel tsearch" id="filter-search" placeholder="Rechercher un événement…" oninput="renderList()">
+      <span class="tlabel">Du</span><input type="date" class="tsel" id="filter-date-debut" onchange="renderList()">
+      <span class="tlabel">Au</span><input type="date" class="tsel" id="filter-date-fin" onchange="renderList()">
+    </div>
+    <div id="list-wrap"><div class="state-msg">⏳ Chargement…</div></div>
+  </div>
+
+  <!-- DÉTAIL -->
+  <div id="view-detail" class="detail-wrap">
+    <div class="back-link" onclick="backToList()">← Retour à la liste</div>
+    <div class="detail-hero">
+      <div class="detail-title" id="d-titre"></div>
+      <div class="detail-meta" id="d-meta"></div>
+    </div>
+    <div class="detail-card">
+      <div class="tabs-row2">
+        <button class="tab2 active" id="t-generique" onclick="switchTab2('generique')">📋 Générique</button>
+        <button class="tab2" id="t-responsable" onclick="switchTab2('responsable')">⭐ Responsable</button>
+        <button class="tab2" id="t-rapport" onclick="switchTab2('rapport')">📄 Rapport</button>
+      </div>
+      <div class="panel2 active" id="p-generique"></div>
+      <div class="panel2" id="p-responsable"></div>
+      <div class="panel2" id="p-rapport"></div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<div class="lb-overlay" id="lb-overlay" onclick="this.classList.remove('open')"><img id="lb-img" src=""></div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let events = [], sites = [], sections = [], items = [];
+let currentEvent = null, reponses = [], rapport = null;
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function siteNom(id){ const s = sites.find(x=>x.id===id); return s ? s.nom : ''; }
+
+async function loadAll(){
+  try{
+    const [{data:ev},{data:st},{data:sec},{data:it}] = await Promise.all([
+      sb.from('evenements').select('*').order('date',{ascending:false}).order('heure_debut'),
+      sb.from('sites').select('id,nom'),
+      sb.from('evenements_checklist_sections').select('*').eq('actif',true).order('ordre'),
+      sb.from('evenements_checklist_items').select('*').eq('actif',true).order('ordre')
+    ]);
+    events = ev||[]; sites = st||[]; sections = sec||[]; items = it||[];
+    const siteSel = document.getElementById('filter-site');
+    siteSel.innerHTML = '<option value="all">Tous</option>' + sites.map(s=>`<option value="${s.id}">${escHtml(s.nom)}</option>`).join('');
+    await computeCounts();
+    renderList();
+  }catch(e){
+    document.getElementById('list-wrap').innerHTML = `<div class="state-msg">Erreur : ${escHtml(e.message)}</div>`;
+  }
+}
+
+let repCountByEvent = {}, rapportByEvent = {};
+async function computeCounts(){
+  try{
+    const ids = events.map(e=>e.id);
+    if(!ids.length) return;
+    const [{data:reps},{data:rapports}] = await Promise.all([
+      sb.from('evenements_checklist_reponses').select('evenement_id,item_id,checked').in('evenement_id',ids),
+      sb.from('evenements_rapports').select('evenement_id,statut').in('evenement_id',ids)
+    ]);
+    repCountByEvent = {};
+    (reps||[]).forEach(r => { if(r.checked){ (repCountByEvent[r.evenement_id] = repCountByEvent[r.evenement_id]||[]).push(r.item_id); } });
+    rapportByEvent = {};
+    (rapports||[]).forEach(r => { rapportByEvent[r.evenement_id] = r.statut; });
+  }catch(e){ console.warn(e.message); }
+}
+
+function renderList(){
+  const site = document.getElementById('filter-site').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+  const dDebut = document.getElementById('filter-date-debut').value;
+  const dFin = document.getElementById('filter-date-fin').value;
+  const totalItems = items.length;
+
+  const filtered = events.filter(e => {
+    if (site!=='all' && e.site_id!==site) return false;
+    if (search && !(e.titre||'').toLowerCase().includes(search)) return false;
+    if (dDebut && e.date < dDebut) return false;
+    if (dFin && e.date > dFin) return false;
+    return true;
+  });
+
+  const el = document.getElementById('list-wrap');
+  if(!filtered.length){ el.innerHTML = `<div class="state-msg">Aucun événement pour ces filtres.</div>`; return; }
+
+  el.innerHTML = `<table class="etable">
+    <thead><tr><th>Date</th><th>Événement</th><th>Site</th><th>Checklist</th><th>Rapport</th></tr></thead>
+    <tbody>${filtered.map(e => {
+      const done = (repCountByEvent[e.id]||[]).length;
+      const pct = totalItems ? Math.round((done/totalItems)*100) : 0;
+      const pctCls = pct>=80?'badge-ok':pct>=30?'badge-mid':'badge-low';
+      const rpStatut = rapportByEvent[e.id];
+      const rpCls = rpStatut==='cloture'?'rp-cloture':rpStatut==='ouvert'?'rp-ouvert':'rp-aucun';
+      const rpTxt = rpStatut==='cloture'?'✓ Clôturé':rpStatut==='ouvert'?'⏳ En cours':'— Aucun';
+      return `<tr onclick="openDetail('${e.id}')">
+        <td>${(e.date||'').split('-').reverse().join('.')}</td>
+        <td><strong>${escHtml(e.titre)}</strong></td>
+        <td>${escHtml(siteNom(e.site_id) || e.lieu || '—')}</td>
+        <td><span class="badge-pct ${pctCls}">${done}/${totalItems} (${pct}%)</span></td>
+        <td><span class="badge-rapport ${rpCls}">${rpTxt}</span></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function backToList(){
+  document.getElementById('view-detail').classList.remove('open');
+  document.getElementById('view-list').style.display = 'block';
+}
+
+async function openDetail(id){
+  currentEvent = events.find(e=>e.id===id);
+  if(!currentEvent) return;
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-detail').classList.add('open');
+  document.getElementById('d-titre').textContent = currentEvent.titre;
+  document.getElementById('d-meta').textContent = `📍 ${siteNom(currentEvent.site_id) || currentEvent.lieu || '—'} · ${currentEvent.date} · ${(currentEvent.heure_debut||'').slice(0,5)}`;
+
+  try{
+    const [{data:reps},{data:rap}] = await Promise.all([
+      sb.from('evenements_checklist_reponses').select('*').eq('evenement_id', currentEvent.id),
+      sb.from('evenements_rapports').select('*').eq('evenement_id', currentEvent.id).maybeSingle()
+    ]);
+    reponses = reps||[]; rapport = rap||null;
+  }catch(e){ reponses = []; rapport = null; }
+
+  renderChecklistPanel('generique');
+  renderChecklistPanel('responsable');
+  renderRapportPanel();
+  switchTab2('generique');
+}
+
+function switchTab2(tab){
+  ['generique','responsable','rapport'].forEach(t => {
+    document.getElementById('t-'+t).classList.toggle('active', t===tab);
+    document.getElementById('p-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+// ─── CHECKLIST (format checklist, pas tableau) ────────────────────────────────
+function renderChecklistPanel(formulaire){
+  const secs = sections.filter(s=>s.formulaire===formulaire).sort((a,b)=>a.ordre-b.ordre);
+  const el = document.getElementById('p-'+formulaire);
+  if(!secs.length){ el.innerHTML = `<div class="state-msg">Aucune section configurée.</div>`; return; }
+  el.innerHTML = secs.map(sec => {
+    const secItems = items.filter(i=>i.section_id===sec.id).sort((a,b)=>a.ordre-b.ordre);
+    return `<div class="sec-title2">${escHtml(sec.label)}</div>` + secItems.map(it => {
+      const rep = reponses.find(r=>r.item_id===it.id);
+      const checked = rep && rep.checked;
+      return `<div class="chk-row2" onclick="toggleItemAdmin('${it.id}','${formulaire}')">
+        <div class="chk-box2 ${checked?'on':''}">${checked?'✓':''}</div>
+        <div class="chk-txt2">
+          ${it.tag?`<span class="chk-tag2">${escHtml(it.tag)}</span>`:''}${escHtml(it.label)}
+          ${checked && rep.agent_nom ? `<div class="chk-meta2">✓ ${escHtml(rep.agent_nom)} — ${new Date(rep.checked_at).toLocaleString('fr-CH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>` : '<div class="chk-meta2">Non coché</div>'}
+        </div>
+      </div>`;
+    }).join('');
+  }).join('');
+}
+async function toggleItemAdmin(itemId, formulaire){
+  const existing = reponses.find(r=>r.item_id===itemId);
+  const nowChecked = !(existing && existing.checked);
+  try{
+    if(nowChecked){
+      const { data, error } = await sb.from('evenements_checklist_reponses')
+        .upsert({ evenement_id: currentEvent.id, item_id: itemId, checked:true, agent_nom:'Centraliste (correction)', checked_at: new Date().toISOString() }, { onConflict:'evenement_id,item_id' })
+        .select().single();
+      if(error) throw error;
+      const idx = reponses.findIndex(r=>r.item_id===itemId);
+      if(idx>-1) reponses[idx]=data; else reponses.push(data);
+    }else{
+      await sb.from('evenements_checklist_reponses').delete().eq('evenement_id',currentEvent.id).eq('item_id',itemId);
+      reponses = reponses.filter(r=>r.item_id!==itemId);
+    }
+    renderChecklistPanel(formulaire);
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+// ─── RAPPORT (consultable + modifiable) ───────────────────────────────────────
+let controleValAdmin = null;
+function renderRapportPanel(){
+  const el = document.getElementById('p-rapport');
+  const r = rapport || {};
+  el.innerHTML = `
+    <div class="field-row2">
+      <div class="field2"><label>Agent</label><input class="fi" id="a-agent" value="${escHtml(r.agent_nom||'')}"></div>
+      <div class="field2"><label>Statut</label><input class="fi" value="${r.statut==='cloture'?'✓ Clôturé':r.statut==='ouvert'?'⏳ En cours':'— Aucun rapport'}" disabled></div>
+    </div>
+    <div class="sec-title2">Préparation &amp; début d'événement</div>
+    <div class="field-row2">
+      <div class="field2"><label>Date événement</label><input type="date" class="fi" id="a-date" value="${r.date_evenement||''}"></div>
+      <div class="field2"><label>Heure début</label><input type="time" class="fi" id="a-heure-debut" value="${(r.heure_debut_evenement||'').slice(0,5)}"></div>
+    </div>
+    <div class="sec-title2">Événement</div>
+    <div class="field2"><label>Lieu</label><input class="fi" id="a-lieu" value="${escHtml(r.lieu_evenement||'')}"></div>
+    <div class="field2"><label>Contrôle issues secours / extincteurs / défibrillateur</label>
+      <div class="chip-row2"><div class="chip2" id="a-chip-oui" onclick="setControleAdmin(true)">Oui</div><div class="chip2" id="a-chip-non" onclick="setControleAdmin(false)">Non</div></div>
+    </div>
+    <div class="field2"><label>Affluence max</label><input class="fi" id="a-affluence" value="${escHtml(r.affluence_max||'')}"></div>
+    <div class="field2"><label>Événement particulier 1</label><textarea class="fi" id="a-evp1">${escHtml(r.evenement_particulier_1||'')}</textarea></div>
+    <div class="field2"><label>Événement particulier 2</label><textarea class="fi" id="a-evp2">${escHtml(r.evenement_particulier_2||'')}</textarea></div>
+    <div class="sec-title2">Fin d'événement</div>
+    <div class="field-row2">
+      <div class="field2"><label>Heure départ invités</label><input type="time" class="fi" id="a-depart-heure" value="${(r.depart_invites_heure||'').slice(0,5)}"></div>
+      <div class="field2"><label>Photo</label>${r.photo_depart_invites_url?`<img class="photo-thumb2" src="${r.photo_depart_invites_url}" onclick="openLb('${r.photo_depart_invites_url}')">`:'—'}</div>
+    </div>
+    <div class="field-row2">
+      <div class="field2"><label>Heure fin de service</label><input type="time" class="fi" id="a-fin-heure" value="${(r.heure_fin_service||'').slice(0,5)}"></div>
+      <div class="field2"><label>Photo</label>${r.photo_fin_service_url?`<img class="photo-thumb2" src="${r.photo_fin_service_url}" onclick="openLb('${r.photo_fin_service_url}')">`:'—'}</div>
+    </div>
+    <button class="btn-save2" onclick="saveRapportAdmin()">✓ Enregistrer les modifications</button>
+  `;
+  document.querySelectorAll('#p-rapport .fi').forEach(inp => inp.style.cssText = 'width:100%;padding:8px 11px;border-radius:2px;border:1px solid var(--rdz-border);font-size:13px;font-family:Arial,sans-serif;');
+  controleValAdmin = r.controle_issues_secours ?? null;
+  document.getElementById('a-chip-oui').classList.toggle('on', controleValAdmin===true);
+  document.getElementById('a-chip-non').classList.toggle('on', controleValAdmin===false);
+}
+function setControleAdmin(val){
+  controleValAdmin = val;
+  document.getElementById('a-chip-oui').classList.toggle('on', val===true);
+  document.getElementById('a-chip-non').classList.toggle('on', val===false);
+}
+function openLb(url){ document.getElementById('lb-img').src=url; document.getElementById('lb-overlay').classList.add('open'); }
+
+async function saveRapportAdmin(){
+  const payload = {
+    evenement_id: currentEvent.id,
+    evenement_nom: currentEvent.titre,
+    site: siteNom(currentEvent.site_id) || currentEvent.lieu || null,
+    agent_nom: document.getElementById('a-agent').value.trim() || null,
+    date_evenement: document.getElementById('a-date').value || null,
+    heure_debut_evenement: document.getElementById('a-heure-debut').value ? document.getElementById('a-heure-debut').value+':00' : null,
+    lieu_evenement: document.getElementById('a-lieu').value.trim() || null,
+    controle_issues_secours: controleValAdmin,
+    affluence_max: document.getElementById('a-affluence').value.trim() || null,
+    evenement_particulier_1: document.getElementById('a-evp1').value.trim() || null,
+    evenement_particulier_2: document.getElementById('a-evp2').value.trim() || null,
+    depart_invites_heure: document.getElementById('a-depart-heure').value ? document.getElementById('a-depart-heure').value+':00' : null,
+    heure_fin_service: document.getElementById('a-fin-heure').value ? document.getElementById('a-fin-heure').value+':00' : null,
+    updated_at: new Date().toISOString()
+  };
+  try{
+    if(rapport){
+      const { error } = await sb.from('evenements_rapports').update(payload).eq('id', rapport.id);
+      if(error) throw error;
+    }else{
+      payload.statut = 'ouvert';
+      const { data, error } = await sb.from('evenements_rapports').insert(payload).select().single();
+      if(error) throw error;
+      rapport = data;
+    }
+    alert('Rapport mis à jour.');
+    await computeCounts();
+    renderList();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
