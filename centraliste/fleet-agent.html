@@ -63,6 +63,13 @@ button,input,select,textarea{font-family:inherit;}
 /* Schema consultation mode (read-only markers) */
 #schema-img-wrap{cursor:default;}
 #schema-add-wrap{cursor:crosshair;}
+.schema-vtabs{display:flex;gap:4px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto;}
+.schema-vtabs::-webkit-scrollbar{display:none;}
+.schema-vtab{flex-shrink:0;padding:5px 9px;font-size:10px;font-weight:700;color:var(--text2);background:var(--white);border:1.5px solid var(--border2);border-radius:14px;cursor:pointer;white-space:nowrap;}
+.schema-vtab.on{background:var(--red);color:#fff;border-color:var(--red);}
+.schema-center{display:flex;align-items:center;justify-content:center;background:var(--white);padding:8px;}
+.schema-svgbox{position:relative;height:150px;}
+.schema-svgbox svg{height:100%;width:auto;display:block;pointer-events:none;}
 
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
@@ -361,35 +368,12 @@ button,input,select,textarea{font-family:inherit;}
             <div style="font-size:12px;font-weight:700;color:var(--anth);">💥 Dégâts carrosserie</div>
             <div style="font-size:10px;color:var(--text3);" id="pin-hint-inline">Cliquez un marqueur pour le détail</div>
           </div>
-          <div id="schema-img-wrap" style="position:relative;cursor:default;user-select:none;touch-action:none;">
-            <svg id="schema-bg-img" viewBox="0 0 160 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;pointer-events:none;">
-              <text x="80" y="9" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">AVANT</text>
-              <text x="80" y="328" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">ARRIÈRE</text>
-              <path d="M32,45 Q31,28 44,21 L58,16 L102,16 L116,21 Q129,28 128,45 L128,285 Q128,302 115,308 L102,313 L58,313 L45,308 Q32,302 32,285 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
-              <path d="M41,44 L41,82 Q41,84 43,84 L117,84 Q119,84 119,82 L119,44 Q119,30 110,24 L102,20 L58,20 L50,24 Q41,30 41,44 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-              <path d="M46,83 L50,130 L110,130 L114,83 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-              <rect x="42" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
-              <rect x="111" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
-              <rect x="41" y="128" width="78" height="76" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-              <rect x="41" y="128" width="78" height="4" fill="#c4c8d0"/>
-              <rect x="41" y="200" width="78" height="4" fill="#c4c8d0"/>
-              <line x1="41" y1="169" x2="119" y2="169" stroke="#9ca3af" stroke-width=".7" stroke-dasharray="4,2.5"/>
-              <rect x="39" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-              <rect x="117" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-              <rect x="39" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-              <rect x="117" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-              <path d="M46,204 L50,245 L110,245 L114,204 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-              <rect x="42" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
-              <rect x="111" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
-              <path d="M41,244 L41,285 Q41,298 50,305 L58,310 L102,310 L110,305 Q119,298 119,285 L119,244 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-              <rect x="13" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
-              <rect x="127" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
-              <rect x="13" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
-              <rect x="127" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
-              <path d="M11,128 L11,140 L28,140 L32,134 L28,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-              <path d="M149,128 L149,140 L132,140 L128,134 L132,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-            </svg>
-            <svg id="damage-overlay" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="schema-vtabs" id="schema-vtabs-consult"></div>
+          <div id="schema-img-wrap" class="schema-center" style="cursor:default;user-select:none;touch-action:none;">
+            <div id="schema-bg-box" class="schema-svgbox">
+              <div id="schema-bg-content" style="height:100%;"></div>
+              <svg id="damage-overlay" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
           </div>
         </div>
         <!-- ── BOUTON SIGNALER ── -->
@@ -407,35 +391,12 @@ button,input,select,textarea{font-family:inherit;}
           <!-- Schéma interactif pour ajout -->
           <div style="border-bottom:1px solid var(--border);">
             <div style="font-size:10.5px;color:var(--text3);text-align:center;padding:6px 0 2px;" id="pin-hint-add">👆 Tapez sur le schéma pour localiser le dégât</div>
-            <div id="schema-add-wrap" style="position:relative;cursor:crosshair;user-select:none;touch-action:none;">
-              <svg viewBox="0 0 160 330" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;pointer-events:none;">
-                <text x="80" y="9" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">AVANT</text>
-                <text x="80" y="328" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">ARRIÈRE</text>
-                <path d="M32,45 Q31,28 44,21 L58,16 L102,16 L116,21 Q129,28 128,45 L128,285 Q128,302 115,308 L102,313 L58,313 L45,308 Q32,302 32,285 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
-                <path d="M41,44 L41,82 Q41,84 43,84 L117,84 Q119,84 119,82 L119,44 Q119,30 110,24 L102,20 L58,20 L50,24 Q41,30 41,44 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-                <path d="M46,83 L50,130 L110,130 L114,83 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-                <rect x="42" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
-                <rect x="111" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
-                <rect x="41" y="128" width="78" height="76" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-                <rect x="41" y="128" width="78" height="4" fill="#c4c8d0"/>
-                <rect x="41" y="200" width="78" height="4" fill="#c4c8d0"/>
-                <line x1="41" y1="169" x2="119" y2="169" stroke="#9ca3af" stroke-width=".7" stroke-dasharray="4,2.5"/>
-                <rect x="39" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-                <rect x="117" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-                <rect x="39" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-                <rect x="117" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
-                <path d="M46,204 L50,245 L110,245 L114,204 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
-                <rect x="42" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
-                <rect x="111" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
-                <path d="M41,244 L41,285 Q41,298 50,305 L58,310 L102,310 L110,305 Q119,298 119,285 L119,244 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
-                <rect x="13" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
-                <rect x="127" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
-                <rect x="13" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
-                <rect x="127" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
-                <path d="M11,128 L11,140 L28,140 L32,134 L28,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-                <path d="M149,128 L149,140 L132,140 L128,134 L132,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
-              </svg>
-              <svg id="damage-overlay-add" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="schema-vtabs" id="schema-vtabs-add"></div>
+            <div id="schema-add-wrap" class="schema-center" style="cursor:crosshair;user-select:none;touch-action:none;">
+              <div id="schema-add-bg-box" class="schema-svgbox">
+                <div id="schema-add-bg-content" style="height:100%;"></div>
+                <svg id="damage-overlay-add" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"></svg>
+              </div>
             </div>
           </div>
           <!-- Champs formulaire -->
@@ -652,6 +613,132 @@ const SUPPLIERS = {
 
 const VIEW_LABELS = {top:'🔝 Dessus',front:'⬛ Avant',rear:'⬛ Arrière',left:'◀ Gauche',right:'▶ Droite'};
 
+const SVG_VIEWS = {
+  top:`<svg viewBox="0 0 160 330" xmlns="http://www.w3.org/2000/svg">
+    <text x="80" y="9" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">AVANT</text>
+    <text x="80" y="328" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">ARRIÈRE</text>
+    <path d="M32,45 Q31,28 44,21 L58,16 L102,16 L116,21 Q129,28 128,45 L128,285 Q128,302 115,308 L102,313 L58,313 L45,308 Q32,302 32,285 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
+    <path d="M41,44 L41,82 Q41,84 43,84 L117,84 Q119,84 119,82 L119,44 Q119,30 110,24 L102,20 L58,20 L50,24 Q41,30 41,44 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
+    <path d="M46,83 L50,130 L110,130 L114,83 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="42" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
+    <rect x="111" y="83" width="7" height="48" rx="2" fill="#c4c8d0"/>
+    <rect x="41" y="128" width="78" height="76" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
+    <rect x="41" y="128" width="78" height="4" fill="#c4c8d0"/>
+    <rect x="41" y="200" width="78" height="4" fill="#c4c8d0"/>
+    <line x1="41" y1="169" x2="119" y2="169" stroke="#9ca3af" stroke-width=".7" stroke-dasharray="4,2.5"/>
+    <rect x="39" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
+    <rect x="117" y="148" width="4" height="9" rx="1.5" fill="#9ca3af"/>
+    <rect x="39" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
+    <rect x="117" y="178" width="4" height="9" rx="1.5" fill="#9ca3af"/>
+    <path d="M46,204 L50,245 L110,245 L114,204 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="42" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
+    <rect x="111" y="204" width="7" height="42" rx="2" fill="#c4c8d0"/>
+    <path d="M41,244 L41,285 Q41,298 50,305 L58,310 L102,310 L110,305 Q119,298 119,285 L119,244 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
+    <rect x="13" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
+    <rect x="127" y="55" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="58" width="14" height="32" rx="4" fill="#4b5563"/>
+    <rect x="13" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="16" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
+    <rect x="127" y="246" width="20" height="38" rx="6" fill="#374151"/><rect x="130" y="249" width="14" height="32" rx="4" fill="#4b5563"/>
+    <path d="M11,128 L11,140 L28,140 L32,134 L28,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
+    <path d="M149,128 L149,140 L132,140 L128,134 L132,128 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
+  </svg>`,
+
+  front:`<svg viewBox="0 0 240 170" xmlns="http://www.w3.org/2000/svg">
+    <text x="120" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">AVANT</text>
+    <path d="M14,148 L14,88 Q16,62 34,48 L62,30 L88,21 L152,21 L178,30 L206,48 Q224,62 226,88 L226,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
+    <path d="M72,70 L83,24 L157,24 L168,70 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <polygon points="72,70 65,24 83,24" fill="#c4c8d0"/>
+    <polygon points="168,70 157,24 175,24" fill="#c4c8d0"/>
+    <path d="M16,80 L16,122 Q16,128 23,128 L72,128 L72,80 Z" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
+    <path d="M20,84 L20,124 L68,124 L68,84 Z" fill="#fef08a" opacity=".85"/>
+    <rect x="16" y="76" width="56" height="6" rx="2" fill="white" opacity=".9"/>
+    <path d="M224,80 L224,122 Q224,128 217,128 L168,128 L168,80 Z" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
+    <path d="M220,84 L220,124 L172,124 L172,84 Z" fill="#fef08a" opacity=".85"/>
+    <rect x="168" y="76" width="56" height="6" rx="2" fill="white" opacity=".9"/>
+    <rect x="80" y="92" width="80" height="36" rx="4" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
+    <line x1="80" y1="107" x2="160" y2="107" stroke="#9ca3af" stroke-width=".6"/>
+    <line x1="106" y1="92" x2="106" y2="128" stroke="#9ca3af" stroke-width=".6"/>
+    <line x1="134" y1="92" x2="134" y2="128" stroke="#9ca3af" stroke-width=".6"/>
+    <path d="M10,134 Q10,154 22,157 L218,157 Q230,154 230,134 L230,132 L10,132 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <rect x="38" y="137" width="56" height="12" rx="3" fill="#c5c9d1"/>
+    <rect x="146" y="137" width="56" height="12" rx="3" fill="#c5c9d1"/>
+    <ellipse cx="55" cy="149" rx="12" ry="5" fill="#fef9c3" stroke="#d97706" stroke-width=".7"/>
+    <ellipse cx="185" cy="149" rx="12" ry="5" fill="#fef9c3" stroke="#d97706" stroke-width=".7"/>
+    <ellipse cx="57" cy="164" rx="40" ry="9" fill="#374151"/><ellipse cx="57" cy="164" rx="27" ry="6" fill="#4b5563"/>
+    <ellipse cx="183" cy="164" rx="40" ry="9" fill="#374151"/><ellipse cx="183" cy="164" rx="27" ry="6" fill="#4b5563"/>
+  </svg>`,
+
+  rear:`<svg viewBox="0 0 240 170" xmlns="http://www.w3.org/2000/svg">
+    <text x="120" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">ARRIÈRE</text>
+    <path d="M14,148 L14,88 Q16,62 34,48 L62,30 L88,21 L152,21 L178,30 L206,48 Q224,62 226,88 L226,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
+    <path d="M74,70 L84,24 L156,24 L166,70 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <polygon points="74,70 66,24 84,24" fill="#c4c8d0"/>
+    <polygon points="166,70 156,24 174,24" fill="#c4c8d0"/>
+    <path d="M16,80 L16,130 Q16,136 24,136 L68,136 L68,80 Z" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
+    <path d="M20,84 L20,132 L64,132 L64,84 Z" fill="#fca5a5" opacity=".85"/>
+    <rect x="16" y="76" width="52" height="6" rx="2" fill="#fed7aa" opacity=".9"/>
+    <path d="M224,80 L224,130 Q224,136 216,136 L172,136 L172,80 Z" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
+    <path d="M220,84 L220,132 L176,132 L176,84 Z" fill="#fca5a5" opacity=".85"/>
+    <rect x="172" y="76" width="52" height="6" rx="2" fill="#fed7aa" opacity=".9"/>
+    <rect x="80" y="88" width="80" height="42" rx="3" fill="#d8dbe0" stroke="#9ca3af" stroke-width=".8"/>
+    <rect x="102" y="134" width="36" height="5" rx="2" fill="#9ca3af"/>
+    <path d="M10,138 Q10,158 22,161 L218,161 Q230,158 230,138 L230,136 L10,136 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+    <rect x="90" y="143" width="60" height="10" rx="3" fill="#c5c9d1"/>
+    <ellipse cx="46" cy="153" rx="10" ry="4" fill="#fecaca" stroke="#dc2626" stroke-width=".7"/>
+    <ellipse cx="57" cy="164" rx="40" ry="9" fill="#374151"/><ellipse cx="57" cy="164" rx="27" ry="6" fill="#4b5563"/>
+    <ellipse cx="183" cy="164" rx="40" ry="9" fill="#374151"/><ellipse cx="183" cy="164" rx="27" ry="6" fill="#4b5563"/>
+  </svg>`,
+
+  left:`<svg viewBox="0 0 340 170" xmlns="http://www.w3.org/2000/svg">
+    <text x="170" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">CÔTÉ GAUCHE</text>
+    <path d="M24,148 L24,86 Q26,62 40,50 L72,30 L110,20 L232,20 L268,30 L296,48 Q316,64 316,86 L316,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
+    <path d="M84,148 L84,20 L232,20 L280,44 L316,84 L316,148 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
+    <polygon points="110,22 92,92 156,92 154,22" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <polygon points="92,92 110,22 96,22 80,92" fill="#c4c8d0"/>
+    <rect x="158" y="24" width="70" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="231" y="22" width="8" height="70" rx="2" fill="#c4c8d0"/>
+    <rect x="241" y="24" width="55" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="297" y="24" width="8" height="70" rx="2" fill="#c4c8d0"/>
+    <polygon points="305,22 316,60 316,92 305,92" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="24" y="146" width="292" height="8" rx="3" fill="#c4c8d0" stroke="#9ca3af" stroke-width=".7"/>
+    <rect x="156" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
+    <rect x="240" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
+    <rect x="24" y="90" width="42" height="36" rx="5" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
+    <rect x="27" y="93" width="36" height="30" rx="3" fill="#fef08a" opacity=".8"/>
+    <rect x="24" y="86" width="42" height="6" rx="2" fill="white" opacity=".9"/>
+    <rect x="296" y="90" width="20" height="36" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
+    <path d="M14,128 Q14,152 26,155 L68,155 L68,128 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
+    <path d="M296,128 L316,128 L316,155 L300,155 Q293,152 293,145 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
+    <path d="M90,76 L90,88 L108,88 L112,82 L108,76 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
+    <circle cx="72" cy="158" r="28" fill="#374151"/><circle cx="72" cy="158" r="19" fill="#4b5563"/><circle cx="72" cy="158" r="8" fill="#6b7280"/>
+    <circle cx="264" cy="158" r="28" fill="#374151"/><circle cx="264" cy="158" r="19" fill="#4b5563"/><circle cx="264" cy="158" r="8" fill="#6b7280"/>
+  </svg>`,
+
+  right:`<svg viewBox="0 0 340 170" xmlns="http://www.w3.org/2000/svg">
+    <text x="170" y="11" text-anchor="middle" font-size="7.5" fill="#9ca3af" font-family="DM Sans,sans-serif" font-weight="600" letter-spacing=".5">CÔTÉ DROIT</text>
+    <path d="M316,148 L316,86 Q314,62 300,50 L268,30 L230,20 L108,20 L72,30 L44,48 Q24,64 24,86 L24,148 Z" fill="#e8eaed" stroke="#b0b4bc" stroke-width="1.2"/>
+    <path d="M256,148 L256,20 L108,20 L60,44 L24,84 L24,148 Z" fill="#d8dbe0" stroke="#b0b4bc" stroke-width=".8"/>
+    <polygon points="230,22 248,92 184,92 186,22" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <polygon points="248,92 230,22 244,22 260,92" fill="#c4c8d0"/>
+    <rect x="112" y="24" width="70" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="101" y="22" width="8" height="70" rx="2" fill="#c4c8d0"/>
+    <rect x="44" y="24" width="55" height="68" rx="2" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="35" y="24" width="8" height="70" rx="2" fill="#c4c8d0"/>
+    <polygon points="35,22 24,60 24,92 35,92" fill="#bfdbfe" stroke="#93c5fd" stroke-width=".8"/>
+    <rect x="24" y="146" width="292" height="8" rx="3" fill="#c4c8d0" stroke="#9ca3af" stroke-width=".7"/>
+    <rect x="179" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
+    <rect x="95" y="104" width="5" height="12" rx="2" fill="#9ca3af"/>
+    <rect x="274" y="90" width="42" height="36" rx="5" fill="#fef3c7" stroke="#d97706" stroke-width=".9"/>
+    <rect x="277" y="93" width="36" height="30" rx="3" fill="#fef08a" opacity=".8"/>
+    <rect x="274" y="86" width="42" height="6" rx="2" fill="white" opacity=".9"/>
+    <rect x="24" y="90" width="20" height="36" rx="4" fill="#fecaca" stroke="#dc2626" stroke-width=".9"/>
+    <path d="M326,128 Q326,152 314,155 L272,155 L272,128 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
+    <path d="M44,128 L24,128 L24,155 L40,155 Q47,152 47,145 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width=".9"/>
+    <path d="M232,76 L232,88 L250,88 L254,82 L250,76 Z" fill="#6b7280" stroke="#555" stroke-width=".6"/>
+    <circle cx="268" cy="158" r="28" fill="#374151"/><circle cx="268" cy="158" r="19" fill="#4b5563"/><circle cx="268" cy="158" r="8" fill="#6b7280"/>
+    <circle cx="76" cy="158" r="28" fill="#374151"/><circle cx="76" cy="158" r="19" fill="#4b5563"/><circle cx="76" cy="158" r="8" fill="#6b7280"/>
+  </svg>`,
+};
+
 // ══════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════
@@ -659,6 +746,7 @@ let vehicles=[], events=[], damages=[], movements=[], authToken=null;
 let agentName='', currentVeh=null, currentTab='fiche';
 let mcFilter='all', mcEditId=null;
 let dmgView='top', pinX=null, pinY=null, dmgSeverity='';
+let consultView='top';
 let pendingPhotos=[]; // {dataUrl, file}
 
 // ══════════════════════════════════════════
@@ -1022,11 +1110,11 @@ function openDmgForm(){
   dmgFormOpen=true;
   document.getElementById('dmg-form-panel').style.display='block';
   document.getElementById('btn-open-dmg-form').style.display='none';
-  pinX=null;pinY=null;dmgSeverity='';pendingPhotos=[];
+  dmgView='top';pinX=null;pinY=null;dmgSeverity='';pendingPhotos=[];
   document.getElementById('d-type').value='';
   document.getElementById('d-desc').value='';
   document.getElementById('d-date').value=today();
-  setSev('');renderPhotoRow();renderSchemaAdd();
+  setSev('');renderPhotoRow();renderVtabs('schema-vtabs-add', dmgView, 'setView');renderSchemaAdd();
   setTimeout(()=>document.getElementById('dmg-form-panel').scrollIntoView({behavior:'smooth',block:'start'}),80);
 }
 
@@ -1040,10 +1128,11 @@ function closeDmgForm(){
 
 function renderSchemaAdd(){
   const svg=document.getElementById('damage-overlay-add');
-  if(!svg)return;
+  const content=document.getElementById('schema-add-bg-content');
+  const box=document.getElementById('schema-add-bg-box');
+  if(!svg||!content||!box)return;
+  content.innerHTML=SVG_VIEWS[dmgView]||SVG_VIEWS.top;
   svg.innerHTML='';
-  const wrap=document.getElementById('schema-add-wrap');
-  if(!wrap)return;
   if(pinX!==null&&pinY!==null){
     const cx=`${pinX}%`,cy=`${pinY}%`;
     const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -1056,13 +1145,13 @@ function renderSchemaAdd(){
     const hint=document.getElementById('pin-hint-add');
     if(hint)hint.textContent='📍 Position marquée — retapez pour déplacer';
   }
-  wrap.onclick=onSchemaAddTap;
+  box.onclick=onSchemaAddTap;
 }
 
 function onSchemaAddTap(e){
   if(!dmgFormOpen)return;
-  const wrap=document.getElementById('schema-add-wrap');
-  const rect=wrap.getBoundingClientRect();
+  const box=document.getElementById('schema-add-bg-box');
+  const rect=box.getBoundingClientRect();
   pinX=((e.clientX-rect.left)/rect.width)*100;
   pinY=((e.clientY-rect.top)/rect.height)*100;
   renderSchemaAdd();
@@ -1071,21 +1160,38 @@ function onSchemaAddTap(e){
 //  DAMAGE FORM
 // ══════════════════════════════════════════
 function buildViewTabs(){
+  renderVtabs('schema-vtabs-consult', consultView, 'setConsultView');
+  renderVtabs('schema-vtabs-add', dmgView, 'setView');
+  renderSchemaImage();
+}
+function renderVtabs(containerId, active, fn){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  el.innerHTML=Object.keys(VIEW_LABELS).map(v=>
+    `<div class="schema-vtab${v===active?' on':''}" onclick="${fn}('${v}')">${VIEW_LABELS[v]}</div>`
+  ).join('');
+}
+function setConsultView(v){
+  consultView=v;
+  renderVtabs('schema-vtabs-consult', consultView, 'setConsultView');
   renderSchemaImage();
 }
 function setView(v){
   dmgView=v;pinX=null;pinY=null;
-  renderSchemaImage();
+  renderVtabs('schema-vtabs-add', dmgView, 'setView');
+  renderSchemaAdd();
 }
 
 function renderSchema(){}
 
 function renderSchemaImage(){
-  const wrap=document.getElementById('schema-img-wrap');
   const svg=document.getElementById('damage-overlay');
-  if(!wrap||!svg)return;
+  const content=document.getElementById('schema-bg-content');
+  const box=document.getElementById('schema-bg-box');
+  if(!svg||!content||!box)return;
+  content.innerHTML=SVG_VIEWS[consultView]||SVG_VIEWS.top;
   svg.innerHTML='';
-  const vDmgs=(currentVeh?damages.filter(d=>d.vehicle_id===currentVeh.id&&!d.resolved):[]);
+  const vDmgs=(currentVeh?damages.filter(d=>d.vehicle_id===currentVeh.id&&!d.resolved&&(d.view||'top')===consultView):[]);
   vDmgs.forEach(d=>{
     const cfg=DMG_TYPES[d.type]||{color:'#6b7280'};
     const sevColors={mineur:'#ca8a04',modere:'#ea580c',grave:'#c0272d'};
@@ -1119,11 +1225,11 @@ function renderSchemaImage(){
     dot.setAttribute('fill','#c0272d');dot.setAttribute('stroke','white');dot.setAttribute('stroke-width','0.8%');
     svg.appendChild(ring);svg.appendChild(dot);
   }
-  wrap.onclick=null;
+  box.onclick=null;
 }
 
 function onSchemaTap(e){
-  const wrap=document.getElementById('schema-img-wrap');
+  const wrap=document.getElementById('schema-bg-box');
   if(!wrap)return;
   const rect=wrap.getBoundingClientRect();
   pinX=((e.clientX-rect.left)/rect.width)*100;
@@ -1356,22 +1462,38 @@ function renderMovements(){
   }
   const container=document.getElementById('mv-list');
   if(!vMv.length){container.innerHTML='<div class="empty" style="margin:0 12px;">Aucun mouvement enregistré.</div>';return;}
-  const cleanLabel={'propre':'✅ Propre','acceptable':'⚠️ Acceptable','sale':'🔴 Sale'};
-  container.innerHTML=vMv.map(m=>{
+  const cleanLabel={'propre':'✅ Propre','acceptable':'⚠️ OK','sale':'🔴 Sale'};
+  const cardHtml=(m)=>{
     const isPr=m.type==='prise';
     const dt=m.datetime?new Date(m.datetime):new Date(m.created_at);
-    const dtStr=dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
-    return `<div style="background:var(--white);margin:0 12px 8px;border-radius:var(--r-sm);box-shadow:var(--sh);padding:12px 14px;border-left:3px solid ${isPr?'#ca8a04':'var(--green)'};">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
-        <div style="font-size:13px;font-weight:700;">${isPr?'🔑 Prise':'✅ Restitution'}</div>
-        <div style="font-size:10.5px;color:var(--text3);font-family:DM Mono,monospace;">${dtStr}</div>
+    const dtStr=dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'})+' '+dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="background:var(--white);margin-bottom:8px;border-radius:var(--r-sm);box-shadow:var(--sh);padding:9px 10px;border-left:3px solid ${isPr?'#ca8a04':'var(--green)'};">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:3px;">
+        <div style="font-size:11.5px;font-weight:700;">${isPr?'🔑 Prise':'✅ Restit.'}</div>
+        <div style="font-size:9.5px;color:var(--text3);font-family:DM Mono,monospace;white-space:nowrap;">${dtStr}</div>
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:3px;">👤 ${esc(m.agent_name||'—')}</div>
-      ${m.cleanliness?`<div style="font-size:11.5px;color:var(--text3);">${cleanLabel[m.cleanliness]||m.cleanliness}</div>`:''}
-      ${m.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic;">${esc(m.notes)}</div>`:''}
-      ${m.photo_dashboard?`<img src="${esc(m.photo_dashboard)}" onclick="openLightbox([this.src],0)" style="margin-top:8px;width:100%;max-height:140px;object-fit:cover;border-radius:var(--r-xs);cursor:zoom-in;border:1px solid var(--border);" loading="lazy">`:''}
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;color:var(--text2);">👤 ${esc(m.agent_name||'—')}</div>
+          ${m.cleanliness?`<div style="font-size:10.5px;color:var(--text3);">${cleanLabel[m.cleanliness]||m.cleanliness}</div>`:''}
+          ${m.notes?`<div style="font-size:10.5px;color:var(--text2);margin-top:3px;font-style:italic;">${esc(m.notes)}</div>`:''}
+        </div>
+        ${m.photo_dashboard?`<img src="${esc(m.photo_dashboard)}" onclick="openLightbox(['${esc(m.photo_dashboard)}'],0)" style="width:46px;height:46px;object-fit:cover;border-radius:var(--r-xs);cursor:zoom-in;border:1px solid var(--border);flex-shrink:0;" loading="lazy">`:''}
+      </div>
     </div>`;
-  }).join('');
+  };
+  const prises=vMv.filter(m=>m.type==='prise');
+  const restitutions=vMv.filter(m=>m.type!=='prise');
+  container.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px;">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">🔑 Prises</div>
+      ${prises.length?prises.map(cardHtml).join(''):'<div class="empty" style="padding:14px 4px;font-size:11px;">Aucune</div>'}
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">✅ Restitutions</div>
+      ${restitutions.length?restitutions.map(cardHtml).join(''):'<div class="empty" style="padding:14px 4px;font-size:11px;">Aucune</div>'}
+    </div>
+  </div>`;
 }
 
 function openMvModal(type){
