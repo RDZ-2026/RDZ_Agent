@@ -213,9 +213,9 @@ function onFile(input){
   reader.onload = (e) => {
     try{
       const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const wb = XLSX.read(data, { type: 'array', cellDates: false });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
       shifts = parseAgendrix(rows);
       if(!shifts.length){ setSave('error','Aucune donnée reconnue dans ce fichier'); return; }
       setSave('saved', shifts.length + ' service(s) importé(s)');
@@ -239,6 +239,21 @@ function onFile(input){
   reader.readAsArrayBuffer(file);
 }
 
+// Conversion manuelle et déterministe du numéro de série Excel → Date UTC.
+// On ne fait plus confiance à la conversion automatique de SheetJS (cellDates),
+// dont le comportement dépend de l'environnement/fuseau du navigateur.
+function excelSerialToUTCDate(serial){
+  const utcDays = Math.floor(serial - 25569); // 25569 = jours entre 1899-12-30 et 1970-01-01
+  const dayMs = utcDays * 86400 * 1000;
+  const dayBase = new Date(dayMs); // instant UTC du début du jour (l'heure est toujours 00:00 ici)
+  const fractionalDay = serial - Math.floor(serial) + 1e-7;
+  let totalSeconds = Math.round(86400 * fractionalDay);
+  const seconds = totalSeconds % 60; totalSeconds -= seconds;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  return new Date(Date.UTC(dayBase.getUTCFullYear(), dayBase.getUTCMonth(), dayBase.getUTCDate(), hours, minutes, seconds));
+}
+
 function parseAgendrix(rows){
   const out = [];
   let currentSite = null;
@@ -250,8 +265,8 @@ function parseAgendrix(rows){
     if (a === 'Salarié' && b === 'Numéro de salarié') { inTable = true; return; }
     const isSiteHeader = a && !b && !c && !d && !e && !f && !g;
     if (isSiteHeader) { currentSite = a; inTable = false; return; }
-    if (inTable && currentSite && a && c === 'Plage horaire' && e instanceof Date && f instanceof Date) {
-      const debut = new Date(e), fin = new Date(f);
+    if (inTable && currentSite && a && c === 'Plage horaire' && typeof e === 'number' && typeof f === 'number') {
+      const debut = excelSerialToUTCDate(e), fin = excelSerialToUTCDate(f);
       out.push({
         agent: a, matricule: b, site: currentSite, poste: d || '',
         debut, fin, totalH: parseFloat(g) || 0,
@@ -329,7 +344,7 @@ function renderGantt(){
         const leftPct = (startH/totalHours)*100;
         const widthPct = Math.max(0.5, ((endH-startH)/totalHours)*100);
         const color = hashColor(agent, AGENT_COLORS);
-        return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)}</div>`;
+        return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)} · ${fmtTime(s.debut)}–${fmtTime(s.fin)}</div>`;
       }).join('');
       return `<div class="gantt-row">
         <div class="gantt-row-lbl">${escHtml(agent)}</div>
