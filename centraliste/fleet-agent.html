@@ -55,7 +55,8 @@ button,input,select,textarea{font-family:inherit;}
 .tb-sub{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;}
 .tb-spacer{flex:1;}
 .tb-name{font-size:11px;color:rgba(255,255,255,.6);font-family:'DM Mono';cursor:pointer;border:1px solid rgba(255,255,255,.15);border-radius:5px;padding:3px 8px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
-.tb-home{display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:rgba(255,255,255,.1);border-radius:var(--r-xs);font-size:15px;text-decoration:none;flex-shrink:0;}
+.tb-home{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);border-radius:var(--r-xs);font-size:13px;font-weight:700;color:white;text-decoration:none;flex-shrink:0;}
+.tb-home:active{background:rgba(255,255,255,.28);}
 .sync{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
 .sync.spin{background:var(--yellow);animation:blink 1s infinite;}
 .sync.err{background:var(--red);}
@@ -298,8 +299,7 @@ button,input,select,textarea{font-family:inherit;}
     <div class="tb-ico">🚗</div>
     <div><div class="tb-brand">Fleet_RDZ</div><div class="tb-sub">Agent terrain</div></div>
     <div class="tb-spacer"></div>
-    <div class="tb-name" id="tb-name" onclick="promptName()">👤 —</div>
-    <a class="tb-home" href="../index.html" title="Accueil suite">🏠</a>
+    <a class="tb-home" href="../index.html" title="Accueil suite">🏠 Accueil</a>
     <div class="sync" id="sync-home"></div>
   </div>
   <div class="body" id="home-body">
@@ -323,7 +323,7 @@ button,input,select,textarea{font-family:inherit;}
     <button class="tb-back" onclick="nav('home')">←</button>
     <div><div class="tb-brand" id="det-plate-tb">—</div><div class="tb-sub">Fiche véhicule</div></div>
     <div class="tb-spacer"></div>
-    <a class="tb-home" href="../index.html">🏠</a>
+    <a class="tb-home" href="../index.html">🏠 Accueil</a>
     <div class="sync" id="sync-det"></div>
   </div>
   <div style="display:flex;flex-direction:column;height:calc(100% - 54px);overflow:hidden;">
@@ -723,7 +723,7 @@ async function loadData(){
 // ══════════════════════════════════════════
 //  AGENT NAME
 // ══════════════════════════════════════════
-function refreshNameBadge(){document.getElementById('tb-name').textContent=agentName?`👤 ${agentName}`:'👤 Mon nom';}
+function refreshNameBadge(){const el=document.getElementById('tb-name');if(el)el.textContent=agentName?`👤 ${agentName}`:'👤 Mon nom';}
 function promptName(){const n=prompt('Votre prénom / nom :',agentName||'');if(n===null)return;agentName=n.trim();localStorage.setItem(NAME_K,agentName);refreshNameBadge();}
 
 // ══════════════════════════════════════════
