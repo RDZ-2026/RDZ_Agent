@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Feuilles de route : Théorique vs Réel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-header { margin-bottom: 20px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    .toolbar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* Liste des feuilles du jour */
+    .sheets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 10px; margin-bottom: 20px; }
+    .sheet-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-border); border-radius: 2px; padding: 12px 14px; cursor: pointer; transition: all .15s; }
+    .sheet-card:hover { border-left-color: var(--rdz-red); box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+    .sheet-card.active { border-left-color: var(--rdz-red); background: #fdf5f5; }
+    .sheet-cat { font-size: 9.5px; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .05em; }
+    .sheet-name { font-size: 13.5px; font-weight: 700; margin-top: 2px; }
+    .sheet-shift { font-size: 11.5px; color: var(--rdz-gray); margin-top: 4px; font-family: 'Courier New', monospace; }
+    .sheet-completion { font-size: 11px; margin-top: 6px; font-weight: 700; }
+
+    /* Résumé de la feuille sélectionnée */
+    .summary-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 14px 18px; flex: 1; min-width: 130px; }
+    .stat-num { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 10.5px; color: var(--rdz-gray); margin-top: 3px; text-transform: uppercase; letter-spacing: .03em; }
+
+    table.ctable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.ctable thead th { background: var(--rdz-black); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 9px 10px; text-align: left; white-space: nowrap; }
+    table.ctable tbody td { padding: 9px 10px; font-size: 12.5px; border-bottom: 1px solid var(--rdz-border); vertical-align: top; }
+    table.ctable tbody tr:last-child td { border-bottom: none; }
+    table.ctable tbody tr.row-missing td { background: #fef2f2; }
+    table.ctable tbody tr.row-late td { background: #fffbeb; }
+    .mono { font-family: 'Courier New', monospace; white-space: nowrap; }
+    .site-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+    .ecart { font-weight: 700; }
+    .ecart.ok { color: #166534; }
+    .ecart.late { color: #b45309; }
+    .ecart.early { color: #1e3a5f; }
+    .ecart.missing { color: #9a9a9a; font-weight: 400; font-style: italic; }
+    .badge-fixed { background: #fef3c7; color: #92400e; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 2px; margin-left: 4px; }
+    .note-cell { font-size: 11.5px; color: var(--rdz-gray); font-style: italic; max-width: 180px; }
+
+    .state-msg { text-align: center; padding: 50px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 30px; margin-bottom: 10px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Feuilles de route — Théorique vs Réel</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="RouteOps_Supervision.html">🕐 Feuilles de route</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Comparatif planning théorique / réalisé</div>
+    <div class="page-sub">Pour chaque ligne d'une feuille de route : les horaires prévus au planning, comparés aux horaires réels saisis par l'agent sur le terrain.</div>
+  </div>
+
+  <div class="toolbar">
+    <span class="tlabel">Date</span>
+    <input type="date" class="tsel" id="date-picker" onchange="onDateChange()">
+    <button class="btn-nav" style="background:var(--rdz-red);border-color:var(--rdz-red-dark)" onclick="goToday()">Aujourd'hui</button>
+    <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
+  </div>
+
+  <div id="sheets-list-wrap">
+    <div class="state-msg"><div class="big">⏳</div>Chargement du planning…</div>
+  </div>
+
+  <div id="detail-wrap"></div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ─── DEUX BASES : planning théorique (RouteOps) + pointages réels (base principale) ──
+const RO_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const RO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let S = { sites: [], missions: [], sheets: [], travel: {} };
+let currentDate = todayStr();
+let currentSheetId = null;
+let pointagesMap = {};
+
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function tMin(t){ if(!t||!t.includes(':'))return null; const[h,m]=t.split(':').map(Number); return h*60+m; }
+function minToT(m){ m=((m%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function escHtml(s){ return (s??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function getMission(id){ return S.missions.find(m=>m.id===id); }
+function getSite(id){ return S.sites.find(s=>s.id===id); }
+function getTravelTime(a,b){ if(!a||!b||a===b) return 0; return S.travel[a]?.[b] ?? S.travel[b]?.[a] ?? 15; }
+function getInstancesForDate(date){ return S.sheets.filter(s=>!s.isTemplate && s.date===date); }
+function setSave(state,msg){ document.getElementById('save-dot').className='save-dot '+state; document.getElementById('save-text').textContent=msg; }
+
+// ─── CALCUL DES HORAIRES THÉORIQUES (identique à RouteOps / feuille-route-agent) ──
+function calcSheetTimes(sh){
+  let cur = tMin(sh.startTime) || 0;
+  let lastSite = null;
+  return sh.tasks.map(task=>{
+    const m = getMission(task.mId);
+    if(!m) return {...task, startTime:'', endTime:'', travelMin:0, alert:false};
+    let travel=0, alert=false;
+    if(task.fixedStart){
+      let ft = tMin(task.fixedStart);
+      if(ft!==null){
+        if(ft<cur-120) ft+=1440;
+        if(ft<cur){ alert=true; } else { cur=ft; }
+      }
+    } else if(lastSite && m.siteId && lastSite!==m.siteId){
+      travel = getTravelTime(lastSite, m.siteId);
+      cur += travel;
+    }
+    const st = minToT(cur);
+    const dureeUsed = task.overrideDuree || m.duree || '00:00';
+    const [dh,dm] = dureeUsed.split(':').map(Number);
+    cur += dh*60+dm;
+    const et = minToT(cur);
+    if(m.siteId) lastSite = m.siteId;
+    return {...task, startTime:st, endTime:et, travelMin:travel, alert, dureeUsed};
+  });
+}
+
+// ─── CHARGEMENT PLANNING (lecture seule) ──────────────────────────────────────
+async function loadRouteOps(){
+  const h = { 'apikey': RO_KEY, 'Authorization': 'Bearer ' + RO_KEY };
+  const base = RO_URL + '/rest/v1';
+  const [sitesR, missionsR, sheetsR, travelR] = await Promise.all([
+    fetch(base+'/sites?active=eq.true&order=name',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/missions?active=eq.true',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/sheets?active=eq.true',{headers:h}).then(r=>r.json()).catch(()=>[]),
+    fetch(base+'/travel?select=*',{headers:h}).then(r=>r.json()).catch(()=>[]),
+  ]);
+  S.sites = (sitesR||[]).map(r=>({id:r.id,name:r.name,code:r.code,color:r.color}));
+  S.missions = (missionsR||[]).map(r=>({
+    id:r.id,name:r.name,code:r.code||'',siteId:r.site_id,type:r.type||'',
+    duree:r.duree||'00:30',fixed:r.fixed||false,desc:r.description||''
+  }));
+  S.sheets = (sheetsR||[]).map(r=>({
+    id:r.id,name:r.name,cat:r.cat,isTemplate:r.is_template,date:r.date,
+    startTime:r.start_time,endTime:r.end_time||'',endService:r.end_time||'',
+    status:r.status||'actif',tasks:Array.isArray(r.tasks)?r.tasks:[],
+    note:r.note||'',observations:r.observations||''
+  }));
+  S.travel = {};
+  (travelR||[]).forEach(t=>{ if(!S.travel[t.site_a]) S.travel[t.site_a]={}; S.travel[t.site_a][t.site_b]=t.minutes; });
+}
+
+async function loadPointages(sheetId, date){
+  pointagesMap = {};
+  try{
+    const { data, error } = await sb.from('feuille_pointages').select('*').eq('sheet_id', sheetId).eq('sheet_date', date);
+    if(error) throw error;
+    (data||[]).forEach(p => { pointagesMap[p.task_index] = p; });
+  }catch(e){ /* silencieux, les cases resteront vides */ }
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+async function init(){
+  document.getElementById('date-picker').value = currentDate;
+  try{
+    await loadRouteOps();
+    setSave('saved','Planning chargé');
+  }catch(e){
+    setSave('error','Erreur planning');
+  }
+  renderSheetsList();
+}
+
+function goToday(){ currentDate = todayStr(); document.getElementById('date-picker').value = currentDate; onDateChange(); }
+function onDateChange(){
+  currentDate = document.getElementById('date-picker').value || todayStr();
+  currentSheetId = null;
+  document.getElementById('detail-wrap').innerHTML = '';
+  renderSheetsList();
+}
+
+const CAT_LABELS = {
+  'patrouille-semaine':'Patrouille · Semaine','patrouille-we':'Patrouille · WE',
+  'mdp-semaine':'MDP · Semaine','mdp-we':'MDP · WE',
+  'regm-semaine':'REGM · Semaine','regm-we':'REGM · WE','special':'Spécial'
+};
+
+function renderSheetsList(){
+  const sheets = getInstancesForDate(currentDate).slice().sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99'));
+  const el = document.getElementById('sheets-list-wrap');
+  if(!sheets.length){
+    el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucune feuille de route pour cette date.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="sheets-grid">${sheets.map(sh=>{
+    const calc = calcSheetTimes(sh);
+    const lastEnd = calc.filter(r=>r.endTime).pop()?.endTime || '—';
+    const endService = sh.endService || lastEnd;
+    const active = sh.id === currentSheetId ? ' active' : '';
+    return `<div class="sheet-card${active}" onclick="openSheet('${sh.id}')">
+      <div class="sheet-cat">${CAT_LABELS[sh.cat]||sh.cat||''}</div>
+      <div class="sheet-name">${escHtml(sh.name)}</div>
+      <div class="sheet-shift">⏱ ${sh.startTime||'—'} → ${endService}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function openSheet(sheetId){
+  currentSheetId = sheetId;
+  renderSheetsList();
+  const sh = S.sheets.find(s=>s.id===sheetId && s.date===currentDate);
+  if(!sh) return;
+  document.getElementById('detail-wrap').innerHTML = `<div class="state-msg"><div class="big">⏳</div>Chargement des pointages…</div>`;
+  await loadPointages(sheetId, currentDate);
+  renderDetail(sh);
+}
+
+function diffMin(reel, prevu){
+  const r = tMin(reel), p = tMin(prevu);
+  if(r===null || p===null) return null;
+  return r - p;
+}
+function fmtEcart(d){
+  if(d===null) return { cls:'missing', txt:'Non pointé' };
+  if(Math.abs(d) < 5) return { cls:'ok', txt: (d>=0?'+':'') + d + ' min' };
+  if(d > 0) return { cls:'late', txt: '+' + d + ' min (retard)' };
+  return { cls:'early', txt: d + ' min (avance)' };
+}
+
+function renderDetail(sh){
+  const calc = calcSheetTimes(sh);
+  let pointées = 0, retards = 0, manquantes = 0;
+
+  const rows = calc.map((r, idx) => {
+    const m = getMission(r.mId);
+    if(!m) return '';
+    const site = getSite(m.siteId);
+    const p = pointagesMap[idx] || {};
+    const arrReelle = p.heure_arrivee_reelle ? p.heure_arrivee_reelle.slice(0,5) : '';
+    const depReel = p.heure_depart_reelle ? p.heure_depart_reelle.slice(0,5) : '';
+    const hasPointage = !!(arrReelle || depReel);
+    if(hasPointage) pointées++; else manquantes++;
+
+    const dArr = arrReelle ? diffMin(arrReelle, r.startTime) : null;
+    const eArr = fmtEcart(dArr);
+    if(eArr.cls === 'late') retards++;
+
+    const rowCls = !hasPointage ? 'row-missing' : (eArr.cls === 'late' ? 'row-late' : '');
+
+    return `<tr class="${rowCls}">
+      <td>${site ? `<span class="site-dot" style="background:${site.color}"></span>` : ''}${escHtml(m.name)}${r.fixedStart ? '<span class="badge-fixed">🔒 Fixe</span>' : ''}</td>
+      <td class="mono">${r.startTime} → ${r.endTime}</td>
+      <td class="mono">${arrReelle || '—'} → ${depReel || '—'}</td>
+      <td><span class="ecart ${eArr.cls}">${eArr.txt}</span></td>
+      <td class="note-cell">${escHtml(p.note || '—')}${p.agent_nom ? `<br><span style="color:#bbb">— ${escHtml(p.agent_nom)}</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  const total = calc.length;
+  const tauxPointage = total ? Math.round((pointées/total)*100) : 0;
+
+  document.getElementById('detail-wrap').innerHTML = `
+    <div class="summary-row">
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-lbl">Missions au planning</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#166534">${pointées}</div><div class="stat-lbl">Pointées (${tauxPointage}%)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#9a9a9a">${manquantes}</div><div class="stat-lbl">Non pointées</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#b45309">${retards}</div><div class="stat-lbl">En retard (+5 min)</div></div>
+    </div>
+    <table class="ctable">
+      <thead><tr><th>Mission</th><th>Prévu</th><th>Réel</th><th>Écart (arrivée)</th><th>Note agent</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+init();
+</script>
+
+</body>
+</html>
