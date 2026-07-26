@@ -472,26 +472,26 @@ function makeThumb(url, title) {
   return '<img class="photo-thumb" src="' + url + '" onclick="openPhoto(\'' + url + '\',\'' + title + '\')" title="' + title + ' — clic pour agrandir">';
 }
 
-// ═══ TABLEAU DE BORD — RAPPORTS DU JOUR, DERNIER PASSAGE PAR SITE ═══
+// ═══ TABLEAU DE BORD — RAPPORTS DU DERNIER PASSAGE, PAR SITE (peu importe la date) ═══
 function renderDashboardRapports() {
-  var w = getTodayWindow();
-  var today = allVehicles.filter(function(v){ return inPeriod(v, w.jourDebut, w.jourFin); });
   var el = document.getElementById('dash-rapports');
-  if (!today.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun rapport aujourd\'hui.</div>'; return; }
+  if (!allVehicles.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun rapport.</div>'; return; }
 
-  // Regrouper par site
+  // Regrouper tous les rapports par site
   var bySite = {};
-  today.forEach(function(v){ (bySite[v.site || '—'] = bySite[v.site || '—'] || []).push(v); });
+  allVehicles.forEach(function(v){ (bySite[v.site || '—'] = bySite[v.site || '—'] || []).push(v); });
 
   var html = '';
   Object.keys(bySite).sort().forEach(function(site) {
-    var list = bySite[site].slice().sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
-    var lastRound = list[0].round_id || null;
-    var lastPassage = lastRound ? list.filter(function(v){ return v.round_id === lastRound; }) : [list[0]];
+    var list = bySite[site];
+    // Date du dernier passage pour ce site (JJ courant peu importe, on prend juste la date la plus récente)
+    var lastDate = list.reduce(function(max, v){ var d = v.created_at.slice(0,10); return d > max ? d : max; }, '');
+    var lastPassage = list.filter(function(v){ return v.created_at.slice(0,10) === lastDate; });
     lastPassage.sort(function(a,b){ return new Date(a.created_at) - new Date(b.created_at); });
 
+    var dateFmt = lastDate ? lastDate.split('-').reverse().join('.') : '—';
     html += '<div style="margin-bottom:14px;border:1px solid var(--gray-border);border-radius:2px;overflow:hidden">';
-    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between"><span>📍 ' + site + '</span><span style="color:var(--gray-mid);font-weight:400">' + lastPassage.length + ' rapport(s) — dernier passage</span></div>';
+    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between"><span>📍 ' + site + '</span><span style="color:var(--gray-mid);font-weight:400">Dernier passage : ' + dateFmt + ' · ' + lastPassage.length + ' rapport(s)</span></div>';
     html += '<table><thead><tr><th>Heure</th><th>Statut</th><th>Plaque</th><th>Motif / Macaron</th><th>Photos</th><th>IA</th><th>Actions</th></tr></thead><tbody>';
 
     lastPassage.forEach(function(v) {
@@ -1105,12 +1105,10 @@ async function loadComptagesToday() {
     window._sitesGuidageMap = {};
     list.forEach(s => window._sitesGuidageMap[s.id] = s.nom);
     const siteIds = list.map(s=>s.id);
-    const w = getTodayWindow();
     const { data } = await db.from('comptages').select('*,zones(nom,places_totales)')
       .in('site_id', siteIds)
-      .gte('created_at', w.jourDebut.toISOString())
-      .lt('created_at', w.jourFin.toISOString())
-      .order('created_at',{ascending:false});
+      .order('created_at',{ascending:false})
+      .limit(500);
     window._comptagesToday = data || [];
     renderComptages();
   } catch(e) { console.warn('comptages:', e.message); el.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px">Erreur: '+e.message+'</div>'; }
@@ -1118,24 +1116,27 @@ async function loadComptagesToday() {
 function renderComptages() {
   const el = document.getElementById('dash-comptages');
   const data = window._comptagesToday || [];
-  if (!data.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun comptage aujourd\'hui.</div>'; return; }
+  if (!data.length) { el.innerHTML = '<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun comptage.</div>'; return; }
 
-  // Regrouper par site, puis par zone : garder uniquement le relevé le plus récent (déjà trié desc)
+  // Regrouper par site, trouver le dernier jour de passage, puis garder TOUS les relevés de ce jour-là
   var bySite = {};
   data.forEach(function(c) {
     var siteName = window._sitesGuidageMap[c.site_id] || c.site_id;
-    var zoneKey = c.zone_id || c.places_totales;
-    bySite[siteName] = bySite[siteName] || {};
-    if (!bySite[siteName][zoneKey]) bySite[siteName][zoneKey] = c; // premier rencontré = plus récent (tri desc)
+    (bySite[siteName] = bySite[siteName] || []).push(c);
   });
 
   var html = '';
   Object.keys(bySite).sort().forEach(function(siteName) {
-    var zones = Object.values(bySite[siteName]).sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
+    var list = bySite[siteName];
+    var lastDate = list.reduce(function(max, c){ var d = c.created_at.slice(0,10); return d > max ? d : max; }, '');
+    var lastPassage = list.filter(function(c){ return c.created_at.slice(0,10) === lastDate; });
+    lastPassage.sort(function(a,b){ return new Date(b.created_at) - new Date(a.created_at); });
+    var dateFmt = lastDate ? lastDate.split('-').reverse().join('.') : '—';
+
     html += '<div style="margin-bottom:14px;border:1px solid var(--gray-border);border-radius:2px;overflow:hidden">';
-    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700">📍 ' + siteName + '</div>';
+    html += '<div style="background:var(--gray-light);padding:8px 12px;font-size:12.5px;font-weight:700;display:flex;justify-content:space-between"><span>📍 ' + siteName + '</span><span style="color:var(--gray-mid);font-weight:400">Dernier passage : ' + dateFmt + '</span></div>';
     html += '<table><thead><tr><th>Heure</th><th>Agent</th><th>Zone</th><th>Véhicules</th><th>Taux</th></tr></thead><tbody>';
-    zones.forEach(function(c) {
+    lastPassage.forEach(function(c) {
       var dt = new Date(c.created_at);
       var heure = pad(dt.getHours())+'h'+pad(dt.getMinutes());
       var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
