@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Planning Agendrix</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1400px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+    input[type=file] { display: none; }
+
+    .content { max-width: 1400px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-header { margin-bottom: 20px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    .tabs-row { display: flex; gap: 4px; background: #fff; border-radius: 2px; padding: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 18px; }
+    .tab-btn { flex: 1; padding: 9px; text-align: center; font-size: 12.5px; font-weight: 700; border: none; border-radius: 2px; cursor: pointer; background: none; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .03em; font-family: inherit; }
+    .tab-btn.active { background: var(--rdz-red); color: #fff; }
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    .save-status { font-size: 11px; display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,.8); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.4); }
+    .save-dot.saved { background: #86efac; }
+    .save-dot.error { background: #fca5a5; }
+
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; }
+    .state-msg .big { font-size: 34px; margin-bottom: 12px; }
+
+    /* ── DIAGRAMME HORAIRE (Gantt) ── */
+    .site-block { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 18px; overflow: hidden; }
+    .site-block-title { background: var(--rdz-black); color: #fff; padding: 10px 16px; font-size: 13px; font-weight: 700; }
+    .gantt-scroll { overflow-x: auto; }
+    .gantt-inner { min-width: 1500px; padding: 10px 16px 16px; }
+    .gantt-days { display: flex; margin-left: 130px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 4px; }
+    .gantt-day-lbl { flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; padding-bottom: 4px; border-left: 1px solid var(--rdz-border); }
+    .gantt-row { display: flex; align-items: center; height: 34px; position: relative; }
+    .gantt-row-lbl { width: 130px; flex-shrink: 0; font-size: 11.5px; font-weight: 700; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gantt-track { flex: 1; position: relative; height: 24px; background: repeating-linear-gradient(to right, var(--rdz-bg) 0, var(--rdz-bg) 1px, transparent 1px, transparent calc(100%/7)); border-radius: 2px; }
+    .gantt-bar { position: absolute; top: 0; height: 24px; border-radius: 3px; font-size: 9.5px; color: #fff; font-weight: 700; display: flex; align-items: center; padding: 0 6px; overflow: hidden; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+
+    /* ── TABLEAU JOURNALIER PDSA ── */
+    .day-block { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+    .day-block-title { background: var(--rdz-black); color: #fff; padding: 9px 16px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    table.ptable { width: 100%; border-collapse: collapse; }
+    table.ptable thead th { background: var(--rdz-bg); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--rdz-gray); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rdz-border); white-space: nowrap; }
+    table.ptable tbody td { padding: 7px 10px; font-size: 12.5px; border-bottom: 1px solid var(--rdz-border); }
+    table.ptable tbody tr:last-child td { border-bottom: none; }
+    table.ptable tbody tr:hover td { background: var(--rdz-bg); }
+    .time-input { padding: 5px 7px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 12.5px; width: 90px; }
+    .time-input:focus { outline: none; border-color: var(--rdz-red); }
+    .time-input.filled { background: #f0fdf4; border-color: #86efac; }
+    .site-tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 700; color: #fff; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Planning Agendrix — Diagramme horaire &amp; PDSA</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <label class="btn-nav btn-nav-accent" for="file-input">📂 Importer un export Agendrix (.xlsx)</label>
+      <input type="file" id="file-input" accept=".xlsx" onchange="onFile(this)">
+      <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">En attente d'un fichier</span></div>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Planning des services</div>
+    <div class="page-sub">Importe l'export Agendrix de la semaine (.xlsx). Le diagramme horaire montre qui est où et quand ; le tableau journalier permet de saisir la PDSA et l'heure de prise de service réelle.</div>
+  </div>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" id="tab-gantt" onclick="switchTab('gantt')">📊 Diagramme horaire par site</button>
+    <button class="tab-btn" id="tab-pdsa" onclick="switchTab('pdsa')">📋 Tableau journalier (PDSA)</button>
+    <button class="tab-btn" id="tab-hist" onclick="switchTab('hist')">🕘 Historique PDSA</button>
+  </div>
+
+  <div id="view-gantt" class="view-section active">
+    <div id="gantt-wrap"><div class="state-msg"><div class="big">📂</div>Importe un fichier Agendrix pour afficher le diagramme.</div></div>
+  </div>
+
+  <div id="view-pdsa" class="view-section">
+    <div id="pdsa-wrap"><div class="state-msg"><div class="big">📂</div>Importe un fichier Agendrix pour afficher le tableau journalier.</div></div>
+  </div>
+
+  <div id="view-hist" class="view-section">
+    <div class="toolbar" style="background:#fff;border:1px solid var(--rdz-border);border-radius:2px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Site</span>
+      <select class="time-input" style="width:auto" id="h-site" onchange="renderHistorique()"><option value="all">Tous</option></select>
+      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Agent</span>
+      <input type="text" class="time-input" style="width:180px" id="h-search" placeholder="Rechercher un agent…" oninput="renderHistorique()">
+      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Du</span>
+      <input type="date" class="time-input" style="width:auto" id="h-date-debut" onchange="renderHistorique()">
+      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Au</span>
+      <input type="date" class="time-input" style="width:auto" id="h-date-fin" onchange="renderHistorique()">
+      <span style="margin-left:auto;font-size:11px;color:var(--rdz-gray)" id="h-count"></span>
+    </div>
+    <div id="hist-wrap"><div class="state-msg"><div class="big">⏳</div>Chargement de l'historique…</div></div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script>
+// ─── SUPABASE (persistance PDSA / heure de prise de service uniquement) ─────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let shifts = [];         // {agent, matricule, site, poste, debut:Date, fin:Date, totalH, key}
+let pdsaMap = {};         // shift_key -> {pdsa, heure_prise_service}
+const SITE_COLORS = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207'];
+const AGENT_COLORS = ['#c0272d','#2563eb','#16a34a','#ea580c','#7c3aed','#0891b2','#db2777','#65a30d','#4b5563','#ca8a04','#0d9488','#9333ea'];
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function setSave(state,msg){ document.getElementById('save-dot').className='save-dot '+state; document.getElementById('save-text').textContent=msg; }
+function hashColor(str, palette){
+  let h = 0; for (let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+function fmtTime(d){ return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDateShort(d){ return d.toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function dateKey(d){ return d.toISOString().slice(0,10); }
+
+function switchTab(tab){
+  document.getElementById('tab-gantt').classList.toggle('active', tab==='gantt');
+  document.getElementById('tab-pdsa').classList.toggle('active', tab==='pdsa');
+  document.getElementById('tab-hist').classList.toggle('active', tab==='hist');
+  document.getElementById('view-gantt').classList.toggle('active', tab==='gantt');
+  document.getElementById('view-pdsa').classList.toggle('active', tab==='pdsa');
+  document.getElementById('view-hist').classList.toggle('active', tab==='hist');
+}
+
+// ─── LECTURE DU FICHIER AGENDRIX ─────────────────────────────────────────────
+function onFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  setSave('', 'Lecture du fichier…');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      shifts = parseAgendrix(rows);
+      if(!shifts.length){ setSave('error','Aucune donnée reconnue dans ce fichier'); return; }
+      setSave('saved', shifts.length + ' service(s) importé(s)');
+      loadPdsaFor(shifts).then(() => { renderGantt(); renderPdsaTables(); });
+    }catch(err){
+      setSave('error', 'Erreur de lecture : ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseAgendrix(rows){
+  const out = [];
+  let currentSite = null;
+  let inTable = false;
+  rows.forEach(row => {
+    const a = row[0], b = row[1], c = row[2], d = row[3], e = row[4], f = row[5], g = row[6];
+    if (a === 'Lieux de travail') return;
+    if (typeof a === 'string' && a.startsWith('Total (')) { inTable = false; return; }
+    if (a === 'Salarié' && b === 'Numéro de salarié') { inTable = true; return; }
+    const isSiteHeader = a && !b && !c && !d && !e && !f && !g;
+    if (isSiteHeader) { currentSite = a; inTable = false; return; }
+    if (inTable && currentSite && a && c === 'Plage horaire' && e instanceof Date && f instanceof Date) {
+      const debut = new Date(e), fin = new Date(f);
+      out.push({
+        agent: a, matricule: b, site: currentSite, poste: d || '',
+        debut, fin, totalH: parseFloat(g) || 0,
+        key: currentSite + '|' + a + '|' + debut.toISOString()
+      });
+    }
+  });
+  return out;
+}
+
+// ─── PDSA : chargement / sauvegarde ──────────────────────────────────────────
+async function loadPdsaFor(shiftList){
+  pdsaMap = {};
+  const keys = shiftList.map(s => s.key);
+  try{
+    const { data, error } = await sb.from('agendrix_pointages').select('*').in('shift_key', keys);
+    if(error) throw error;
+    (data||[]).forEach(r => { pdsaMap[r.shift_key] = r; });
+  }catch(e){ console.warn('Chargement PDSA impossible :', e.message); }
+}
+
+async function savePdsaField(shift, field, value){
+  const payload = {
+    shift_key: shift.key,
+    agent_nom: shift.agent,
+    site: shift.site,
+    poste: shift.poste,
+    debut_prevu: shift.debut.toISOString(),
+    fin_prevu: shift.fin.toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  payload[field] = value ? value + ':00' : null;
+  try{
+    await sb.from('agendrix_pointages').upsert(payload, { onConflict: 'shift_key' });
+    pdsaMap[shift.key] = { ...(pdsaMap[shift.key]||{}), ...payload };
+    const idx = historique.findIndex(h => h.shift_key === shift.key);
+    if (idx > -1) historique[idx] = { ...historique[idx], ...payload };
+    else historique.unshift(payload);
+  }catch(e){ alert('Erreur d\'enregistrement : ' + e.message); }
+}
+
+// ─── DIAGRAMME HORAIRE (GANTT) ────────────────────────────────────────────────
+function renderGantt(){
+  const wrap = document.getElementById('gantt-wrap');
+  if(!shifts.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service à afficher.</div>`; return; }
+
+  const weekStart = new Date(Math.min(...shifts.map(s=>s.debut)));
+  weekStart.setHours(0,0,0,0);
+  const totalHours = 7*24;
+
+  const sites = [...new Set(shifts.map(s=>s.site))];
+  const dayLabels = Array.from({length:7}, (_,i) => {
+    const d = new Date(weekStart); d.setDate(d.getDate()+i); return fmtDateShort(d);
+  });
+
+  wrap.innerHTML = sites.map((site, sIdx) => {
+    const siteColor = hashColor(site, SITE_COLORS);
+    const siteShifts = shifts.filter(s=>s.site===site);
+    const agents = [...new Set(siteShifts.map(s=>s.agent))].sort((a,b)=>a.localeCompare(b,'fr'));
+
+    const rows = agents.map(agent => {
+      const bars = siteShifts.filter(s=>s.agent===agent).map(s => {
+        const startH = (s.debut - weekStart) / 3600000;
+        let durH = (s.fin - s.debut) / 3600000;
+        const leftPct = Math.max(0, (startH/totalHours)*100);
+        const widthPct = Math.min(100-leftPct, (durH/totalHours)*100);
+        const color = hashColor(agent, AGENT_COLORS);
+        return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)}</div>`;
+      }).join('');
+      return `<div class="gantt-row">
+        <div class="gantt-row-lbl">${escHtml(agent)}</div>
+        <div class="gantt-track">${bars}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="site-block">
+      <div class="site-block-title" style="border-left:5px solid ${siteColor}">📍 ${escHtml(site)} — ${agents.length} agent(s), ${siteShifts.length} service(s)</div>
+      <div class="gantt-scroll"><div class="gantt-inner">
+        <div class="gantt-days">${dayLabels.map(l=>`<div class="gantt-day-lbl">${l}</div>`).join('')}</div>
+        ${rows}
+      </div></div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TABLEAU JOURNALIER (PDSA) ────────────────────────────────────────────────
+function renderPdsaTables(){
+  const wrap = document.getElementById('pdsa-wrap');
+  if(!shifts.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service à afficher.</div>`; return; }
+
+  const byDay = {};
+  shifts.forEach(s => { const k = dateKey(s.debut); (byDay[k] = byDay[k]||[]).push(s); });
+  const days = Object.keys(byDay).sort();
+
+  wrap.innerHTML = days.map(day => {
+    const dayShifts = byDay[day].slice().sort((a,b)=> a.debut - b.debut || a.site.localeCompare(b.site,'fr'));
+    const dLabel = new Date(day+'T12:00').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    return `<div class="day-block">
+      <div class="day-block-title">📅 ${dLabel}</div>
+      <table class="ptable">
+        <thead><tr><th>Agent</th><th>Site</th><th>Poste</th><th>Début prévu</th><th>Fin prévu</th><th>PDSA</th><th>Heure prise de service</th></tr></thead>
+        <tbody>${dayShifts.map(s => {
+          const existing = pdsaMap[s.key] || {};
+          const pdsaVal = existing.pdsa ? existing.pdsa.slice(0,5) : '';
+          const hpsVal = existing.heure_prise_service ? existing.heure_prise_service.slice(0,5) : '';
+          const siteColor = hashColor(s.site, SITE_COLORS);
+          return `<tr>
+            <td><strong>${escHtml(s.agent)}</strong></td>
+            <td><span class="site-tag" style="background:${siteColor}">${escHtml(s.site)}</span></td>
+            <td>${escHtml(s.poste)}</td>
+            <td class="mono">${fmtTime(s.debut)}</td>
+            <td class="mono">${fmtTime(s.fin)}</td>
+            <td><input type="time" class="time-input ${pdsaVal?'filled':''}" value="${pdsaVal}" data-key="${s.key}" data-field="pdsa" onchange="onPdsaInput(this)"></td>
+            <td><input type="time" class="time-input ${hpsVal?'filled':''}" value="${hpsVal}" data-key="${s.key}" data-field="heure_prise_service" onchange="onPdsaInput(this)"></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+function onPdsaInput(el){
+  const key = el.dataset.key;
+  const field = el.dataset.field;
+  const shift = shifts.find(s => s.key === key);
+  if(!shift) return;
+  el.classList.toggle('filled', !!el.value);
+  savePdsaField(shift, field, el.value);
+}
+
+// ─── HISTORIQUE (lit directement la base, indépendant du fichier importé) ────
+let historique = [];
+
+async function loadHistorique(){
+  try{
+    const { data, error } = await sb.from('agendrix_pointages').select('*').order('debut_prevu', { ascending: false }).limit(1000);
+    if(error) throw error;
+    historique = data || [];
+    const sites = [...new Set(historique.map(h=>h.site).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+    document.getElementById('h-site').innerHTML = '<option value="all">Tous</option>' + sites.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+    renderHistorique();
+  }catch(e){
+    document.getElementById('hist-wrap').innerHTML = `<div class="state-msg"><div class="big">⚠️</div>Impossible de charger l'historique.<br><small>${escHtml(e.message)}</small></div>`;
+  }
+}
+
+function renderHistorique(){
+  const site = document.getElementById('h-site').value;
+  const search = document.getElementById('h-search').value.toLowerCase().trim();
+  const dDebut = document.getElementById('h-date-debut').value;
+  const dFin = document.getElementById('h-date-fin').value;
+
+  const filtered = historique.filter(h => {
+    if (site !== 'all' && h.site !== site) return false;
+    if (search && !(h.agent_nom||'').toLowerCase().includes(search)) return false;
+    if (dDebut && h.debut_prevu && h.debut_prevu.slice(0,10) < dDebut) return false;
+    if (dFin && h.debut_prevu && h.debut_prevu.slice(0,10) > dFin) return false;
+    return true;
+  });
+  document.getElementById('h-count').textContent = filtered.length + ' entrée(s)';
+
+  const wrap = document.getElementById('hist-wrap');
+  if(!filtered.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune donnée pour ces filtres.</div>`; return; }
+
+  const byDay = {};
+  filtered.forEach(h => { const k = (h.debut_prevu||'').slice(0,10) || 'inconnue'; (byDay[k]=byDay[k]||[]).push(h); });
+  const days = Object.keys(byDay).sort().reverse();
+
+  wrap.innerHTML = days.map(day => {
+    const dayItems = byDay[day].slice().sort((a,b)=> new Date(a.debut_prevu||0) - new Date(b.debut_prevu||0));
+    const dLabel = day!=='inconnue' ? new Date(day+'T12:00').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric'}) : 'Date inconnue';
+    return `<div class="day-block">
+      <div class="day-block-title">📅 ${dLabel}</div>
+      <table class="ptable">
+        <thead><tr><th>Agent</th><th>Site</th><th>Poste</th><th>Prévu</th><th>PDSA</th><th>Prise de service</th></tr></thead>
+        <tbody>${dayItems.map(h => {
+          const siteColor = hashColor(h.site||'', SITE_COLORS);
+          const debutStr = h.debut_prevu ? new Date(h.debut_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '—';
+          const finStr = h.fin_prevu ? new Date(h.fin_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '—';
+          return `<tr>
+            <td><strong>${escHtml(h.agent_nom)}</strong></td>
+            <td><span class="site-tag" style="background:${siteColor}">${escHtml(h.site)}</span></td>
+            <td>${escHtml(h.poste||'—')}</td>
+            <td class="mono">${debutStr} → ${finStr}</td>
+            <td class="mono">${h.pdsa ? h.pdsa.slice(0,5) : '—'}</td>
+            <td class="mono">${h.heure_prise_service ? h.heure_prise_service.slice(0,5) : '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadHistorique();
+</script>
+
+</body>
+</html>
