@@ -99,12 +99,21 @@
   <div class="page-header">
     <div class="page-title">Planning des services</div>
     <div class="page-sub">Importe l'export Agendrix de la semaine (.xlsx). Le diagramme horaire montre qui est où et quand ; le tableau journalier permet de saisir la PDSA et l'heure de prise de service réelle.</div>
+    <div class="page-sub" id="data-range-info" style="font-weight:700;color:var(--rdz-red)"></div>
+  </div>
+
+  <div class="toolbar" id="view-mode-bar" style="display:none;background:#fff;border:1px solid var(--rdz-border);border-radius:2px;padding:12px 16px;margin-bottom:16px;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Affichage</span>
+    <div style="display:flex;gap:4px;background:var(--rdz-bg);border-radius:2px;padding:3px">
+      <button class="tab-btn active" id="mode-semaine" style="flex:none;padding:6px 14px;font-size:11.5px" onclick="setViewMode('semaine')">Semaine</button>
+      <button class="tab-btn" id="mode-jour" style="flex:none;padding:6px 14px;font-size:11.5px" onclick="setViewMode('jour')">Jour</button>
+    </div>
+    <input type="date" class="time-input" style="width:auto;display:none" id="day-picker" onchange="onDayPicked()">
   </div>
 
   <div class="tabs-row">
     <button class="tab-btn active" id="tab-gantt" onclick="switchTab('gantt')">📊 Diagramme horaire par site</button>
     <button class="tab-btn" id="tab-pdsa" onclick="switchTab('pdsa')">📋 Tableau journalier (PDSA)</button>
-    <button class="tab-btn" id="tab-hist" onclick="switchTab('hist')">🕘 Historique PDSA</button>
   </div>
 
   <div id="view-gantt" class="view-section active">
@@ -113,21 +122,6 @@
 
   <div id="view-pdsa" class="view-section">
     <div id="pdsa-wrap"><div class="state-msg"><div class="big">📂</div>Importe un fichier Agendrix pour afficher le tableau journalier.</div></div>
-  </div>
-
-  <div id="view-hist" class="view-section">
-    <div class="toolbar" style="background:#fff;border:1px solid var(--rdz-border);border-radius:2px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Site</span>
-      <select class="time-input" style="width:auto" id="h-site" onchange="renderHistorique()"><option value="all">Tous</option></select>
-      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Agent</span>
-      <input type="text" class="time-input" style="width:180px" id="h-search" placeholder="Rechercher un agent…" oninput="renderHistorique()">
-      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Du</span>
-      <input type="date" class="time-input" style="width:auto" id="h-date-debut" onchange="renderHistorique()">
-      <span style="font-size:11px;font-weight:700;color:var(--rdz-gray);text-transform:uppercase;letter-spacing:.04em">Au</span>
-      <input type="date" class="time-input" style="width:auto" id="h-date-fin" onchange="renderHistorique()">
-      <span style="margin-left:auto;font-size:11px;color:var(--rdz-gray)" id="h-count"></span>
-    </div>
-    <div id="hist-wrap"><div class="state-msg"><div class="big">⏳</div>Chargement de l'historique…</div></div>
   </div>
 
 </div>
@@ -154,17 +148,40 @@ function hashColor(str, palette){
   let h = 0; for (let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
   return palette[h % palette.length];
 }
-function fmtTime(d){ return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
-function fmtDateShort(d){ return d.toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function fmtTime(d){ return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit', timeZone:'UTC'}); }
+function fmtDateShort(d){ return d.toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'2-digit', timeZone:'UTC'}); }
 function dateKey(d){ return d.toISOString().slice(0,10); }
 
 function switchTab(tab){
   document.getElementById('tab-gantt').classList.toggle('active', tab==='gantt');
   document.getElementById('tab-pdsa').classList.toggle('active', tab==='pdsa');
-  document.getElementById('tab-hist').classList.toggle('active', tab==='hist');
   document.getElementById('view-gantt').classList.toggle('active', tab==='gantt');
   document.getElementById('view-pdsa').classList.toggle('active', tab==='pdsa');
-  document.getElementById('view-hist').classList.toggle('active', tab==='hist');
+}
+
+let viewMode = 'semaine'; // 'semaine' | 'jour'
+let selectedDay = null;   // 'YYYY-MM-DD', utilisé en mode 'jour'
+
+function setViewMode(mode){
+  viewMode = mode;
+  document.getElementById('mode-semaine').classList.toggle('active', mode==='semaine');
+  document.getElementById('mode-jour').classList.toggle('active', mode==='jour');
+  document.getElementById('day-picker').style.display = mode==='jour' ? 'inline-block' : 'none';
+  if (mode==='jour' && !selectedDay && shifts.length) {
+    selectedDay = dateKey(new Date(Math.max(...shifts.map(s=>s.debut))));
+    document.getElementById('day-picker').value = selectedDay;
+  }
+  renderGantt();
+  renderPdsaTables();
+}
+function onDayPicked(){
+  selectedDay = document.getElementById('day-picker').value;
+  renderGantt();
+  renderPdsaTables();
+}
+function shiftsForView(){
+  if (viewMode === 'jour' && selectedDay) return shifts.filter(s => dateKey(s.debut) === selectedDay);
+  return shifts;
 }
 
 // ─── LECTURE DU FICHIER AGENDRIX ─────────────────────────────────────────────
@@ -182,6 +199,18 @@ function onFile(input){
       shifts = parseAgendrix(rows);
       if(!shifts.length){ setSave('error','Aucune donnée reconnue dans ce fichier'); return; }
       setSave('saved', shifts.length + ' service(s) importé(s)');
+
+      const lastDate = new Date(Math.max(...shifts.map(s=>s.debut)));
+      document.getElementById('data-range-info').textContent =
+        '📅 Planning disponible jusqu\'au ' + lastDate.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric', timeZone:'UTC'});
+
+      document.getElementById('view-mode-bar').style.display = 'flex';
+      const dp = document.getElementById('day-picker');
+      dp.min = dateKey(new Date(Math.min(...shifts.map(s=>s.debut))));
+      dp.max = dateKey(lastDate);
+      if (!selectedDay) selectedDay = dateKey(lastDate);
+      dp.value = selectedDay;
+
       loadPdsaFor(shifts).then(() => { renderGantt(); renderPdsaTables(); });
     }catch(err){
       setSave('error', 'Erreur de lecture : ' + err.message);
@@ -238,9 +267,6 @@ async function savePdsaField(shift, field, value){
   try{
     await sb.from('agendrix_pointages').upsert(payload, { onConflict: 'shift_key' });
     pdsaMap[shift.key] = { ...(pdsaMap[shift.key]||{}), ...payload };
-    const idx = historique.findIndex(h => h.shift_key === shift.key);
-    if (idx > -1) historique[idx] = { ...historique[idx], ...payload };
-    else historique.unshift(payload);
   }catch(e){ alert('Erreur d\'enregistrement : ' + e.message); }
 }
 
@@ -249,32 +275,45 @@ function renderGantt(){
   const wrap = document.getElementById('gantt-wrap');
   if(!shifts.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service à afficher.</div>`; return; }
 
-  const weekStart = new Date(Math.min(...shifts.map(s=>s.debut)));
-  weekStart.setHours(0,0,0,0);
-  const totalHours = 7*24;
+  const isDay = viewMode === 'jour' && selectedDay;
+  let rangeStart, totalHours, dayLabels, colDivisions;
 
-  const sites = [...new Set(shifts.map(s=>s.site))];
-  const dayLabels = Array.from({length:7}, (_,i) => {
-    const d = new Date(weekStart); d.setDate(d.getDate()+i); return fmtDateShort(d);
-  });
+  if (isDay) {
+    rangeStart = new Date(selectedDay + 'T00:00:00Z');
+    totalHours = 24;
+    dayLabels = Array.from({length:8}, (_,i) => String(i*3).padStart(2,'0') + 'h');
+    colDivisions = 8;
+  } else {
+    rangeStart = new Date(Math.min(...shifts.map(s=>s.debut)));
+    rangeStart.setUTCHours(0,0,0,0);
+    totalHours = 7*24;
+    dayLabels = Array.from({length:7}, (_,i) => { const d = new Date(rangeStart); d.setUTCDate(d.getUTCDate()+i); return fmtDateShort(d); });
+    colDivisions = 7;
+  }
+  const rangeEnd = new Date(rangeStart.getTime() + totalHours*3600000);
 
-  wrap.innerHTML = sites.map((site, sIdx) => {
+  const viewShifts = shifts.filter(s => s.debut < rangeEnd && s.fin > rangeStart);
+  if(!viewShifts.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service pour ${isDay ? 'ce jour' : 'cette période'}.</div>`; return; }
+
+  const sites = [...new Set(viewShifts.map(s=>s.site))];
+
+  wrap.innerHTML = sites.map((site) => {
     const siteColor = hashColor(site, SITE_COLORS);
-    const siteShifts = shifts.filter(s=>s.site===site);
+    const siteShifts = viewShifts.filter(s=>s.site===site);
     const agents = [...new Set(siteShifts.map(s=>s.agent))].sort((a,b)=>a.localeCompare(b,'fr'));
 
     const rows = agents.map(agent => {
       const bars = siteShifts.filter(s=>s.agent===agent).map(s => {
-        const startH = (s.debut - weekStart) / 3600000;
-        let durH = (s.fin - s.debut) / 3600000;
-        const leftPct = Math.max(0, (startH/totalHours)*100);
-        const widthPct = Math.min(100-leftPct, (durH/totalHours)*100);
+        const startH = Math.max(0, (s.debut - rangeStart) / 3600000);
+        const endH = Math.min(totalHours, (s.fin - rangeStart) / 3600000);
+        const leftPct = (startH/totalHours)*100;
+        const widthPct = Math.max(0.5, ((endH-startH)/totalHours)*100);
         const color = hashColor(agent, AGENT_COLORS);
         return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)}</div>`;
       }).join('');
       return `<div class="gantt-row">
         <div class="gantt-row-lbl">${escHtml(agent)}</div>
-        <div class="gantt-track">${bars}</div>
+        <div class="gantt-track" style="background:repeating-linear-gradient(to right, var(--rdz-bg) 0, var(--rdz-bg) 1px, transparent 1px, transparent calc(100%/${colDivisions}))">${bars}</div>
       </div>`;
     }).join('');
 
@@ -294,12 +333,14 @@ function renderPdsaTables(){
   if(!shifts.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service à afficher.</div>`; return; }
 
   const byDay = {};
-  shifts.forEach(s => { const k = dateKey(s.debut); (byDay[k] = byDay[k]||[]).push(s); });
+  const viewShifts = viewMode === 'jour' && selectedDay ? shifts.filter(s => dateKey(s.debut) === selectedDay) : shifts;
+  viewShifts.forEach(s => { const k = dateKey(s.debut); (byDay[k] = byDay[k]||[]).push(s); });
   const days = Object.keys(byDay).sort();
+  if (!days.length) { wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucun service pour ce jour.</div>`; return; }
 
   wrap.innerHTML = days.map(day => {
     const dayShifts = byDay[day].slice().sort((a,b)=> a.debut - b.debut || a.site.localeCompare(b.site,'fr'));
-    const dLabel = new Date(day+'T12:00').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    const dLabel = new Date(day+'T12:00:00Z').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
     return `<div class="day-block">
       <div class="day-block-title">📅 ${dLabel}</div>
       <table class="ptable">
@@ -333,71 +374,7 @@ function onPdsaInput(el){
   savePdsaField(shift, field, el.value);
 }
 
-// ─── HISTORIQUE (lit directement la base, indépendant du fichier importé) ────
-let historique = [];
-
-async function loadHistorique(){
-  try{
-    const { data, error } = await sb.from('agendrix_pointages').select('*').order('debut_prevu', { ascending: false }).limit(1000);
-    if(error) throw error;
-    historique = data || [];
-    const sites = [...new Set(historique.map(h=>h.site).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
-    document.getElementById('h-site').innerHTML = '<option value="all">Tous</option>' + sites.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
-    renderHistorique();
-  }catch(e){
-    document.getElementById('hist-wrap').innerHTML = `<div class="state-msg"><div class="big">⚠️</div>Impossible de charger l'historique.<br><small>${escHtml(e.message)}</small></div>`;
-  }
-}
-
-function renderHistorique(){
-  const site = document.getElementById('h-site').value;
-  const search = document.getElementById('h-search').value.toLowerCase().trim();
-  const dDebut = document.getElementById('h-date-debut').value;
-  const dFin = document.getElementById('h-date-fin').value;
-
-  const filtered = historique.filter(h => {
-    if (site !== 'all' && h.site !== site) return false;
-    if (search && !(h.agent_nom||'').toLowerCase().includes(search)) return false;
-    if (dDebut && h.debut_prevu && h.debut_prevu.slice(0,10) < dDebut) return false;
-    if (dFin && h.debut_prevu && h.debut_prevu.slice(0,10) > dFin) return false;
-    return true;
-  });
-  document.getElementById('h-count').textContent = filtered.length + ' entrée(s)';
-
-  const wrap = document.getElementById('hist-wrap');
-  if(!filtered.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune donnée pour ces filtres.</div>`; return; }
-
-  const byDay = {};
-  filtered.forEach(h => { const k = (h.debut_prevu||'').slice(0,10) || 'inconnue'; (byDay[k]=byDay[k]||[]).push(h); });
-  const days = Object.keys(byDay).sort().reverse();
-
-  wrap.innerHTML = days.map(day => {
-    const dayItems = byDay[day].slice().sort((a,b)=> new Date(a.debut_prevu||0) - new Date(b.debut_prevu||0));
-    const dLabel = day!=='inconnue' ? new Date(day+'T12:00').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric'}) : 'Date inconnue';
-    return `<div class="day-block">
-      <div class="day-block-title">📅 ${dLabel}</div>
-      <table class="ptable">
-        <thead><tr><th>Agent</th><th>Site</th><th>Poste</th><th>Prévu</th><th>PDSA</th><th>Prise de service</th></tr></thead>
-        <tbody>${dayItems.map(h => {
-          const siteColor = hashColor(h.site||'', SITE_COLORS);
-          const debutStr = h.debut_prevu ? new Date(h.debut_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '—';
-          const finStr = h.fin_prevu ? new Date(h.fin_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}) : '—';
-          return `<tr>
-            <td><strong>${escHtml(h.agent_nom)}</strong></td>
-            <td><span class="site-tag" style="background:${siteColor}">${escHtml(h.site)}</span></td>
-            <td>${escHtml(h.poste||'—')}</td>
-            <td class="mono">${debutStr} → ${finStr}</td>
-            <td class="mono">${h.pdsa ? h.pdsa.slice(0,5) : '—'}</td>
-            <td class="mono">${h.heure_prise_service ? h.heure_prise_service.slice(0,5) : '—'}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>`;
-  }).join('');
-}
-
 document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
-loadHistorique();
 </script>
 
 </body>
