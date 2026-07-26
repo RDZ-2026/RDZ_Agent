@@ -948,10 +948,8 @@ function showDmgDetail(id){
     h+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-top:12px;margin-bottom:6px;">📸 Photos (${photos.length})</div>
     <div class="photos-grid">${photos.map((url,i)=>`<img src="${esc(url)}" onclick="openDmgPhoto(${i})" loading="lazy" style="cursor:zoom-in;border-radius:var(--r-sm);width:100%;aspect-ratio:4/3;object-fit:cover;">`).join('')}</div>`;
   }
-  if(isMe(d)){
-    if(!d.resolved)h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
-    h+=`<button onclick="deleteDmg('${d.id}')" style="width:100%;padding:11px;background:var(--red-l);color:var(--red-d);border:1px solid #fca5a5;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🗑 Supprimer ce dégât</button>`;
-  }
+  if(!d.resolved)h+=`<button class="btn-resolve" onclick="resolveDmg('${d.id}')">✅ Marquer comme résolu</button>`;
+  h+=`<button onclick="deleteDmg('${d.id}')" style="width:100%;padding:11px;background:var(--red-l);color:var(--red-d);border:1px solid #fca5a5;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">🗑 Supprimer ce dégât</button>`;
   document.getElementById('dmg-modal-title').textContent=cfg.label;
   document.getElementById('dmg-modal-body').innerHTML=h;
   document.getElementById('dmg-modal-bg').classList.add('on');
@@ -969,7 +967,7 @@ async function resolveDmg(id){
 }
 async function deleteDmg(id){
   const d=damages.find(x=>x.id===id);
-  if(!d||!isMe(d)){toast('Non autorisé','err');return;}
+  if(!d){toast('Dégât introuvable','err');return;}
   if(!confirm(`Supprimer définitivement ce dégât ?\n"${(d.description||d.type||'').slice(0,60)}"\n\nCette action est irréversible.`))return;
   try{
     await sb(`fleet_damages?id=eq.${id}`,{method:'DELETE',headers:{'Prefer':'return=minimal'}});
@@ -1080,7 +1078,7 @@ function renderSchemaImage(){
     const col=sevColors[d.severity]||cfg.color;
     const cx=`${d.location_x}%`,cy=`${d.location_y}%`;
     const g=document.createElementNS('http://www.w3.org/2000/svg','g');
-    g.setAttribute('style','cursor:pointer');
+    g.setAttribute('style','cursor:pointer;pointer-events:auto');
     g.setAttribute('onclick',`showDmgDetail('${d.id}')`);
     const halo=document.createElementNS('http://www.w3.org/2000/svg','circle');
     halo.setAttribute('cx',cx);halo.setAttribute('cy',cy);halo.setAttribute('r','3%');
