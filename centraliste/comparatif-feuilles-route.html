@@ -66,6 +66,8 @@
     .ecart.ok { color: #166534; }
     .ecart.late { color: #b45309; }
     .ecart.early { color: #1e3a5f; }
+    .ecart.over { color: #7c3aed; }
+    .ecart.under { color: #0e7490; }
     .ecart.missing { color: #9a9a9a; font-weight: 400; font-style: italic; }
     .badge-fixed { background: #fef3c7; color: #92400e; font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 2px; margin-left: 4px; }
     .note-cell { font-size: 11.5px; color: var(--rdz-gray); font-style: italic; max-width: 180px; }
@@ -272,10 +274,17 @@ function fmtEcart(d){
   if(d > 0) return { cls:'late', txt: '+' + d + ' min (retard)' };
   return { cls:'early', txt: d + ' min (avance)' };
 }
+function fmtEcartDuree(reelleMin, prevueMin){
+  if(reelleMin===null) return { cls:'missing', txt:'—' };
+  const d = reelleMin - prevueMin;
+  if(Math.abs(d) < 5) return { cls:'ok', txt: (d>=0?'+':'') + d + ' min' };
+  if(d > 0) return { cls:'over', txt: '+' + d + ' min (plus long)' };
+  return { cls:'under', txt: d + ' min (plus court)' };
+}
 
 function renderDetail(sh){
   const calc = calcSheetTimes(sh);
-  let pointées = 0, retards = 0, manquantes = 0;
+  let pointées = 0, retards = 0, manquantes = 0, dureesEcartees = 0;
 
   const rows = calc.map((r, idx) => {
     const m = getMission(r.mId);
@@ -291,6 +300,17 @@ function renderDetail(sh){
     const eArr = fmtEcart(dArr);
     if(eArr.cls === 'late') retards++;
 
+    // Durée prévue (planning) vs durée réelle (arrivée → départ pointés)
+    const [dh, dm] = (r.dureeUsed || '00:00').split(':').map(Number);
+    const dureePrevueMin = (dh||0)*60 + (dm||0);
+    let dureeReelleMin = null;
+    if (arrReelle && depReel) {
+      dureeReelleMin = tMin(depReel) - tMin(arrReelle);
+      if (dureeReelleMin < 0) dureeReelleMin += 1440; // passage minuit
+    }
+    const eDuree = fmtEcartDuree(dureeReelleMin, dureePrevueMin);
+    if (eDuree.cls === 'over' || eDuree.cls === 'under') dureesEcartees++;
+
     const rowCls = !hasPointage ? 'row-missing' : (eArr.cls === 'late' ? 'row-late' : '');
 
     return `<tr class="${rowCls}">
@@ -298,6 +318,8 @@ function renderDetail(sh){
       <td class="mono">${r.startTime} → ${r.endTime}</td>
       <td class="mono">${arrReelle || '—'} → ${depReel || '—'}</td>
       <td><span class="ecart ${eArr.cls}">${eArr.txt}</span></td>
+      <td class="mono">${dureePrevueMin} min / ${dureeReelleMin!==null ? dureeReelleMin+' min' : '—'}</td>
+      <td><span class="ecart ${eDuree.cls}">${eDuree.txt}</span></td>
       <td class="note-cell">${escHtml(p.note || '—')}${p.agent_nom ? `<br><span style="color:#bbb">— ${escHtml(p.agent_nom)}</span>` : ''}</td>
     </tr>`;
   }).join('');
@@ -311,9 +333,10 @@ function renderDetail(sh){
       <div class="stat-card"><div class="stat-num" style="color:#166534">${pointées}</div><div class="stat-lbl">Pointées (${tauxPointage}%)</div></div>
       <div class="stat-card"><div class="stat-num" style="color:#9a9a9a">${manquantes}</div><div class="stat-lbl">Non pointées</div></div>
       <div class="stat-card"><div class="stat-num" style="color:#b45309">${retards}</div><div class="stat-lbl">En retard (+5 min)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#7c3aed">${dureesEcartees}</div><div class="stat-lbl">Durées hors norme</div></div>
     </div>
     <table class="ctable">
-      <thead><tr><th>Mission</th><th>Prévu</th><th>Réel</th><th>Écart (arrivée)</th><th>Note agent</th></tr></thead>
+      <thead><tr><th>Mission</th><th>Prévu</th><th>Réel</th><th>Écart (arrivée)</th><th>Durée prévue / réelle</th><th>Écart durée</th><th>Note agent</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
