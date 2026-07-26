@@ -68,7 +68,7 @@ button,input,select,textarea{font-family:inherit;}
 .schema-vtab{flex-shrink:0;padding:5px 9px;font-size:10px;font-weight:700;color:var(--text2);background:var(--white);border:1.5px solid var(--border2);border-radius:14px;cursor:pointer;white-space:nowrap;}
 .schema-vtab.on{background:var(--red);color:#fff;border-color:var(--red);}
 .schema-center{display:flex;align-items:center;justify-content:center;background:var(--white);padding:8px;}
-.schema-svgbox{position:relative;height:150px;}
+.schema-svgbox{position:relative;height:320px;}
 .schema-svgbox svg{height:100%;width:auto;display:block;pointer-events:none;}
 
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
@@ -611,7 +611,7 @@ const SUPPLIERS = {
   'Zurich':{phone:'0800 80 80 80',contact:'Service sinistres'},
 };
 
-const VIEW_LABELS = {top:'🔝 Dessus',front:'⬛ Avant',rear:'⬛ Arrière',left:'◀ Gauche',right:'▶ Droite'};
+const VIEW_LABELS = {top:'🔝 Dessus',front:'⬛ Avant',rear:'⬛ Arrière',left:'🧑 Conducteur',right:'👤 Passager'};
 
 const VIEW_IMAGES = {
   top: 'images/vehicule-dessus.png',
