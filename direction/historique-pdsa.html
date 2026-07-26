@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Historique PDSA</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1300px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 1300px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-header { margin-bottom: 20px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    .toolbar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    .day-block { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+    .day-block-title { background: var(--rdz-black); color: #fff; padding: 9px 16px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+    table.ptable { width: 100%; border-collapse: collapse; }
+    table.ptable thead th { background: var(--rdz-bg); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--rdz-gray); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--rdz-border); white-space: nowrap; }
+    table.ptable tbody td { padding: 7px 10px; font-size: 12.5px; border-bottom: 1px solid var(--rdz-border); }
+    table.ptable tbody tr:last-child td { border-bottom: none; }
+    table.ptable tbody tr:hover td { background: var(--rdz-bg); }
+    .mono { font-family: 'Courier New', monospace; white-space: nowrap; }
+    .site-tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 700; color: #fff; }
+
+    .state-msg { text-align: center; padding: 50px 20px; font-size: 14px; color: var(--rdz-gray); background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; }
+    .state-msg .big { font-size: 30px; margin-bottom: 10px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1300px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Historique PDSA — Planning Agendrix</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Historique des prises de service</div>
+    <div class="page-sub">PDSA et heure de prise de service saisies par le centraliste, toutes semaines confondues.</div>
+  </div>
+
+  <div class="toolbar">
+    <span class="tlabel">Site</span>
+    <select class="tsel" id="h-site" onchange="renderHistorique()"><option value="all">Tous</option></select>
+    <span class="tlabel">Agent</span>
+    <input type="text" class="tsel" id="h-search" placeholder="Rechercher un agent…" oninput="renderHistorique()">
+    <span class="tlabel">Du</span>
+    <input type="date" class="tsel" id="h-date-debut" onchange="renderHistorique()">
+    <span class="tlabel">Au</span>
+    <input type="date" class="tsel" id="h-date-fin" onchange="renderHistorique()">
+    <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
+  </div>
+
+  <div id="hist-wrap"><div class="state-msg"><div class="big">⏳</div>Chargement de l'historique…</div></div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SITE_COLORS = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207'];
+let historique = [];
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function setSave(state,msg){ document.getElementById('save-dot').className='save-dot '+state; document.getElementById('save-text').textContent=msg; }
+function hashColor(str, palette){
+  let h = 0; for (let i=0;i<str.length;i++) h = (h*31 + str.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+
+async function loadHistorique(){
+  try{
+    const { data, error } = await sb.from('agendrix_pointages').select('*').order('debut_prevu', { ascending: false }).limit(1000);
+    if(error) throw error;
+    historique = data || [];
+    setSave('saved', historique.length + ' entrée(s) chargée(s)');
+    const sites = [...new Set(historique.map(h=>h.site).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+    document.getElementById('h-site').innerHTML = '<option value="all">Tous</option>' + sites.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+    renderHistorique();
+  }catch(e){
+    setSave('error', 'Erreur de connexion');
+    document.getElementById('hist-wrap').innerHTML = `<div class="state-msg"><div class="big">⚠️</div>Impossible de charger l'historique.<br><small>${escHtml(e.message)}</small></div>`;
+  }
+}
+
+function renderHistorique(){
+  const site = document.getElementById('h-site').value;
+  const search = document.getElementById('h-search').value.toLowerCase().trim();
+  const dDebut = document.getElementById('h-date-debut').value;
+  const dFin = document.getElementById('h-date-fin').value;
+
+  const filtered = historique.filter(h => {
+    if (site !== 'all' && h.site !== site) return false;
+    if (search && !(h.agent_nom||'').toLowerCase().includes(search)) return false;
+    if (dDebut && h.debut_prevu && h.debut_prevu.slice(0,10) < dDebut) return false;
+    if (dFin && h.debut_prevu && h.debut_prevu.slice(0,10) > dFin) return false;
+    return true;
+  });
+
+  const wrap = document.getElementById('hist-wrap');
+  if(!filtered.length){ wrap.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune donnée pour ces filtres.</div>`; return; }
+
+  const byDay = {};
+  filtered.forEach(h => { const k = (h.debut_prevu||'').slice(0,10) || 'inconnue'; (byDay[k]=byDay[k]||[]).push(h); });
+  const days = Object.keys(byDay).sort().reverse();
+
+  wrap.innerHTML = days.map(day => {
+    const dayItems = byDay[day].slice().sort((a,b)=> new Date(a.debut_prevu||0) - new Date(b.debut_prevu||0));
+    const dLabel = day!=='inconnue' ? new Date(day+'T12:00:00Z').toLocaleDateString('fr-CH',{weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'}) : 'Date inconnue';
+    return `<div class="day-block">
+      <div class="day-block-title">📅 ${dLabel}</div>
+      <table class="ptable">
+        <thead><tr><th>Agent</th><th>Site</th><th>Poste</th><th>Prévu</th><th>PDSA</th><th>Prise de service</th></tr></thead>
+        <tbody>${dayItems.map(h => {
+          const siteColor = hashColor(h.site||'', SITE_COLORS);
+          const debutStr = h.debut_prevu ? new Date(h.debut_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit', timeZone:'UTC'}) : '—';
+          const finStr = h.fin_prevu ? new Date(h.fin_prevu).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit', timeZone:'UTC'}) : '—';
+          return `<tr>
+            <td><strong>${escHtml(h.agent_nom)}</strong></td>
+            <td><span class="site-tag" style="background:${siteColor}">${escHtml(h.site)}</span></td>
+            <td>${escHtml(h.poste||'—')}</td>
+            <td class="mono">${debutStr} → ${finStr}</td>
+            <td class="mono">${h.pdsa ? h.pdsa.slice(0,5) : '—'}</td>
+            <td class="mono">${h.heure_prise_service ? h.heure_prise_service.slice(0,5) : '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadHistorique();
+</script>
+
+</body>
+</html>
