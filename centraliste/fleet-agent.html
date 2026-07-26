@@ -1365,7 +1365,7 @@ function renderMovements(){
   const emptyCell='<div style="border:1.5px dashed var(--border2);border-radius:var(--r-sm);padding:14px;text-align:center;font-size:10.5px;color:var(--text3);">— Véhicule dehors —</div>';
 
   // ── Appariement chronologique : chaque prise avec sa restitution correspondante ──
-  const asc=[...vMv].sort((a,b)=>new Date(a.datetime||a.created_at)-new Date(b.datetime||b.created_at));
+  const asc=[...vMv].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   const sessions=[];
   let pending=null;
   asc.forEach(m=>{
