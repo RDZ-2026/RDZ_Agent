@@ -275,6 +275,7 @@ const VIEW_IMAGES = {
   right: 'images/vehicule-droite.png',
 };
 const VIEW_LABELS = {top:'🔝 Dessus', front:'⬛ Avant', rear:'⬛ Arrière', left:'🧑 Conducteur', right:'👤 Passager'};
+const VIEW_SCALE = {top:0.5, front:1, rear:1, left:0.5, right:0.5};
 let dmgView='top';
 const SUPPLIERS={
   'Garage Renault RRG Plan-les-Ouates':{phone:'0844 774 774',address:'Rte de Saint-Julien 180, 1228 Plan-les-Ouates',hours:'Lun–Ven 7h30–17h30'},
@@ -482,9 +483,11 @@ function renderDegats(){
     <div style="display:flex;border-bottom:1px solid var(--border)">
       ${Object.keys(VIEW_IMAGES).map(v=>`<div onclick="setDmgView('${v}')" style="flex:1;text-align:center;padding:8px 4px;font-size:10.5px;font-weight:700;cursor:pointer;color:${dmgView===v?'var(--red)':'var(--text3)'};border-bottom:2px solid ${dmgView===v?'var(--red)':'transparent'};margin-bottom:-1px">${VIEW_LABELS[v]}</div>`).join('')}
     </div>
-    <div id="schema-wrap-el" style="position:relative;height:280px;background:#fafafa;touch-action:none;user-select:none;">
-      <div id="schema-img-content" style="height:100%;display:flex;align-items:center;justify-content:center"></div>
-      <svg id="dmg-overlay" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="schema-wrap-el" style="position:relative;height:280px;background:#fafafa;touch-action:none;user-select:none;display:flex;align-items:center;justify-content:center;">
+      <div id="schema-frame" style="position:relative;height:100%;display:inline-block">
+        <div id="schema-img-content" style="height:100%"></div>
+        <svg id="dmg-overlay" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
     </div>
   </div>
   <button class="btn-submit" id="btn-open-dmg-form" onclick="openDmgForm()" style="margin-bottom:14px">＋ Signaler un nouveau dégât</button>
@@ -505,9 +508,12 @@ function setDmgView(v){
 }
 
 function renderDmgOverlay(){
+  const frame=document.getElementById('schema-frame');
   const content=document.getElementById('schema-img-content');
   const svg=document.getElementById('dmg-overlay');
-  if(!content||!svg)return;
+  if(!frame||!content||!svg)return;
+  const scale=VIEW_SCALE[dmgView]||1;
+  frame.style.height=(scale*100)+'%';
   content.innerHTML=`<img src="${VIEW_IMAGES[dmgView]||VIEW_IMAGES.top}" style="height:100%;width:auto;display:block;pointer-events:none" draggable="false">`;
   svg.innerHTML='';
   const vDmgs=damages.filter(d=>d.vehicle_id===currentVeh.id&&!d.resolved&&(d.view||'top')===dmgView);
@@ -636,7 +642,7 @@ function closeDmgForm(){
   renderDmgOverlay();
 }
 function onSchemaTap(e){
-  const wrap=document.getElementById('schema-wrap-el');
+  const wrap=document.getElementById('schema-frame');
   const rect=wrap.getBoundingClientRect();
   pinX=((e.clientX-rect.left)/rect.width)*100;
   pinY=((e.clientY-rect.top)/rect.height)*100;
