@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Historique des ouvertures résidences</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1280px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    .content { max-width: 1280px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-header { margin-bottom: 20px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    .stats { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 14px 20px; flex: 1; min-width: 150px; }
+    .stat-num { font-size: 24px; font-weight: 700; }
+    .stat-lbl { font-size: 11px; color: var(--rdz-gray); margin-top: 3px; letter-spacing: .03em; text-transform: uppercase; }
+
+    .toolbar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel, .tsearch { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); }
+    .tsearch { min-width: 200px; }
+    .save-status { margin-left: auto; font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--rdz-gray); }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    table.otable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.otable thead th { background: var(--rdz-black); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 10px 12px; text-align: left; white-space: nowrap; }
+    table.otable tbody td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid var(--rdz-border); vertical-align: top; }
+    table.otable tbody tr:hover { background: var(--rdz-bg); }
+    table.otable tbody tr:last-child td { border-bottom: none; }
+    .cell-site { color: var(--rdz-gray); white-space: nowrap; }
+    .photo-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 2px; cursor: pointer; border: 1px solid var(--rdz-border); }
+
+    .state-msg { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .state-msg .big { font-size: 32px; margin-bottom: 12px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1280px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+
+    /* Lightbox photo */
+    .lb-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 300; align-items: center; justify-content: center; }
+    .lb-overlay.open { display: flex; }
+    .lb-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 4px; }
+    .lb-close { position: absolute; top: 20px; right: 24px; color: #fff; font-size: 26px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Historique des ouvertures résidences</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <button class="btn-nav btn-nav-accent" onclick="openReportModal()">🖨 Rapport client (PDF)</button>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Ouvertures résidences</div>
+    <div class="page-sub">Historique des ouvertures enregistrées par les agents (badge oublié, badge perdu, autre). Génère un rapport imprimable pour le client à partir des filtres ci-dessous.</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">Ouvertures (période)</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-sites">—</div><div class="stat-lbl">Sites concernés</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-motif-top">—</div><div class="stat-lbl">Motif le plus fréquent</div></div>
+  </div>
+
+  <div class="toolbar">
+    <span class="tlabel">Site</span>
+    <select class="tsel" id="filter-site" onchange="render()"><option value="all">Tous les sites</option></select>
+    <span class="tlabel">Motif</span>
+    <select class="tsel" id="filter-motif" onchange="render()"><option value="all">Tous</option></select>
+    <span class="tlabel">Du</span>
+    <input type="date" class="tsel" id="filter-date-debut" onchange="render()">
+    <span class="tlabel">Au</span>
+    <input type="date" class="tsel" id="filter-date-fin" onchange="render()">
+    <input type="text" class="tsearch" id="filter-search" placeholder="Rechercher un nom, une localisation…" oninput="render()">
+    <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
+  </div>
+
+  <div id="content-table">
+    <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<!-- LIGHTBOX PHOTO -->
+<div class="lb-overlay" id="lb-overlay" onclick="closeLightbox()">
+  <span class="lb-close">✕</span>
+  <img id="lb-img" src="">
+</div>
+
+<script>
+// ─── SUPABASE ───────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let ouvertures = [];
+
+function escHtml(s) { return (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDate(d) { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}.${m}.${y}`; }
+function fmtHeure(h) { return h ? h.slice(0,5) : '—'; }
+function setSave(state, msg) {
+  document.getElementById('save-dot').className = 'save-dot ' + state;
+  document.getElementById('save-text').textContent = msg;
+}
+
+async function loadAll() {
+  try {
+    const { data, error } = await sb.from('ouvertures').select('*').order('date_ouverture', { ascending: false }).order('heure_ouverture', { ascending: false });
+    if (error) throw error;
+    ouvertures = data || [];
+    setSave('saved', `${ouvertures.length} ouverture${ouvertures.length > 1 ? 's' : ''} chargée${ouvertures.length > 1 ? 's' : ''}`);
+    populateFilters();
+    render();
+  } catch (err) {
+    setSave('error', 'Erreur de connexion');
+    document.getElementById('content-table').innerHTML = `<div class="state-msg">Impossible de charger les données.<br><small>${escHtml(err.message)}</small></div>`;
+  }
+}
+
+function populateFilters() {
+  const sites = [...new Set(ouvertures.map(o => o.site).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const siteSel = document.getElementById('filter-site');
+  siteSel.innerHTML = '<option value="all">Tous les sites</option>' + sites.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+
+  const motifs = [...new Set(ouvertures.map(o => o.motif).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const motifSel = document.getElementById('filter-motif');
+  motifSel.innerHTML = '<option value="all">Tous</option>' + motifs.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+}
+
+function getFiltered() {
+  const site   = document.getElementById('filter-site').value;
+  const motif  = document.getElementById('filter-motif').value;
+  const dDebut = document.getElementById('filter-date-debut').value;
+  const dFin   = document.getElementById('filter-date-fin').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  return ouvertures.filter(o => {
+    if (site !== 'all' && o.site !== site) return false;
+    if (motif !== 'all' && o.motif !== motif) return false;
+    if (dDebut && o.date_ouverture < dDebut) return false;
+    if (dFin && o.date_ouverture > dFin) return false;
+    if (search && !((o.personne||'').toLowerCase().includes(search) || (o.localisation||'').toLowerCase().includes(search))) return false;
+    return true;
+  });
+}
+
+function render() {
+  const filtered = getFiltered();
+
+  document.getElementById('stat-total').textContent = filtered.length;
+  document.getElementById('stat-sites').textContent = new Set(filtered.map(o=>o.site).filter(Boolean)).size;
+  const motifCounts = {};
+  filtered.forEach(o => { if (o.motif) motifCounts[o.motif] = (motifCounts[o.motif]||0) + 1; });
+  const topMotif = Object.entries(motifCounts).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('stat-motif-top').textContent = topMotif ? `${topMotif[0]} (${topMotif[1]})` : '—';
+  document.getElementById('stat-motif-top').style.fontSize = topMotif && topMotif[0].length > 18 ? '14px' : '24px';
+
+  const el = document.getElementById('content-table');
+  if (!filtered.length) {
+    el.innerHTML = `<div class="state-msg"><div class="big">📭</div>Aucune ouverture pour ces filtres.</div>`;
+    return;
+  }
+
+  el.innerHTML = `<table class="otable">
+    <thead><tr>
+      <th>Date</th><th>Heure</th><th>Site</th><th>Localisation</th><th>Identité de la personne</th><th>Motif</th><th>Agent</th><th>Note</th><th>Photo</th>
+    </tr></thead>
+    <tbody>
+      ${filtered.map(o => `<tr>
+        <td>${fmtDate(o.date_ouverture)}</td>
+        <td>${fmtHeure(o.heure_ouverture)}</td>
+        <td class="cell-site">${escHtml(o.site)}</td>
+        <td>${escHtml(o.localisation || '—')}</td>
+        <td>${escHtml(o.personne)}</td>
+        <td>${escHtml(o.motif)}</td>
+        <td class="cell-site">${escHtml(o.agent_nom || '—')}</td>
+        <td style="font-size:12px;color:var(--rdz-gray)">${escHtml(o.note || '—')}</td>
+        <td>${o.photo_url ? `<img class="photo-thumb" src="${escHtml(o.photo_url)}" onclick="openLightbox('${escHtml(o.photo_url)}')">` : '—'}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function openLightbox(url) {
+  document.getElementById('lb-img').src = url;
+  document.getElementById('lb-overlay').classList.add('open');
+}
+function closeLightbox() { document.getElementById('lb-overlay').classList.remove('open'); }
+
+// ─── RAPPORT CLIENT (impression / PDF) ──────────────────────────────────────
+function isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const weekNum = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + (firstThursday.getUTCDay() + 6) % 7) / 7);
+  return weekNum;
+}
+function mondayOf(d) {
+  const r = new Date(d);
+  const day = (r.getDay() + 6) % 7;
+  r.setDate(r.getDate() - day);
+  return r;
+}
+function fmtDateLongFr(d) {
+  return d.toLocaleDateString('fr-CH', { day: 'numeric', month: 'long', year: '2-digit' });
+}
+
+function openReportModal() {
+  const filtered = getFiltered();
+  if (!filtered.length) { alert('Aucune donnée à exporter avec les filtres actuels.'); return; }
+  generateClientReport(filtered);
+}
+
+function generateClientReport(data) {
+  // Détermine la semaine à partir de la date la plus ancienne du jeu filtré (comme le rapport de référence)
+  const dates = data.map(o => new Date(o.date_ouverture + 'T00:00:00')).sort((a,b)=>a-b);
+  const refDate = mondayOf(dates[0]);
+  const weekNum = isoWeekNumber(refDate);
+  const title = `Rapport Semaine n°${weekNum} du ${fmtDateLongFr(refDate)}`;
+
+  const motifCounts = {};
+  data.forEach(o => { const m = o.motif || 'Autre'; motifCounts[m] = (motifCounts[m]||0) + 1; });
+  const motifRows = Object.entries(motifCounts).sort((a,b)=>a[0].localeCompare(b[0],'fr'));
+  const total = data.length;
+
+  const sorted = [...data].sort((a,b) => {
+    const da = a.date_ouverture + 'T' + (a.heure_ouverture||'00:00:00');
+    const db = b.date_ouverture + 'T' + (b.heure_ouverture||'00:00:00');
+    return da.localeCompare(db);
+  });
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1a1a1a;background:#fff}
+    @page{margin:14mm 12mm;size:A4}
+    .rpt-header{display:flex;align-items:center;gap:14px;background:#f0f0f0;border-radius:4px;padding:14px 18px;margin-bottom:20px}
+    .rpt-logo{width:42px;height:42px;border-radius:50%;background:#8B1A1A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+    .rpt-title{font-size:16px;font-weight:700;color:#1a1a1a}
+    .summary-table{margin:0 auto 26px;border-collapse:collapse;min-width:280px}
+    .summary-table td{padding:6px 16px;font-size:12.5px;border-bottom:1px solid #ddd}
+    .summary-table tr:last-child td{border-bottom:none;background:#ececec;font-weight:700}
+    .summary-table td:last-child{text-align:right;font-weight:600}
+    .semaine-label{font-size:11px;color:#555;margin-bottom:14px;border-bottom:1px solid #ccc;padding-bottom:6px}
+    .semaine-label strong{font-weight:700}
+    table.detail{width:100%;border-collapse:collapse;font-size:11px}
+    table.detail thead th{background:#8B1A1A;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.03em}
+    table.detail tbody td{padding:6px 10px;border-bottom:1px solid #e2e2e2}
+    table.detail tbody tr:nth-child(even) td{background:#f7f7f7}
+    .col-date{font-weight:700;white-space:nowrap}
+    @media print{.no-print{display:none}}
+  </style></head><body>
+    <div class="rpt-header">
+      <div class="rpt-logo">RDZ</div>
+      <div class="rpt-title">${title}</div>
+    </div>
+    <table class="summary-table">
+      ${motifRows.map(([m,c]) => `<tr><td>${escHtml(m)}</td><td>${c}</td></tr>`).join('')}
+      <tr><td>TOTAL</td><td>${total}</td></tr>
+    </table>
+    <div class="semaine-label">Semaine N° &nbsp; <strong>Semaine n°${weekNum} du ${fmtDateLongFr(refDate)}</strong></div>
+    <table class="detail">
+      <thead><tr><th>Date</th><th>Heure</th><th>Site</th><th>Localisation</th><th>Identité de la personne</th><th>Motifs</th></tr></thead>
+      <tbody>
+        ${sorted.map(o => `<tr>
+          <td class="col-date">${fmtDate(o.date_ouverture)}</td>
+          <td>${fmtHeure(o.heure_ouverture)}</td>
+          <td>${escHtml(o.site)}</td>
+          <td>${escHtml(o.localisation || '—')}</td>
+          <td>${escHtml(o.personne)}</td>
+          <td>${escHtml(o.motif)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
