@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Paramétrage checklists événements</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A; --rdz-red-dark: #6B1212; --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a; --rdz-border: #d0ccc5; --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1000px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+
+    .content { max-width: 1000px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; margin-bottom: 20px; }
+
+    .tabs-row { display: flex; gap: 4px; background: #fff; border-radius: 2px; padding: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 18px; }
+    .tab-btn { flex: 1; padding: 9px; text-align: center; font-size: 12.5px; font-weight: 700; border: none; border-radius: 2px; cursor: pointer; background: none; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .03em; font-family: inherit; }
+    .tab-btn.active { background: var(--rdz-red); color: #fff; }
+    .view-form { display: none; }
+    .view-form.active { display: block; }
+
+    .btn-add-section { width: 100%; padding: 10px; border: 1.5px dashed var(--rdz-border); border-radius: 2px; background: #fff; color: var(--rdz-gray); font-size: 12.5px; font-weight: 700; cursor: pointer; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .03em; }
+    .btn-add-section:hover { border-color: var(--rdz-red); color: var(--rdz-red); }
+
+    .section-card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 14px; overflow: hidden; }
+    .section-hdr { background: var(--rdz-black); color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+    .section-hdr-label { flex: 1; font-size: 13px; font-weight: 700; }
+    .ord-btns { display: flex; gap: 2px; }
+    .ord-btn { width: 22px; height: 22px; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1); color: #fff; border-radius: 2px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+    .ord-btn:hover { background: rgba(255,255,255,.25); }
+    .sec-action { padding: 4px 9px; border-radius: 2px; border: 1px solid rgba(255,255,255,.4); background: rgba(255,255,255,.1); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .sec-action:hover { background: rgba(255,255,255,.25); }
+    .sec-action.del { border-color: #fca5a5; color: #fca5a5; }
+
+    .item-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--rdz-border); }
+    .item-row:last-child { border-bottom: none; }
+    .item-tag { font-size: 9.5px; font-weight: 700; color: #fff; background: var(--rdz-gray); padding: 2px 7px; border-radius: 2px; text-transform: uppercase; white-space: nowrap; flex-shrink: 0; }
+    .item-label { flex: 1; font-size: 12.5px; }
+    .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .item-btn { width: 24px; height: 24px; border: 1px solid var(--rdz-border); background: #fff; border-radius: 2px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; color: var(--rdz-gray); }
+    .item-btn:hover { background: var(--rdz-bg); }
+    .item-btn.del:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+    .btn-add-item { width: 100%; padding: 8px; border: none; background: var(--rdz-bg); color: var(--rdz-gray); font-size: 11.5px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: .03em; }
+    .btn-add-item:hover { background: #ebe9e6; }
+
+    .state-msg { text-align: center; padding: 40px 20px; font-size: 13px; color: var(--rdz-gray); }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: flex-start; justify-content: center; padding: 70px 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 24px; width: 100%; max-width: 440px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 14px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 18px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 6px; }
+    .field input, .field select { width: 100%; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; font-family: Arial, sans-serif; }
+    .field input:focus, .field select:focus { outline: none; border-color: var(--rdz-red); }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Paramétrage — Checklists événements</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+  <div class="page-title">Checklists événements</div>
+  <div class="page-sub">Crée, modifie, réordonne les sections et les items des deux checklists (générique et responsable) — sans jamais avoir besoin de retoucher le code.</div>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" id="tab-generique" onclick="switchForm('generique')">Formulaire Générique</button>
+    <button class="tab-btn" id="tab-responsable" onclick="switchForm('responsable')">Formulaire Responsable</button>
+  </div>
+
+  <div id="view-generique" class="view-form active">
+    <button class="btn-add-section" onclick="openSectionModal('generique')">+ Ajouter une section</button>
+    <div id="sections-generique"><div class="state-msg">Chargement…</div></div>
+  </div>
+
+  <div id="view-responsable" class="view-form">
+    <button class="btn-add-section" onclick="openSectionModal('responsable')">+ Ajouter une section</button>
+    <div id="sections-responsable"><div class="state-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<!-- MODAL SECTION -->
+<div class="modal-overlay" id="modal-section">
+  <div class="modal">
+    <div class="modal-title" id="section-modal-title">Nouvelle section</div>
+    <div class="field"><label>Nom de la section</label><input type="text" id="f-section-label" placeholder="Ex : T-30 min — Arrivée site"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modal-section')">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveSection()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ITEM -->
+<div class="modal-overlay" id="modal-item">
+  <div class="modal">
+    <div class="modal-title" id="item-modal-title">Nouvel item</div>
+    <div class="field"><label>Texte de l'item</label><input type="text" id="f-item-label" placeholder="Ex : Radio chargée à 100%"></div>
+    <div class="field"><label>Tag (optionnel)</label><input type="text" id="f-item-tag" placeholder="Ex : RADIO, SÉCURITÉ, DOCUMENTS…"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal('modal-item')">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveItem()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let sections = [], items = [];
+let currentForm = 'generique';
+let editSectionId = null, editItemId = null, addItemSectionId = null;
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target===o) o.classList.remove('open'); }));
+
+async function loadAll(){
+  try{
+    const [{data:s,error:e1},{data:it,error:e2}] = await Promise.all([
+      sb.from('evenements_checklist_sections').select('*').order('ordre'),
+      sb.from('evenements_checklist_items').select('*').order('ordre')
+    ]);
+    if(e1||e2) throw (e1||e2);
+    sections = s||[]; items = it||[];
+    render();
+  }catch(e){
+    document.getElementById('sections-generique').innerHTML = `<div class="state-msg">Erreur de chargement : ${escHtml(e.message)}</div>`;
+  }
+}
+
+function switchForm(f){
+  currentForm = f;
+  document.getElementById('tab-generique').classList.toggle('active', f==='generique');
+  document.getElementById('tab-responsable').classList.toggle('active', f==='responsable');
+  document.getElementById('view-generique').classList.toggle('active', f==='generique');
+  document.getElementById('view-responsable').classList.toggle('active', f==='responsable');
+}
+
+function render(){
+  ['generique','responsable'].forEach(f => {
+    const el = document.getElementById('sections-'+f);
+    const secs = sections.filter(s => s.formulaire===f).sort((a,b)=>a.ordre-b.ordre);
+    if(!secs.length){ el.innerHTML = `<div class="state-msg">Aucune section — clique "+ Ajouter une section" ci-dessus.</div>`; return; }
+    el.innerHTML = secs.map((sec, idx) => {
+      const secItems = items.filter(i => i.section_id===sec.id).sort((a,b)=>a.ordre-b.ordre);
+      return `<div class="section-card">
+        <div class="section-hdr">
+          <div class="ord-btns">
+            <button class="ord-btn" ${idx===0?'disabled style="opacity:.3"':''} onclick="moveSection('${sec.id}',-1)">↑</button>
+            <button class="ord-btn" ${idx===secs.length-1?'disabled style="opacity:.3"':''} onclick="moveSection('${sec.id}',1)">↓</button>
+          </div>
+          <div class="section-hdr-label">${escHtml(sec.label)}</div>
+          <button class="sec-action" onclick="openSectionModal('${f}','${sec.id}')">✎ Renommer</button>
+          <button class="sec-action del" onclick="deleteSection('${sec.id}')">🗑 Supprimer</button>
+        </div>
+        ${secItems.map((it, iidx) => `<div class="item-row">
+          <div class="ord-btns">
+            <button class="item-btn" ${iidx===0?'disabled style="opacity:.3"':''} onclick="moveItem('${it.id}',-1)">↑</button>
+            <button class="item-btn" ${iidx===secItems.length-1?'disabled style="opacity:.3"':''} onclick="moveItem('${it.id}',1)">↓</button>
+          </div>
+          ${it.tag ? `<span class="item-tag">${escHtml(it.tag)}</span>` : ''}
+          <div class="item-label">${escHtml(it.label)}</div>
+          <div class="item-actions">
+            <button class="item-btn" onclick="openItemModal('${sec.id}','${it.id}')">✎</button>
+            <button class="item-btn del" onclick="deleteItem('${it.id}')">🗑</button>
+          </div>
+        </div>`).join('')}
+        <button class="btn-add-item" onclick="openItemModal('${sec.id}')">+ Ajouter un item dans cette section</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+// ─── SECTIONS ────────────────────────────────────────────────────────────────
+function openSectionModal(formulaire, id){
+  editSectionId = id || null;
+  currentForm = formulaire;
+  document.getElementById('section-modal-title').textContent = id ? 'Renommer la section' : 'Nouvelle section';
+  document.getElementById('f-section-label').value = id ? (sections.find(s=>s.id===id)||{}).label||'' : '';
+  document.getElementById('modal-section').classList.add('open');
+}
+async function saveSection(){
+  const label = document.getElementById('f-section-label').value.trim();
+  if(!label){ alert('Merci de saisir un nom.'); return; }
+  try{
+    if(editSectionId){
+      await sb.from('evenements_checklist_sections').update({label}).eq('id',editSectionId);
+    }else{
+      const maxOrdre = Math.max(0, ...sections.filter(s=>s.formulaire===currentForm).map(s=>s.ordre));
+      await sb.from('evenements_checklist_sections').insert({formulaire:currentForm, label, ordre:maxOrdre+1, actif:true});
+    }
+    closeModal('modal-section');
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+async function deleteSection(id){
+  if(!confirm('Supprimer cette section et tous ses items ? Cette action est irréversible.')) return;
+  try{
+    await sb.from('evenements_checklist_sections').delete().eq('id',id);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+async function moveSection(id, dir){
+  const sec = sections.find(s=>s.id===id);
+  const siblings = sections.filter(s=>s.formulaire===sec.formulaire).sort((a,b)=>a.ordre-b.ordre);
+  const idx = siblings.findIndex(s=>s.id===id);
+  const swapWith = siblings[idx+dir];
+  if(!swapWith) return;
+  try{
+    await Promise.all([
+      sb.from('evenements_checklist_sections').update({ordre:swapWith.ordre}).eq('id',sec.id),
+      sb.from('evenements_checklist_sections').update({ordre:sec.ordre}).eq('id',swapWith.id)
+    ]);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+// ─── ITEMS ───────────────────────────────────────────────────────────────────
+function openItemModal(sectionId, id){
+  addItemSectionId = sectionId;
+  editItemId = id || null;
+  document.getElementById('item-modal-title').textContent = id ? 'Modifier l\'item' : 'Nouvel item';
+  const it = id ? items.find(i=>i.id===id) : null;
+  document.getElementById('f-item-label').value = it ? it.label : '';
+  document.getElementById('f-item-tag').value = it ? (it.tag||'') : '';
+  document.getElementById('modal-item').classList.add('open');
+}
+async function saveItem(){
+  const label = document.getElementById('f-item-label').value.trim();
+  const tag = document.getElementById('f-item-tag').value.trim();
+  if(!label){ alert('Merci de saisir un texte.'); return; }
+  try{
+    if(editItemId){
+      await sb.from('evenements_checklist_items').update({label, tag: tag||null}).eq('id',editItemId);
+    }else{
+      const maxOrdre = Math.max(0, ...items.filter(i=>i.section_id===addItemSectionId).map(i=>i.ordre));
+      await sb.from('evenements_checklist_items').insert({section_id:addItemSectionId, label, tag: tag||null, ordre:maxOrdre+1, actif:true});
+    }
+    closeModal('modal-item');
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+async function deleteItem(id){
+  if(!confirm('Supprimer cet item ?')) return;
+  try{
+    await sb.from('evenements_checklist_items').delete().eq('id',id);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+async function moveItem(id, dir){
+  const it = items.find(i=>i.id===id);
+  const siblings = items.filter(i=>i.section_id===it.section_id).sort((a,b)=>a.ordre-b.ordre);
+  const idx = siblings.findIndex(i=>i.id===id);
+  const swapWith = siblings[idx+dir];
+  if(!swapWith) return;
+  try{
+    await Promise.all([
+      sb.from('evenements_checklist_items').update({ordre:swapWith.ordre}).eq('id',it.id),
+      sb.from('evenements_checklist_items').update({ordre:it.ordre}).eq('id',swapWith.id)
+    ]);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
