@@ -3,31 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ParkGuard RDZ — Admin</title>
+<title>RDZ — Contrôle Parking (Admin)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
-  --red:#D0021B;--red-light:#FFF0F1;--red-dark:#A80016;
-  --black:#111;--gray-dark:#444;--gray-mid:#888;
-  --gray-light:#F4F4F4;--gray-border:#E2E2E2;--white:#FFF;
-  --green:#1A7A4A;--green-light:#EDF7F2;
-  --amber:#B45309;--amber-light:#FFFBEB;
-  --blue:#1A56A4;--blue-light:#EFF4FF;
-  --radius:12px;--radius-sm:8px;
+  --red:#8B1A1A;--red-light:#f5e8e8;--red-dark:#6B1212;
+  --black:#1a1a1a;--gray-dark:#4a4a4a;--gray-mid:#9a9a9a;
+  --gray-light:#f5f4f2;--gray-border:#d0ccc5;--white:#FFF;
+  --green:#166534;--green-light:#dcfce7;
+  --amber:#854d0e;--amber-light:#fef9c3;
+  --blue:#1e3a5f;--blue-light:#eff6ff;
+  --radius:2px;--radius-sm:2px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-light);color:var(--black);min-height:100vh}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);color:var(--black);min-height:100vh}
 
-.topbar{background:var(--black);padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
-.topbar-logo{font-size:18px;font-weight:900;color:var(--white);letter-spacing:-.5px}
-.topbar-logo span{color:var(--red)}
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.header{background:var(--red);border-bottom:4px solid var(--red-dark)}
+.header-inner{max-width:1280px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-brand{padding:14px 0}
+.header-brand-name{font-size:14px;font-weight:700;color:#fff;letter-spacing:.07em;text-transform:uppercase}
+.header-brand-sub{font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.03em;margin-top:2px}
+.header-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-nav{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:2px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;transition:all .15s;border:1.5px solid rgba(255,255,255,.85);background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+.btn-nav:hover{background:rgba(255,255,255,.25)}
+.online-badge{font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.15);color:#fff}
 
-.container{max-width:1200px;margin:0 auto;padding:24px}
+.container{max-width:1280px;margin:0 auto;padding:24px 28px 48px}
 
-.card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px}
-.card-title{font-size:15px;font-weight:700;margin-bottom:4px}
-.card-sub{font-size:13px;color:var(--gray-mid);margin-bottom:16px}
+.tabs-row{display:flex;gap:4px;background:#fff;border-radius:var(--radius);padding:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;flex-wrap:wrap}
+.tab-btn{flex:1;min-width:140px;padding:9px;text-align:center;font-size:12.5px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;background:none;color:var(--gray-dark);font-family:inherit;transition:.15s;text-transform:uppercase;letter-spacing:.03em}
+.tab-btn.active{background:var(--red);color:#fff}
+.tab-btn:hover:not(.active){background:var(--gray-light)}
+.view-section{display:none}
+.view-section.active{display:block}
+
+.card{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;color:var(--black)}
 
 .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
 .badge-red{background:var(--red-light);color:var(--red-dark)}
@@ -36,326 +47,188 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-blue{background:var(--blue-light);color:var(--blue)}
 .badge-gray{background:var(--gray-light);color:var(--gray-dark)}
 
-.btn{padding:10px 18px;font-size:14px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:8px}
+.btn{padding:9px 16px;font-size:13px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:7px}
 .btn:active{opacity:.82}
 .btn:disabled{opacity:.35;cursor:not-allowed}
 .btn-red{background:var(--red);color:var(--white)}
 .btn-black{background:var(--black);color:var(--white)}
 .btn-outline{background:var(--white);color:var(--black);border:1.5px solid var(--gray-border)}
 .btn-green{background:var(--green);color:var(--white)}
-.btn-sm{padding:6px 12px;font-size:12px}
+.btn-sm{padding:5px 11px;font-size:11.5px}
 
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.stat-box{background:var(--white);border:1px solid var(--gray-border);border-radius:var(--radius-sm);padding:16px}
-.stat-val{font-size:28px;font-weight:800}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-box{background:var(--white);border:1px solid var(--gray-border);border-top:3px solid var(--red);border-radius:var(--radius-sm);padding:14px 16px}
+.stat-val{font-size:26px;font-weight:700}
 .stat-val.red{color:var(--red)}
 .stat-val.green{color:var(--green)}
 .stat-val.amber{color:var(--amber)}
 .stat-val.blue{color:var(--blue)}
-.stat-lbl{font-size:12px;color:var(--gray-mid);margin-top:2px}
+.stat-lbl{font-size:11px;color:var(--gray-mid);margin-top:3px;text-transform:uppercase;letter-spacing:.03em}
 
-/* SELECTION TOOLBAR */
 .sel-toolbar{background:var(--black);color:var(--white);padding:10px 16px;border-radius:var(--radius-sm);margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
 .sel-toolbar.visible{display:flex}
-.sel-count{font-size:14px;font-weight:700;flex:1}
+.sel-count{font-size:13px;font-weight:700;flex:1}
 
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:10px 12px;font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--gray-border);background:var(--gray-light)}
-td{padding:10px 12px;border-bottom:1px solid var(--gray-light);vertical-align:middle}
+th{text-align:left;padding:9px 12px;font-size:10.5px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.05em;background:var(--black)}
+td{padding:9px 12px;border-bottom:1px solid var(--gray-light);vertical-align:middle}
 tr:hover td{background:#fafafa}
-tr.selected td{background:#f0f4ff}
-.plate{font-family:'Courier New',monospace;font-weight:700;font-size:14px;letter-spacing:.05em}
+tr.selected td{background:var(--red-light)}
+.plate{font-family:'Courier New',monospace;font-weight:700;font-size:13.5px;letter-spacing:.05em}
 
-.photo-thumb{width:48px;height:36px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--gray-border)}
+.photo-thumb{width:46px;height:34px;object-fit:cover;border-radius:2px;cursor:pointer;border:1px solid var(--gray-border)}
 .photo-thumb:hover{opacity:.8}
 .photos-cell{display:flex;gap:4px;flex-wrap:wrap}
 
-/* CHECKBOX */
 input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--red)}
 
 .filter-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.filter-select{padding:8px 12px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:inherit}
+.filter-select{padding:7px 11px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:inherit}
 
 .progress-bar{height:4px;background:var(--gray-light);border-radius:4px;overflow:hidden;margin-top:8px}
 .progress-fill{height:4px;background:var(--red);border-radius:4px;transition:width .3s}
 
-/* IA SECTION */
-.ia-prompt-box{background:#0f0f23;border-radius:var(--radius-sm);padding:16px;font-family:'Courier New',monospace;font-size:12px;color:#7dd3fc;white-space:pre-wrap;max-height:240px;overflow-y:auto;margin-bottom:12px;line-height:1.6;border:1px solid #1e3a5f}
 .result-input{width:100%;padding:10px 12px;font-size:13px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:'Courier New',monospace;min-height:100px;resize:vertical}
-.result-input:focus{outline:none;border-color:var(--blue)}
+.result-input:focus{outline:none;border-color:var(--red)}
 
 .section-label{font-size:11px;font-weight:700;color:var(--gray-mid);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;margin-top:16px}
 .section-label:first-child{margin-top:0}
 
-/* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
-.modal{background:var(--white);border-radius:var(--radius);padding:24px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto}
-.modal-title{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
-.modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:var(--gray-mid)}
-
-.tab-btn{flex:1;padding:9px;text-align:center;font-size:13px;font-weight:700;border:none;border-radius:var(--radius-sm);cursor:pointer;background:none;color:var(--gray-mid);font-family:inherit;transition:.15s}
-.tab-btn.active{background:var(--red);color:#fff}
-.tab-btn:hover:not(.active){background:var(--gray-light)}
-.view-section{display:none}
-.view-section.active{display:block}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:var(--white);padding:12px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:360px}
-.toast.show{opacity:1}
-
-.field-label{font-size:11px;font-weight:700;color:var(--gray-dark);display:block;margin-bottom:5px;text-transform:uppercase}
-.field-input{width:100%;padding:10px 12px;font-size:14px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;margin-bottom:12px}
-.field-input:focus{outline:none;border-color:var(--red)}
-
 .step-box{background:var(--gray-light);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px;font-size:13px;line-height:1.6;border-left:3px solid var(--gray-border)}
 .step-box.active{border-left-color:var(--red);background:var(--red-light)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:var(--white);border-radius:var(--radius);padding:24px;max-width:640px;width:100%;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase;letter-spacing:.03em}
+.modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:var(--gray-mid)}
+
+.field-label{font-size:11px;font-weight:700;color:var(--gray-dark);display:block;margin-bottom:5px;text-transform:uppercase}
+.field-input{width:100%;padding:9px 11px;font-size:14px;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;margin-bottom:12px}
+.field-input:focus{outline:none;border-color:var(--red)}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--black);color:var(--white);padding:12px 20px;border-radius:2px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:360px}
+.toast.show{opacity:1}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="topbar-logo">PARK<span>GUARD</span></div>
-  <span style="font-size:12px;color:#666">Admin</span>
-  <div class="topbar-right">
-    <a href="parkguard-stats.html" style="background:var(--blue);color:#fff;text-decoration:none;padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px">📈 Statistiques</a>
-    <a href="parkguard-config.html" style="background:#444;color:#fff;text-decoration:none;padding:7px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px">⚙️ Config</a>
-    <div id="online-badge" class="badge badge-gray">⏳ Connexion...</div>
-    <span style="font-size:12px;color:#666" id="last-refresh"></span>
-    <button class="btn btn-outline btn-sm" onclick="loadData()">🔄 Actualiser</button>
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Contrôle Parking — Administration</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="parkguard-stats.html" target="_blank" rel="noopener">📈 Statistiques</a>
+      <a class="btn-nav" href="parkguard-config.html" target="_blank" rel="noopener">⚙ Config</a>
+      <button class="btn-nav" onclick="loadData()">🔄 Actualiser</button>
+      <span class="online-badge" id="online-badge">⏳ Connexion...</span>
+    </nav>
   </div>
-</div>
+</header>
 
 <div class="container">
 
-  <!-- ONGLETS -->
-  <div style="display:flex;gap:4px;background:#fff;border-radius:var(--radius);padding:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px">
+  <div class="tabs-row">
     <button id="tab-dashboard" class="tab-btn active" onclick="switchView('dashboard')">📊 Tableau de bord</button>
-    <button id="tab-historique" class="tab-btn" onclick="switchView('historique')">🔍 Historique véhicules</button>
-    <button id="tab-comptages-hist" class="tab-btn" onclick="switchView('comptages-hist')">📋 Historique comptages</button>
+    <button id="tab-ia" class="tab-btn" onclick="switchView('ia')">🤖 En attente IA</button>
+    <button id="tab-historique" class="tab-btn" onclick="switchView('historique')">🔍 Historique</button>
+    <button id="tab-comptages-hist" class="tab-btn" onclick="switchView('comptages-hist')">📋 Passages parking</button>
   </div>
 
-  <!-- VUE DASHBOARD -->
+  <!-- ══════════════════════ TABLEAU DE BORD ══════════════════════ -->
   <div id="view-dashboard" class="view-section active">
 
-  <!-- STATS -->
-  <div class="stats-row">
-    <div class="stat-box">
-      <div class="stat-val red" id="s-inf">—</div>
-      <div class="stat-lbl">Infractions aujourd'hui</div>
-      <div id="s-inf-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-val red" id="s-inf">—</div>
+        <div class="stat-lbl">Infractions aujourd'hui</div>
+        <div id="s-inf-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val green" id="s-aut">—</div>
+        <div class="stat-lbl">Autorisés aujourd'hui</div>
+        <div id="s-aut-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val amber" id="s-ia">—</div>
+        <div class="stat-lbl">En attente IA</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val blue" id="s-total">—</div>
+        <div class="stat-lbl">Total aujourd'hui</div>
+        <div id="s-total-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
+      </div>
     </div>
-    <div class="stat-box">
-      <div class="stat-val green" id="s-aut">—</div>
-      <div class="stat-lbl">Autorisés aujourd'hui</div>
-      <div id="s-aut-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val amber" id="s-ia">—</div>
-      <div class="stat-lbl">En attente IA</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-val blue" id="s-total">—</div>
-      <div class="stat-lbl">Total aujourd'hui</div>
-      <div id="s-total-veille" style="font-size:11px;color:var(--gray-mid);margin-top:3px"></div>
-    </div>
-  </div>
 
-  <!-- COMPTAGES DLCC -->
-  <div id="comptages-section" style="display:none">
-    <div class="card" style="margin-bottom:16px">
+    <div class="card" id="comptages-section" style="display:none">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="card-title" style="margin:0">🔢 Derniers relevés de comptage</div>
+        <div class="card-title" style="margin:0">🔢 Derniers relevés de comptage (aujourd'hui)</div>
         <select id="comptage-site-filter" class="filter-select" onchange="renderComptages()" style="font-size:12px;padding:5px 10px">
           <option value="">Tous les sites guidage</option>
         </select>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead>
-          <tr style="background:var(--gray-light)">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Date / Heure</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Agent</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Zone</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Véhicules présents</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Info</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Taux</th>
-            <th style="padding:8px 12px"></th>
-          </tr>
-        </thead>
-        <tbody id="comptages-table-body">
-          <tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- TABLE VÉHICULES -->
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="card-title" style="margin:0">Véhicules</div>
-      <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 Export CSV</button>
-    </div>
-
-    <!-- FILTRES -->
-    <div class="filter-row">
-      <input type="text" class="filter-select" id="f-search" placeholder="🔍 Plaque ou N° dénonciation..." oninput="renderTable()" style="min-width:220px">
-      <select class="filter-select" id="f-statut" onchange="renderTable()">
-        <option value="">Tous les statuts</option>
-        <option value="infraction">Infractions</option>
-        <option value="autorise">Autorisés</option>
-      </select>
-      <select class="filter-select" id="f-site" onchange="renderTable()">
-        <option value="">Tous les sites</option>
-        <option value="Grange Canal">Grange Canal</option>
-        <option value="Clair Matin">Clair Matin</option>
-      </select>
-      <select class="filter-select" id="f-ia" onchange="renderTable()">
-        <option value="">Tous</option>
-        <option value="true">IA en attente</option>
-        <option value="false">IA traitée</option>
-      </select>
-      <input type="date" class="filter-select" id="f-date" onchange="renderTable()">
-      <span style="font-size:12px;color:var(--gray-mid)" id="filter-count"></span>
-    </div>
-
-    <!-- BARRE DE SÉLECTION -->
-    <div class="sel-toolbar" id="sel-toolbar">
-      <div class="sel-count" id="sel-count">0 sélectionné(s)</div>
-      <button class="btn btn-black btn-sm" onclick="openIAModal()">🤖 Analyser avec Claude</button>
-      <button class="btn btn-outline btn-sm" onclick="exportSelectedCSV()">📥 Exporter sélection</button>
-      <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="deleteSelected()">🗑️ Supprimer sélection</button>
-      <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕ Désélectionner</button>
-    </div>
-
-    <div style="overflow-x:auto">
       <table>
-        <thead>
-          <tr>
-            <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
-            <th>Date / Heure</th>
-            <th>Site</th>
-            <th>Statut</th>
-            <th>Plaque</th>
-            <th>Motif / Macaron</th>
-            <th>Photos</th>
-            <th>IA</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="table-body">
-          <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
+        <thead><tr><th>Date / Heure</th><th>Agent</th><th>Zone</th><th>Véhicules</th><th>Taux</th></tr></thead>
+        <tbody id="comptages-table-body">
+          <tr><td colspan="5" style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</td></tr>
         </tbody>
       </table>
     </div>
+
   </div>
 
-</div>
-
-<!-- MODAL PHOTO -->
-<div id="photo-modal" class="modal-overlay" style="display:none;background:rgba(0,0,0,0.92)" onclick="if(event.target===this||event.target.id==='photo-modal')this.style.display='none'">
-  <div style="position:relative;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;align-items:center;gap:10px">
-    <!-- Barre d'actions -->
-    <div style="display:flex;gap:10px;align-items:center;width:100%;justify-content:space-between">
-      <div id="photo-modal-label" style="color:#fff;font-size:13px;font-weight:600;opacity:.8"></div>
-      <div style="display:flex;gap:8px">
-        <a id="photo-modal-dl" href="" download target="_blank"
-           style="background:#fff;color:#1a1a1a;font-size:12px;font-weight:700;padding:7px 14px;border-radius:6px;text-decoration:none;display:flex;align-items:center;gap:5px">
-          ⬇ Télécharger originale
-        </a>
-        <button onclick="document.getElementById('photo-modal').style.display='none'"
-                style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px">✕ Fermer</button>
+  <!-- ══════════════════════ EN ATTENTE IA ══════════════════════ -->
+  <div id="view-ia" class="view-section">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="card-title" style="margin:0">🤖 Rapports en attente d'analyse IA</div>
       </div>
-    </div>
-    <!-- Photo pleine résolution -->
-    <img id="photo-modal-img" src="" alt="photo"
-         style="max-width:96vw;max-height:88vh;object-fit:contain;border-radius:8px;display:block;cursor:zoom-in"
-         onclick="this.style.maxWidth=this.style.maxWidth==='none'?'96vw':'none';this.style.cursor=this.style.cursor==='zoom-in'?'zoom-out':'zoom-in'">
-    <div style="color:rgba(255,255,255,.4);font-size:11px">Clic sur la photo pour zoomer · Clic en dehors pour fermer</div>
-  </div>
-</div>
+      <div style="font-size:12px;color:var(--gray-mid);margin-bottom:12px">Sélectionne un ou plusieurs rapports, télécharge le pack photos + message, fais analyser par Claude.ai, colle le résultat JSON pour l'appliquer.</div>
 
-<!-- MODAL EDIT -->
-<div id="edit-modal" class="modal-overlay" style="display:none">
-  <div class="modal">
-    <div class="modal-title">
-      Modifier le véhicule
-      <button class="modal-close" onclick="document.getElementById('edit-modal').style.display='none'">✕</button>
-    </div>
-    <div id="edit-modal-content"></div>
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button class="btn btn-green" onclick="saveEdit()">✅ Enregistrer</button>
-      <button class="btn btn-outline" onclick="document.getElementById('edit-modal').style.display='none'">Annuler</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL IA -->
-<div id="ia-modal" class="modal-overlay" style="display:none">
-  <div class="modal" style="max-width:760px">
-    <div class="modal-title">
-      🤖 Analyse IA — Claude.ai
-      <button class="modal-close" onclick="document.getElementById('ia-modal').style.display='none'">✕</button>
-    </div>
-
-    <!-- ÉTAPES -->
-    <div class="step-box active">
-      <strong>Étape 1</strong> — Clique "Télécharger le pack" — tu reçois un ZIP avec toutes les photos + le message prêt.
-    </div>
-    <div class="step-box">
-      <strong>Étape 2</strong> — Ouvre Claude.ai, extrait le ZIP, glisse toutes les photos + le fichier message.txt. Envoie.
-    </div>
-    <div class="step-box">
-      <strong>Étape 3</strong> — Copie le JSON retourné par Claude, colle-le ci-dessous, clique Appliquer.
-    </div>
-
-    <!-- UN SEUL BOUTON -->
-    <div style="margin:20px 0;text-align:center">
-      <button class="btn btn-black" id="btn-zip" onclick="downloadPack()" style="padding:14px 28px;font-size:15px">
-        📦 Télécharger le pack (photos + message)
-      </button>
-      <div id="zip-progress" style="display:none;margin-top:12px">
-        <div style="font-size:13px;color:var(--gray-mid)" id="zip-status">Préparation...</div>
-        <div class="progress-bar" style="margin-top:6px"><div class="progress-fill" id="zip-bar" style="width:0%"></div></div>
+      <div class="filter-row">
+        <input type="text" class="filter-select" id="ia-search" placeholder="🔍 Plaque ou N° dénonciation..." oninput="renderIA()" style="min-width:220px">
+        <select class="filter-select" id="ia-site" onchange="renderIA()">
+          <option value="">Tous les sites</option>
+        </select>
+        <input type="date" class="filter-select" id="ia-date-debut" onchange="renderIA()" title="Date début">
+        <input type="date" class="filter-select" id="ia-date-fin" onchange="renderIA()" title="Date fin">
+        <span style="font-size:12px;color:var(--gray-mid)" id="ia-count"></span>
       </div>
-      <div id="zip-done" style="display:none;margin-top:12px;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);line-height:1.7">
-        ✅ Pack téléchargé !<br>
-        Extrait le ZIP → glisse <strong>toutes les photos + message.txt</strong> dans Claude.ai → envoie.
+
+      <div class="sel-toolbar" id="sel-toolbar">
+        <div class="sel-count" id="sel-count">0 sélectionné(s)</div>
+        <button class="btn btn-black btn-sm" onclick="openIAModal()">🤖 Analyser avec Claude</button>
+        <button class="btn btn-outline btn-sm" onclick="exportSelectedCSV()">📥 Exporter sélection</button>
+        <button class="btn btn-sm" style="background:#dc2626;color:white" onclick="deleteSelected()">🗑️ Supprimer sélection</button>
+        <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕ Désélectionner</button>
       </div>
-      <div style="margin-top:10px">
-        <a href="https://claude.ai" target="_blank" class="btn btn-outline btn-sm">↗ Ouvrir Claude.ai</a>
+
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
+              <th>Date / Heure</th><th>Site</th><th>Statut</th><th>Plaque</th><th>Photos</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ia-table-body">
+            <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--gray-mid)">Chargement...</td></tr>
+          </tbody>
+        </table>
       </div>
-    </div>
-
-    <div class="section-label">Réponse JSON de Claude — colle-la ici</div>
-    <textarea class="result-input" id="claude-result" placeholder='Colle ici le JSON retourné par Claude.ai...'></textarea>
-
-    <div id="apply-progress" style="display:none;margin-top:8px">
-      <div style="font-size:13px;color:var(--gray-mid)" id="apply-status">Application...</div>
-      <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
-    </div>
-
-    <!-- PANNEAU CONTRÔLE QUALITÉ -->
-    <div id="quality-panel" style="display:none;margin-top:16px;border:1.5px solid var(--gray-border);border-radius:8px;overflow:hidden">
-      <div style="background:var(--gray-light);padding:8px 12px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#555;border-bottom:1px solid var(--gray-border)">
-        🔍 Contrôle qualité dénonciation
-      </div>
-      <div id="quality-panel-body" style="max-height:320px;overflow-y:auto;padding:0"></div>
-    </div>
-
-    <div style="display:flex;gap:10px;margin-top:12px">
-      <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
-      <button class="btn btn-outline" onclick="closeIAModal()">Fermer</button>
     </div>
   </div>
-</div>
-  </div><!-- fin view-dashboard -->
 
-  <!-- VUE HISTORIQUE VÉHICULES -->
+  <!-- ══════════════════════ HISTORIQUE ══════════════════════ -->
   <div id="view-historique" class="view-section">
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="card-title" style="margin:0">🔍 Historique des véhicules</div>
+        <div class="card-title" style="margin:0">🔍 Historique des rapports</div>
         <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 Export CSV</button>
       </div>
-      <!-- Filtres historique -->
-      <div class="filter-row" style="margin-bottom:12px">
+      <div class="filter-row">
         <input type="text" class="filter-select" id="h-search" placeholder="🔍 Plaque ou N° dénonciation..." oninput="renderHistorique()" style="min-width:220px">
         <select class="filter-select" id="h-statut" onchange="renderHistorique()">
           <option value="">Tous les statuts</option>
@@ -375,64 +248,135 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
         <input type="date" class="filter-select" id="h-date-fin" onchange="renderHistorique()" title="Date fin">
         <span style="font-size:12px;color:var(--gray-mid)" id="h-count"></span>
       </div>
-    <div style="overflow-x:auto">
-      <table>
-        <thead>
-          <tr>
-            <th>Date / Heure</th>
-            <th>Site</th>
-            <th>Statut</th>
-            <th>Plaque</th>
-            <th>Motif / Macaron</th>
-            <th>Photos</th>
-            <th>IA</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="historique-table-body">
-          <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Chargement...</td></tr>
-        </tbody>
-      </table>
-    </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Date / Heure</th><th>Site</th><th>Statut</th><th>Plaque</th><th>Motif / Macaron</th><th>Photos</th><th>IA</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="historique-table-body">
+            <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--gray-mid)">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- VUE HISTORIQUE COMPTAGES -->
+  <!-- ══════════════════════ PASSAGES PARKING (COMPTAGES) ══════════════════════ -->
   <div id="view-comptages-hist" class="view-section">
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div class="card-title" style="margin:0">📋 Historique des comptages</div>
-      </div>
-      <div class="filter-row" style="margin-bottom:12px">
-        <select class="filter-select" id="ch-site" onchange="renderComptagesHist()">
+      <div class="card-title" style="margin-bottom:12px">📋 Historique des passages sur les parkings</div>
+      <div class="filter-row">
+        <select class="filter-select" id="ch-site">
           <option value="">Tous les sites guidage</option>
         </select>
-        <select class="filter-select" id="ch-zone" onchange="renderComptagesHist()">
+        <select class="filter-select" id="ch-zone">
           <option value="">Toutes les zones</option>
           <option value="80">DLCC (80 pl)</option>
           <option value="35">CLX (35 pl)</option>
         </select>
-        <input type="date" class="filter-select" id="ch-date-debut" onchange="renderComptagesHist()" title="Date début">
-        <input type="date" class="filter-select" id="ch-date-fin" onchange="renderComptagesHist()" title="Date fin">
+        <input type="date" class="filter-select" id="ch-date-debut" title="Date début">
+        <input type="date" class="filter-select" id="ch-date-fin" title="Date fin">
         <span style="font-size:12px;color:var(--gray-mid)" id="ch-count"></span>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead>
-          <tr style="background:var(--gray-light)">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Date / Heure</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Agent</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Zone</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Véhicules</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--gray-mid);font-weight:700;text-transform:uppercase">Taux</th>
-            <th style="padding:8px 12px"></th>
-          </tr>
-        </thead>
+      <table>
+        <thead><tr><th>Date / Heure</th><th>Agent</th><th>Zone</th><th>Véhicules</th><th>Taux</th><th></th></tr></thead>
         <tbody id="comptages-hist-body">
-          <tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</td></tr>
         </tbody>
       </table>
     </div>
   </div>
+
+</div>
+
+<!-- MODAL PHOTO -->
+<div id="photo-modal" class="modal-overlay" style="display:none;background:rgba(0,0,0,0.92)" onclick="if(event.target===this||event.target.id==='photo-modal')this.style.display='none'">
+  <div style="position:relative;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;align-items:center;gap:10px">
+    <div style="display:flex;gap:10px;align-items:center;width:100%;justify-content:space-between">
+      <div id="photo-modal-label" style="color:#fff;font-size:13px;font-weight:600;opacity:.8"></div>
+      <div style="display:flex;gap:8px">
+        <a id="photo-modal-dl" href="" download target="_blank"
+           style="background:#fff;color:#1a1a1a;font-size:12px;font-weight:700;padding:7px 14px;border-radius:2px;text-decoration:none;display:flex;align-items:center;gap:5px">
+          ⬇ Télécharger originale
+        </a>
+        <button onclick="document.getElementById('photo-modal').style.display='none'"
+                style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:2px;padding:7px 12px;cursor:pointer;font-size:13px">✕ Fermer</button>
+      </div>
+    </div>
+    <img id="photo-modal-img" src="" alt="photo"
+         style="max-width:96vw;max-height:88vh;object-fit:contain;border-radius:2px;display:block;cursor:zoom-in"
+         onclick="this.style.maxWidth=this.style.maxWidth==='none'?'96vw':'none';this.style.cursor=this.style.cursor==='zoom-in'?'zoom-out':'zoom-in'">
+    <div style="color:rgba(255,255,255,.4);font-size:11px">Clic sur la photo pour zoomer · Clic en dehors pour fermer</div>
+  </div>
+</div>
+
+<!-- MODAL EDIT -->
+<div id="edit-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-title">
+      Modifier le rapport
+      <button class="modal-close" onclick="document.getElementById('edit-modal').style.display='none'">✕</button>
+    </div>
+    <div id="edit-modal-content"></div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-green" onclick="saveEdit()">✅ Enregistrer</button>
+      <button class="btn btn-outline" onclick="document.getElementById('edit-modal').style.display='none'">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IA -->
+<div id="ia-modal" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-title">
+      🤖 Analyse IA — Claude.ai
+      <button class="modal-close" onclick="closeIAModal()">✕</button>
+    </div>
+
+    <div class="step-box active"><strong>Étape 1</strong> — Clique "Télécharger le pack" — tu reçois un ZIP avec toutes les photos + le message prêt.</div>
+    <div class="step-box"><strong>Étape 2</strong> — Ouvre Claude.ai, extrait le ZIP, glisse toutes les photos + le fichier message.txt. Envoie.</div>
+    <div class="step-box"><strong>Étape 3</strong> — Copie le JSON retourné par Claude, colle-le ci-dessous, clique Appliquer.</div>
+
+    <div class="section-label">Photos du/des rapport(s) sélectionné(s)</div>
+    <div id="photos-download-list" style="margin-bottom:12px"></div>
+
+    <div style="margin:16px 0;text-align:center">
+      <button class="btn btn-black" id="btn-zip" onclick="downloadPack()" style="padding:12px 24px;font-size:14px">
+        📦 Télécharger le pack (photos + message)
+      </button>
+      <div id="zip-progress" style="display:none;margin-top:12px">
+        <div style="font-size:13px;color:var(--gray-mid)" id="zip-status">Préparation...</div>
+        <div class="progress-bar"><div class="progress-fill" id="zip-bar" style="width:0%"></div></div>
+      </div>
+      <div id="zip-done" style="display:none;margin-top:12px;background:var(--green-light);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--green);line-height:1.7">
+        ✅ Pack téléchargé !<br>Extrait le ZIP → glisse <strong>toutes les photos + message.txt</strong> dans Claude.ai → envoie.
+      </div>
+      <div style="margin-top:10px">
+        <a href="https://claude.ai" target="_blank" class="btn btn-outline btn-sm">↗ Ouvrir Claude.ai</a>
+      </div>
+    </div>
+
+    <div class="section-label">Réponse JSON de Claude — colle-la ici</div>
+    <textarea class="result-input" id="claude-result" placeholder="Colle ici le JSON retourné par Claude.ai..."></textarea>
+
+    <div id="apply-progress" style="display:none;margin-top:8px">
+      <div style="font-size:13px;color:var(--gray-mid)" id="apply-status">Application...</div>
+      <div class="progress-bar"><div class="progress-fill" id="apply-bar" style="width:0%"></div></div>
+    </div>
+
+    <div id="quality-panel" style="display:none;margin-top:16px;border:1.5px solid var(--gray-border);border-radius:2px;overflow:hidden">
+      <div style="background:var(--gray-light);padding:8px 12px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#555;border-bottom:1px solid var(--gray-border)">
+        🔍 Contrôle qualité dénonciation
+      </div>
+      <div id="quality-panel-body" style="max-height:320px;overflow-y:auto;padding:0"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-green" onclick="applyClaudeResult()">✅ Appliquer dans Supabase</button>
+      <button class="btn btn-outline" onclick="closeIAModal()">Fermer</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 
@@ -441,18 +385,15 @@ const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 var db;
 function initDB() {
-  if (typeof supabase !== 'undefined' && !db) {
-    db = supabase.createClient(SUPA_URL, SUPA_KEY);
-  }
+  if (typeof supabase !== 'undefined' && !db) db = supabase.createClient(SUPA_URL, SUPA_KEY);
   return !!db;
 }
-// Essayer immédiatement
 initDB();
 
-let allVehicles  = [];
+let allVehicles  = [];   // dataset unique : tous les rapports (remplace l'ancien double allVehicles/allVehiclesHist)
 let selectedIds  = new Set();
 let editingId    = null;
-let filteredData = [];
+let filteredData = [];   // dernier jeu filtré affiché dans l'onglet "En attente IA" (pour la sélection globale)
 
 // ═══ TOAST ═══
 function toast(msg, ms=3000) {
@@ -464,193 +405,49 @@ function toast(msg, ms=3000) {
 // ═══ LOAD ═══
 async function loadData() {
   try {
-    // Charger les véhicules du dernier passage par site
-    // 1. Trouver la date du dernier enregistrement par site
-    const { data: lastBySite } = await db
-      .from('vehicles')
-      .select('site, created_at')
-      .order('created_at', { ascending: false });
-
-    // Grouper par site — garder le plus récent
-    const latestBySite = {};
-    (lastBySite || []).forEach(function(v) {
-      if (!latestBySite[v.site]) latestBySite[v.site] = v.created_at;
-    });
-
-    // Pour chaque site, charger les véhicules du round_id le plus récent
-    // En pratique : charger tous les véhicules des dernières 24h par site
-    // puis filtrer par round_id du dernier passage
-    const { data, error } = await db
-      .from('vehicles').select('*')
+    const { data, error } = await db.from('vehicles').select('*')
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(1000);
     if (error) throw error;
+    allVehicles = data || [];
 
-    // Identifier le round_id le plus récent par site
-    const latestRoundBySite = {};
-    (data || []).forEach(function(v) {
-      if (!latestRoundBySite[v.site]) {
-        latestRoundBySite[v.site] = v.round_id || v.created_at.slice(0,10);
-      }
+    // Remplir les filtres "site" des différents onglets
+    const sites = [...new Set(allVehicles.map(v=>v.site).filter(Boolean))].sort();
+    ['ia-site','h-site'].forEach(id => {
+      const sel = document.getElementById(id);
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Tous les sites</option>' + sites.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+      sel.value = cur;
     });
 
-    // Garder : dernier round par site OU en attente IA (quelle que soit la date)
-    allVehicles = (data || []).filter(function(v) {
-      // Toujours inclure les véhicules en attente IA
-      if (v.ia_pending) return true;
-      // Sinon : uniquement le dernier round par site
-      var siteRound = latestRoundBySite[v.site];
-      if (v.round_id) return v.round_id === siteRound;
-      return v.created_at.slice(0,10) === siteRound;
-    });
     updateStats();
-    renderTable();
-    await loadComptages();
-    document.getElementById('online-badge').className = 'badge badge-green';
+    renderIA();
+    renderHistorique();
+    await loadComptagesToday();
     document.getElementById('online-badge').textContent = '● En ligne';
-    document.getElementById('last-refresh').textContent = 'Actualisé ' + new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
   } catch(e) {
-    document.getElementById('online-badge').className = 'badge badge-red';
     document.getElementById('online-badge').textContent = '● Erreur';
     toast('❌ ' + e.message);
   }
 }
 
-// ═══ COMPTAGES ═══
-let allComptages = [];
-let allSitesGuidage = [];
-
-async function loadComptages() {
-  try {
-    // Charger sites guidage
-    const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage').eq('actif',true);
-    allSitesGuidage = sites || [];
-
-    if (!allSitesGuidage.length) {
-      document.getElementById('comptages-section').style.display = 'none';
-      return;
-    }
-
-    // Afficher la section
-    document.getElementById('comptages-section').style.display = 'block';
-
-    // Remplir le filtre sites
-    const sel = document.getElementById('comptage-site-filter');
-    sel.innerHTML = '<option value="">Tous les sites guidage</option>' +
-      allSitesGuidage.map(s => '<option value="' + s.id + '">' + s.nom + '</option>').join('');
-
-    // Trouver la dernière journée enregistrée
-    const siteIds = allSitesGuidage.map(s => s.id);
-    const { data: lastComptage } = await db.from('comptages')
-      .select('created_at')
-      .in('site_id', siteIds)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    let comptages = [];
-    if (lastComptage && lastComptage.length) {
-      const lastDate = lastComptage[0].created_at.slice(0, 10); // YYYY-MM-DD
-      const dayStart = lastDate + 'T00:00:00.000Z';
-      const dayEnd   = lastDate + 'T23:59:59.999Z';
-      const { data: c } = await db.from('comptages')
-        .select('*,zones(nom,places_totales)')
-        .in('site_id', siteIds)
-        .gte('created_at', dayStart)
-        .lte('created_at', dayEnd)
-        .order('created_at', { ascending: false });
-      comptages = c || [];
-      // Afficher la date dans le titre
-      const dateLabel = new Date(lastDate).toLocaleDateString('fr-CH', {day:'2-digit',month:'2-digit',year:'numeric'});
-      const title = document.querySelector('#comptages-section .card-title');
-      if (title) title.textContent = '🔢 Relevés de comptage — Dernière journée : ' + dateLabel;
-    }
-
-    allComptages = comptages || [];
-    renderComptages();
-  } catch(e) {
-    console.warn('Erreur chargement comptages:', e);
-  }
-}
-
-function renderComptages() {
-  const tbody = document.getElementById('comptages-table-body');
-  const siteFilter = document.getElementById('comptage-site-filter').value;
-
-  const filtered = siteFilter
-    ? allComptages.filter(c => c.site_id === siteFilter)
-    : allComptages;
-
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun relevé de comptage</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(c => {
-    const dt = new Date(c.created_at);
-    const dateStr = pad(dt.getDate()) + '/' + pad(dt.getMonth()+1) + '/' + dt.getFullYear();
-    const heureStr = pad(dt.getHours()) + 'h' + pad(dt.getMinutes());
-    const taux = c.taux_occupation !== null ? parseFloat(c.taux_occupation) : null;
-    const tauxColor = taux === null ? '#888' : taux >= 90 ? 'var(--red)' : taux >= 70 ? 'var(--amber)' : 'var(--green)';
-    // Nom de zone : depuis la jointure, ou depuis places_totales si zone_id null
-    var zoneName = c.zones ? c.zones.nom : '—';
-    if (zoneName === '—' && c.places_totales) {
-      // Heuristique : 80 places = DLCC, 35 places = CLX
-      zoneName = c.places_totales === 80 ? 'DLCC' : c.places_totales === 35 ? 'CLX' : c.places_totales + ' pl';
-    }
-    return '<tr style="border-bottom:1px solid var(--gray-border)">' +
-      '<td style="padding:9px 12px;font-size:12px">' + dateStr + '<br><span style="color:var(--gray-mid)">' + heureStr + '</span></td>' +
-      '<td style="padding:9px 12px;font-size:12px">' + (c.agent_name || '—') + '</td>' +
-      '<td style="padding:9px 12px"><span style="font-weight:700">' + zoneName + '</span></td>' +
-      '<td style="padding:9px 12px;font-size:14px;font-weight:700">' + c.vehicules_presents +
-        '<span style="font-size:10px;color:var(--gray-mid);font-weight:400;margin-left:4px">/ ' + c.places_totales + '</span>' +
-      '</td>' +
-      '<td style="padding:9px 12px;font-size:12px;color:var(--gray-mid)">' +
-        // Pour DLCC (80 places) : indiquer les places libres aussi
-        (c.places_totales === 80 ? (c.places_totales - c.vehicules_presents) + ' libres' : c.places_totales + ' pl') +
-      '</td>' +
-      '<td style="padding:9px 12px">' +
-        (taux !== null
-          ? '<span style="font-weight:700;color:' + tauxColor + '">' + taux + '%</span>' +
-            '<div style="margin-top:4px;height:6px;background:#e0e0e0;border-radius:3px;width:80px;overflow:hidden">' +
-            '<div style="height:100%;background:' + tauxColor + ';border-radius:3px;width:' + Math.min(100,taux) + '%"></div></div>'
-          : '—') +
-      '</td>' +
-      '<td style="padding:6px 12px">' +
-        '<button onclick="deleteComptage(\'' + c.id + '\')" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑️</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-async function deleteComptage(id) {
-  if (!confirm('Supprimer ce relevé de comptage ?')) return;
-  const { error } = await db.from('comptages').delete().eq('id', id);
-  if (error) { toast('❌ ' + error.message); return; }
-  toast('✅ Relevé supprimé');
-  await loadComptages();
-}
-
 function pad(v) { return String(v).padStart(2,'0'); }
 
 function updateStats() {
-  // Fenêtre journée : 06h30 aujourd'hui → 06h29 demain
   var now = new Date();
   var jourDebut = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 30, 0);
-  if (now < jourDebut) jourDebut.setDate(jourDebut.getDate() - 1); // avant 6h30 = encore hier
+  if (now < jourDebut) jourDebut.setDate(jourDebut.getDate() - 1);
   var jourFin = new Date(jourDebut); jourFin.setDate(jourFin.getDate() + 1);
   var veilleDebut = new Date(jourDebut); veilleDebut.setDate(veilleDebut.getDate() - 1);
 
-  function inPeriod(v, from, to) {
-    var t = new Date(v.created_at);
-    return t >= from && t < to;
-  }
-  var today = allVehicles.filter(function(v){ return inPeriod(v, jourDebut, jourFin); });
+  function inPeriod(v, from, to) { var t = new Date(v.created_at); return t >= from && t < to; }
+  var today  = allVehicles.filter(function(v){ return inPeriod(v, jourDebut, jourFin); });
   var veille = allVehicles.filter(function(v){ return inPeriod(v, veilleDebut, jourDebut); });
 
-  var tInf   = today.filter(function(v){ return v.statut==='infraction'; }).length;
-  var tAut   = today.filter(function(v){ return v.statut==='autorise'; }).length;
-  var vInf   = veille.filter(function(v){ return v.statut==='infraction'; }).length;
-  var vAut   = veille.filter(function(v){ return v.statut==='autorise'; }).length;
+  var tInf = today.filter(function(v){ return v.statut==='infraction'; }).length;
+  var tAut = today.filter(function(v){ return v.statut==='autorise'; }).length;
+  var vInf = veille.filter(function(v){ return v.statut==='infraction'; }).length;
+  var vAut = veille.filter(function(v){ return v.statut==='autorise'; }).length;
 
   document.getElementById('s-inf').textContent   = tInf;
   document.getElementById('s-aut').textContent   = tAut;
@@ -669,105 +466,78 @@ function updateStats() {
   document.getElementById('s-total-veille').innerHTML = delta(today.length, veille.length);
 }
 
-// ═══ TABLE ═══
-function renderTable() {
-  const fStatut = document.getElementById('f-statut').value;
-  const fSite   = document.getElementById('f-site').value;
-  const fIa     = document.getElementById('f-ia').value;
-  const fDate   = document.getElementById('f-date').value;
+function makeThumb(url, title) {
+  return '<img class="photo-thumb" src="' + url + '" onclick="openPhoto(\'' + url + '\',\'' + title + '\')" title="' + title + ' — clic pour agrandir">';
+}
 
-  var fSearch = (document.getElementById('f-search').value || '').toLowerCase().trim();
-  filteredData = allVehicles.filter(v => {
-    if (fStatut && v.statut !== fStatut) return false;
-    if (fSite   && v.site   !== fSite)   return false;
-    if (fIa === 'true'  && !v.ia_pending)  return false;
-    if (fIa === 'false' &&  v.ia_pending)  return false;
-    if (fDate && !v.created_at.startsWith(fDate)) return false;
-    if (fSearch) {
-      var plate = (v.plaque || '').toLowerCase().replace(/[\s\-]/g,'');
-      var deno  = (v.num_denonciation || '').toLowerCase();
-      var searchClean = fSearch.replace(/[\s\-]/g,'');
-      if (!plate.includes(searchClean) && !deno.includes(fSearch)) return false;
+// ═══ ONGLET "EN ATTENTE IA" ═══
+function renderIA() {
+  var search  = (document.getElementById('ia-search').value||'').toLowerCase().trim();
+  var site    = document.getElementById('ia-site').value;
+  var dDebut  = document.getElementById('ia-date-debut').value;
+  var dFin    = document.getElementById('ia-date-fin').value;
+
+  filteredData = allVehicles.filter(function(v) {
+    if (!v.ia_pending) return false;
+    if (site   && v.site   !== site)   return false;
+    if (dDebut && v.created_at.slice(0,10) < dDebut) return false;
+    if (dFin   && v.created_at.slice(0,10) > dFin)   return false;
+    if (search) {
+      var plate = (v.plaque||'').toLowerCase().replace(/[\s\-]/g,'');
+      var deno  = (v.num_denonciation||'').toLowerCase();
+      var sc    = search.replace(/[\s\-]/g,'');
+      if (!plate.includes(sc) && !deno.includes(search)) return false;
     }
     return true;
   });
 
-  document.getElementById('filter-count').textContent = filteredData.length + ' résultat(s)';
-
-  const tbody = document.getElementById('table-body');
+  document.getElementById('ia-count').textContent = filteredData.length + ' résultat(s)';
+  var tbody = document.getElementById('ia-table-body');
   if (!filteredData.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun véhicule.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--gray-mid)">Aucun rapport en attente.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = filteredData.map(v => {
-    const isInf = v.statut === 'infraction';
-    const dt    = new Date(v.created_at);
-    const heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' +
-                  dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
-    const isSel = selectedIds.has(v.id);
+  tbody.innerHTML = filteredData.map(function(v) {
+    var isInf = v.statut === 'infraction';
+    var dt    = new Date(v.created_at);
+    var heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    var isSel = selectedIds.has(v.id);
 
-    const thumbs = [
+    var thumbs = [
       v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'Véhicule') : '',
       v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'Dénonciation') : '',
       v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
       v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
     ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">—</span>';
 
-    const plaque = v.plaque
-      ? '<span class="plate">' + v.plaque + '</span>'
-      : '<span style="color:var(--gray-mid);font-size:11px">— IA</span>';
-
-    const motif = isInf
-      ? (v.motif || '—') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N° ' + v.num_denonciation + '</span>' : '')
-      : (v.num_macaron ? '<span style="font-size:12px">🏷️ ' + v.num_macaron + '</span>' : '—');
-
-    const iaBadge = v.ia_pending
-      ? '<span class="badge badge-amber">⏳ Attente</span>'
-      : '<span class="badge badge-green">✅ OK</span>';
+    var plaque = v.plaque ? '<span class="plate">' + v.plaque + '</span>' : '<span style="color:var(--gray-mid);font-size:11px">— IA</span>';
+    var st = v.statut === 'parking_vide' || v.motif === 'PARKING_VIDE' ? 'parking_vide' : v.statut;
+    var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
+    var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
+    v._statut_display = st;
 
     return '<tr class="' + (isSel ? 'selected' : '') + '" id="row-' + v.id + '">' +
       '<td><input type="checkbox" ' + (isSel ? 'checked' : '') + ' onchange="toggleRow(\'' + v.id + '\',this.checked)"></td>' +
       '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
       '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
-      (function(){
-        var st = v.statut;
-        if (st !== 'infraction' && (st === 'parking_vide' || v.motif === 'PARKING_VIDE')) st = 'parking_vide';
-        var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
-        var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
-        v._statut_display = st; // pour openRapport
-        return '<td><span class="badge '+cls+'">'+lbl+'</span></td>';
-      })()+
+      '<td><span class="badge ' + cls + '">' + lbl + '</span></td>' +
       '<td>' + plaque + '</td>' +
-      '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
       '<td><div class="photos-cell">' + thumbs + '</div></td>' +
-      '<td>' + iaBadge + '</td>' +
       '<td style="white-space:nowrap">' +
-        (function(){
-          var st = v._statut_display || v.statut;
-          if (st==='infraction') return '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">📄 Rapport</button>';
-          if (st==='parking_vide') return '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">📄 Rapport</button>';
-          return '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">📄 Rapport</button>';
-        })()+
-        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️ Modifier</button>' +
-        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')">✏️ Modifier</button>' +
       '</td>' +
-      '</tr>';
+    '</tr>';
   }).join('');
 }
 
-function makeThumb(url, title) {
-  return '<img class="photo-thumb" src="' + url + '" onclick="openPhoto(\'' + url + '\',\'' + title + '\')" title="' + title + ' — clic pour agrandir">';
-}
-
-// ═══ SÉLECTION ═══
+// ═══ SÉLECTION (utilisée par l'onglet En attente IA) ═══
 function toggleRow(id, checked) {
   if (checked) selectedIds.add(id); else selectedIds.delete(id);
   const row = document.getElementById('row-' + id);
   if (row) row.className = checked ? 'selected' : '';
   updateSelToolbar();
 }
-
 function toggleAll(checked) {
   filteredData.forEach(v => {
     if (checked) selectedIds.add(v.id); else selectedIds.delete(v.id);
@@ -778,89 +548,61 @@ function toggleAll(checked) {
   });
   updateSelToolbar();
 }
-
 function clearSelection() {
   selectedIds.clear();
-  document.getElementById('check-all').checked = false;
-  renderTable();
+  const ca = document.getElementById('check-all'); if (ca) ca.checked = false;
+  renderIA();
   updateSelToolbar();
 }
-
 function updateSelToolbar() {
   const toolbar = document.getElementById('sel-toolbar');
   const count   = document.getElementById('sel-count');
-  if (selectedIds.size > 0) {
-    toolbar.classList.add('visible');
-    count.textContent = selectedIds.size + ' sélectionné(s)';
-  } else {
-    toolbar.classList.remove('visible');
-  }
+  if (selectedIds.size > 0) { toolbar.classList.add('visible'); count.textContent = selectedIds.size + ' sélectionné(s)'; }
+  else toolbar.classList.remove('visible');
 }
 
 // ═══ SUPPRESSION ═══
 async function deleteSingle(id) {
-  if (!confirm('Supprimer ce véhicule ?')) return;
+  if (!confirm('Supprimer ce rapport ?')) return;
   try {
     const { error } = await db.from('vehicles').delete().eq('id', id);
     if (error) throw error;
-    toast('🗑️ Véhicule supprimé');
+    toast('🗑️ Rapport supprimé');
     selectedIds.delete(id);
     await loadData();
   } catch(e) { toast('❌ ' + e.message); }
 }
-
 async function deleteSelected() {
   const ids = Array.from(selectedIds);
   if (!ids.length) return;
-  if (!confirm('Supprimer ' + ids.length + ' véhicule(s) ? Cette action est irréversible.')) return;
+  if (!confirm('Supprimer ' + ids.length + ' rapport(s) ? Cette action est irréversible.')) return;
   try {
     const { error } = await db.from('vehicles').delete().in('id', ids);
     if (error) throw error;
-    toast('🗑️ ' + ids.length + ' véhicule(s) supprimé(s)');
+    toast('🗑️ ' + ids.length + ' rapport(s) supprimé(s)');
     selectedIds.clear();
     await loadData();
     updateSelToolbar();
   } catch(e) { toast('❌ ' + e.message); }
 }
 
-// ═══ RAPPORT PDF ═══
+// ═══ RAPPORT PDF (pages externes) ═══
 function openRapport(id, type) {
-  const v = allVehicles.find(x => x.id === id) || allVehiclesHist.find(x => x.id === id);
+  const v = allVehicles.find(x => x.id === id);
   if (!v) return;
-  // sessionStorage est partagé entre onglets du même domaine (fichier local)
   sessionStorage.setItem('rdz_rapport_data', JSON.stringify(v));
-  // Construire URL avec paramètres essentiels en fallback
   const params = new URLSearchParams({
-    id: v.id || '',
-    site: v.site || '',
-    agent_name: v.agent_name || '',
-    agent: v.agent_name || '',
-    plaque: v.plaque || '',
-    motif: v.motif || '',
-    remarque: v.remarque || '',
-    num_denonciation: v.num_denonciation || '',
-    created_at: v.created_at || '',
-    photo_vehicule_url: v.photo_vehicule_url || '',
-    photo_denonciation_url: v.photo_denonciation_url || '',
-    photo_parebrise_url: v.photo_parebrise_url || '',
-    photo_macaron_url: v.photo_macaron_url || '',
+    id: v.id || '', site: v.site || '', agent_name: v.agent_name || '', agent: v.agent_name || '',
+    plaque: v.plaque || '', motif: v.motif || '', remarque: v.remarque || '',
+    num_denonciation: v.num_denonciation || '', created_at: v.created_at || '',
+    photo_vehicule_url: v.photo_vehicule_url || '', photo_denonciation_url: v.photo_denonciation_url || '',
+    photo_parebrise_url: v.photo_parebrise_url || '', photo_macaron_url: v.photo_macaron_url || '',
     num_macaron: v.num_macaron || ''
   });
-  // Utiliser le statut affiché (corrigé) plutôt que le statut brut Supabase
   const effectiveType = type || v._statut_display || v.statut;
-  const targets = {
-    'infraction':   'parkguard-rapport-denonciation.html',
-    'autorise':     'parkguard-rapport-autorise.html',
-    'parking_vide': 'parkguard-rapport-vide.html'
-  };
+  const targets = { 'infraction':'parkguard-rapport-denonciation.html', 'autorise':'parkguard-rapport-autorise.html', 'parking_vide':'parkguard-rapport-vide.html' };
   const target = targets[effectiveType] || 'parkguard-rapport-denonciation.html';
   window.open(target + '?' + params.toString(), '_blank');
-}
-
-function closeIAModal() {
-  document.getElementById('ia-modal').style.display = 'none';
-  document.getElementById('quality-panel').style.display = 'none';
-  document.getElementById('quality-panel-body').innerHTML = '';
 }
 
 // ═══ PHOTOS ═══
@@ -868,11 +610,8 @@ function openPhoto(url, label) {
   const img = document.getElementById('photo-modal-img');
   const dl  = document.getElementById('photo-modal-dl');
   const lbl = document.getElementById('photo-modal-label');
-  img.src = url;
-  img.style.maxWidth = '96vw'; // reset zoom
-  img.style.cursor   = 'zoom-in';
-  dl.href = url;
-  dl.download = label ? label.replace(/\s/g,'_') + '.jpg' : 'photo.jpg';
+  img.src = url; img.style.maxWidth = '96vw'; img.style.cursor = 'zoom-in';
+  dl.href = url; dl.download = label ? label.replace(/\s/g,'_') + '.jpg' : 'photo.jpg';
   if (lbl) lbl.textContent = label || '';
   document.getElementById('photo-modal').style.display = 'flex';
 }
@@ -880,7 +619,7 @@ function openPhoto(url, label) {
 // ═══ EDIT ═══
 function openEdit(id) {
   editingId = id;
-  const v = allVehicles.find(x => x.id === id) || allVehiclesHist.find(x => x.id === id);
+  const v = allVehicles.find(x => x.id === id);
   if (!v) return;
   document.getElementById('edit-modal-content').innerHTML =
     fld('Plaque', 'e-plaque', v.plaque || '') +
@@ -890,8 +629,7 @@ function openEdit(id) {
   document.getElementById('edit-modal').style.display = 'flex';
 }
 function fld(label, id, val) {
-  return '<label class="field-label">' + label + '</label>' +
-    '<input class="field-input" id="' + id + '" value="' + val + '">';
+  return '<label class="field-label">' + label + '</label><input class="field-input" id="' + id + '" value="' + val + '">';
 }
 async function saveEdit() {
   try {
@@ -912,7 +650,7 @@ async function saveEdit() {
 // ═══ IA MODAL ═══
 async function openIAModal() {
   const ids = Array.from(selectedIds);
-  if (!ids.length) { toast('Sélectionnez au moins un véhicule'); return; }
+  if (!ids.length) { toast('Sélectionnez au moins un rapport'); return; }
   window._iaIds = ids;
   document.getElementById('ia-modal').style.display = 'flex';
   document.getElementById('claude-result').value = '';
@@ -924,21 +662,62 @@ async function openIAModal() {
   const btn = document.getElementById('btn-zip');
   btn.disabled = false;
   btn.textContent = '📦 Télécharger le pack (photos + message)';
-  // Afficher les photos des véhicules sélectionnés
-  const vehiclesSel = allVehicles.filter(v => ids.includes(v.id));
-  renderIAModal(vehiclesSel);
+  renderIAModal(allVehicles.filter(v => ids.includes(v.id)));
+}
+function closeIAModal() {
+  document.getElementById('ia-modal').style.display = 'none';
+  document.getElementById('quality-panel').style.display = 'none';
+  document.getElementById('quality-panel-body').innerHTML = '';
+}
+
+function renderIAModal(vehicles) {
+  const photoFields = [
+    { col:'photo_vehicule_url',     label:'Véhicule' },
+    { col:'photo_denonciation_url', label:'Dénonciation' },
+    { col:'photo_parebrise_url',    label:'Pare-brise' },
+    { col:'photo_macaron_url',      label:'Macaron' }
+  ];
+  let photosHtml = '';
+  vehicles.forEach((v, i) => {
+    const isInf = v.statut === 'infraction';
+    const dt = new Date(v.created_at).toLocaleString('fr-CH');
+    const hasSomePhoto = photoFields.some(pf => v[pf.col]);
+    if (!hasSomePhoto) return;
+    photosHtml += '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">';
+    photosHtml += '<div style="font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">';
+    photosHtml += '<span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'INF' : 'AUT') + '</span>';
+    photosHtml += 'Rapport ' + (i+1) + ' · ' + v.site + ' · ' + dt + '</div>';
+    photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    photoFields.forEach((pf) => {
+      const url = v[pf.col];
+      if (!url) return;
+      const filename = 'V' + (i+1) + '_' + pf.label.replace(/\s/g,'') + '.jpg';
+      photosHtml += '<div style="text-align:center">';
+      photosHtml += '<img src="' + url + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-border);display:block;cursor:pointer" onclick="openPhoto(\'' + url + '\',\'' + pf.label + '\')">';
+      photosHtml += '<a href="' + url + '" download="' + filename + '" target="_blank" style="font-size:10px;color:var(--blue);display:block;margin-top:3px;text-decoration:none">⬇ ' + pf.label + '</a></div>';
+    });
+    photosHtml += '</div></div>';
+  });
+  document.getElementById('photos-download-list').innerHTML = photosHtml || '<div style="color:var(--gray-mid);font-size:13px;padding:8px">Aucune photo disponible pour cette sélection.</div>';
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
 }
 
 async function downloadPack() {
   const ids      = window._iaIds || [];
   const vehicles = allVehicles.filter(v => ids.includes(v.id));
-  if (!vehicles.length) { toast('Aucun véhicule'); return; }
+  if (!vehicles.length) { toast('Aucun rapport'); return; }
 
   const btn = document.getElementById('btn-zip');
   btn.disabled = true;
   document.getElementById('zip-progress').style.display = 'block';
   document.getElementById('zip-done').style.display = 'none';
-
   const statusEl = document.getElementById('zip-status');
   const barEl    = document.getElementById('zip-bar');
 
@@ -954,7 +733,6 @@ async function downloadPack() {
     { col:'photo_parebrise_url',    label:'Parebrise' },
     { col:'photo_macaron_url',      label:'Macaron' }
   ];
-
   let totalPhotos = 0;
   vehicles.forEach(v => photoFields.forEach(pf => { if (v[pf.col]) totalPhotos++; }));
 
@@ -967,18 +745,14 @@ async function downloadPack() {
       statusEl.textContent = 'Photo ' + (done+1) + ' / ' + totalPhotos + '...';
       try {
         const resp = await fetch(url);
-        if (resp.ok) {
-          zip.file('V' + (i+1) + '_' + pf.label + '.jpg', await resp.blob());
-        }
+        if (resp.ok) zip.file('V' + (i+1) + '_' + pf.label + '.jpg', await resp.blob());
       } catch(e) { console.warn('Photo non récupérable:', url); }
       done++;
       barEl.style.width = Math.round((done / totalPhotos) * 90) + '%';
     }
   }
 
-  // Message texte
   zip.file('MESSAGE_POUR_CLAUDE.txt', buildPromptLines(vehicles).join('\n'));
-
   statusEl.textContent = 'Création du ZIP...';
   barEl.style.width = '95%';
   const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE' });
@@ -1002,9 +776,7 @@ function buildPromptLines(vehicles) {
     'Analyse chaque photo jointe et extrais les informations demandées avec précision.',
     '',
     'RÉPONDS UNIQUEMENT avec ce JSON strict, sans texte avant ou après, sans commentaire :',
-    '{',
-    '  "resultats": [',
-    '    {',
+    '{', '  "resultats": [', '    {',
     '      "id": "uuid-exact-du-vehicule",',
     '      "plaque": "VS488278/CH",',
     '      "num_denonciation": "D800 1757862",',
@@ -1015,9 +787,9 @@ function buildPromptLines(vehicles) {
     '      "confiance_plaque": "haute",',
     '      "denonciation_check": {',
     '        "denonciateur":    { "ok": true,  "valeur_lue": "RDZ Security Management SA, Quai du Seujet 22 1201 Genève", "probleme": null },',
-    '        "date":            { "ok": false, "valeur_lue": "19/06/26", "probleme": "Année sur 2 chiffres — doit être JJ/MM/AAAA" },',
-    '        "heure":           { "ok": false, "valeur_lue": "09:30",   "probleme": "Format interdit — doit être 09h30 (avec H)" },',
-    '        "plaque_deno":     { "ok": false, "valeur_lue": "VS 488278", "probleme": "Manque le code pays — doit être VS488278/CH" },',
+    '        "date":            { "ok": false, "valeur_lue": "19/06/26",   "probleme": "Année sur 2 chiffres — doit être JJ/MM/AAAA" },',
+    '        "heure":           { "ok": false, "valeur_lue": "09:30",      "probleme": "Format interdit — doit être 09h30 (avec H)" },',
+    '        "plaque_deno":     { "ok": false, "valeur_lue": "VS 488278",  "probleme": "Manque le code pays — doit être VS488278/CH" },',
     '        "lieu":            { "ok": false, "valeur_lue": "Chemin du Bournoud 21-23", "probleme": "Plusieurs numéros — garder un seul ex: 23" },',
     '        "commune":         { "ok": true,  "valeur_lue": "1219 Le Lignon", "probleme": null },',
     '        "marque_type":     { "ok": false, "valeur_lue": null, "probleme": "Marque ou type véhicule manquant (AUT/VU/...)" },',
@@ -1025,75 +797,55 @@ function buildPromptLines(vehicles) {
     '        "matricule_agent": { "ok": false, "valeur_lue": null, "probleme": "Matricule agent absent" },',
     '        "signature":       { "ok": false, "valeur_lue": null, "probleme": "Signature absente" },',
     '        "encre_noire":     { "ok": true,  "valeur_lue": null, "probleme": null }',
-    '      }',
-    '    }',
-    '  ]',
-    '}',
-    '',
+    '      }', '    }', '  ]', '}', '',
     '══════════════════════════════════════════',
     'RÈGLES PRÉCISES PAR CHAMP :',
-    '══════════════════════════════════════════',
-    '',
+    '══════════════════════════════════════════', '',
     '--- PLAQUE (photo Véhicule) ---',
     '- Format requis : lettres+chiffres SANS espace SANS tiret + /code_pays',
     '- Exemples valides : VS488278/CH  GE123456/CH  AB123CD/F  W-AB1234/D',
     '- Code pays obligatoire : /CH /F /D /I /E /A /GB etc.',
-    '- Si illisible : null',
-    '',
-    '--- DÉNONCIATION (photo Denonciation) — vérifier chaque point : ---',
-    '',
+    '- Si illisible : null', '',
+    '--- DÉNONCIATION (photo Denonciation) — vérifier chaque point : ---', '',
     'denonciateur :',
     '  Valeur attendue EXACTE : "RDZ Security Management SA, Quai du Seujet 22 1201 Genève"',
-    '  → ok=false si manquant, incomplet ou différent',
-    '',
+    '  → ok=false si manquant, incomplet ou différent', '',
     'date :',
     '  Format requis : JJ/MM/AAAA (année sur 4 chiffres)',
-    '  → ok=false si JJ/MM/AA (2 chiffres) ou autre format',
-    '',
+    '  → ok=false si JJ/MM/AA (2 chiffres) ou autre format', '',
     'heure :',
     '  Format requis : HHhMM ex: 06h12 ou 9h30 (lettre H obligatoire)',
-    '  → ok=false si format HH:MM avec deux-points',
-    '',
+    '  → ok=false si format HH:MM avec deux-points', '',
     'plaque_deno :',
     '  La plaque sur le formulaire doit se terminer par /code_pays ex: VS488278/CH',
-    '  → ok=false si pas de code pays',
-    '',
+    '  → ok=false si pas de code pays', '',
     'lieu :',
     '  Le numéro de rue doit être UN SEUL numéro (ex: 23)',
-    '  → ok=false si numéro multiple ex: 21-23 ou 21/23',
-    '',
+    '  → ok=false si numéro multiple ex: 21-23 ou 21/23', '',
     'commune :',
     '  Doit contenir le nom ET le code postal ex: 1219 Le Lignon',
-    '  → ok=false si manque le code postal ou le nom',
-    '',
+    '  → ok=false si manque le code postal ou le nom', '',
     'marque_type :',
     '  Doit contenir la marque du véhicule ET son type (AUT=automobile, VU=véhicule utilitaire, MOTO, etc.)',
-    '  → ok=false si vide ou incomplet',
-    '',
+    '  → ok=false si vide ou incomplet', '',
     'code_infraction :',
     '  Code infraction coché/écrit ex: B31A, B37A',
-    '  → ok=false si absent',
-    '',
+    '  → ok=false si absent', '',
     'matricule_agent :',
     '  Numéro/code de matricule de l\'agent RDZ',
-    '  → ok=false si absent',
-    '',
+    '  → ok=false si absent', '',
     'signature :',
     '  Signature manuscrite de l\'agent présente',
-    '  → ok=false si absente',
-    '',
+    '  → ok=false si absente', '',
     'encre_noire :',
     '  Les annotations MANUSCRITES (pas les libellés imprimés) doivent être en encre BLEUE',
     '  → ok=false si écriture manuscrite semble noire ou très foncée',
-    '  → ok=true si écriture bleue (normal)',
-    '',
+    '  → ok=true si écriture bleue (normal)', '',
     '- Pour chaque point : renseigner valeur_lue (ce que tu vois) et probleme (explication courte si ok=false, sinon null)',
     '- Si pas de photo dénonciation : mettre null pour denonciation_check',
     '- Ne jamais inventer — null si illisible',
-    '- Conserver les IDs exacts ci-dessous',
-    '',
-    'VÉHICULES À ANALYSER (' + vehicles.length + ') :',
-    ''
+    '- Conserver les IDs exacts ci-dessous', '',
+    'VÉHICULES À ANALYSER (' + vehicles.length + ') :', ''
   ];
   vehicles.forEach((v, i) => {
     const isInf = v.statut === 'infraction';
@@ -1112,286 +864,35 @@ function buildPromptLines(vehicles) {
   return lines;
 }
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-function renderIAModal(vehicles) {
-
-  // Construire la liste des photos à télécharger
-  const photoFields = [
-    { col:'photo_vehicule_url',     label:'Véhicule' },
-    { col:'photo_denonciation_url', label:'Dénonciation' },
-    { col:'photo_parebrise_url',    label:'Pare-brise' },
-    { col:'photo_macaron_url',      label:'Macaron' }
-  ];
-
-  let photosHtml = '';
-  let totalPhotos = 0;
-  const allPhotoUrls = []; // pour le prompt
-
-  vehicles.forEach((v, i) => {
-    const isInf = v.statut === 'infraction';
-    const dt = new Date(v.created_at).toLocaleString('fr-CH');
-    const hasSomePhoto = photoFields.some(pf => v[pf.col]);
-    if (!hasSomePhoto) return;
-
-    photosHtml += '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px">';
-    photosHtml += '<div style="font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px">';
-    photosHtml += '<span class="badge ' + (isInf ? 'badge-red' : 'badge-green') + '">' + (isInf ? 'INF' : 'AUT') + '</span>';
-    photosHtml += 'Véhicule ' + (i+1) + ' · ' + v.site + ' · ' + dt;
-    photosHtml += '</div>';
-    photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-
-    photoFields.forEach((pf, pi) => {
-      const url = v[pf.col];
-      if (!url) return;
-      const filename = 'V' + (i+1) + '_' + pf.label.replace(/\s/g,'') + '.jpg';
-      totalPhotos++;
-      allPhotoUrls.push({ vehicleNum: i+1, vehicleId: v.id, label: pf.label, url, filename });
-      photosHtml += '<div style="text-align:center">';
-      photosHtml += '<img src="' + url + '" style="width:80px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--gray-border);display:block;cursor:pointer" onclick="openPhoto(\'' + url + '\',\'' + pf.label + '\')">';
-      photosHtml += '<a href="' + url + '" download="' + filename + '" target="_blank" style="font-size:10px;color:var(--blue);display:block;margin-top:3px;text-decoration:none">⬇ ' + pf.label + '</a>';
-      photosHtml += '</div>';
-    });
-
-    photosHtml += '</div></div>';
-  });
-
-  if (!photosHtml) {
-    photosHtml = '<div style="color:var(--gray-mid);font-size:13px;padding:8px">Aucune photo disponible pour ces véhicules.</div>';
-  }
-
-  document.getElementById('photos-download-list').innerHTML = photosHtml;
-}
-
-
-// ═══ VUES ═══
-let currentView = 'dashboard';
-let allVehiclesHist = []; // tous les véhicules pour l'historique
-let allComptagesHist = []; // tous les comptages pour l'historique
-let histPage = 0;
-const HIST_PAGE_SIZE = 50;
-
-function switchView(view) {
-  currentView = view;
-  ['dashboard','historique','comptages-hist'].forEach(function(v) {
-    document.getElementById('view-'+v).classList.toggle('active', v===view);
-    document.getElementById('tab-'+v).classList.toggle('active', v===view);
-  });
-  if (view === 'historique' && !allVehiclesHist.length) loadHistorique();
-  if (view === 'comptages-hist' && !allComptagesHist.length) loadComptagesHist();
-}
-
-// ═══ HISTORIQUE VÉHICULES ═══
-async function loadHistorique() {
-  const tbody = document.getElementById('historique-table-body');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>';
-  try {
-    const { data } = await db.from('vehicles').select('*')
-      .order('created_at', { ascending: false })
-      .limit(1000);
-    allVehiclesHist = data || [];
-    // Remplir filtre sites
-    const sites = [...new Set(allVehiclesHist.map(v=>v.site).filter(Boolean))].sort();
-    const sel = document.getElementById('h-site');
-    sel.innerHTML = '<option value="">Tous les sites</option>' +
-      sites.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
-    renderHistorique();
-  } catch(e) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--red);padding:24px">Erreur: '+e.message+'</td></tr>'; }
-}
-
-function renderHistorique() {
-  var search = (document.getElementById('h-search').value||'').toLowerCase().trim();
-  var statut = document.getElementById('h-statut').value;
-  var site   = document.getElementById('h-site').value;
-  var ia     = document.getElementById('h-ia').value;
-  var dDebut = document.getElementById('h-date-debut').value;
-  var dFin   = document.getElementById('h-date-fin').value;
-
-  var filtered = allVehiclesHist.filter(function(v) {
-    if (statut && v.statut !== statut) return false;
-    if (site   && v.site   !== site)   return false;
-    if (ia === 'true'  && !v.ia_pending) return false;
-    if (ia === 'false' &&  v.ia_pending) return false;
-    if (dDebut && v.created_at.slice(0,10) < dDebut) return false;
-    if (dFin   && v.created_at.slice(0,10) > dFin)   return false;
-    if (search) {
-      var plate = (v.plaque||'').toLowerCase().replace(/[\s\-]/g,'');
-      var deno  = (v.num_denonciation||'').toLowerCase();
-      var sc    = search.replace(/[\s\-]/g,'');
-      if (!plate.includes(sc) && !deno.includes(search)) return false;
-    }
-    return true;
-  });
-
-  document.getElementById('h-count').textContent = filtered.length + ' r\u00e9sultat(s)';
-  var tbody = document.getElementById('historique-table-body');
-
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-mid)">Aucun v\u00e9hicule.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = filtered.slice(0, 300).map(function(v) {
-    var isInf = v.statut === 'infraction';
-    var dt    = new Date(v.created_at);
-    var heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' +
-                dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
-
-    var thumbs = [
-      v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'V\u00e9hicule') : '',
-      v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'D\u00e9nonciation') : '',
-      v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
-      v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
-    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">\u2014</span>';
-
-    var plaque = v.plaque
-      ? '<span class="plate">' + v.plaque + '</span>'
-      : '<span style="color:var(--gray-mid);font-size:11px">\u2014 IA</span>';
-
-    var motif = isInf
-      ? (v.motif || '\u2014') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N\u00b0 ' + v.num_denonciation + '</span>' : '')
-      : (v.num_macaron ? '<span style="font-size:12px">\uD83C\uDFF7\uFE0F ' + v.num_macaron + '</span>' : '\u2014');
-
-    var iaBadge = v.ia_pending
-      ? '<span class="badge badge-amber">\u23F3 Attente</span>'
-      : '<span class="badge badge-green">\u2705 OK</span>';
-
-    var st = v.statut;
-    if (st !== 'infraction' && (st === 'parking_vide' || v.motif === 'PARKING_VIDE')) st = 'parking_vide';
-    var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
-    var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'\uD83C\uDD7F\uFE0F Vide':'Autoris\u00e9';
-    v._statut_display = st;
-
-    var rapportBtn = st==='infraction'
-      ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">\uD83D\uDCC4 Rapport</button>'
-      : st==='parking_vide'
-        ? '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">\uD83D\uDCC4 Rapport</button>'
-        : '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">\uD83D\uDCC4 Rapport</button>';
-
-    return '<tr id="row-' + v.id + '">' +
-      '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
-      '<td style="font-size:13px">' + (v.site||'\u2014') + '</td>' +
-      '<td><span class="badge ' + cls + '">' + lbl + '</span></td>' +
-      '<td>' + plaque + '</td>' +
-      '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
-      '<td><div class="photos-cell">' + thumbs + '</div></td>' +
-      '<td>' + iaBadge + '</td>' +
-      '<td style="white-space:nowrap">' +
-        rapportBtn +
-        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">\u270F\uFE0F Modifier</button>' +
-        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">\uD83D\uDDD1\uFE0F</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-
-// ═══ HISTORIQUE COMPTAGES ═══
-async function loadComptagesHist() {
-  const tbody = document.getElementById('comptages-hist-body');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Chargement...</td></tr>';
-  try {
-    const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage');
-    const siteIds = (sites||[]).map(s=>s.id);
-    // Remplir filtre sites
-    const sel = document.getElementById('ch-site');
-    sel.innerHTML = '<option value="">Tous les sites guidage</option>' +
-      (sites||[]).map(s=>'<option value="'+s.id+'">'+s.nom+'</option>').join('');
-    if (!siteIds.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px">Aucun site guidage</td></tr>'; return; }
-    const { data } = await db.from('comptages')
-      .select('*,zones(nom,places_totales)')
-      .in('site_id', siteIds)
-      .order('created_at', { ascending: false })
-      .limit(500);
-    allComptagesHist = data || [];
-    renderComptagesHist();
-  } catch(e) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:24px">Erreur: '+e.message+'</td></tr>'; }
-}
-
-function renderComptagesHist() {
-  const site    = document.getElementById('ch-site').value;
-  const zone    = document.getElementById('ch-zone').value;
-  const dDebut  = document.getElementById('ch-date-debut').value;
-  const dFin    = document.getElementById('ch-date-fin').value;
-
-  let filtered = allComptagesHist.filter(function(c) {
-    if (site  && c.site_id !== site) return false;
-    if (zone  && String(c.places_totales) !== zone) return false;
-    if (dDebut && c.created_at.slice(0,10) < dDebut) return false;
-    if (dFin   && c.created_at.slice(0,10) > dFin)   return false;
-    return true;
-  });
-
-  document.getElementById('ch-count').textContent = filtered.length + ' relevé(s)';
-  const tbody = document.getElementById('comptages-hist-body');
-  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:24px">Aucun résultat</td></tr>'; return; }
-
-  tbody.innerHTML = filtered.map(function(c) {
-    var dt = new Date(c.created_at);
-    var dateStr = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+'/'+dt.getFullYear();
-    var heureStr = pad(dt.getHours())+'h'+pad(dt.getMinutes());
-    var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
-    var taux = c.taux_occupation !== null ? parseFloat(c.taux_occupation) : null;
-    var tauxColor = taux===null?'#888':taux>=90?'var(--red)':taux>=70?'var(--amber)':'var(--green)';
-    return '<tr style="border-bottom:1px solid var(--gray-border)">' +
-      '<td style="padding:8px 12px;font-size:12px">'+dateStr+'<br><span style="color:var(--gray-mid)">'+heureStr+'</span></td>' +
-      '<td style="padding:8px 12px;font-size:12px">'+(c.agent_name||'—')+'</td>' +
-      '<td style="padding:8px 12px;font-weight:700">'+zoneName+'</td>' +
-      '<td style="padding:8px 12px;font-size:14px;font-weight:700">'+c.vehicules_presents+' / '+c.places_totales+'</td>' +
-      '<td style="padding:8px 12px">' +
-        (taux!==null?'<span style="font-weight:700;color:'+tauxColor+'">'+taux+'%</span>' +
-        '<div style="margin-top:4px;height:6px;background:#e0e0e0;border-radius:3px;width:80px;overflow:hidden">' +
-        '<div style="height:100%;background:'+tauxColor+';border-radius:3px;width:'+Math.min(100,taux)+'%"></div></div>':'—') +
-      '</td>' +
-      '<td style="padding:6px 12px">' +
-        '<button data-cid="'+c.id+'" onclick="deleteComptage(this.dataset.cid)" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑️</button>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
-}
-
-// ═══ APPLY RÉSULTAT IA ═══
+// ═══ APPLY RÉSULTAT IA (version unique — l'ancien fichier avait 2 versions, la 2e écrasait le panneau qualité) ═══
 async function applyClaudeResult() {
   const raw = document.getElementById('claude-result').value.trim();
   if (!raw) { toast('⚠️ Colle le JSON de Claude d\'abord'); return; }
   let parsed;
-  try {
-    parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
-  } catch(e) { toast('❌ JSON invalide — vérifie la réponse de Claude'); return; }
+  try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+  catch(e) { toast('❌ JSON invalide — vérifie la réponse de Claude'); return; }
 
   const resultats = parsed.resultats || [];
   if (!resultats.length) { toast('⚠️ Aucun résultat dans le JSON'); return; }
 
-  // Afficher le panneau qualité AVANT de sauvegarder
   renderQualityPanel(resultats);
 
-  const prog   = document.getElementById('apply-progress');
+  const prog = document.getElementById('apply-progress');
   const status = document.getElementById('apply-status');
-  const bar    = document.getElementById('apply-bar');
+  const bar = document.getElementById('apply-bar');
   prog.style.display = 'block';
 
   let done = 0, errors = 0;
   for (const r of resultats) {
     if (!r.id) continue;
     try {
-      // Construire remarque à partir des erreurs qualité uniquement
       const erreurs = buildQualityErrors(r);
       const updateData = {
-        plaque:           r.plaque           || null,
-        num_denonciation: r.num_denonciation || null,
-        num_macaron:      r.num_macaron      || null,
-        ia_pending:       false,
-        ia_processed_at:  new Date().toISOString()
+        plaque: r.plaque || null, num_denonciation: r.num_denonciation || null, num_macaron: r.num_macaron || null,
+        ia_pending: false, ia_processed_at: new Date().toISOString()
       };
       if (r.macaron_details) updateData.remarque = 'Macaron: ' + r.macaron_details;
-      if (erreurs.length)    updateData.remarque = (updateData.remarque ? updateData.remarque + ' | ' : '') + erreurs.join(' | ');
-
+      if (erreurs.length) updateData.remarque = (updateData.remarque ? updateData.remarque + ' | ' : '') + erreurs.join(' | ');
       const { error } = await db.from('vehicles').update(updateData).eq('id', r.id);
       if (error) throw error;
       done++;
@@ -1411,19 +912,14 @@ function buildQualityErrors(r) {
   if (!r.denonciation_check) return erreurs;
   const dc = r.denonciation_check;
   const LABELS = {
-    denonciateur: 'Dénonciateur', date: 'Date', heure: 'Heure',
-    plaque_deno: 'Plaque (formulaire)', lieu: 'Lieu', commune: 'Commune',
-    marque_type: 'Marque/Type', code_infraction: 'Code infraction',
-    matricule_agent: 'Matricule agent', signature: 'Signature', encre_noire: 'Encre'
+    denonciateur:'Dénonciateur', date:'Date', heure:'Heure', plaque_deno:'Plaque (formulaire)',
+    lieu:'Lieu', commune:'Commune', marque_type:'Marque/Type', code_infraction:'Code infraction',
+    matricule_agent:'Matricule agent', signature:'Signature', encre_noire:'Encre'
   };
   Object.keys(LABELS).forEach(k => {
-    const champ = dc[k];
-    if (!champ) return;
-    if (k === 'encre_noire') {
-      if (!champ.ok) erreurs.push('⚠️ Encre noire détectée');
-    } else {
-      if (!champ.ok) erreurs.push('❌ ' + LABELS[k] + ': ' + (champ.probleme || 'invalide'));
-    }
+    const champ = dc[k]; if (!champ) return;
+    if (k === 'encre_noire') { if (!champ.ok) erreurs.push('⚠️ Encre noire détectée'); }
+    else { if (!champ.ok) erreurs.push('❌ ' + LABELS[k] + ': ' + (champ.probleme || 'invalide')); }
   });
   return erreurs;
 }
@@ -1432,61 +928,37 @@ function renderQualityPanel(resultats) {
   const panel = document.getElementById('quality-panel');
   const body  = document.getElementById('quality-panel-body');
   if (!panel || !body) return;
-
   const LABELS = {
-    denonciateur: 'Dénonciateur', date: 'Date (JJ/MM/AAAA)',
-    heure: 'Heure (HHhMM)', plaque_deno: 'Plaque sur formulaire',
-    lieu: 'Lieu (n° unique)', commune: 'Commune + code postal',
-    marque_type: 'Marque & type véhicule', code_infraction: 'Code infraction',
-    matricule_agent: 'Matricule agent', signature: 'Signature agent',
-    encre_noire: 'Encre bleue obligatoire'
+    denonciateur:'Dénonciateur', date:'Date (JJ/MM/AAAA)', heure:'Heure (HHhMM)', plaque_deno:'Plaque sur formulaire',
+    lieu:'Lieu (n° unique)', commune:'Commune + code postal', marque_type:'Marque & type véhicule',
+    code_infraction:'Code infraction', matricule_agent:'Matricule agent', signature:'Signature agent', encre_noire:'Encre bleue obligatoire'
   };
-
   let html = '';
   resultats.forEach((r, i) => {
     const v = allVehicles.find(x => x.id === r.id);
-    const label = v ? (v.plaque || v.site || 'Véhicule ' + (i+1)) : 'Véhicule ' + (i+1);
+    const label = v ? (v.plaque || v.site || 'Rapport ' + (i+1)) : 'Rapport ' + (i+1);
     html += '<div style="margin-bottom:16px">';
-    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;padding:6px 10px;background:var(--gray-light);border-radius:6px">📋 ' + label + '</div>';
-
-    // Plaque extraite
-    html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)">';
-    html += '<span style="color:#555">Plaque extraite</span>';
-    if (r.plaque) {
-      html += '<span style="font-weight:700;color:var(--green)">' + r.plaque + '</span>';
-    } else {
-      html += '<span style="color:var(--red-dark)">❌ Non lue</span>';
-    }
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;padding:6px 10px;background:var(--gray-light);border-radius:2px">📋 ' + label + '</div>';
+    html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)"><span style="color:#555">Plaque extraite</span>';
+    html += r.plaque ? ('<span style="font-weight:700;color:var(--green)">' + r.plaque + '</span>') : '<span style="color:var(--red-dark)">❌ Non lue</span>';
     html += '</div>';
-
-    // Macaron
     if (r.num_macaron) {
-      html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)">';
-      html += '<span style="color:#555">Macaron</span>';
-      html += '<span style="font-weight:600">' + r.num_macaron + (r.macaron_details ? ' · ' + r.macaron_details : '') + '</span>';
-      html += '</div>';
+      html += '<div style="display:flex;justify-content:space-between;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border)"><span style="color:#555">Macaron</span>';
+      html += '<span style="font-weight:600">' + r.num_macaron + (r.macaron_details ? ' · ' + r.macaron_details : '') + '</span></div>';
     }
-
-    // Vérification dénonciation
     if (r.denonciation_check) {
       const dc = r.denonciation_check;
       html += '<div style="margin-top:8px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:1px;padding:0 10px 4px">Contrôle dénonciation</div>';
       Object.keys(LABELS).forEach(k => {
-        const champ = dc[k];
-        if (!champ) return;
-        const isOk = k === 'encre_noire' ? champ.ok : champ.ok;
+        const champ = dc[k]; if (!champ) return;
+        const isOk = champ.ok;
         const icon = isOk ? '✅' : (k === 'encre_noire' ? '⚠️' : '❌');
         const color = isOk ? 'var(--green)' : (k === 'encre_noire' ? 'var(--amber)' : 'var(--red-dark)');
         const bg = isOk ? '' : (k === 'encre_noire' ? 'background:#fffbeb' : 'background:#fdf0f0');
         html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:5px 10px;font-size:12px;border-bottom:1px solid var(--gray-border);' + bg + '">';
         html += '<span style="color:#555;flex-shrink:0;width:160px">' + icon + ' ' + LABELS[k] + '</span>';
         html += '<span style="text-align:right;color:' + color + ';font-weight:' + (isOk ? 'normal' : '600') + '">';
-        if (isOk) {
-          html += champ.valeur_lue || '✓';
-        } else {
-          html += (champ.probleme || 'Problème détecté');
-          if (champ.valeur_lue) html += '<br><span style="font-weight:normal;color:#888;font-size:11px">Lu: ' + champ.valeur_lue + '</span>';
-        }
+        html += isOk ? (champ.valeur_lue || '✓') : ((champ.probleme || 'Problème détecté') + (champ.valeur_lue ? ('<br><span style="font-weight:normal;color:#888;font-size:11px">Lu: ' + champ.valeur_lue + '</span>') : ''));
         html += '</span></div>';
       });
     } else {
@@ -1494,88 +966,190 @@ function renderQualityPanel(resultats) {
     }
     html += '</div>';
   });
-
   body.innerHTML = html;
   panel.style.display = 'block';
 }
 
+// ═══ ONGLET HISTORIQUE ═══
+function renderHistorique() {
+  var search = (document.getElementById('h-search').value||'').toLowerCase().trim();
+  var statut = document.getElementById('h-statut').value;
+  var site   = document.getElementById('h-site').value;
+  var ia     = document.getElementById('h-ia').value;
+  var dDebut = document.getElementById('h-date-debut').value;
+  var dFin   = document.getElementById('h-date-fin').value;
 
-async function applyClaudeResult() {
-  const raw = document.getElementById('claude-result').value.trim();
-  if (!raw) { toast('⚠️ Colle le JSON de Claude d\'abord'); return; }
-  let parsed;
+  var filtered = allVehicles.filter(function(v) {
+    if (statut && v.statut !== statut) return false;
+    if (site   && v.site   !== site)   return false;
+    if (ia === 'true'  && !v.ia_pending) return false;
+    if (ia === 'false' &&  v.ia_pending) return false;
+    if (dDebut && v.created_at.slice(0,10) < dDebut) return false;
+    if (dFin   && v.created_at.slice(0,10) > dFin)   return false;
+    if (search) {
+      var plate = (v.plaque||'').toLowerCase().replace(/[\s\-]/g,'');
+      var deno  = (v.num_denonciation||'').toLowerCase();
+      var sc    = search.replace(/[\s\-]/g,'');
+      if (!plate.includes(sc) && !deno.includes(search)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('h-count').textContent = filtered.length + ' résultat(s)';
+  var tbody = document.getElementById('historique-table-body');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--gray-mid)">Aucun rapport.</td></tr>'; return; }
+
+  tbody.innerHTML = filtered.slice(0, 300).map(function(v) {
+    var isInf = v.statut === 'infraction';
+    var dt = new Date(v.created_at);
+    var heure = dt.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+    var thumbs = [
+      v.photo_vehicule_url     ? makeThumb(v.photo_vehicule_url,     'Véhicule') : '',
+      v.photo_denonciation_url ? makeThumb(v.photo_denonciation_url, 'Dénonciation') : '',
+      v.photo_parebrise_url    ? makeThumb(v.photo_parebrise_url,    'Pare-brise') : '',
+      v.photo_macaron_url      ? makeThumb(v.photo_macaron_url,      'Macaron') : ''
+    ].filter(Boolean).join('') || '<span style="color:var(--gray-mid);font-size:11px">—</span>';
+    var plaque = v.plaque ? '<span class="plate">' + v.plaque + '</span>' : '<span style="color:var(--gray-mid);font-size:11px">— IA</span>';
+    var motif = isInf
+      ? (v.motif || '—') + (v.num_denonciation ? '<br><span style="font-size:11px;color:var(--gray-mid)">N° ' + v.num_denonciation + '</span>' : '')
+      : (v.num_macaron ? '<span style="font-size:12px">🏷️ ' + v.num_macaron + '</span>' : '—');
+    var iaBadge = v.ia_pending ? '<span class="badge badge-amber">⏳ Attente</span>' : '<span class="badge badge-green">✅ OK</span>';
+    var st = v.statut === 'parking_vide' || v.motif === 'PARKING_VIDE' ? 'parking_vide' : v.statut;
+    var cls = st==='infraction'?'badge-red':st==='parking_vide'?'badge-gray':'badge-green';
+    var lbl = st==='infraction'?'Infraction':st==='parking_vide'?'🅿️ Vide':'Autorisé';
+    v._statut_display = st;
+    var rapportBtn = st==='infraction'
+      ? '<button class="btn btn-sm" style="background:var(--blue);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'infraction\')">📄 Rapport</button>'
+      : st==='parking_vide'
+        ? '<button class="btn btn-sm" style="background:#555;color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'parking_vide\')">📄 Rapport</button>'
+        : '<button class="btn btn-sm" style="background:var(--green);color:#fff;border:none;margin-right:4px;font-size:11px" onclick="openRapport(\'' + v.id + '\',\'autorise\')">📄 Rapport</button>';
+
+    return '<tr>' +
+      '<td style="white-space:nowrap;font-size:12px">' + heure + '<br><span style="color:var(--gray-mid)">' + (v.agent_name||'') + '</span></td>' +
+      '<td style="font-size:13px">' + (v.site||'—') + '</td>' +
+      '<td><span class="badge ' + cls + '">' + lbl + '</span></td>' +
+      '<td>' + plaque + '</td>' +
+      '<td style="font-size:12px;max-width:160px">' + motif + '</td>' +
+      '<td><div class="photos-cell">' + thumbs + '</div></td>' +
+      '<td>' + iaBadge + '</td>' +
+      '<td style="white-space:nowrap">' + rapportBtn +
+        '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + v.id + '\')" style="margin-right:4px">✏️ Modifier</button>' +
+        '<button class="btn btn-sm" style="background:var(--red-light);color:var(--red-dark);border:none" onclick="deleteSingle(\'' + v.id + '\')">🗑️</button>' +
+      '</td></tr>';
+  }).join('');
+}
+
+// ═══ COMPTAGES DU JOUR (dashboard) ═══
+async function loadComptagesToday() {
   try {
-    parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
-  } catch(e) { toast('❌ JSON invalide'); return; }
+    const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage').eq('actif',true);
+    const list = sites || [];
+    const sel = document.getElementById('comptage-site-filter');
+    sel.innerHTML = '<option value="">Tous les sites guidage</option>' + list.map(s=>'<option value="'+s.id+'">'+s.nom+'</option>').join('');
+    document.getElementById('comptages-section').style.display = list.length ? 'block' : 'none';
+    if (!list.length) return;
+    const siteIds = list.map(s=>s.id);
+    const { data } = await db.from('comptages').select('*,zones(nom,places_totales)').in('site_id', siteIds).order('created_at',{ascending:false}).limit(50);
+    window._comptagesToday = data || [];
+    renderComptages();
+  } catch(e) { console.warn('comptages:', e.message); }
+}
+function renderComptages() {
+  const siteFilter = document.getElementById('comptage-site-filter').value;
+  const data = (window._comptagesToday||[]).filter(c => !siteFilter || c.site_id === siteFilter).slice(0,20);
+  const tbody = document.getElementById('comptages-table-body');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--gray-mid);padding:20px">Aucun relevé</td></tr>'; return; }
+  tbody.innerHTML = data.map(function(c) {
+    var dt = new Date(c.created_at);
+    var dateStr = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+' '+pad(dt.getHours())+'h'+pad(dt.getMinutes());
+    var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
+    var taux = c.taux_occupation !== null && c.taux_occupation !== undefined ? parseFloat(c.taux_occupation) : Math.round((c.vehicules_presents/(c.places_totales||1))*100);
+    var tauxColor = taux>=90?'var(--red)':taux>=70?'var(--amber)':'var(--green)';
+    return '<tr><td style="font-size:12px">'+dateStr+'</td><td style="font-size:12px">'+(c.agent_name||'—')+'</td>' +
+      '<td style="font-weight:700">'+zoneName+'</td><td style="font-weight:700">'+c.vehicules_presents+' / '+c.places_totales+'</td>' +
+      '<td style="color:'+tauxColor+';font-weight:700">'+taux+'%</td></tr>';
+  }).join('');
+}
 
-  const resultats = parsed.resultats || [];
-  if (!resultats.length) { toast('⚠️ Aucun résultat'); return; }
+// ═══ VUES (ONGLETS) ═══
+let allComptagesHist = [];
 
-  const prog   = document.getElementById('apply-progress');
-  const status = document.getElementById('apply-status');
-  const bar    = document.getElementById('apply-bar');
-  prog.style.display = 'block';
+function switchView(view) {
+  ['dashboard','ia','historique','comptages-hist'].forEach(function(v) {
+    document.getElementById('view-'+v).classList.toggle('active', v===view);
+    document.getElementById('tab-'+v).classList.toggle('active', v===view);
+  });
+  if (view === 'comptages-hist' && !allComptagesHist.length) loadComptagesHist();
+}
 
-  let done = 0, errors = 0;
-  for (const r of resultats) {
-    if (!r.id) continue;
-    try {
-      // Construire le remarque enrichi avec les infos IA
-      let remarqueIA = [];
-      if (r.macaron_details) remarqueIA.push('Macaron: ' + r.macaron_details);
-      if (r.denonciation_check) {
-        const dc = r.denonciation_check;
-        const manquants = [];
-        if (!dc.date_remplie) manquants.push('date');
-        if (!dc.heure_remplie) manquants.push('heure');
-        if (!dc.plaque_remplie) manquants.push('plaque');
-        if (!dc.motif_coche) manquants.push('motif');
-        if (!dc.signature_presente) manquants.push('signature');
-        if (manquants.length) remarqueIA.push('⚠️ Dénonciation — champs manquants: ' + manquants.join(', '));
-        if (dc.encre_noire)   remarqueIA.push('⚠️ Encre NOIRE détectée sur la dénonciation — doit être en bleu');
-        if (dc.observations)  remarqueIA.push('Note: ' + dc.observations);
-      }
+// ═══ HISTORIQUE COMPTAGES (PASSAGES) ═══
+async function loadComptagesHist() {
+  const tbody = document.getElementById('comptages-hist-body');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:20px">Chargement...</td></tr>';
+  try {
+    const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage');
+    const siteIds = (sites||[]).map(s=>s.id);
+    const sel = document.getElementById('ch-site');
+    sel.innerHTML = '<option value="">Tous les sites guidage</option>' + (sites||[]).map(s=>'<option value="'+s.id+'">'+s.nom+'</option>').join('');
+    sel.onchange = renderComptagesHist;
+    document.getElementById('ch-zone').onchange = renderComptagesHist;
+    document.getElementById('ch-date-debut').onchange = renderComptagesHist;
+    document.getElementById('ch-date-fin').onchange = renderComptagesHist;
+    if (!siteIds.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px">Aucun site guidage</td></tr>'; return; }
+    const { data } = await db.from('comptages').select('*,zones(nom,places_totales)').in('site_id', siteIds).order('created_at',{ascending:false}).limit(500);
+    allComptagesHist = data || [];
+    renderComptagesHist();
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);padding:20px">Erreur: '+e.message+'</td></tr>'; }
+}
 
-      const updateData = {
-        plaque:           r.plaque           || null,
-        num_denonciation: r.num_denonciation || null,
-        num_macaron:      r.num_macaron      || null,
-        ia_pending:       false,
-        ia_processed_at:  new Date().toISOString()
-      };
-      // Ajouter les infos IA dans remarque si elles existent
-      if (remarqueIA.length) {
-        updateData.remarque = remarqueIA.join(' | ');
-      }
-
-      const { error } = await db.from('vehicles').update(updateData).eq('id', r.id);
-      if (error) throw error;
-      done++;
-    } catch(e) { errors++; }
-    const pct = Math.round(((done+errors)/resultats.length)*100);
-    bar.style.width = pct + '%';
-    status.textContent = (done+errors) + ' / ' + resultats.length + ' mis à jour...';
-  }
-
-  prog.style.display = 'none';
-  toast('✅ ' + done + ' mis à jour' + (errors ? ' · ⚠️ ' + errors + ' erreur(s)' : ''));
-  document.getElementById('claude-result').value = '';
-  document.getElementById('ia-modal').style.display = 'none';
-  await loadData();
+function renderComptagesHist() {
+  const site   = document.getElementById('ch-site').value;
+  const zone   = document.getElementById('ch-zone').value;
+  const dDebut = document.getElementById('ch-date-debut').value;
+  const dFin   = document.getElementById('ch-date-fin').value;
+  let filtered = allComptagesHist.filter(function(c) {
+    if (site  && c.site_id !== site) return false;
+    if (zone  && String(c.places_totales) !== zone) return false;
+    if (dDebut && c.created_at.slice(0,10) < dDebut) return false;
+    if (dFin   && c.created_at.slice(0,10) > dFin)   return false;
+    return true;
+  });
+  document.getElementById('ch-count').textContent = filtered.length + ' relevé(s)';
+  const tbody = document.getElementById('comptages-hist-body');
+  if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:20px">Aucun résultat</td></tr>'; return; }
+  tbody.innerHTML = filtered.map(function(c) {
+    var dt = new Date(c.created_at);
+    var dateStr = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+'/'+dt.getFullYear();
+    var heureStr = pad(dt.getHours())+'h'+pad(dt.getMinutes());
+    var zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
+    var taux = c.taux_occupation !== null && c.taux_occupation !== undefined ? parseFloat(c.taux_occupation) : null;
+    var tauxColor = taux===null?'#888':taux>=90?'var(--red)':taux>=70?'var(--amber)':'var(--green)';
+    return '<tr>' +
+      '<td style="font-size:12px">'+dateStr+'<br><span style="color:var(--gray-mid)">'+heureStr+'</span></td>' +
+      '<td style="font-size:12px">'+(c.agent_name||'—')+'</td>' +
+      '<td style="font-weight:700">'+zoneName+'</td>' +
+      '<td style="font-size:14px;font-weight:700">'+c.vehicules_presents+' / '+c.places_totales+'</td>' +
+      '<td>' + (taux!==null ? ('<span style="font-weight:700;color:'+tauxColor+'">'+taux+'%</span><div style="margin-top:4px;height:6px;background:#e0e0e0;border-radius:3px;width:80px;overflow:hidden"><div style="height:100%;background:'+tauxColor+';border-radius:3px;width:'+Math.min(100,taux)+'%"></div></div>') : '—') + '</td>' +
+      '<td><button data-cid="'+c.id+'" onclick="deleteComptage(this.dataset.cid)" style="background:#fdf0f0;color:var(--red);border:1px solid #fca5a5;border-radius:2px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">🗑️</button></td>' +
+    '</tr>';
+  }).join('');
+}
+async function deleteComptage(id) {
+  if (!confirm('Supprimer ce relevé de comptage ?')) return;
+  const { error } = await db.from('comptages').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  toast('✅ Relevé supprimé');
+  await loadComptagesHist();
 }
 
 // ═══ EXPORT CSV ═══
-function getExportData(ids) {
-  return ids ? allVehicles.filter(v => ids.includes(v.id)) : allVehicles;
-}
+function getExportData(ids) { return ids ? allVehicles.filter(v => ids.includes(v.id)) : allVehicles; }
 function buildCSV(data) {
   const headers = ['Date','Site','Agent','Statut','Plaque','Motif','N° Dénonciation','N° Macaron','Remarque','Photos','IA traitée'];
   const rows = data.map(v => [
     new Date(v.created_at).toLocaleString('fr-CH'),
-    v.site||'', v.agent_name||'', v.statut,
-    v.plaque||'', v.motif||'',
-    v.num_denonciation||'', v.num_macaron||'', v.remarque||'',
-    v.photos_count||0, v.ia_pending ? 'Non' : 'Oui'
+    v.site||'', v.agent_name||'', v.statut, v.plaque||'', v.motif||'',
+    v.num_denonciation||'', v.num_macaron||'', v.remarque||'', v.photos_count||0, v.ia_pending ? 'Non' : 'Oui'
   ]);
   return [headers,...rows].map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
 }
@@ -1599,21 +1173,16 @@ function exportSelectedCSV() {
 // ═══ INIT ═══
 function waitAndLoad(n) {
   initDB();
-  if (window.db) {
-    loadData();
-    setInterval(loadData, 60000);
-  } else if (n > 0) {
-    setTimeout(function() { waitAndLoad(n-1); }, 150);
-  } else {
+  if (window.db) { loadData(); setInterval(loadData, 60000); }
+  else if (n > 0) { setTimeout(function() { waitAndLoad(n-1); }, 150); }
+  else {
     var b = document.getElementById('online-badge');
-    if (b) { b.className='badge badge-red'; b.textContent='● SDK non chargé'; }
+    if (b) b.textContent = '● SDK non chargé';
   }
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() { waitAndLoad(30); });
-} else {
-  waitAndLoad(30);
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function() { waitAndLoad(30); });
+else waitAndLoad(30);
 </script>
+
 </body>
 </html>
