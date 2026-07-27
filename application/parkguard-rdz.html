@@ -1295,6 +1295,16 @@ async function nextFlowStep() {
   if (flowStep < STEPS[flowType].length - 1) { flowStep++; renderFlowStep(); }
   else await saveEntry();
 }
+function prevFlowStep() {
+  if (flowStep > 0) {
+    flowStep--;
+    renderFlowStep();
+  } else {
+    const hasData = Object.keys(flowPhotos).length > 0 || Object.keys(flowFields).length > 0;
+    if (hasData && !confirm('Abandonner cette saisie et revenir à la ronde ?')) return;
+    showScreen('s-round');
+  }
+}
 
 // ═══ UPLOAD PHOTO ═══
 async function uploadPhoto(blob, filename) {
