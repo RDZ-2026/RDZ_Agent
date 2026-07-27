@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>RDZ — Gestion Agents, Matériel &amp; Accès</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#8B1A1A;--red-dark:#6B1212;--black:#1a1a1a;--white:#fff;
+  --gray-light:#f5f4f2;--gray-border:#d0ccc5;--gray-mid:#888;--gray-dark:#555;
+  --green:#1e7a1e;--green-light:#f0f8f0;--green-border:#86c986;
+  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fbbf24;
+  --blue:#2563eb;--blue-light:#eff6ff;--blue-border:#93c5fd;
+  --radius:2px;--radius-sm:2px;
+}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);color:var(--black);min-height:100vh}
+.header{background:var(--red);border-bottom:4px solid var(--red-dark)}
+.header-inner{max-width:1000px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-brand{padding:14px 0}
+.header-brand-name{font-size:14px;font-weight:700;color:#fff;letter-spacing:.07em;text-transform:uppercase}
+.header-brand-sub{font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.03em;margin-top:2px}
+.header-nav{display:flex;gap:8px;align-items:center}
+.btn-nav{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:2px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;transition:all .15s;border:1.5px solid rgba(255,255,255,.85);background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+.btn-nav:hover{background:rgba(255,255,255,.25)}
+.sync-wrap{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.75)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
+.sync-dot.ok{background:#86efac}.sync-dot.loading{background:#fde68a;animation:blink 1s infinite}.sync-dot.err{background:#fca5a5}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.content{max-width:1000px;margin:0 auto;padding:24px 28px 48px}
+.page-title{font-size:18px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.page-sub{font-size:12px;color:var(--gray-dark);margin-top:4px;margin-bottom:20px}
+
+.action-row{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.action-btn{flex:1;min-width:180px;background:#fff;border:1px solid var(--gray-border);border-radius:2px;padding:16px 18px;cursor:pointer;text-align:left;transition:all .15s;font-family:inherit}
+.action-btn:hover{border-color:var(--red);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.action-btn.active{border-color:var(--red);background:#fdf5f5;border-top:3px solid var(--red)}
+.action-btn .ico{font-size:22px;margin-bottom:6px}
+.action-btn .lbl{font-size:13.5px;font-weight:700;color:var(--black)}
+.action-btn .desc{font-size:11px;color:var(--gray-mid);margin-top:2px}
+
+.panel{display:none}
+.panel.active{display:block}
+.sec-title{font-size:12px;font-weight:700;color:var(--gray-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+
+.card{background:#fff;border:1px solid var(--gray-border);border-radius:2px;padding:14px 16px;margin-bottom:14px}
+.av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex-shrink:0}
+.badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.bok{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
+.bwarn{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-border)}
+.balert{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+.bgray{background:var(--gray-light);color:var(--gray-mid);border:1px solid var(--gray-border)}
+.binfo{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border)}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:2px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;font-family:inherit}
+.btn-p{background:var(--red);color:#fff;border-color:var(--red-dark)}
+.btn-p:hover{background:var(--red-dark)}
+.btn-g{background:var(--gray-light);color:var(--gray-dark);border-color:var(--gray-border)}
+.btn-g:hover{background:#ebe9e6}
+.btn-sm{padding:5px 11px;font-size:11px}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:2px;cursor:pointer;font-weight:700;font-family:inherit}
+
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:11px;font-weight:700;color:var(--gray-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.fc{width:100%;padding:9px 11px;border-radius:2px;border:1px solid var(--gray-border);font-size:14px;font-family:inherit}
+.fc:focus{outline:none;border-color:var(--red)}
+.fr{display:flex;gap:10px}
+.fr .fg{flex:1}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:6px 12px;border:1.5px solid var(--gray-border);border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;color:var(--gray-mid);background:#fff}
+.chip.sel{background:var(--red);border-color:var(--red-dark);color:#fff}
+
+.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-start;justify-content:center;padding:60px 20px;overflow-y:auto}
+.moverlay.show{display:flex}
+.modal{background:#fff;border-radius:2px;border-top:3px solid var(--red);padding:22px;width:100%;max-width:440px}
+.mhead{display:flex;justify-content:space-between;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--gray-border);margin-bottom:16px}
+.mtitle{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--red)}
+.mclose{background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-mid)}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-border)}
+
+.toast{position:fixed;bottom:22px;right:22px;background:var(--black);color:#fff;padding:10px 18px;border-radius:2px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;border-left:4px solid var(--red)}
+.toast.show{opacity:1}
+
+.footer{border-top:1px solid var(--gray-border);padding:16px 28px;max-width:1000px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#9a9a9a}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Gestion — Agents, Matériel &amp; Accès</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <div class="sync-wrap"><div class="sync-dot loading" id="sdot"></div><span id="slbl">Connexion…</span></div>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+  <div class="page-title">Gestion</div>
+  <div class="page-sub">Configuration des agents, du catalogue matériel et des clés/badges (sites, articles, réceptionnaires).</div>
+
+  <div class="action-row">
+    <button class="action-btn active" id="btn-agents" onclick="setPanel('agents')">
+      <div class="ico">👮</div>
+      <div class="lbl">Agents</div>
+      <div class="desc" id="cfg-agents-count">—</div>
+    </button>
+    <button class="action-btn" id="btn-mat" onclick="setPanel('mat')">
+      <div class="ico">📦</div>
+      <div class="lbl">Matériel</div>
+      <div class="desc">Catalogue des articles</div>
+    </button>
+    <button class="action-btn" id="btn-acces" onclick="setPanel('acces')">
+      <div class="ico">🔑</div>
+      <div class="lbl">Accès</div>
+      <div class="desc">Sites, clés &amp; badges, réceptionnaires</div>
+    </button>
+  </div>
+
+  <!-- AGENTS -->
+  <div class="panel active" id="p-agents">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-p btn-sm" onclick="openNewAgent()">➕ Nouvel agent</button>
+    </div>
+    <div class="card" id="cfg-agents-list"></div>
+  </div>
+
+  <!-- MATÉRIEL -->
+  <div class="panel" id="p-mat">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-p btn-sm" onclick="document.getElementById('m-new-mat').classList.add('show')">➕ Nouveau matériel</button>
+    </div>
+    <div class="card" id="cfg-mat-list"></div>
+  </div>
+
+  <!-- ACCÈS -->
+  <div class="panel" id="p-acces">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">📍 Sites</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('site')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-sites"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">🔑 Clés &amp; Badges</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('item')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-items"></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0">👤 Réceptionnaires</div>
+          <button class="btn btn-p btn-sm" onclick="openNewAccesItem('recept')">➕ Ajouter</button>
+        </div>
+        <div class="card" id="cfg-acces-recept"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<!-- MODAL AGENT -->
+<div class="moverlay" id="m-agent"><div class="modal">
+  <div class="mhead"><div class="mtitle" id="agent-modal-title">👮 Nouvel agent</div><button class="mclose" onclick="closeM('m-agent')">✕</button></div>
+  <div>
+    <input type="hidden" id="ea-id">
+    <div class="fg"><label class="fl">Nom complet</label><input type="text" class="fc" id="ea-nom" placeholder="Prénom Nom"></div>
+    <div class="fg"><label class="fl">Poste</label>
+      <select class="fc" id="ea-poste">
+        <option>Agent de sécurité</option>
+        <option>Agent EPI</option>
+        <option>Formateur</option>
+        <option>Responsable de site</option>
+        <option>Superviseur</option>
+        <option>Direction</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">Statut</label>
+      <select class="fc" id="ea-actif"><option value="true">✅ Actif — visible sur le terrain</option><option value="false">⏸ Inactif — masqué sur le terrain</option></select>
+    </div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-agent')">Annuler</button><button class="btn btn-p" onclick="doSaveAgent()">✅ Enregistrer</button></div>
+</div></div>
+
+<!-- MODAL NOUVEAU MATÉRIEL -->
+<div class="moverlay" id="m-new-mat"><div class="modal">
+  <div class="mhead"><div class="mtitle">📦 Nouvel article matériel</div><button class="mclose" onclick="closeM('m-new-mat')">✕</button></div>
+  <div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Nom</label><input type="text" class="fc" id="nm-nom" placeholder="Ex : Lampe frontale"></div>
+      <div class="fg"><label class="fl">Icône emoji</label><input type="text" class="fc" id="nm-icon" placeholder="🔦" maxlength="4"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Qté initiale</label><input type="number" min="0" value="0" class="fc" id="nm-qty"></div>
+      <div class="fg"><label class="fl">Seuil alerte</label><input type="number" min="1" value="3" class="fc" id="nm-seuil"></div>
+    </div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-new-mat')">Annuler</button><button class="btn btn-p" onclick="doNewMat()">✅ Créer</button></div>
+</div></div>
+
+<!-- MODAL MODIFIER MATÉRIEL -->
+<div class="moverlay" id="m-edit-mat"><div class="modal">
+  <div class="mhead"><div class="mtitle">✏️ Modifier le matériel</div><button class="mclose" onclick="closeM('m-edit-mat')">✕</button></div>
+  <div>
+    <input type="hidden" id="em-id">
+    <div class="fr">
+      <div class="fg"><label class="fl">Nom</label><input type="text" class="fc" id="em-nom" placeholder="Nom de l'article"></div>
+      <div class="fg"><label class="fl">Icône emoji</label><input type="text" class="fc" id="em-icon" placeholder="📦" maxlength="4"></div>
+    </div>
+    <div class="fg"><label class="fl">Seuil d'alerte</label><input type="number" min="1" value="3" class="fc" id="em-seuil"></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-edit-mat')">Annuler</button><button class="btn btn-p" onclick="doEditMat()">✅ Enregistrer</button></div>
+</div></div>
+
+<!-- MODAL ARTICLE ACCÈS (site / clé-badge / réceptionnaire) -->
+<div class="moverlay" id="m-acces-item"><div class="modal">
+  <div class="mhead"><div class="mtitle" id="acces-item-title">➕ Ajouter</div><button class="mclose" onclick="closeM('m-acces-item')">✕</button></div>
+  <div>
+    <input type="hidden" id="ai-type">
+    <input type="hidden" id="ai-edit-id">
+    <div class="fg"><label class="fl" id="ai-label-nom">Nom</label><input type="text" class="fc" id="ai-nom" placeholder=""></div>
+    <div id="ai-type-wrap" style="display:none">
+      <div class="fg"><label class="fl">Type</label>
+        <div class="chips" id="ai-type-chips">
+          <span class="chip sel" onclick="selC(this,'ai-item-type','clé')">🔑 Clé</span>
+          <span class="chip" onclick="selC(this,'ai-item-type','badge')">🪪 Badge</span>
+          <span class="chip" onclick="selC(this,'ai-item-type','autre')">📦 Autre</span>
+        </div>
+        <input type="hidden" id="ai-item-type" value="clé">
+      </div>
+      <div class="fg"><label class="fl">Destiné à</label>
+        <div class="chips" id="ai-public-chips">
+          <span class="chip sel" onclick="selC(this,'ai-public','tous')">🔁 Les deux</span>
+          <span class="chip" onclick="selC(this,'ai-public','agent')">👮 Agent uniquement</span>
+          <span class="chip" onclick="selC(this,'ai-public','externe')">👤 Externe uniquement</span>
+        </div>
+        <input type="hidden" id="ai-public" value="tous">
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Contrôle dans quelle application terrain cette clé/badge apparaît</div>
+      </div>
+      <div class="fg"><label class="fl">Site de stockage</label>
+        <select class="fc" id="ai-site"><option value="">— Aucun site assigné —</option></select>
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Le site se pré-remplira automatiquement lors de la remise</div>
+      </div>
+    </div>
+    <div id="ai-societe-wrap" style="display:none">
+      <div class="fg"><label class="fl">Société / Organisation</label><input type="text" class="fc" id="ai-societe" placeholder="Ex : Entreprise ABC"></div>
+    </div>
+    <div class="fg"><label class="fl">Description (optionnel)</label><input type="text" class="fc" id="ai-desc" placeholder=""></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-acces-item')">Annuler</button><button class="btn btn-p" onclick="doSaveAccesItem()">✅ Enregistrer</button></div>
+</div></div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const SB_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb={
+  H:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=representation'},
+  Hp:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Prefer':'return=minimal'},
+  async get(t,p=''){const r=await fetch(`${SB_URL}/rest/v1/${t}${p}`,{headers:this.H});if(!r.ok)throw new Error(await r.text());return r.json();},
+  async post(t,b){const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:this.H,body:JSON.stringify(b)});if(!r.ok)throw new Error(await r.text());return r.json();},
+  async patch(t,id,b){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:this.Hp,body:JSON.stringify(b)});if(!r.ok)throw new Error(await r.text());return true;},
+  async del(t,id){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:this.Hp});if(!r.ok)throw new Error(await r.text());return true;}
+};
+
+let DB={agents:[],allAgents:[],stock:[],acesSites:[],acesItems:[],acesRecept:[]};
+
+const ini=n=>n.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
+const stm=i=>i.quantite_dispo<=i.seuil_alerte/2?'alert':i.quantite_dispo<=i.seuil_alerte?'warn':'ok';
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function closeM(id){document.getElementById(id).classList.remove('show');}
+function selC(el,hid,val){el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');document.getElementById(hid).value=val;}
+function sync(s,l){document.getElementById('sdot').className='sync-dot '+s;if(l)document.getElementById('slbl').textContent=l;}
+
+function setPanel(p){
+  ['agents','mat','acces'].forEach(k=>{
+    document.getElementById('btn-'+k).classList.toggle('active',k===p);
+    document.getElementById('p-'+k).classList.toggle('active',k===p);
+  });
+}
+
+// ═══ LOAD ═══
+async function loadAll(){
+  sync('loading','Synchronisation…');
+  try{
+    const [allAgents,stock,acesSites,acesItems,acesRecept]=await Promise.all([
+      sb.get('stock_agents','?order=nom'),
+      sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
+      sb.get('stock_acces_sites','?actif=eq.true&order=nom'),
+      sb.get('stock_acces_items','?actif=eq.true&order=nom'),
+      sb.get('stock_acces_recept','?actif=eq.true&order=nom'),
+    ]);
+    DB={
+      agents: allAgents.filter(a=>a.actif!==false),
+      allAgents,
+      stock,acesSites,acesItems,acesRecept
+    };
+    sync('ok','Synchronisé — '+new Date().toLocaleTimeString('fr-FR'));
+    rCfgAgents();rCfgMat();rCfgAcces();
+    return true;
+  }catch(e){sync('err','Erreur connexion');console.error(e);return false;}
+}
+
+// ═══ AGENTS ═══
+function rCfgAgents(){
+  const tous=(DB.allAgents||[]).slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr'));
+  const nActif=tous.filter(a=>a.actif!==false).length;
+  const nInactif=tous.filter(a=>a.actif===false).length;
+  const countEl=document.getElementById('cfg-agents-count');
+  if(countEl) countEl.textContent=nActif+' actif(s) · '+nInactif+' inactif(s)';
+  document.getElementById('cfg-agents-list').innerHTML=tous.length?tous.map(function(a){
+    const inactif=a.actif===false;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-border);opacity:'+(inactif?0.55:1)+'">'
+      +'<div class="av" style="background:'+(inactif?'var(--gray-mid)':'var(--black)')+'">'+ini(a.nom)+'</div>'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;font-weight:700">'+a.nom+'</div>'
+      +'<div style="font-size:11px;color:var(--gray-mid)">'+a.poste+'</div>'
+      +'</div>'
+      +'<span class="badge '+(inactif?'bgray':'bok')+'" style="margin-right:4px">'+(inactif?'⏸ Inactif':'✅ Actif')+'</span>'
+      +'<button class="btn btn-g btn-sm" onclick="openEditAgent(\''+a.id+'\')">✏️</button>'
+      +'<button class="btn btn-xs" style="background:'+(inactif?'var(--green-light)':'#fef2f2')+';color:'+(inactif?'var(--green)':'var(--red)')+';border:1px solid '+(inactif?'var(--green-border)':'#fca5a5')+'"'
+      +' onclick="toggleAgentActif(\''+a.id+'\','+inactif+',\''+a.nom+'\')">'
+      +(inactif?'▶ Activer':'⏸ Désactiver')
+      +'</button>'
+      +'</div>';
+  }).join(''):'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun agent</div>';
+}
+function openNewAgent(){
+  document.getElementById('ea-id').value='';
+  document.getElementById('ea-nom').value='';
+  document.getElementById('agent-modal-title').textContent='👮 Nouvel agent';
+  document.getElementById('m-agent').classList.add('show');
+}
+function openEditAgent(id){
+  const a=(DB.allAgents||[]).find(x=>x.id===id);if(!a)return;
+  document.getElementById('ea-id').value=a.id;
+  document.getElementById('ea-nom').value=a.nom;
+  document.getElementById('ea-poste').value=a.poste;
+  document.getElementById('ea-actif').value=String(a.actif!==false);
+  document.getElementById('agent-modal-title').textContent='✏️ Modifier — '+a.nom;
+  document.getElementById('m-agent').classList.add('show');
+}
+async function doSaveAgent(){
+  const id=document.getElementById('ea-id').value;
+  const nom=document.getElementById('ea-nom').value.trim();
+  const poste=document.getElementById('ea-poste').value;
+  const actif=document.getElementById('ea-actif').value==='true';
+  if(!nom){toast('⚠️ Nom requis');return;}
+  try{
+    if(id)await sb.patch('stock_agents',id,{nom,poste,actif});
+    else await sb.post('stock_agents',{nom,poste,actif:true});
+    await loadAll();closeM('m-agent');
+    toast(id?'✅ Agent mis à jour':'✅ Agent créé : '+nom);
+  }catch(e){toast('❌ '+e.message);}
+}
+async function toggleAgentActif(id,currentlyInactif,nom){
+  const newActif=currentlyInactif;
+  const msg=newActif
+    ?'Réactiver "'+nom+'" ? Il réapparaîtra sur le terrain.'
+    :'Désactiver "'+nom+'" ? Il n\'apparaîtra plus dans les listes du terrain.';
+  if(!confirm(msg))return;
+  try{
+    await sb.patch('stock_agents',id,{actif:newActif});
+    await loadAll();
+    toast(newActif?'✅ '+nom+' réactivé':'⏸ '+nom+' désactivé');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+// ═══ MATÉRIEL ═══
+function rCfgMat(){
+  document.getElementById('cfg-mat-list').innerHTML=DB.stock.map(item=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-border)">
+      <span style="font-size:22px;width:30px;text-align:center">${item.icon}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">${item.nom}</div>
+        <div style="font-size:11px;color:var(--gray-mid)">${item.quantite_dispo}/${item.quantite_total} · Seuil ${item.seuil_alerte}</div>
+      </div>
+      <span class="badge ${stm(item)==='ok'?'bok':stm(item)==='warn'?'bwarn':'balert'}" style="margin-right:4px">${stm(item)==='ok'?'OK':stm(item)==='warn'?'Faible':'Critique'}</span>
+      <button class="btn btn-g btn-sm" onclick="openEditMat('${item.id}')">✏️ Modifier</button>
+      <button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="archiveMat('${item.id}','${item.nom}')">🗑️</button>
+    </div>`).join('')||'<div style="color:var(--gray-mid);padding:14px;text-align:center;font-size:13px">Aucun article</div>';
+}
+async function doNewMat(){
+  const nom=document.getElementById('nm-nom').value.trim();
+  const icon=document.getElementById('nm-icon').value.trim()||'📦';
+  const qty=parseInt(document.getElementById('nm-qty').value)||0;
+  const seuil=parseInt(document.getElementById('nm-seuil').value)||3;
+  if(!nom){toast('⚠️ Nom requis');return;}
+  try{
+    await sb.post('stock_materiel_items',{nom,icon,quantite_total:qty,quantite_dispo:qty,seuil_alerte:seuil,actif:true});
+    await loadAll();closeM('m-new-mat');
+    document.getElementById('nm-nom').value='';document.getElementById('nm-icon').value='';
+    toast('✅ Matériel créé : '+nom);
+  }catch(e){toast('❌ '+e.message);}
+}
+function openEditMat(id){
+  const item=DB.stock.find(s=>s.id===id);if(!item)return;
+  document.getElementById('em-id').value=id;
+  document.getElementById('em-nom').value=item.nom;
+  document.getElementById('em-icon').value=item.icon||'';
+  document.getElementById('em-seuil').value=item.seuil_alerte;
+  document.getElementById('m-edit-mat').classList.add('show');
+}
+async function doEditMat(){
+  const id=document.getElementById('em-id').value;
+  const nom=document.getElementById('em-nom').value.trim();
+  const icon=document.getElementById('em-icon').value.trim()||'📦';
+  const seuil=parseInt(document.getElementById('em-seuil').value)||3;
+  if(!nom){toast('⚠️ Nom requis');return;}
+  try{
+    await sb.patch('stock_materiel_items',id,{nom,icon,seuil_alerte:seuil});
+    await loadAll();closeM('m-edit-mat');
+    toast('✅ '+nom+' mis à jour');
+  }catch(e){toast('❌ '+e.message);}
+}
+async function archiveMat(id,nom){
+  if(!confirm('Archiver "'+nom+'" ?'))return;
+  try{await sb.patch('stock_materiel_items',id,{actif:false});await loadAll();toast('🗑️ '+nom+' archivé');}
+  catch(e){toast('❌ '+e.message);}
+}
+
+// ═══ ACCÈS (Sites / Clés & Badges / Réceptionnaires) ═══
+function rCfgAcces(){
+  document.getElementById('cfg-acces-sites').innerHTML=
+    DB.acesSites.length?DB.acesSites.map(function(item){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700">📍 '+item.nom+'</div></div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'site\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'site\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun site</div>';
+
+  document.getElementById('cfg-acces-items').innerHTML=
+    DB.acesItems.length?DB.acesItems.map(function(item){
+      const typeLabel=item.type==='badge'?'🪪 Badge':item.type==='clé'?'🔑 Clé':'📦 Autre';
+      const siteLabel=item.site_nom
+        ?'<span style="color:var(--gray-mid)"> · 📍 '+item.site_nom+'</span>'
+        :'<span style="color:var(--amber)"> · ⚠️ Sans site assigné</span>';
+      const pub=item.public||'tous';
+      const pubLabel=pub==='agent'?'<span class="badge binfo">👮 Agent uniquement</span>':pub==='externe'?'<span class="badge bgray">👤 Externe uniquement</span>':'<span class="badge bok">🔁 Les deux</span>';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700">'+item.nom+'</div>'
+        +'<div style="font-size:11px;color:var(--gray-mid)">'+typeLabel+siteLabel+'</div>'
+        +'<div style="margin-top:4px">'+pubLabel+'</div>'
+        +'</div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'item\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'item\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucune clé/badge</div>';
+
+  document.getElementById('cfg-acces-recept').innerHTML=
+    DB.acesRecept.length?DB.acesRecept.map(function(item){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
+        +'<div style="flex:1">'
+        +'<div style="font-size:13px;font-weight:700">👤 '+item.nom+'</div>'
+        +(item.societe?'<div style="font-size:11px;color:var(--gray-mid)">'+item.societe+'</div>':'')
+        +'</div>'
+        +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'recept\')">✏️ Modifier</button>'
+        +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
+        +' onclick="archiveAccesItem(\''+item.id+'\',\'recept\',\''+item.nom+'\')">🗑️</button>'
+        +'</div>';
+    }).join(''):'<div style="color:var(--gray-mid);font-size:13px;padding:10px 0;text-align:center">Aucun réceptionnaire</div>';
+}
+
+function openEditAccesItem(id,type){
+  const arr={site:DB.acesSites,item:DB.acesItems,recept:DB.acesRecept}[type]||[];
+  const item=arr.find(x=>x.id===id);if(!item)return;
+  document.getElementById('ai-type').value=type;
+  document.getElementById('ai-edit-id').value=id;
+  document.getElementById('ai-nom').value=item.nom;
+  document.getElementById('ai-desc').value=item.description||'';
+  document.getElementById('ai-societe').value=item.societe||'';
+  document.getElementById('ai-item-type').value=item.type||'clé';
+  const aiSite=document.getElementById('ai-site');
+  if(aiSite){
+    while(aiSite.options.length>1)aiSite.remove(1);
+    DB.acesSites.slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{
+      const o=document.createElement('option');o.value=s.id+'|'+s.nom;o.textContent=s.nom;aiSite.appendChild(o);
+    });
+    if(item.site_id) aiSite.value=item.site_id+'|'+item.site_nom;
+  }
+  document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
+  document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
+  const titles={site:'✏️ Modifier le site',item:'✏️ Modifier la clé / badge',recept:'✏️ Modifier le réceptionnaire'};
+  const labels={site:'Nom du site',item:'Nom de la clé / badge',recept:'Nom du réceptionnaire'};
+  document.getElementById('acces-item-title').textContent=titles[type];
+  document.getElementById('ai-label-nom').textContent=labels[type];
+  if(type==='item'){
+    document.querySelectorAll('#ai-type-chips .chip').forEach(c=>{
+      const v=c.textContent.includes('Clé')?'clé':c.textContent.includes('Badge')?'badge':'autre';
+      c.classList.toggle('sel',v===(item.type||'clé'));
+    });
+    document.getElementById('ai-public').value=item.public||'tous';
+    document.querySelectorAll('#ai-public-chips .chip').forEach(c=>{
+      const v=c.textContent.includes('Agent')?'agent':c.textContent.includes('Externe')?'externe':'tous';
+      c.classList.toggle('sel',v===(item.public||'tous'));
+    });
+  }
+  document.getElementById('m-acces-item').classList.add('show');
+}
+function openNewAccesItem(type){
+  document.getElementById('ai-type').value=type;
+  document.getElementById('ai-edit-id').value='';
+  document.getElementById('ai-nom').value='';
+  document.getElementById('ai-desc').value='';
+  document.getElementById('ai-societe').value='';
+  const aiSite=document.getElementById('ai-site');
+  if(aiSite){
+    while(aiSite.options.length>1)aiSite.remove(1);
+    DB.acesSites.slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).forEach(s=>{
+      const o=document.createElement('option');o.value=s.id+'|'+s.nom;o.textContent=s.nom;aiSite.appendChild(o);
+    });
+    aiSite.value='';
+  }
+  document.getElementById('ai-type-wrap').style.display=type==='item'?'block':'none';
+  document.getElementById('ai-societe-wrap').style.display=type==='recept'?'block':'none';
+  const titles={site:'➕ Ajouter un site',item:'➕ Ajouter une clé / badge',recept:'➕ Ajouter un réceptionnaire'};
+  const labels={site:'Nom du site',item:'Nom de la clé / badge',recept:'Nom du réceptionnaire'};
+  document.getElementById('acces-item-title').textContent=titles[type];
+  document.getElementById('ai-label-nom').textContent=labels[type];
+  if(type==='item'){
+    document.getElementById('ai-public').value='tous';
+    document.querySelectorAll('#ai-public-chips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+    document.querySelectorAll('#ai-type-chips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+    document.getElementById('ai-item-type').value='clé';
+  }
+  document.getElementById('m-acces-item').classList.add('show');
+}
+async function doSaveAccesItem(){
+  const type=document.getElementById('ai-type').value;
+  const editId=document.getElementById('ai-edit-id').value;
+  const nom=document.getElementById('ai-nom').value.trim();
+  const desc=document.getElementById('ai-desc').value.trim();
+  const societe=document.getElementById('ai-societe').value.trim();
+  const itemType=document.getElementById('ai-item-type').value;
+  const itemPublic=document.getElementById('ai-public').value;
+  if(!nom){toast('⚠️ Nom requis');return;}
+
+  const aiSiteEl=document.getElementById('ai-site');
+  const siteRaw=aiSiteEl?aiSiteEl.value:'';
+  const sepIdx=siteRaw.indexOf('|');
+  const siteId=sepIdx>0?siteRaw.substring(0,sepIdx):null;
+  const siteNom=sepIdx>0?siteRaw.substring(sepIdx+1):null;
+
+  const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
+  const bodies={
+    site:{nom},
+    item:{nom,type:itemType,public:itemPublic,description:desc||null,site_id:siteId,site_nom:siteNom},
+    recept:{nom,societe:societe||null}
+  };
+
+  try{
+    if(editId){
+      await sb.patch(tables[type],editId,bodies[type]);
+      toast('✅ Mis à jour : '+nom);
+    } else {
+      await sb.post(tables[type],{...bodies[type],actif:true});
+      toast('✅ Ajouté : '+nom);
+    }
+    document.getElementById('ai-edit-id').value='';
+    await loadAll();
+    closeM('m-acces-item');
+  }catch(e){toast('❌ '+e.message);}
+}
+async function archiveAccesItem(id,type,nom){
+  if(!confirm('Supprimer "'+nom+'" ?'))return;
+  const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
+  try{
+    await sb.patch(tables[type],id,{actif:false});
+    await loadAll();toast('🗑️ '+nom+' supprimé');
+  }catch(e){toast('❌ '+e.message);}
+}
+
+document.getElementById('footer-date').textContent='Version 1.0 — '+new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
