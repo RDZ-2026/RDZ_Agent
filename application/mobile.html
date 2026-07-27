@@ -220,8 +220,11 @@ const MAIN_SECTIONS = [
 const POSTE_ITEMS = [
   { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
   { icon: '📦', name: 'Matériel & clés', desc: "Sortie combinée, en cours, maintenance", href: 'materiel-agent.html' },
-  { icon: '🔄', name: 'Inventaire vestiaire', desc: "Comptage tournant des tenues en stock", href: 'inventaire-vestiaire-agent.html' },
   { icon: '🚗', name: 'Prise de véhicule', desc: "État, dégâts, assurance", href: 'vehicule-agent.html' }
+];
+
+const ADMIN_ITEMS = [
+  { icon: '🔄', name: 'Inventaire vestiaire', desc: "Comptage tournant des tenues en stock", href: 'inventaire-vestiaire-agent.html' }
 ];
 
 let currentAgentName = '';
@@ -253,6 +256,8 @@ function renderMenu(nom) {
     if (section.label) html += `<div class="menu-section-label">${section.label}</div>`;
     section.items.forEach(item => { html += cardHtml(item); });
   });
+  html += `<div class="menu-section-label">Admin</div>`;
+  ADMIN_ITEMS.forEach(item => { html += cardHtml(item); });
   document.getElementById('menu-content').innerHTML = html;
   showScreen('screen-menu');
 }
