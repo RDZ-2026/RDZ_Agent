@@ -129,6 +129,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
   <button class="nav-item" id="nav-hmat"  onclick="go('hmat')"><span class="ni">📜</span>Historique</button>
   <button class="nav-item" id="nav-maint" onclick="go('maint')"><span class="ni">🔧</span>Maintenance <span class="nav-bdg" id="nb-m">—</span></button>
   <button class="nav-item" id="nav-acces" onclick="go('acces')"><span class="ni">🔑</span>Clés & Badges</button>
+  <button class="nav-item" id="nav-accesnonret" onclick="go('accesnonret')"><span class="ni">📤</span>Non retourné <span class="nav-bdg" id="nb-anr">—</span></button>
   <div class="sb-sec">Vestiaire</div>
   <button class="nav-item" id="nav-vest"  onclick="go('vest')"><span class="ni">👕</span>Stock tenues</button>
   <button class="nav-item" id="nav-dot"   onclick="go('dot')"><span class="ni">👮</span>Dotations</button>
@@ -238,18 +239,6 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
     </div>
   </div>
   <div class="g3 mb20" id="acces-kpi"></div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
-    <div class="sec-title" style="margin-bottom:0">Remises actives</div>
-    <div style="display:flex;gap:8px">
-      <select class="fc" id="ac-filter-actif-site" style="width:auto" onchange="rAcces()">
-        <option value="">Tous sites</option>
-      </select>
-      <select class="fc" id="ac-filter-actif-item" style="width:auto" onchange="rAcces()">
-        <option value="">Toutes clés/badges</option>
-      </select>
-    </div>
-  </div>
-  <div id="acces-actifs"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:11px;flex-wrap:wrap;gap:8px">
     <div class="sec-title" style="margin-bottom:0">Historique complet</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -273,6 +262,25 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
       <tbody id="acces-hist-body"></tbody>
     </table>
   </div></div>
+</div>
+
+<!-- CLÉS & BADGES NON RETOURNÉS -->
+<div class="panel" id="panel-accesnonret">
+  <div class="phdr">
+    <div><div class="ptitle">📤 Clés & Badges non retournés</div></div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
+    <div class="sec-title" style="margin-bottom:0">Remises actives</div>
+    <div style="display:flex;gap:8px">
+      <select class="fc" id="ac-filter-actif-site" style="width:auto" onchange="rAccesNonRet()">
+        <option value="">Tous sites</option>
+      </select>
+      <select class="fc" id="ac-filter-actif-item" style="width:auto" onchange="rAccesNonRet()">
+        <option value="">Toutes clés/badges</option>
+      </select>
+    </div>
+  </div>
+  <div id="acces-actifs"></div>
 </div>
 
 <!-- STOCK VESTIAIRE -->
@@ -724,6 +732,7 @@ async function loadAll(){
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
     document.getElementById('nb-nr').textContent=attr.length;
+    document.getElementById('nb-anr').textContent=acces.filter(a=>a.statut==='actif').length;
     sync('ok','Synchronisé — '+new Date().toLocaleTimeString('fr-FR'));
     return true;
   }catch(e){sync('err','Erreur connexion');console.error(e);return false;}
@@ -737,7 +746,7 @@ function calcAlerts(){
   return n;
 }
 async function refresh(){await loadAll();renderPanel();toast('🔄 Données actualisées');}
-function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
+function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,accesnonret:rAccesNonRet,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
 function go(n){
   PANEL=n;
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1566,59 +1575,24 @@ async function doDot(){
 
 // ═══ ACCÈS CLÉS/BADGES ═══
 function rAcces(){
-  // Populate filter selects
-  ['ac-filter-item','ac-filter-actif-item'].forEach(id=>{
+  ['ac-filter-item'].forEach(id=>{
     const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
     [...new Set(DB.acces.map(a=>a.item_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
   });
-  ['ac-filter-site','ac-filter-actif-site'].forEach(id=>{
+  ['ac-filter-site'].forEach(id=>{
     const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
     [...new Set(DB.acces.map(a=>a.site_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
   });
   const fStatut=document.getElementById('ac-filter-statut')?.value||'';
   const fItem=document.getElementById('ac-filter-item')?.value||'';
   const fSite=document.getElementById('ac-filter-site')?.value||'';
-  const fActifSite=document.getElementById('ac-filter-actif-site')?.value||'';
-  const fActifItem=document.getElementById('ac-filter-actif-item')?.value||'';
-  // Populate filter selects if empty
-  ['ac-filter-item','ac-filter-actif-item'].forEach(id=>{
-    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
-    [...new Set(DB.acces.map(a=>a.item_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
-  });
-  ['ac-filter-site','ac-filter-actif-site'].forEach(id=>{
-    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
-    [...new Set(DB.acces.map(a=>a.site_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
-  });
-  const actifs=DB.acces.filter(a=>a.statut==='actif'&&(!fActifSite||a.site_nom===fActifSite)&&(!fActifItem||a.item_nom===fActifItem));
+  const actifs=DB.acces.filter(a=>a.statut==='actif');
   const total=DB.acces.length;
   const retard=DB.acces.filter(a=>a.statut==='actif'&&Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24).length;
   document.getElementById('acces-kpi').innerHTML=`
     <div class="sbox cblue"><div class="snum" style="color:var(--blue)">${actifs.length}</div><div class="slbl">Remises actives</div></div>
     <div class="sbox ${retard>0?'cred':'cgreen'}"><div class="snum" style="color:var(--${retard>0?'red':'green'})">${retard}</div><div class="slbl">En retard (+24h)</div></div>
     <div class="sbox cgold"><div class="snum" style="color:#b45309">${total}</div><div class="slbl">Total remises</div></div>`;
-  document.getElementById('acces-actifs').innerHTML=actifs.length?actifs.map(a=>{
-    const hrs=Math.floor((Date.now()-new Date(a.date_remise))/3600000);
-    const late=hrs>24;
-    return `<div class="card mb14">
-      <div style="display:flex;align-items:flex-start;gap:12px">
-        <span style="font-size:28px">${a.item_type==='badge'?'🪪':'🔑'}</span>
-        <div style="flex:1">
-          <div style="font-size:14px;font-weight:700">${a.item_nom}</div>
-          <div style="font-size:12px;color:var(--gray-mid);margin-top:3px">📍 ${a.site_nom} · 👮 ${a.agent_nom}</div>
-          <div style="font-size:12px;margin-top:3px">👤 <strong>${a.receptionnaire_nom}</strong>${a.receptionnaire_societe?' — '+a.receptionnaire_societe:''}</div>
-          <div style="font-size:11px;color:${late?'var(--red)':'var(--gray-mid)'};margin-top:3px">
-            🕐 ${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
-            ${late?' — ⚠️ '+Math.floor(hrs/24)+'j sans retour':''}
-          </div>
-          ${a.notes?`<div style="font-size:11px;color:var(--gray-dark);margin-top:4px;padding:6px 8px;background:var(--gray-light);border-radius:4px">📝 ${a.notes}</div>`:''}
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-          <span class="badge ${late?'balert':'bwarn'}">${late?'⚠️ Retard':'En cours'}</span>
-          <button class="btn btn-ok btn-sm" onclick="doRetourAccesAdmin('${a.id}','${a.item_nom}')">↩️ Retour</button>
-        </div>
-      </div>
-    </div>`;
-  }).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucune remise active</div>';
 
   const filteredAcces=DB.acces.filter(a=>(!fStatut||a.statut===fStatut)&&(!fItem||a.item_nom===fItem)&&(!fSite||a.site_nom===fSite));
   const fmtDt=d=>d?new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'—';
@@ -1643,11 +1617,49 @@ function rAcces(){
   </tr>`).join('');
 }
 
+function rAccesNonRet(){
+  ['ac-filter-actif-item'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.item_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
+  ['ac-filter-actif-site'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel||sel.options.length>1)return;
+    [...new Set(DB.acces.map(a=>a.site_nom).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});
+  });
+  const fActifSite=document.getElementById('ac-filter-actif-site')?.value||'';
+  const fActifItem=document.getElementById('ac-filter-actif-item')?.value||'';
+  const actifs=DB.acces.filter(a=>a.statut==='actif'&&(!fActifSite||a.site_nom===fActifSite)&&(!fActifItem||a.item_nom===fActifItem));
+  document.getElementById('nb-anr').textContent=DB.acces.filter(a=>a.statut==='actif').length;
+  document.getElementById('acces-actifs').innerHTML=actifs.length?actifs.map(a=>{
+    const hrs=Math.floor((Date.now()-new Date(a.date_remise))/3600000);
+    const late=hrs>24;
+    return `<div class="card mb14">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <span style="font-size:28px">${a.item_type==='badge'?'🪪':'🔑'}</span>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700">${a.item_nom}</div>
+          <div style="font-size:12px;color:var(--gray-mid);margin-top:3px">📍 ${a.site_nom} · 👮 ${a.agent_nom}</div>
+          <div style="font-size:12px;margin-top:3px">👤 <strong>${a.receptionnaire_nom}</strong>${a.receptionnaire_societe?' — '+a.receptionnaire_societe:''}</div>
+          <div style="font-size:11px;color:${late?'var(--red)':'var(--gray-mid)'};margin-top:3px">
+            🕐 ${new Date(a.date_remise).toLocaleDateString('fr-FR')} ${new Date(a.date_remise).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+            ${late?' — ⚠️ '+Math.floor(hrs/24)+'j sans retour':''}
+          </div>
+          ${a.notes?`<div style="font-size:11px;color:var(--gray-dark);margin-top:4px;padding:6px 8px;background:var(--gray-light);border-radius:4px">📝 ${a.notes}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <span class="badge ${late?'balert':'bwarn'}">${late?'⚠️ Retard':'En cours'}</span>
+          <button class="btn btn-ok btn-sm" onclick="doRetourAccesAdmin('${a.id}','${a.item_nom}')">↩️ Retour</button>
+        </div>
+      </div>
+    </div>`;
+  }).join(''):'<div style="color:var(--green);font-weight:700;padding:10px 0">✅ Aucune remise active</div>';
+}
+
 async function doRetourAccesAdmin(id,nom){
   if(!confirm('Confirmer le retour de "'+nom+'" ?'))return;
   try{
     await sb.patch('stock_acces',id,{statut:'rendu',date_retour_reel:new Date().toISOString()});
-    await loadAll();rAcces();toast('↩️ Retour de '+nom+' enregistré');
+    await loadAll();rAcces();rAccesNonRet();toast('↩️ Retour de '+nom+' enregistré');
   }catch(e){toast('❌ '+e.message);}
 }
 
