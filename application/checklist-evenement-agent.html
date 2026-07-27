@@ -162,13 +162,23 @@ body{font-family:Arial,Helvetica,sans-serif;color:var(--black);}
     <div class="fg">
       <label class="fl">Photo — départ des invités</label>
       <div class="photo-box" id="photo-depart" onclick="document.getElementById('file-depart').click()">📷</div>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <div onclick="document.getElementById('file-depart-camera').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">📷 Caméra</div>
+        <div onclick="document.getElementById('file-depart').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">🖼 Galerie</div>
+      </div>
       <input type="file" id="file-depart" accept="image/*" style="display:none" onchange="onPhoto(this,'depart')">
+      <input type="file" id="file-depart-camera" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this,'depart')">
     </div>
     <div class="fg"><label class="fl">Heure de fin de service (accord client)</label><input type="time" class="fi" id="rp-fin-heure"></div>
     <div class="fg">
       <label class="fl">Photo — fin de service</label>
       <div class="photo-box" id="photo-fin" onclick="document.getElementById('file-fin').click()">📷</div>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <div onclick="document.getElementById('file-fin-camera').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">📷 Caméra</div>
+        <div onclick="document.getElementById('file-fin').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">🖼 Galerie</div>
+      </div>
       <input type="file" id="file-fin" accept="image/*" style="display:none" onchange="onPhoto(this,'fin')">
+      <input type="file" id="file-fin-camera" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this,'fin')">
     </div>
 
     <button class="btn-submit" id="btn-save-rapport" onclick="saveRapport(false)">💾 Enregistrer</button>
