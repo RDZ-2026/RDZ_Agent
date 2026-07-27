@@ -92,6 +92,8 @@
     /* ── Style du moteur "RDZ Reports" (repris à l'identique) ── */
     .rpt-wrap{max-width:800px;margin:20px auto;padding:0;display:none;}
     .rpt-wrap.open{display:block;}
+    .ods-wrap{max-width:800px;margin:20px auto;padding:0;display:none;}
+    .ods-wrap.open{display:block;}
     .rpt-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
     .rpt-page{background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1);}
     .rpt-hdr{background:#1a1a1a;padding:1.5rem 2rem;}
@@ -128,8 +130,12 @@
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
       .header,.content > .page-title,.content > .page-sub,#view-list,.back-link,.detail-hero,.detail-card,.footer{display:none!important;}
       body{background:#fff;}
-      .rpt-wrap{display:block!important;margin:0;max-width:100%;}
+      .rpt-wrap{display:none;margin:0;max-width:100%;}
+      .rpt-wrap.open{display:block!important;}
       .rpt-toolbar{display:none!important;}
+      .ods-wrap{display:none;margin:0;max-width:100%;}
+      .ods-wrap.open{display:block!important;}
+      .ods-toolbar{display:none!important;}
       .rpt-page{box-shadow:none;border-radius:0;}
       .rpt-sec{break-inside:avoid;}
       .rpt-photos{break-inside:avoid;}
@@ -180,10 +186,12 @@
         <button class="tab2 active" id="t-generique" onclick="switchTab2('generique')">📋 Générique</button>
         <button class="tab2" id="t-responsable" onclick="switchTab2('responsable')">⭐ Responsable</button>
         <button class="tab2" id="t-rapport" onclick="switchTab2('rapport')">📄 Rapport</button>
+        <button class="tab2" id="t-ods" onclick="switchTab2('ods')">📃 Ordre de service</button>
       </div>
       <div class="panel2 active" id="p-generique"></div>
       <div class="panel2" id="p-responsable"></div>
       <div class="panel2" id="p-rapport"></div>
+      <div class="panel2" id="p-ods"></div>
     </div>
   </div>
 
@@ -194,6 +202,15 @@
       <button class="btn-nav" style="background:#fff;border-color:var(--rdz-border);color:var(--rdz-gray)" onclick="closePrintView()">✕ Fermer l'aperçu</button>
     </div>
     <div id="rpt-content"></div>
+  </div>
+
+  <div class="ods-wrap" id="ods-wrap">
+    <div class="ods-toolbar" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn-nav" style="background:var(--rdz-red);border-color:var(--rdz-red-dark);color:#fff" onclick="window.print()">🖨 Imprimer</button>
+      <div style="flex:1"></div>
+      <button class="btn-nav" style="background:#fff;border-color:var(--rdz-border);color:var(--rdz-gray)" onclick="closeODSView()">✕ Fermer l'aperçu</button>
+    </div>
+    <div id="ods-content"></div>
   </div>
 </div>
 
@@ -311,11 +328,12 @@ async function openDetail(id){
   renderChecklistPanel('generique');
   renderChecklistPanel('responsable');
   renderRapportPanel();
+  renderODSPanel();
   switchTab2('generique');
 }
 
 function switchTab2(tab){
-  ['generique','responsable','rapport'].forEach(t => {
+  ['generique','responsable','rapport','ods'].forEach(t => {
     document.getElementById('t-'+t).classList.toggle('active', t===tab);
     document.getElementById('p-'+t).classList.toggle('active', t===tab);
   });
@@ -362,6 +380,14 @@ async function toggleItemAdmin(itemId, formulaire){
 
 // ─── RAPPORT (consultable + modifiable) ───────────────────────────────────────
 let controleValAdmin = null;
+function renderODSPanel(){
+  const el = document.getElementById('p-ods');
+  el.innerHTML = `<div style="padding:20px;text-align:center">
+    <div style="font-size:12.5px;color:var(--rdz-gray);margin-bottom:14px">Consulter et imprimer l'ordre de service de cet événement.</div>
+    <button class="btn-save2" onclick="openODSView()">📃 Voir / Imprimer l'ordre de service</button>
+  </div>`;
+}
+
 function renderRapportPanel(){
   const el = document.getElementById('p-rapport');
   const r = rapport || {};
@@ -503,6 +529,7 @@ function buildRapportHtml(){
 function openPrintView(){
   if(!rapport){ alert('Aucun rapport enregistré pour cet événement.'); return; }
   document.getElementById('rpt-content').innerHTML = buildRapportHtml();
+  document.getElementById('ods-wrap').classList.remove('open');
   document.getElementById('rpt-wrap').classList.add('open');
   window.scrollTo(0,0);
 }
@@ -512,6 +539,176 @@ function closePrintView(){
 
 document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
 loadAll();
+
+// ═══ ORDRE DE SERVICE (repris à l'identique de evenements.html) ═══
+function fmtOds(d){ if(!d) return ''; const [y,m,dd]=d.split('-'); return `${dd}.${m}.${y}`; }
+function fmtFullOds(d){ if(!d) return ''; return new Date(d+'T00:00:00').toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
+function todayOds(){ return new Date().toISOString().split('T')[0]; }
+
+function printHeaderOds(){
+  return `<table style="width:100%;margin-bottom:0"><tr>
+    <td style="padding-bottom:10px;vertical-align:bottom">
+      <div style="font-size:17px;font-weight:700;letter-spacing:.07em;color:#8B1A1A;text-transform:uppercase">RDZ Security Management SA</div>
+    </td>
+    <td style="text-align:right;vertical-align:bottom;padding-bottom:10px">
+      <div style="font-size:10px;color:#9a9a9a;text-transform:uppercase;letter-spacing:.05em">Document confidentiel — usage interne</div>
+      <div style="font-size:10px;color:#9a9a9a;margin-top:2px">Édité le ${fmtOds(todayOds())}</div>
+    </td>
+  </tr></table>
+  <div style="border-bottom:3px solid #8B1A1A;margin-bottom:16px"></div>`;
+}
+function signatureBlockOds(){
+  return `<div style="margin-top:24px;border-top:1px solid #d0ccc5;padding-top:14px;page-break-inside:avoid">
+    <div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1a1a1a;margin-bottom:12px">Prise en charge — à signer par l'agent</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="width:40%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Nom et prénom</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+        <td style="width:20%;padding-right:20px;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+        <td style="width:40%;vertical-align:bottom">
+          <div style="font-size:10px;color:#9a9a9a;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Signature</div>
+          <div style="border-bottom:1px solid #1a1a1a;height:28px"></div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+}
+
+function buildOrdreDeServiceHtml(e){
+  const site = sites.find(s=>s.id===e.site_id);
+  const serviceDebut = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : (e.heure_debut ? e.heure_debut.slice(0,5) : null);
+  const serviceFin   = e.heure_service_fin   ? e.heure_service_fin.slice(0,5)   : (e.heure_fin   ? e.heure_fin.slice(0,5)   : null);
+
+  let html = `<div style="font-family:Arial,sans-serif;color:#1a1a1a">`;
+  html += printHeaderOds();
+  html += `<div style="text-align:center;margin-bottom:18px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Ordre de service</div>
+    <div style="font-size:16px;font-weight:700;color:#8B1A1A;letter-spacing:.03em;line-height:1.3">${escHtml(e.titre)}</div>
+    <div style="font-size:10px;color:#4a4a4a;margin-top:6px">${fmtFullOds(e.date)}</div>
+  </div>`;
+
+  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:18px;border:1px solid #d0ccc5">
+    <tr>
+      <td style="padding:12px 14px;background:#1a1a1a;color:#fff;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:4px">Lieu</div>
+        <div style="font-size:10px;font-weight:700">${escHtml(e.lieu || (site ? site.nom : '—'))}</div>
+        ${site && e.lieu ? `<div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:2px">${escHtml(site.nom)}</div>` : ''}
+      </td>
+      <td style="padding:12px 14px;background:#8B1A1A;color:#fff;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:4px">Prise de service</div>
+        <div style="font-size:16px;font-weight:700">${serviceDebut || '—'}</div>
+        ${serviceFin ? `<div style="font-size:9px;color:rgba(255,255,255,.75);margin-top:1px">Fin : ${serviceFin}</div>` : ''}
+      </td>
+      <td style="padding:12px 14px;background:#f5f4f2;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Horaire événement</div>
+        <div style="font-size:10px;font-weight:700;color:#1a1a1a">${e.heure_debut ? e.heure_debut.slice(0,5) : '—'}${e.heure_fin ? ' → ' + e.heure_fin.slice(0,5) : ''}</div>
+      </td>
+      <td style="padding:12px 14px;background:#f5f4f2;width:25%;vertical-align:top;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin-bottom:4px">Effectif / Tenue</div>
+        <div style="font-size:10px;font-weight:700;color:#1a1a1a">${e.nb_agents||0} agent${e.nb_agents > 1 ? 's' : ''}</div>
+        ${e.tenue ? `<div style="font-size:9px;color:#4a4a4a;margin-top:2px">${escHtml(e.tenue)}</div>` : ''}
+      </td>
+    </tr>
+  </table>`;
+
+  if(e.agents) html += `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:2px;padding:8px 14px;margin-bottom:14px">
+    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#166534;margin-right:8px">Agent(s) désigné(s)</span>
+    <span style="font-size:12px;font-weight:700;color:#1a1a1a">${escHtml(e.agents)}</span>
+  </div>`;
+
+  html += `<div style="margin-bottom:14px">
+    <div style="background:#1a1a1a;color:#fff;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">Mission et consignes</div>
+    <div style="border:1px solid #d0ccc5;border-top:none">
+      <div style="padding:0 14px">
+        <div style="border-bottom:1px dashed #e5e2dd;padding:10px 0">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Avant l'événement</div>
+          <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+            · Se présenter au contact sur place pour le briefing initial<br>
+            · Vérifier les issues de secours (localisation, accessibilité, signalisation)<br>
+            · Contrôler l'emplacement et l'état du matériel de premiers secours<br>
+            · Identifier les équipements de sécurité incendie<br>
+            · Effectuer une reconnaissance des lieux et des circuits de circulation
+          </div>
+        </div>
+        <div style="border-bottom:1px dashed #e5e2dd;padding:10px 0">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Pendant l'événement</div>
+          <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+            · Assurer la surveillance continue des espaces assignés<br>
+            · Contrôler les accès et la circulation des participants<br>
+            · Maintenir une attitude professionnelle et discrète tout au long de la mission<br>
+            · Veiller à la sécurité des participants et du personnel<br>
+            · Signaler immédiatement tout incident ou situation anormale à l'astreinte et/ou aux organisateurs
+          </div>
+        </div>
+        <div style="padding:10px 0">
+          <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8B1A1A;margin-bottom:6px">▶ Après l'événement</div>
+          <div style="font-size:11px;color:#1a1a1a;line-height:1.7">
+            · Vérifier que tous les espaces sont évacués<br>
+            · S'assurer de la propreté et de l'ordre des espaces avant le départ<br>
+            · Procéder à la fermeture sécurisée selon les procédures établies du lieu
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  if(e.consignes) html += `<div style="margin-bottom:14px;page-break-inside:avoid">
+    <div style="background:#8B1A1A;color:#fff;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">⚠ Consignes spécifiques à cet événement</div>
+    <div style="border:2px solid #8B1A1A;border-top:none;padding:14px 16px;background:#fff8f8;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="font-size:12px;color:#1a1a1a;line-height:1.8;white-space:pre-wrap">${escHtml(e.consignes)}</div>
+    </div>
+  </div>`;
+
+  if(e.remarques) html += `<div style="margin-bottom:14px;page-break-inside:avoid">
+    <div style="background:#4a4a4a;color:#fff;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">📋 Notes et informations complémentaires</div>
+    <div style="border:1px solid #4a4a4a;border-top:none;padding:14px 16px;background:#f9f9f9;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <div style="font-size:12px;color:#1a1a1a;line-height:1.8;white-space:pre-wrap">${escHtml(e.remarques)}</div>
+    </div>
+  </div>`;
+
+  html += `<div style="margin-bottom:18px">
+    <div style="background:#1a1a1a;color:#fff;padding:8px 12px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact">Contacts</div>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #d0ccc5;border-top:none">
+      <tr>
+        <td style="padding:10px 12px;border-right:1px solid #e5e2dd;width:33%;vertical-align:top">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Astreinte RDZ</div>
+          <div style="font-size:12px;font-weight:700;color:#8B1A1A">+41 79 339 13 41</div>
+        </td>
+        <td style="padding:10px 12px;border-right:1px solid #e5e2dd;width:33%;vertical-align:top">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Contact événement</div>
+          <div style="font-size:11px;color:#1a1a1a">${e.contact ? escHtml(e.contact) : '<span style="color:#ccc;font-style:italic">Non renseigné</span>'}</div>
+        </td>
+        <td style="padding:10px 12px;width:33%;vertical-align:top">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b6b6b;margin-bottom:3px">Urgences</div>
+          <div style="font-size:11px;color:#1a1a1a;line-height:1.6">Police : <strong>117</strong> &nbsp;|&nbsp; Pompiers : <strong>118</strong><br>Ambulance : <strong>144</strong></div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
+  html += signatureBlockOds();
+  html += `<div style="margin-top:16px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#9a9a9a">
+    <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
+    <span>${fmtOds(e.date)}</span>
+  </div>`;
+  html += `</div>`;
+  return html;
+}
+
+function openODSView(){
+  document.getElementById('ods-content').innerHTML = buildOrdreDeServiceHtml(currentEvent);
+  document.getElementById('rpt-wrap').classList.remove('open');
+  document.getElementById('ods-wrap').classList.add('open');
+  window.scrollTo(0,0);
+}
+function closeODSView(){
+  document.getElementById('ods-wrap').classList.remove('open');
+}
 </script>
 
 </body>
