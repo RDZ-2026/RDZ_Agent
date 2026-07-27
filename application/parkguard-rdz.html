@@ -307,9 +307,14 @@ input[type="file"]{display:none}
 
     <div id="vide-photos-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"></div>
 
-    <button class="outline-btn" id="btn-add-vide-photo" onclick="addVidePhoto()" style="margin-bottom:12px">
-      📷 Ajouter une photo d'emplacement
-    </button>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="outline-btn" id="btn-add-vide-photo-cam" onclick="addVidePhoto(true)" style="flex:1">
+        📷 Caméra
+      </button>
+      <button class="outline-btn" id="btn-add-vide-photo-gal" onclick="addVidePhoto(false)" style="flex:1">
+        🖼 Galerie
+      </button>
+    </div>
 
     <div class="field-group">
       <label class="field-label">Remarque (optionnel)</label>
@@ -388,6 +393,7 @@ input[type="file"]{display:none}
 </div>
 <div id="toast" class="toast"></div>
 <input type="file" id="file-input" accept="image/*">
+<input type="file" id="file-input-camera" accept="image/*" capture="environment">
 
 <script>
 // ═══ CONFIG ═══
@@ -897,7 +903,7 @@ if (document.readyState === 'loading') {
 }
 
 // ═══ PHOTO INPUT ═══
-document.getElementById('file-input').addEventListener('change', function() {
+function handlePhotoFileChange() {
   if (this.files[0] && pendingFileCallback) {
     const file = this.files[0];
     const reader = new FileReader();
@@ -905,8 +911,10 @@ document.getElementById('file-input').addEventListener('change', function() {
     reader.readAsDataURL(file);
     this.value = '';
   }
-});
-function triggerCamera(cb) { pendingFileCallback = cb; document.getElementById('file-input').click(); }
+}
+document.getElementById('file-input').addEventListener('change', handlePhotoFileChange);
+document.getElementById('file-input-camera').addEventListener('change', handlePhotoFileChange);
+function triggerCamera(cb, useCamera) { pendingFileCallback = cb; document.getElementById(useCamera ? 'file-input-camera' : 'file-input').click(); }
 
 // ═══ COMPTAGE DLCC ═══
 let comptageZones = []; // zones chargées depuis Supabase
@@ -1111,17 +1119,18 @@ async function saveComptage() {
 // ═══ PARKING VIDE ═══
 let videPhotos = [];
 
-function addVidePhoto() {
+function addVidePhoto(useCamera) {
   if (videPhotos.length >= 6) { toast('Maximum 6 photos'); return; }
   triggerCamera(function(dataUrl, file) {
     videPhotos.push({ dataUrl, file });
     renderVidePhotos();
-  });
+  }, useCamera);
 }
 
 function renderVidePhotos() {
   const grid = document.getElementById('vide-photos-grid');
-  const btn  = document.getElementById('btn-add-vide-photo');
+  const btnCam = document.getElementById('btn-add-vide-photo-cam');
+  const btnGal = document.getElementById('btn-add-vide-photo-gal');
   const save = document.getElementById('btn-save-vide');
 
   grid.innerHTML = videPhotos.map((p, i) =>
@@ -1132,8 +1141,11 @@ function renderVidePhotos() {
     '</div>'
   ).join('');
 
-  btn.style.display  = videPhotos.length >= 6 ? 'none' : 'flex';
-  btn.textContent    = '📷 Ajouter une photo (' + videPhotos.length + '/6)';
+  const atMax = videPhotos.length >= 6;
+  btnCam.style.display = atMax ? 'none' : 'flex';
+  btnGal.style.display = atMax ? 'none' : 'flex';
+  btnCam.textContent = '📷 Caméra (' + videPhotos.length + '/6)';
+  btnGal.textContent = '🖼 Galerie (' + videPhotos.length + '/6)';
   var saveBtn = document.getElementById('btn-save-vide');
   if (saveBtn) { saveBtn.disabled = videPhotos.length === 0; saveBtn.style.opacity = videPhotos.length === 0 ? '.35' : '1'; }
 }
@@ -1225,14 +1237,19 @@ function renderFlowStep() {
     if (taken) {
       html += '<div class="photo-zone taken" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
         '<img src="' + taken + '">' +
-        '<button class="photo-retake" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\')">Reprendre</button>' +
+        '<button class="photo-retake" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\', true)">📷</button>' +
+        '<button class="photo-retake" style="right:44px" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\', false)">🖼</button>' +
         '<div class="photo-taken-bar">✅ Photo enregistrée</div></div>';
     } else {
-      html += '<div class="photo-zone" onclick="takeFlowPhoto(\'' + s.photo.key + '\')">' +
+      html += '<div class="photo-zone" style="cursor:default">' +
         '<div class="photo-zone-inner">' +
         '<div class="photo-zone-icon">📷</div>' +
         '<div class="photo-zone-label">' + s.label + '</div>' +
         '<div class="photo-zone-sub">' + s.photo.hint + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;width:100%">' +
+        '<button class="outline-btn" style="flex:1" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\', true)">📷 Caméra</button>' +
+        '<button class="outline-btn" style="flex:1" onclick="event.stopPropagation();takeFlowPhoto(\'' + s.photo.key + '\', false)">🖼 Galerie</button>' +
+        '</div>' +
         '</div></div>';
     }
   }
@@ -1266,12 +1283,12 @@ function renderFlowStep() {
   }
 }
 
-function takeFlowPhoto(key) {
+function takeFlowPhoto(key, useCamera) {
   triggerCamera(function(dataUrl, file) {
     flowPhotos[key] = dataUrl;
     if (file) flowBlobs[key] = file;
     renderFlowStep();
-  });
+  }, useCamera);
 }
 
 async function nextFlowStep() {
