@@ -597,6 +597,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
         </div>
         <input type="hidden" id="ai-item-type" value="clé">
       </div>
+      <div class="fg"><label class="fl">Destiné à</label>
+        <div class="chips" id="ai-public-chips">
+          <span class="chip sel" onclick="selC(this,'ai-public','tous')">🔁 Les deux</span>
+          <span class="chip" onclick="selC(this,'ai-public','agent')">👮 Agent uniquement</span>
+          <span class="chip" onclick="selC(this,'ai-public','externe')">👤 Externe uniquement</span>
+        </div>
+        <input type="hidden" id="ai-public" value="tous">
+        <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Contrôle dans quelle application terrain cette clé/badge apparaît</div>
+      </div>
       <div class="fg"><label class="fl">Site de stockage</label>
         <select class="fc" id="ai-site"><option value="">— Aucun site assigné —</option></select>
         <div style="font-size:11px;color:var(--gray-mid);margin-top:4px">Le site se pré-remplira automatiquement lors de la remise</div>
@@ -1652,10 +1661,13 @@ function rCfgAcces(){
       const siteLabel=item.site_nom
         ?'<span style="color:var(--gray-mid)"> · 📍 '+item.site_nom+'</span>'
         :'<span style="color:var(--amber)"> · ⚠️ Sans site assigné</span>';
+      const pub=item.public||'tous';
+      const pubLabel=pub==='agent'?'<span class="badge binfo">👮 Agent uniquement</span>':pub==='externe'?'<span class="badge bgray">👤 Externe uniquement</span>':'<span class="badge bok">🔁 Les deux</span>';
       return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">'
         +'<div style="flex:1">'
         +'<div style="font-size:13px;font-weight:700">'+item.nom+'</div>'
         +'<div style="font-size:11px;color:var(--gray-mid)">'+typeLabel+siteLabel+'</div>'
+        +'<div style="margin-top:4px">'+pubLabel+'</div>'
         +'</div>'
         +'<button class="btn btn-g btn-sm" onclick="openEditAccesItem(\''+item.id+'\',\'item\')">✏️ Modifier</button>'
         +'<button class="btn btn-xs" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5"'
@@ -1711,6 +1723,11 @@ function openEditAccesItem(id,type){
       const v=c.textContent.includes('Clé')?'clé':c.textContent.includes('Badge')?'badge':'autre';
       c.classList.toggle('sel',v===(item.type||'clé'));
     });
+    document.getElementById('ai-public').value=item.public||'tous';
+    document.querySelectorAll('#ai-public-chips .chip').forEach(c=>{
+      const v=c.textContent.includes('Agent')?'agent':c.textContent.includes('Externe')?'externe':'tous';
+      c.classList.toggle('sel',v===(item.public||'tous'));
+    });
   }
   document.getElementById('m-acces-item').classList.add('show');
 }
@@ -1736,6 +1753,12 @@ function openNewAccesItem(type){
   const labels={site:'Nom du site',item:'Nom de la clé / badge',recept:'Nom du réceptionnaire'};
   document.getElementById('acces-item-title').textContent=titles[type];
   document.getElementById('ai-label-nom').textContent=labels[type];
+  if(type==='item'){
+    document.getElementById('ai-public').value='tous';
+    document.querySelectorAll('#ai-public-chips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+    document.querySelectorAll('#ai-type-chips .chip').forEach((c,i)=>c.classList.toggle('sel',i===0));
+    document.getElementById('ai-item-type').value='clé';
+  }
   document.getElementById('m-acces-item').classList.add('show');
 }
 
@@ -1746,6 +1769,7 @@ async function doSaveAccesItem(){
   const desc=document.getElementById('ai-desc').value.trim();
   const societe=document.getElementById('ai-societe').value.trim();
   const itemType=document.getElementById('ai-item-type').value;
+  const itemPublic=document.getElementById('ai-public').value;
   if(!nom){toast('⚠️ Nom requis');return;}
 
   // Récupérer site depuis le select (format "uuid|nom")
@@ -1758,7 +1782,7 @@ async function doSaveAccesItem(){
   const tables={site:'stock_acces_sites',item:'stock_acces_items',recept:'stock_acces_recept'};
   const bodies={
     site:{nom},
-    item:{nom,type:itemType,description:desc||null,site_id:siteId,site_nom:siteNom},
+    item:{nom,type:itemType,public:itemPublic,description:desc||null,site_id:siteId,site_nom:siteNom},
     recept:{nom,societe:societe||null}
   };
 
