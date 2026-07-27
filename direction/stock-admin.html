@@ -7,20 +7,20 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --red:#C8102E;--black:#1a1a1a;--white:#fff;
-  --gray-light:#f4f4f4;--gray-border:#e0e0e0;--gray-mid:#888;--gray-dark:#555;
+  --red:#8B1A1A;--red-dark:#6B1212;--black:#1a1a1a;--white:#fff;
+  --gray-light:#f5f4f2;--gray-border:#d0ccc5;--gray-mid:#888;--gray-dark:#555;
   --green:#1e7a1e;--green-light:#f0f8f0;--green-border:#86c986;
   --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fbbf24;
   --blue:#2563eb;--blue-light:#eff6ff;--blue-border:#93c5fd;
   --purple:#7c3aed;--purple-light:#f5f3ff;--purple-border:#c4b5fd;
-  --sidebar:224px;--radius:10px;--radius-sm:6px;
+  --sidebar:224px;--radius:2px;--radius-sm:2px;
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--gray-light);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-.topbar{background:var(--black);height:54px;display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:3px solid var(--red);flex-shrink:0}
-.logo{font-size:17px;font-weight:900;color:#fff;letter-spacing:.08em}.logo span{color:var(--red)}
-.logo-sub{font-size:10px;color:#aaa;font-weight:700;border-left:1px solid #333;padding-left:12px;margin-left:2px}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--red);height:54px;display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:4px solid var(--red-dark);flex-shrink:0}
+.logo{font-size:14px;font-weight:700;color:#fff;letter-spacing:.07em;text-transform:uppercase}.logo span{color:rgba(255,255,255,.65)}
+.logo-sub{font-size:10px;color:rgba(255,255,255,.6);font-weight:700;border-left:1px solid rgba(255,255,255,.3);padding-left:12px;margin-left:2px;text-transform:uppercase;letter-spacing:.03em}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.sync-wrap{display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa}
+.sync-wrap{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7)}
 .sync-dot{width:7px;height:7px;border-radius:50%}
 .sync-dot.ok{background:var(--green)}.sync-dot.loading{background:var(--amber);animation:blink 1s infinite}.sync-dot.err{background:var(--red)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
@@ -125,6 +125,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
   <button class="nav-item active" id="nav-dash"  onclick="go('dash')"><span class="ni">🏠</span>Vue d'ensemble</button>
   <div class="sb-sec">Matériel</div>
   <button class="nav-item" id="nav-stock" onclick="go('stock')"><span class="ni">📦</span>Stock matériel</button>
+  <button class="nav-item" id="nav-nonret" onclick="go('nonret')"><span class="ni">📤</span>Non retourné <span class="nav-bdg" id="nb-nr">—</span></button>
   <button class="nav-item" id="nav-hmat"  onclick="go('hmat')"><span class="ni">📜</span>Historique</button>
   <button class="nav-item" id="nav-maint" onclick="go('maint')"><span class="ni">🔧</span>Maintenance <span class="nav-bdg" id="nb-m">—</span></button>
   <button class="nav-item" id="nav-acces" onclick="go('acces')"><span class="ni">🔑</span>Clés & Badges</button>
@@ -168,6 +169,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
     <button class="btn btn-p btn-sm" onclick="openAjustFor(null)">➕ Ajuster stock</button>
   </div>
   <div id="stock-list"></div>
+</div>
+
+<!-- MATÉRIEL NON RETOURNÉ -->
+<div class="panel" id="panel-nonret">
+  <div class="phdr">
+    <div><div class="ptitle">📤 Matériel non retourné</div></div>
+  </div>
+  <div class="card" id="nonret-list"></div>
 </div>
 
 <!-- HISTORIQUE MATÉRIEL -->
@@ -714,6 +723,7 @@ async function loadAll(){
     tailles.forEach(t=>{if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[];DB.tailles[t.article_id].push(t);});
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
+    document.getElementById('nb-nr').textContent=attr.length;
     sync('ok','Synchronisé — '+new Date().toLocaleTimeString('fr-FR'));
     return true;
   }catch(e){sync('err','Erreur connexion');console.error(e);return false;}
@@ -727,7 +737,7 @@ function calcAlerts(){
   return n;
 }
 async function refresh(){await loadAll();renderPanel();toast('🔄 Données actualisées');}
-function renderPanel(){({dash:rDash,stock:rStock,hmat:rHmat,maint:rMaint,acces:rAcces,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
+function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
 function go(n){
   PANEL=n;
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -779,50 +789,50 @@ function rDash(){
 
 // ═══ STOCK MATÉRIEL ═══
 function rStock(){
-  document.getElementById('stock-list').innerHTML=DB.stock.map(item=>{
+  document.getElementById('stock-list').innerHTML=DB.stock.length?`<div class="card" style="padding:0">`+DB.stock.map(item=>{
     const s=stm(item),pct=Math.round(item.quantite_dispo/item.quantite_total*100)||0;
     const c=s==='ok'?'var(--green)':s==='warn'?'var(--amber)':'var(--red)';
     const attribs=DB.attr.filter(a=>a.materiel_id===item.id);
     const inSvc=attribs.reduce((x,a)=>x+a.quantite,0);
-
-    // Build agents-in-service list
-    const agentsHTML=attribs.length?`
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-border)">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--gray-mid);margin-bottom:7px">En service</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${attribs.map(a=>{
-            const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
-            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:${late?'#fef2f2':'var(--gray-light)'};border:1px solid ${late?'#fca5a5':'var(--gray-border)'};border-radius:99px;font-size:12px">
-              <div style="width:22px;height:22px;border-radius:50%;background:var(--black);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0">${ini(a.agent_nom)}</div>
-              <span style="font-weight:600;color:${late?'var(--red)':'var(--black)'}">${a.agent_nom}</span>
-              <span style="color:var(--gray-mid)">×${a.quantite}</span>
-              ${late?'<span style="color:var(--red);font-size:10px">⚠️</span>':''}
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`:'';
-
-    return `<div class="card mb14">
-      <div style="display:flex;align-items:center;gap:13px">
-        <span style="font-size:30px">${item.icon}</span>
-        <div style="flex:1">
-          <div style="font-size:14px;font-weight:700">${item.nom}</div>
-          <div style="font-size:12px;color:var(--gray-mid)">Seuil : ${item.seuil_alerte} · En service : <strong>${inSvc}</strong></div>
-          <div class="prog" style="margin-top:7px"><div class="prog-b ${s==='ok'?'pgreen':s==='warn'?'pamber':'pred'}" style="width:${pct}%"></div></div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:30px;font-weight:900;color:${c};line-height:1">${item.quantite_dispo}</div>
-          ${item.quantite_total>0?'<div style="font-size:11px;color:var(--gray-mid)">/ '+item.quantite_total+'</div>':'<div style="font-size:10px;color:var(--gray-mid)">non défini</div>'}
-          <span class="badge ${s==='ok'?'bok':s==='warn'?'bwarn':'balert'}" style="margin-top:5px">${s==='ok'?'✅ OK':s==='warn'?'⚠️ Faible':'🚨 Critique'}</span>
-        </div>
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--gray-border)">
+      <span style="font-size:20px;width:26px;text-align:center;flex-shrink:0">${item.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">${item.nom}</div>
+        <div class="prog" style="margin-top:5px;max-width:200px"><div class="prog-b ${s==='ok'?'pgreen':s==='warn'?'pamber':'pred'}" style="width:${pct}%"></div></div>
       </div>
-      ${agentsHTML}
-      <div style="margin-top:10px;text-align:right">
-        <button class="btn btn-g btn-sm" onclick="openAjustFor('${item.id}')">✏️ Ajuster</button>
+      <div style="font-size:11px;color:var(--gray-mid);white-space:nowrap">Seuil ${item.seuil_alerte}${inSvc?' · En service <strong style="color:var(--black)">'+inSvc+'</strong>':''}</div>
+      <div style="text-align:right;flex-shrink:0;min-width:56px">
+        <div style="font-size:18px;font-weight:900;color:${c};line-height:1">${item.quantite_dispo}</div>
+        <div style="font-size:10px;color:var(--gray-mid)">${item.quantite_total>0?'/ '+item.quantite_total:'—'}</div>
       </div>
+      <span class="badge ${s==='ok'?'bok':s==='warn'?'bwarn':'balert'}" style="flex-shrink:0">${s==='ok'?'✅':s==='warn'?'⚠️':'🚨'}</span>
+      <button class="btn btn-g btn-sm" onclick="openAjustFor('${item.id}')" style="flex-shrink:0">✏️ Ajuster</button>
     </div>`;
-  }).join('');
+  }).join('')+`</div>`:'<div class="card" style="text-align:center;color:var(--gray-mid);padding:20px">Aucun article</div>';
 }
+
+function rNonRet(){
+  const attribs=(DB.attr||[]).slice().sort((a,b)=>new Date(a.date_sortie)-new Date(b.date_sortie));
+  document.getElementById('nb-nr').textContent=attribs.length;
+  if(!attribs.length){document.getElementById('nonret-list').innerHTML='<div style="text-align:center;color:var(--green);font-weight:700;padding:20px">✅ Tout le matériel est rentré</div>';return;}
+  document.getElementById('nonret-list').innerHTML=`<div style="overflow-x:auto"><table class="tbl"><thead><tr>
+    <th>Article</th><th>Agent</th><th>Qté</th><th>Sorti le</th><th>Depuis</th><th>Statut</th></tr></thead><tbody>`+
+    attribs.map(a=>{
+      const item=DB.stock.find(s=>s.id===a.materiel_id);
+      const hrs=Math.floor((Date.now()-new Date(a.date_sortie))/3600000);
+      const late=hrs>24;
+      const dureeTxt=hrs<24?hrs+'h':Math.floor(hrs/24)+'j '+(hrs%24)+'h';
+      return `<tr>
+        <td>${item?item.icon+' '+item.nom:'—'}</td>
+        <td><strong>${a.agent_nom}</strong></td>
+        <td>×${a.quantite}</td>
+        <td style="font-size:11px;white-space:nowrap">${new Date(a.date_sortie).toLocaleDateString('fr-FR')} ${new Date(a.date_sortie).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</td>
+        <td><span class="badge ${late?'balert':'bgray'}">${dureeTxt}${late?' ⚠️':''}</span></td>
+        <td><span class="badge ${late?'balert':'bwarn'}">${late?'En retard':'En cours'}</span></td>
+      </tr>`;
+    }).join('')+`</tbody></table></div>`;
+}
+
 function openAjustFor(id){
   fillSelects();
   if(id){document.getElementById('aj-art').value=id;updAjInfo();}
