@@ -134,6 +134,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
   <button class="nav-item" id="nav-vest"  onclick="go('vest')"><span class="ni">👕</span>Stock tenues</button>
   <button class="nav-item" id="nav-dot"   onclick="go('dot')"><span class="ni">👮</span>Dotations</button>
   <button class="nav-item" id="nav-hvest" onclick="go('hvest')"><span class="ni">📜</span>Historique</button>
+  <button class="nav-item" id="nav-inv" onclick="go('inv')"><span class="ni">🔄</span>Inventaires <span class="nav-bdg" id="nb-inv">—</span></button>
   <div class="sb-sec">Rapports</div>
   <button class="nav-item" id="nav-alert" onclick="go('alert')"><span class="ni">🚨</span>Alertes <span class="nav-bdg" id="nb-a">—</span></button>
   <button class="nav-item" id="nav-audit" onclick="go('audit')"><span class="ni">📊</span>Audit</button>
@@ -315,6 +316,29 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
       <tbody id="hvest-body"></tbody>
     </table>
   </div></div>
+</div>
+
+<!-- INVENTAIRES VESTIAIRE -->
+<div class="panel" id="panel-inv">
+  <div id="inv-list-view">
+    <div class="phdr"><div><div class="ptitle">🔄 Inventaires vestiaire</div><div class="psub">Comptages tournants transmis par les agents</div></div></div>
+    <div class="card" id="inv-list"></div>
+  </div>
+  <div id="inv-detail-view" style="display:none">
+    <div class="phdr">
+      <div><div class="ptitle">🔄 Détail de l'inventaire</div><div class="psub" id="inv-detail-sub"></div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-g btn-sm" onclick="backToInvList()">← Retour</button>
+        <button class="btn btn-p btn-sm" id="btn-apply-inv" onclick="applyInventaire()">✅ Appliquer les corrections</button>
+      </div>
+    </div>
+    <div class="card"><div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Article</th><th>Taille</th><th>Théorique</th><th>Compté</th><th>Écart</th></tr></thead>
+        <tbody id="inv-detail-body"></tbody>
+      </table>
+    </div></div>
+  </div>
 </div>
 
 <!-- ALERTES -->
@@ -707,7 +731,7 @@ function alItems(arr){return arr.length?arr.map(i=>`<div class="al-item ${i.t}">
 async function loadAll(){
   sync('loading','Synchronisation…');
   try{
-    const [allAgents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept]=await Promise.all([
+    const [allAgents,stock,articles,tailles,attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept,inventaires]=await Promise.all([
       sb.get('stock_agents','?order=nom'),
       sb.get('stock_materiel_items','?actif=eq.true&order=nom'),
       sb.get('stock_vestiaire_items','?actif=eq.true&order=categorie,nom'),
@@ -721,18 +745,20 @@ async function loadAll(){
       sb.get('stock_acces_sites','?actif=eq.true&order=nom'),
       sb.get('stock_acces_items','?actif=eq.true&order=nom'),
       sb.get('stock_acces_recept','?actif=eq.true&order=nom'),
+      sb.get('stock_inventaires','?order=created_at.desc&limit=100'),
     ]);
     DB={
       agents: allAgents.filter(a=>a.actif!==false),
       inactiveAgents: allAgents.filter(a=>a.actif===false),
       allAgents,
-      stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept
+      stock,articles,tailles:{},attr,maint,dots,histMat,histVest,acces,acesSites,acesItems,acesRecept,inventaires
     };
     tailles.forEach(t=>{if(!DB.tailles[t.article_id])DB.tailles[t.article_id]=[];DB.tailles[t.article_id].push(t);});
     document.getElementById('nb-m').textContent=maint.filter(m=>m.statut==='ouvert'||m.statut==='en_cours').length;
     document.getElementById('nb-a').textContent=calcAlerts();
     document.getElementById('nb-nr').textContent=attr.length;
     document.getElementById('nb-anr').textContent=acces.filter(a=>a.statut==='actif').length;
+    document.getElementById('nb-inv').textContent=inventaires.filter(i=>i.statut==='termine').length;
     sync('ok','Synchronisé — '+new Date().toLocaleTimeString('fr-FR'));
     return true;
   }catch(e){sync('err','Erreur connexion');console.error(e);return false;}
@@ -746,7 +772,7 @@ function calcAlerts(){
   return n;
 }
 async function refresh(){await loadAll();renderPanel();toast('🔄 Données actualisées');}
-function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,accesnonret:rAccesNonRet,vest:rVest,dot:rDot,hvest:rHvest,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
+function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,accesnonret:rAccesNonRet,vest:rVest,dot:rDot,hvest:rHvest,inv:rInv,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
 function go(n){
   PANEL=n;
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1134,6 +1160,81 @@ function rHvest(){
 }
 
 // ═══ ALERTES ═══
+// ═══ INVENTAIRES VESTIAIRE ═══
+let CURRENT_INV=null, CURRENT_INV_LIGNES=[];
+
+function rInv(){
+  document.getElementById('inv-list-view').style.display='block';
+  document.getElementById('inv-detail-view').style.display='none';
+  const invs=(DB.inventaires||[]);
+  const el=document.getElementById('inv-list');
+  if(!invs.length){el.innerHTML='<div style="text-align:center;color:var(--gray-mid);padding:20px">Aucun inventaire transmis pour le moment.</div>';return;}
+  el.innerHTML=invs.map(inv=>{
+    const statutLbl={en_cours:'⏳ En cours (agent)',termine:'📥 À valider',applique:'✅ Appliqué'}[inv.statut]||inv.statut;
+    const statutCls={en_cours:'bwarn',termine:'binfo',applique:'bok'}[inv.statut]||'bgray';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-border);${inv.statut==='termine'?'cursor:pointer':''}" ${inv.statut==='termine'?`onclick="openInvDetail('${inv.id}')"`:''}>
+      <span style="font-size:20px">🔄</span>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700">👤 ${inv.agent_nom}</div>
+        <div style="font-size:11px;color:var(--gray-mid)">Démarré le ${new Date(inv.created_at).toLocaleDateString('fr-FR')} à ${new Date(inv.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}${inv.termine_at?' · Terminé le '+new Date(inv.termine_at).toLocaleDateString('fr-FR'):''}${inv.applique_at?' · Appliqué par '+inv.applique_par:''}</div>
+      </div>
+      <span class="badge ${statutCls}">${statutLbl}</span>
+      ${inv.statut==='termine'?'<button class="btn btn-p btn-sm">👁️ Voir</button>':''}
+    </div>`;
+  }).join('');
+}
+
+async function openInvDetail(id){
+  try{
+    const lignes=await sb.get('stock_inventaire_lignes','?inventaire_id=eq.'+id+'&order=article_nom,taille');
+    CURRENT_INV=(DB.inventaires||[]).find(i=>i.id===id);
+    CURRENT_INV_LIGNES=lignes||[];
+    document.getElementById('inv-list-view').style.display='none';
+    document.getElementById('inv-detail-view').style.display='block';
+    document.getElementById('inv-detail-sub').textContent='👤 '+CURRENT_INV.agent_nom+' — '+new Date(CURRENT_INV.created_at).toLocaleDateString('fr-FR');
+    const btn=document.getElementById('btn-apply-inv');
+    btn.style.display=CURRENT_INV.statut==='termine'?'inline-flex':'none';
+    document.getElementById('inv-detail-body').innerHTML=CURRENT_INV_LIGNES.length?CURRENT_INV_LIGNES.map(l=>{
+      const compte=l.quantite_comptee;
+      const ecart=compte===null||compte===undefined?null:compte-l.quantite_theorique;
+      const ecartTxt=ecart===null?'—':(ecart===0?'✅ 0':(ecart>0?'+'+ecart:ecart));
+      const ecartCls=ecart===null?'bgray':(ecart===0?'bok':'balert');
+      return `<tr>
+        <td>${l.article_nom}</td>
+        <td><span class="badge bgray">${l.taille}</span></td>
+        <td>${l.quantite_theorique}</td>
+        <td>${compte===null||compte===undefined?'<span style="color:var(--gray-mid)">Non compté</span>':compte}</td>
+        <td><span class="badge ${ecartCls}">${ecartTxt}</span></td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--gray-mid);padding:14px">Aucune ligne comptée</td></tr>';
+  }catch(e){toast('❌ '+e.message);}
+}
+
+function backToInvList(){
+  document.getElementById('inv-list-view').style.display='block';
+  document.getElementById('inv-detail-view').style.display='none';
+}
+
+async function applyInventaire(){
+  if(!CURRENT_INV)return;
+  const aCorrigier=CURRENT_INV_LIGNES.filter(l=>l.quantite_comptee!==null&&l.quantite_comptee!==undefined&&l.quantite_comptee!==l.quantite_theorique);
+  if(!confirm('Appliquer cet inventaire va corriger le stock théorique de '+aCorrigier.length+' taille(s) pour correspondre au comptage. Continuer ?'))return;
+  try{
+    for(const l of CURRENT_INV_LIGNES){
+      if(l.quantite_comptee===null||l.quantite_comptee===undefined)continue;
+      const tRow=(DB.tailles[l.article_id]||[]).find(t=>t.taille===l.taille);
+      if(tRow && tRow.quantite!==l.quantite_comptee){
+        await sb.patch('stock_tailles',tRow.id,{quantite:l.quantite_comptee});
+        await sb.post('stock_historique',{module:'vestiaire',type_op:'inventaire',article_nom:l.article_nom,taille:l.taille,quantite:l.quantite_comptee-tRow.quantite,note:'Correction inventaire (théo. '+tRow.quantite+' → compté '+l.quantite_comptee+')',par:'Direction'});
+      }
+    }
+    await sb.patch('stock_inventaires',CURRENT_INV.id,{statut:'applique',applique_at:new Date().toISOString(),applique_par:'Direction'});
+    await loadAll();
+    backToInvList();rInv();
+    toast('✅ Inventaire appliqué — stock corrigé');
+  }catch(e){toast('❌ '+e.message);}
+}
+
 function rAlert(){
   const am=[];
   DB.stock.forEach(s=>{
