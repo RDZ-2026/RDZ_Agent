@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Inventaire Vestiaire</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A;--red-d:#6B1212;--anth:#2d2d2d;
+  --bg:#f0f0f3;--white:#fff;--border:#e2e2e6;--border2:#d0d0d6;
+  --gray:#4a4a4a;--gray3:#9a9a9a;--green:#166534;--green-l:#dcfce7;--amber:#92400e;--amber-l:#fef3c7;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);}
+.screen.hidden{display:none;}
+.topbar{flex-shrink:0;height:54px;background:var(--anth);display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:3px solid var(--red);}
+.tb-back{width:34px;height:34px;background:rgba(255,255,255,.1);border:none;border-radius:6px;color:#fff;font-size:18px;cursor:pointer;}
+.tb-title{color:#fff;font-size:14px;font-weight:700;}
+.tb-sub{color:rgba(255,255,255,.5);font-size:10px;}
+.body{flex:1;overflow-y:auto;padding:14px;}
+.state-msg{text-align:center;padding:50px 16px;color:var(--gray3);font-size:13px;}
+
+.big-btn{width:100%;padding:18px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;}
+.session-card{background:#fff;border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:6px;padding:12px 14px;margin-bottom:10px;cursor:pointer;}
+.session-card:active{background:var(--bg);}
+.session-agent{font-size:13px;font-weight:700;}
+.session-meta{font-size:11.5px;color:var(--gray);margin-top:3px;}
+
+.cat-title{font-size:11px;font-weight:700;color:#fff;background:var(--anth);padding:8px 14px;text-transform:uppercase;letter-spacing:.05em;margin-top:10px;}
+.cat-title:first-child{margin-top:0;}
+.art-card{background:#fff;border-bottom:1px solid var(--border);padding:11px 14px;}
+.art-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.taille-row{display:flex;align-items:center;gap:10px;padding:6px 0;}
+.taille-lbl{width:50px;font-size:12.5px;font-weight:700;color:var(--gray);flex-shrink:0;}
+.taille-theo{font-size:11px;color:var(--gray3);width:70px;flex-shrink:0;}
+.taille-input{flex:1;padding:8px 10px;border:1.5px solid var(--border2);border-radius:6px;font-size:14px;text-align:center;}
+.taille-input.filled{background:var(--green-l);border-color:#86efac;}
+.taille-input.ecart{background:#fef2f2;border-color:#fca5a5;}
+
+.btn-finish{margin:16px 14px 26px;width:calc(100% - 28px);padding:14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+#toasts{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:999;width:calc(100% - 24px);max-width:380px;}
+.toast{background:var(--anth);color:#fff;padding:9px 13px;border-radius:9px;font-size:12.5px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);}
+.toast.err{background:#991b1b;}
+</style>
+</head>
+<body>
+
+<!-- ÉCRAN 1 : ACCUEIL -->
+<div class="screen" id="s-home">
+  <div class="topbar">
+    <div><div class="tb-title">🔄 Inventaire Vestiaire</div><div class="tb-sub">RDZ Security Management</div></div>
+  </div>
+  <div class="body">
+    <button class="big-btn" onclick="startNewSession()">➕ Démarrer un nouvel inventaire</button>
+    <div id="sessions-list"></div>
+  </div>
+</div>
+
+<!-- ÉCRAN 2 : COMPTAGE -->
+<div class="screen hidden" id="s-count">
+  <div class="topbar">
+    <button class="tb-back" onclick="showScreen('s-home')">←</button>
+    <div><div class="tb-title">Comptage en cours</div><div class="tb-sub" id="count-agent-name"></div></div>
+  </div>
+  <div class="body" id="count-body"><div class="state-msg">⏳ Chargement…</div></div>
+  <button class="btn-finish" onclick="finishSession()">✅ Terminer l'inventaire</button>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
+
+let articles = [], tailles = [], currentSession = null, lignes = [];
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+function toast(msg, err){
+  const t = document.createElement('div');
+  t.className = 'toast' + (err?' err':'');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 2400);
+}
+
+async function loadHome(){
+  try{
+    const [{data:art},{data:t},{data:sessions}] = await Promise.all([
+      sb.from('stock_vestiaire_items').select('*').eq('actif',true).order('categorie').order('nom'),
+      sb.from('stock_tailles').select('*'),
+      sb.from('stock_inventaires').select('*').eq('statut','en_cours').order('created_at',{ascending:false})
+    ]);
+    articles = art||[]; tailles = t||[];
+    const el = document.getElementById('sessions-list');
+    if(!sessions || !sessions.length){ el.innerHTML=''; return; }
+    el.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--gray3);text-transform:uppercase;margin:14px 0 8px">Inventaires en cours</div>' +
+      sessions.map(s => `<div class="session-card" onclick="resumeSession('${s.id}')">
+        <div class="session-agent">👤 ${escHtml(s.agent_nom)}</div>
+        <div class="session-meta">Démarré le ${new Date(s.created_at).toLocaleDateString('fr-CH')} à ${new Date(s.created_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>`).join('');
+  }catch(e){ toast('Erreur chargement : '+e.message, true); }
+}
+
+async function startNewSession(){
+  try{
+    const { data, error } = await sb.from('stock_inventaires').insert({ agent_nom: AGENT_NOM, statut:'en_cours' }).select().single();
+    if(error) throw error;
+    currentSession = data;
+    lignes = [];
+    await openCounting();
+  }catch(e){ toast('Erreur : '+e.message, true); }
+}
+async function resumeSession(id){
+  try{
+    const { data, error } = await sb.from('stock_inventaires').select('*').eq('id',id).single();
+    if(error) throw error;
+    currentSession = data;
+    const { data: l } = await sb.from('stock_inventaire_lignes').select('*').eq('inventaire_id', id);
+    lignes = l || [];
+    await openCounting();
+  }catch(e){ toast('Erreur : '+e.message, true); }
+}
+
+async function openCounting(){
+  document.getElementById('count-agent-name').textContent = currentSession.agent_nom;
+  renderCounting();
+  showScreen('s-count');
+}
+
+function renderCounting(){
+  const el = document.getElementById('count-body');
+  if(!articles.length){ el.innerHTML = `<div class="state-msg">Aucun article vestiaire configuré.</div>`; return; }
+  const byCat = {};
+  articles.forEach(a => { (byCat[a.categorie||'Autre'] = byCat[a.categorie||'Autre']||[]).push(a); });
+
+  el.innerHTML = Object.keys(byCat).sort().map(cat => {
+    return `<div class="cat-title">${escHtml(cat)}</div>` + byCat[cat].map(art => {
+      const artTailles = tailles.filter(t => t.article_id === art.id);
+      if(!artTailles.length) return '';
+      return `<div class="art-card">
+        <div class="art-name">${art.icon||'👕'} ${escHtml(art.nom)}</div>
+        ${artTailles.map(t => {
+          const ligne = lignes.find(l => l.article_id===art.id && l.taille===t.taille);
+          const val = ligne && ligne.quantite_comptee!==null && ligne.quantite_comptee!==undefined ? ligne.quantite_comptee : '';
+          const cls = val==='' ? '' : (parseInt(val)===t.quantite ? 'filled' : 'ecart');
+          return `<div class="taille-row">
+            <div class="taille-lbl">${escHtml(t.taille)}</div>
+            <div class="taille-theo">Théo. ${t.quantite}</div>
+            <input type="number" min="0" class="taille-input ${cls}" value="${val}"
+              data-article="${art.id}" data-article-nom="${escHtml(art.nom)}" data-taille="${escHtml(t.taille)}" data-theo="${t.quantite}"
+              placeholder="Compté" onchange="onCountChange(this)">
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+  }).join('');
+}
+
+async function onCountChange(input){
+  const articleId = input.dataset.article;
+  const articleNom = input.dataset.articleNom;
+  const taille = input.dataset.taille;
+  const theo = parseInt(input.dataset.theo);
+  const val = input.value === '' ? null : parseInt(input.value);
+
+  input.classList.remove('filled','ecart');
+  if(val !== null) input.classList.add(val===theo ? 'filled' : 'ecart');
+
+  try{
+    const { data, error } = await sb.from('stock_inventaire_lignes')
+      .upsert({
+        inventaire_id: currentSession.id, article_id: articleId, article_nom: articleNom,
+        taille, quantite_theorique: theo, quantite_comptee: val
+      }, { onConflict: 'inventaire_id,article_id,taille' })
+      .select().single();
+    if(error) throw error;
+    const idx = lignes.findIndex(l => l.article_id===articleId && l.taille===taille);
+    if(idx>-1) lignes[idx]=data; else lignes.push(data);
+  }catch(e){ toast('Erreur d\'enregistrement : '+e.message, true); }
+}
+
+async function finishSession(){
+  const compte = lignes.filter(l => l.quantite_comptee !== null && l.quantite_comptee !== undefined).length;
+  if(!confirm(compte + ' ligne(s) comptée(s). Terminer et transmettre cet inventaire ?')) return;
+  try{
+    await sb.from('stock_inventaires').update({ statut:'termine', termine_at: new Date().toISOString() }).eq('id', currentSession.id);
+    toast('✅ Inventaire transmis');
+    showScreen('s-home');
+    loadHome();
+  }catch(e){ toast('Erreur : '+e.message, true); }
+}
+
+loadHome();
+</script>
+
+</body>
+</html>
