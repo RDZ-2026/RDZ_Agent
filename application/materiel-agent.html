@@ -205,7 +205,7 @@ async function init(){
       sb.from('stock_acces').select('*').eq('statut','actif'),
     ]);
     materielItems=mat.data||[];
-    accesItems=aItems.data||[];
+    accesItems=(aItems.data||[]).filter(i=>!i.public||i.public==='tous'||i.public==='agent');
     accesSites=aSites.data||[];
     accesActifs=aActifs.data||[];
 

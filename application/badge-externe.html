@@ -176,7 +176,7 @@ async function loadAll(){
     sb.from('stock_acces').select('*').eq('statut','actif'),
     sb.from('stock_acces_recept').select('*').eq('actif',true).order('nom'),
   ]);
-  accesItems=aItems.data||[];
+  accesItems=(aItems.data||[]).filter(i=>!i.public||i.public==='tous'||i.public==='externe');
   accesSites=aSites.data||[];
   accesActifs=aActifs.data||[];
   accesRecept=aRecept.data||[];
