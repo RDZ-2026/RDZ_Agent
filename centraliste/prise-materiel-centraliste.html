@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Centraliste — Prise de Matériel</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A;--red-d:#6B1212;--red-l:#f5e8e8;
+  --anth:#1a1a1a;--bg:#f5f4f2;--white:#fff;
+  --border:#d0ccc5;--text:#1a1a1a;--text2:#4a4a4a;--text3:#9a9a9a;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --sh:0 2px 8px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+button,input,select,textarea{font-family:inherit}
+
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:transform .25s ease,opacity .25s;overflow:hidden}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
+
+.app-header{flex-shrink:0;background:var(--red);padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-header-txt{display:flex;flex-direction:column;gap:2px}
+.app-header-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:.06em;text-transform:uppercase}
+.app-header-sub{font-size:10.5px;color:rgba(255,255,255,.65)}
+.back-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;font-weight:700;padding:7px 12px;border-radius:2px;cursor:pointer;white-space:nowrap}
+.back-btn:active{background:rgba(255,255,255,.3)}
+.agent-badge{font-size:10px;color:rgba(255,255,255,.65);margin-top:5px;text-align:right}
+
+.body{flex:1;overflow-y:auto;padding:16px;padding-bottom:40px}
+
+.menu-btn{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:2px;padding:18px;margin-bottom:14px;cursor:pointer;box-shadow:var(--sh)}
+.menu-btn:active{background:var(--bg)}
+.menu-btn-ico{font-size:26px;flex-shrink:0}
+.menu-btn-txt{flex:1}
+.menu-btn-name{font-size:15px;font-weight:700}
+.menu-btn-desc{font-size:12px;color:var(--text3);margin-top:2px}
+.menu-btn-chevron{color:var(--text3);font-size:18px}
+
+.fg{margin-bottom:14px}
+.fl{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px}
+.fi{width:100%;background:var(--white);border:1.5px solid var(--border);border-radius:2px;padding:10px 12px;font-size:14.5px;color:var(--text)}
+.fi:focus{outline:none;border-color:var(--red)}
+.fi-ta{min-height:70px;resize:vertical}
+.add-row{display:flex;gap:8px}
+.add-row .fi{flex:1}
+.btn-add{flex-shrink:0;background:var(--anth);color:#fff;border:none;border-radius:2px;padding:0 16px;font-size:18px;cursor:pointer}
+
+.sec-lbl{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px}
+
+.section-box{background:var(--white);border:1px solid var(--border);border-radius:2px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
+.section-box-title{font-size:11px;font-weight:800;letter-spacing:.05em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+.section-mat{border-left:4px solid var(--anth)}
+.section-mat .section-box-title{color:var(--anth);border-bottom-color:var(--anth)}
+.section-acc{border-left:4px solid var(--red)}
+.section-acc .section-box-title{color:var(--red);border-bottom-color:var(--red)}
+.panier{background:var(--white);border:1px solid var(--border);border-radius:2px;box-shadow:var(--sh);min-height:50px}
+.panier-empty{padding:16px;text-align:center;color:var(--text3);font-size:12.5px}
+.panier-item{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border)}
+.panier-item:last-child{border-bottom:none}
+.pi-icon{font-size:20px;flex-shrink:0}
+.pi-info{flex:1;min-width:0}
+.pi-name{font-size:13px;font-weight:700}
+.pi-sub{font-size:11px;color:var(--text3)}
+.pi-qty{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pi-qbtn{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700}
+.pi-qbtn:active{border-color:var(--red);color:var(--red)}
+.pi-qval{font-size:14px;font-weight:800;min-width:20px;text-align:center}
+.pi-del{background:none;border:none;font-size:17px;cursor:pointer;color:var(--text3);padding:0 2px}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:9px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;background:var(--white)}
+.chip.sel{border-color:var(--red);background:var(--red);color:#fff}
+
+.btn-submit{width:100%;padding:14px;background:var(--red);color:#fff;border:none;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;margin-top:14px}
+.btn-submit:active{background:var(--red-d)}
+.btn-submit:disabled{opacity:.5}
+
+#toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;z-index:999;width:calc(100% - 32px);max-width:380px;pointer-events:none}
+.toast{background:var(--anth);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.toast.ok{background:#15803d}.toast.err{background:#991b1b}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Prise de Matériel — Centraliste</div>
+    </div>
+    <div style="text-align:right">
+      <a class="back-btn" href="../index.html">‹ Accueil</a>
+    </div>
+  </div>
+  <div class="body">
+    <div class="fg" style="margin-bottom:18px">
+      <label class="fl">Pour quel agent ?</label>
+      <select class="fi" id="agent-select" onchange="onAgentSelect()">
+        <option value="">— Sélectionner un agent —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text3);margin-top:5px">L'agent parti avec le matériel/la clé, pas forcément la personne qui utilise cet écran.</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-sortie')">
+      <div class="menu-btn-ico">📤</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Sortie matériel & clés</div><div class="menu-btn-desc">Prendre du matériel et/ou une clé/badge</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-maint')">
+      <div class="menu-btn-ico">🔧</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Signaler une maintenance</div><div class="menu-btn-desc">Panne, batterie HS, perte, remplacement…</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+    <div class="menu-btn" onclick="goScreen('s-encours')">
+      <div class="menu-btn-ico">📋</div>
+      <div class="menu-btn-txt"><div class="menu-btn-name">Matériel & clés en cours</div><div class="menu-btn-desc">Qui a pris quoi, et pourquoi</div></div>
+      <div class="menu-btn-chevron">›</div>
+    </div>
+  </div>
+</div>
+
+<!-- EN COURS -->
+<div class="screen hidden" id="s-encours">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Matériel & clés en cours</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="encours-body"></div>
+</div>
+
+<!-- SORTIE COMBINEE -->
+<div class="screen hidden" id="s-sortie">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Sortie matériel & clés</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="sortie-body"></div>
+</div>
+
+<!-- MAINTENANCE -->
+<div class="screen hidden" id="s-maint">
+  <div class="app-header">
+    <div class="app-header-txt">
+      <div class="app-header-name">RDZ Security Management</div>
+      <div class="app-header-sub">Signaler une maintenance</div>
+    </div>
+    <button class="back-btn" onclick="goScreen('s-home')">‹ Retour</button>
+  </div>
+  <div class="body" id="maint-body"></div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const SUPABASE_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+// Centraliste : pas de session agent — l'agent est choisi manuellement dans le menu pour chaque opération.
+let STOCK_AGENT=null; // {id, nom}, défini par onAgentSelect()
+
+let materielItems=[], accesItems=[], accesSites=[], accesActifs=[], ALL_STOCK_AGENTS=[];
+let cart=[]; // {kind:'materiel'|'acces', id, nom, icon, qty, max, item_type, site_nom}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
+function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function normalizeName(s){
+  return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');
+}
+
+function goScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  if(id==='s-sortie')renderSortie();
+  if(id==='s-maint')renderMaint();
+  if(id==='s-encours')renderEnCours();
+}
+
+async function refreshCatalogs(){
+  try{
+    const [mat,acc]=await Promise.all([
+      sb.from('stock_materiel_items').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces').select('*').eq('statut','actif')
+    ]);
+    if(mat.data) materielItems=mat.data;
+    if(acc.data) accesActifs=acc.data;
+  }catch(e){ console.warn('refreshCatalogs:',e.message); }
+}
+
+async function init(){
+  try{
+    const [stockAgents, mat, aItems, aSites, aActifs]=await Promise.all([
+      sb.from('stock_agents').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_materiel_items').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces_items').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces_sites').select('*').eq('actif',true).order('nom'),
+      sb.from('stock_acces').select('*').eq('statut','actif'),
+    ]);
+    materielItems=mat.data||[];
+    accesItems=(aItems.data||[]).filter(i=>!i.public||i.public==='tous'||i.public==='agent');
+    accesSites=aSites.data||[];
+    accesActifs=aActifs.data||[];
+
+    // Peupler le sélecteur d'agent (liste identique à celle utilisée par l'application mobile)
+    ALL_STOCK_AGENTS=stockAgents.data||[];
+    const sel=document.getElementById('agent-select');
+    sel.innerHTML='<option value="">— Sélectionner un agent —</option>'+
+      ALL_STOCK_AGENTS.map(a=>`<option value="${a.id}">${esc(a.nom)}</option>`).join('');
+  }catch(e){
+    toast('Erreur de chargement : '+e.message,'err');
+  }
+}
+function onAgentSelect(){
+  const id=document.getElementById('agent-select').value;
+  STOCK_AGENT=ALL_STOCK_AGENTS.find(a=>a.id===id)||null;
+}
+
+async function refreshAcces(){
+  const {data}=await sb.from('stock_acces').select('*').eq('statut','actif');
+  accesActifs=data||[];
+}
+
+function currentAgent(){
+  return STOCK_AGENT ? {id:STOCK_AGENT.id, nom:STOCK_AGENT.nom} : null;
+}
+
+// ═══ SORTIE COMBINÉE ═══
+async function renderSortie(){
+  cart=[];
+  document.getElementById('sortie-body').innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>`;
+  await refreshCatalogs();
+  document.getElementById('sortie-body').innerHTML=`
+    <div class="section-box section-mat">
+      <div class="section-box-title">📦 MATÉRIEL</div>
+      <label class="fl">🔍 Filtrer le matériel</label>
+      <input class="fi" id="flt-mat" placeholder="Tapez un nom…" oninput="fillMatSelect()">
+      <div class="add-row" style="margin-top:8px">
+        <select class="fi" id="sel-mat"><option value="">Choisir un matériel…</option></select>
+        <button class="btn-add" onclick="addMat()">➕</button>
+      </div>
+    </div>
+    <div class="section-box section-acc">
+      <div class="section-box-title">🔑 CLÉS / BADGES</div>
+      <label class="fl">📍 Filtrer par site</label>
+      <select class="fi" id="flt-site" onchange="fillAccesSelect()">
+        <option value="">Tous les sites</option>
+        ${accesSites.map(s=>`<option value="${esc(s.nom)}">${esc(s.nom)}</option>`).join('')}
+      </select>
+      <label class="fl" style="margin-top:10px">🔍 Filtrer clé / badge</label>
+      <input class="fi" id="flt-acces" placeholder="Tapez un nom…" oninput="fillAccesSelect()">
+      <div class="add-row" style="margin-top:8px">
+        <select class="fi" id="sel-acces"><option value="">Choisir une clé / badge…</option></select>
+        <button class="btn-add" onclick="addAcces()">➕</button>
+      </div>
+    </div>
+    <div class="sec-lbl">Panier</div>
+    <div class="panier" id="panier"></div>
+    <div class="fg" style="margin-top:14px">
+      <label class="fl">Note (optionnel)</label>
+      <input class="fi" id="sortie-note" placeholder="Informations complémentaires…">
+    </div>
+    <button class="btn-submit" id="btn-sortie" onclick="doSortie()">✅ Confirmer la sortie</button>`;
+  fillMatSelect();
+  fillAccesSelect();
+  renderPanier();
+}
+
+function fillMatSelect(){
+  const q=normalize(document.getElementById('flt-mat').value);
+  const sel=document.getElementById('sel-mat');
+  const avail=materielItems.filter(m=>m.quantite_dispo>0 && (!q || normalize(m.nom).includes(q)));
+  sel.innerHTML='<option value="">Choisir un matériel…</option>'+
+    avail.map(m=>`<option value="${m.id}">${esc(m.icon||'📦')} ${esc(m.nom)} (${m.quantite_dispo} dispo)</option>`).join('');
+}
+function fillAccesSelect(){
+  const q=normalize(document.getElementById('flt-acces').value);
+  const siteFlt=document.getElementById('flt-site').value;
+  const sel=document.getElementById('sel-acces');
+  const takenIds=new Set(accesActifs.map(a=>a.item_id));
+  const avail=accesItems.filter(it=>!takenIds.has(it.id) && (!siteFlt||it.site_nom===siteFlt) && (!q||normalize(it.nom).includes(q)));
+  sel.innerHTML='<option value="">Choisir une clé / badge…</option>'+
+    avail.map(it=>`<option value="${it.id}">${it.type==='badge'?'🪪':'🔑'} ${esc(it.nom)}${it.site_nom?' — '+esc(it.site_nom):''}</option>`).join('');
+}
+
+function addMat(){
+  const id=document.getElementById('sel-mat').value;
+  if(!id){toast('⚠️ Choisissez un matériel','err');return;}
+  const item=materielItems.find(m=>m.id===id);
+  if(!item||item.quantite_dispo<1){toast('❌ Stock insuffisant','err');return;}
+  const ex=cart.find(c=>c.kind==='materiel'&&c.id===id);
+  if(ex){ if(ex.qty<ex.max) ex.qty++; else toast('⚠️ Maximum atteint','err'); renderPanier(); return; }
+  cart.push({kind:'materiel',id:item.id,nom:item.nom,icon:item.icon||'📦',qty:1,max:item.quantite_dispo});
+  document.getElementById('sel-mat').value='';
+  renderPanier();
+}
+function addAcces(){
+  const id=document.getElementById('sel-acces').value;
+  if(!id){toast('⚠️ Choisissez une clé / badge','err');return;}
+  if(cart.find(c=>c.kind==='acces'&&c.id===id)){toast('⚠️ Déjà dans le panier','err');return;}
+  const item=accesItems.find(i=>i.id===id);
+  cart.push({kind:'acces',id:item.id,nom:item.nom,icon:item.type==='badge'?'🪪':'🔑',item_type:item.type||'clé',site_id:item.site_id,site_nom:item.site_nom});
+  document.getElementById('sel-acces').value='';
+  renderPanier();
+}
+function chQty(i,d){
+  const c=cart[i];
+  c.qty=Math.max(1,Math.min(c.max,c.qty+d));
+  renderPanier();
+}
+function removeCart(i){cart.splice(i,1);renderPanier();}
+
+function renderPanier(){
+  const el=document.getElementById('panier');
+  const mats=cart.map((c,i)=>({...c,i})).filter(c=>c.kind==='materiel');
+  const accs=cart.map((c,i)=>({...c,i})).filter(c=>c.kind==='acces');
+
+  function rowMat(c){
+    return `<div class="panier-item">
+      <div class="pi-icon">${c.icon}</div>
+      <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">max ${c.max}</div></div>
+      <div class="pi-qty">
+        <button class="pi-qbtn" onclick="chQty(${c.i},-1)">−</button>
+        <div class="pi-qval">${c.qty}</div>
+        <button class="pi-qbtn" onclick="chQty(${c.i},1)">+</button>
+      </div>
+      <button class="pi-del" onclick="removeCart(${c.i})">✕</button>
+    </div>`;
+  }
+  function rowAcc(c){
+    return `<div class="panier-item">
+      <div class="pi-icon">${c.icon}</div>
+      <div class="pi-info"><div class="pi-name">${esc(c.nom)}</div><div class="pi-sub">${c.item_type==='badge'?'Badge':'Clé'}${c.site_nom?' · '+esc(c.site_nom):''}</div></div>
+      <button class="pi-del" onclick="removeCart(${c.i})">✕</button>
+    </div>`;
+  }
+
+  if(!cart.length){ el.innerHTML='<div class="panier-empty">Panier vide — ajoutez du matériel ou une clé/badge ci-dessus</div>'; return; }
+
+  el.innerHTML=`
+    <div style="background:var(--anth);color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px">📦 Matériel${mats.length?' ('+mats.length+')':''}</div>
+    ${mats.length?mats.map(rowMat).join(''):'<div class="panier-empty" style="font-size:11.5px">Aucun matériel ajouté</div>'}
+    <div style="background:var(--anth);color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px">🔑 Clés / Badges${accs.length?' ('+accs.length+')':''}</div>
+    ${accs.length?accs.map(rowAcc).join(''):'<div class="panier-empty" style="font-size:11.5px">Aucune clé/badge ajoutée</div>'}
+  `;
+}
+
+async function doSortie(){
+  if(!cart.length){toast('⚠️ Ajoutez au moins un article','err');return;}
+  if(!currentAgent()){toast('⚠️ Sélectionnez d\'abord l\'agent concerné','err');return;}
+  const note=document.getElementById('sortie-note').value.trim();
+  const btn=document.getElementById('btn-sortie');
+  btn.disabled=true;btn.textContent='Enregistrement…';
+
+  // Revérifie qu'aucune clé n'a été prise entre-temps par quelqu'un d'autre
+  await refreshAcces();
+  const takenIds=new Set(accesActifs.map(a=>a.item_id));
+  const conflict=cart.find(c=>c.kind==='acces'&&takenIds.has(c.id));
+  if(conflict){
+    toast('🔴 '+conflict.nom+' vient d\'être pris par quelqu\'un d\'autre','err');
+    btn.disabled=false;btn.textContent='✅ Confirmer la sortie';
+    renderSortie();
+    return;
+  }
+
+  try{
+    const ag=currentAgent();
+    for(const c of cart){
+      if(c.kind==='materiel'){
+        const item=materielItems.find(m=>m.id===c.id);
+        if(!item||item.quantite_dispo<c.qty) throw new Error('Stock insuffisant : '+c.nom);
+        await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo-c.qty}).eq('id',c.id);
+        await sb.from('stock_attributions').insert({
+          agent_id:ag.id, agent_nom:ag.nom,
+          materiel_id:c.id, materiel_nom:c.nom, quantite:c.qty, note:note||null, statut:'actif'
+        });
+        // Pas de stock_log : la table stock_attributions sert déjà de trace complète
+        item.quantite_dispo-=c.qty;
+      } else {
+        // Méthode robuste : supprimer toute ancienne ligne pour cette clé/badge,
+        // puis en recréer une neuve — élimine tout risque de conflit de contrainte
+        const { error: delErr } = await sb.from('stock_acces').delete().eq('item_id', c.id);
+        if (delErr) console.warn('Nettoyage stock_acces:', delErr.message);
+
+        const payload = {
+          site_id:c.site_id||null, site_nom:c.site_nom||'—',
+          agent_id:ag.id, agent_nom:ag.nom,
+          item_id:c.id, item_nom:c.nom, item_type:c.item_type,
+          receptionnaire_id:null, receptionnaire_nom:ag.nom,
+          receptionnaire_type:'agent',
+          date_remise:new Date().toISOString(), date_retour_reel:null,
+          statut:'actif', notes:note||null
+        };
+        const { error: accesErr } = await sb.from('stock_acces').insert(payload);
+        if (accesErr) throw accesErr;
+        // Pas de stock_log pour les clés/badges : le tableau stock_acces sert déjà de trace
+      }
+    }
+    toast('✅ '+cart.length+' article(s) sorti(s)');
+    goScreen('s-home');
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    btn.disabled=false;btn.textContent='✅ Confirmer la sortie';
+  }
+}
+
+// ═══ MAINTENANCE ═══
+function renderMaint(){
+  document.getElementById('maint-body').innerHTML=`
+    <div class="fg">
+      <label class="fl">Matériel concerné</label>
+      <select class="fi" id="m-mat">
+        <option value="">Sélectionner…</option>
+        ${materielItems.map(m=>`<option value="${esc(m.nom)}">${esc(m.icon||'📦')} ${esc(m.nom)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Type de problème</label>
+      <div class="chips" id="m-type-chips">
+        <span class="chip sel" data-v="batterie" onclick="selMType(this)">🔋 Batterie HS</span>
+        <span class="chip" data-v="panne" onclick="selMType(this)">⚡ Panne</span>
+        <span class="chip" data-v="remplacement" onclick="selMType(this)">🔄 À remplacer</span>
+        <span class="chip" data-v="perdu" onclick="selMType(this)">❓ Perdu</span>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Description</label>
+      <textarea class="fi fi-ta" id="m-desc" placeholder="Décrivez le problème…"></textarea>
+    </div>
+    <button class="btn-submit" id="btn-maint" onclick="doMaint()">🔧 Signaler</button>`;
+}
+function selMType(el){
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+async function doMaint(){
+  const mat=document.getElementById('m-mat').value;
+  const desc=document.getElementById('m-desc').value.trim();
+  const type=document.querySelector('#m-type-chips .chip.sel')?.dataset.v||'panne';
+  if(!mat||!desc){toast('⚠️ Complétez tous les champs','err');return;}
+  if(!currentAgent()){toast('⚠️ Sélectionnez d\'abord l\'agent concerné','err');return;}
+  const btn=document.getElementById('btn-maint');
+  btn.disabled=true;btn.textContent='Envoi…';
+  try{
+    const ag=currentAgent();
+    await sb.from('stock_maintenances').insert({
+      materiel_nom:mat, type_probleme:type, description:desc,
+      agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
+    });
+    toast('🔧 Problème signalé');
+    goScreen('s-home');
+  }catch(e){
+    toast('❌ '+e.message,'err');
+    btn.disabled=false;btn.textContent='🔧 Signaler';
+  }
+}
+
+// ═══ EN COURS (avec réintégration possible par n'importe quel agent) ═══
+function ago(d){
+  const m=Math.floor((Date.now()-new Date(d))/60000);
+  if(m<1)return 'à l\'instant';
+  if(m<60)return m+' min';
+  if(m<1440)return Math.floor(m/60)+' h';
+  return Math.floor(m/1440)+' j';
+}
+let encoursData={attrs:[],acces:[]};
+let encoursFiltre='all';
+
+async function renderEnCours(){
+  const el=document.getElementById('encours-body');
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">Chargement…</div>';
+  try{
+    const [{data:attrs,error:e1},{data:acces,error:e2}]=await Promise.all([
+      sb.from('stock_attributions').select('*').eq('statut','actif').order('date_sortie',{ascending:false}),
+      sb.from('stock_acces').select('*').eq('statut','actif').order('date_remise',{ascending:false})
+    ]);
+    if(e1||e2) throw (e1||e2);
+    encoursData.attrs=attrs||[];
+    encoursData.acces=acces||[];
+    drawEnCours();
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⚠️ Erreur de chargement.<br><small>${esc(e.message||String(e))}</small></div>`;
+  }
+}
+
+function setEncoursFiltre(f){
+  encoursFiltre=f;
+  drawEnCours();
+}
+
+function drawEnCours(){
+  const el=document.getElementById('encours-body');
+  const meNorm=normalizeName(currentAgent()?.nom||'');
+
+  let attrsShown = encoursFiltre==='mine' ? encoursData.attrs.filter(a=>normalizeName(a.agent_nom)===meNorm) : encoursData.attrs;
+  let accesShown = encoursFiltre==='mine' ? encoursData.acces.filter(a=>normalizeName(a.receptionnaire_nom||a.agent_nom)===meNorm) : encoursData.acces;
+
+  const rows=[];
+  attrsShown.forEach(a=>{
+    const late=Math.floor((Date.now()-new Date(a.date_sortie))/3600000)>24;
+    rows.push(`<div class="panier-item" style="align-items:flex-start;flex-wrap:wrap">
+      <input type="checkbox" class="ret-check" data-kind="materiel" data-id="${a.id}" data-mat="${a.materiel_id}" data-qty="${a.quantite}" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" onchange="onRetCheck(this)">
+      <div class="pi-icon">📦</div>
+      <div class="pi-info">
+        <div class="pi-name">${esc(a.materiel_nom)} ${a.quantite>1?'×'+a.quantite:''}</div>
+        <div class="pi-sub">👤 ${esc(a.agent_nom)} · ${late?'⚠️ Retard ('+ago(a.date_sortie)+')':'depuis '+ago(a.date_sortie)}</div>
+        ${a.note?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.note)}</div>`:''}
+        <div id="ret-etat-${a.id}" style="display:none;margin-top:8px">
+          <div class="chips">
+            <span class="chip sel" data-v="ok" onclick="selRetChip(this)">✅ Bon état</span>
+            <span class="chip" data-v="defectueux" onclick="selRetChip(this)">⚠️ Défectueux</span>
+            <span class="chip" data-v="hs" onclick="selRetChip(this)">🔴 Hors service</span>
+          </div>
+        </div>
+      </div>
+    </div>`);
+  });
+  accesShown.forEach(a=>{
+    const late=Math.floor((Date.now()-new Date(a.date_remise))/3600000)>24;
+    rows.push(`<div class="panier-item" style="align-items:flex-start">
+      <input type="checkbox" class="ret-check" data-kind="acces" data-id="${a.id}" style="width:20px;height:20px;margin-top:2px;flex-shrink:0" onchange="onRetCheck(this)">
+      <div class="pi-icon">${a.item_type==='badge'?'🪪':'🔑'}</div>
+      <div class="pi-info">
+        <div class="pi-name">${esc(a.item_nom)}${a.site_nom?' — '+esc(a.site_nom):''}</div>
+        <div class="pi-sub">${a.receptionnaire_type==='externe'?'👤':'👮'} ${esc(a.receptionnaire_nom||a.agent_nom)}${a.receptionnaire_societe?' ('+esc(a.receptionnaire_societe)+')':''}${a.receptionnaire_telephone?' — ☎ '+esc(a.receptionnaire_telephone):''} · ${late?'⚠️ Retard ('+ago(a.date_remise)+')':'depuis '+ago(a.date_remise)}</div>
+        ${a.notes?`<div class="pi-sub" style="font-style:italic">📝 ${esc(a.notes)}</div>`:''}
+      </div>
+    </div>`);
+  });
+
+  const filterBar = `<div class="chips" style="margin-bottom:14px">
+    <span class="chip${encoursFiltre==='mine'?' sel':''}" onclick="setEncoursFiltre('mine')">👤 Agent sélectionné</span>
+    <span class="chip${encoursFiltre==='all'?' sel':''}" onclick="setEncoursFiltre('all')">👥 Tous</span>
+  </div>`;
+
+  if(!rows.length){
+    el.innerHTML=filterBar+`<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Rien en cours${encoursFiltre==='mine'?' pour vous':''} — tout est rentré.</div>`;
+    return;
+  }
+  el.innerHTML=filterBar
+    +`<div class="sec-lbl" style="margin-top:0">${rows.length} article(s) actuellement sorti(s) — cochez ce qui revient</div>`
+    +`<div class="panier">${rows.join('')}</div>`
+    +`<button class="btn-submit" id="btn-ret-groupe" onclick="confirmReturnGroupe()" disabled style="opacity:.5">↩️ Confirmer le retour (0)</button>`;
+}
+
+function onRetCheck(cb){
+  if(cb.dataset.kind==='materiel'){
+    const etat=document.getElementById('ret-etat-'+cb.dataset.id);
+    if(etat) etat.style.display = cb.checked ? 'block' : 'none';
+  }
+  const n=document.querySelectorAll('.ret-check:checked').length;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled = n===0;
+  btn.style.opacity = n===0 ? '.5' : '1';
+  btn.textContent = `↩️ Confirmer le retour (${n})`;
+}
+
+async function confirmReturnGroupe(){
+  const checks=[...document.querySelectorAll('.ret-check:checked')];
+  if(!checks.length)return;
+  const btn=document.getElementById('btn-ret-groupe');
+  btn.disabled=true;btn.textContent='Enregistrement…';
+  const ag=currentAgent()||{id:null,nom:'Centraliste'};
+  let ok=0, fail=0;
+  for(const cb of checks){
+    try{
+      if(cb.dataset.kind==='materiel'){
+        const attrId=cb.dataset.id, materielId=cb.dataset.mat, qty=parseInt(cb.dataset.qty);
+        const etat=document.querySelector(`#ret-etat-${attrId} .chip.sel`)?.dataset.v || 'ok';
+        if(etat!=='hs'){
+          const {data:item}=await sb.from('stock_materiel_items').select('quantite_dispo').eq('id',materielId).single();
+          if(item) await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo+qty}).eq('id',materielId);
+        }
+        await sb.from('stock_attributions').update({statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat}).eq('id',attrId);
+        if(etat==='hs'){
+          const attr=encoursData.attrs.find(a=>a.id===attrId);
+          await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
+        }
+      } else {
+        await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',cb.dataset.id);
+      }
+      ok++;
+    }catch(e){ fail++; console.warn(e.message); }
+  }
+  toast(fail ? `📥 ${ok} retour(s) enregistré(s), ${fail} échec(s)` : `📥 ${ok} retour(s) enregistré(s)`, fail?'err':'ok');
+  renderEnCours();
+}
+
+function selRetChip(el){
+  el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+init();
+</script>
+</body>
+</html>
