@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Bibliothèque IHEID</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A;--red-d:#6B1212;--anth:#2d2d2d;
+  --bg:#f0f0f3;--white:#fff;--border:#e2e2e6;--border2:#d0d0d6;
+  --gray:#4a4a4a;--gray3:#9a9a9a;--green:#166534;--green-l:#dcfce7;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);}
+body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);}
+.screen.hidden{display:none;}
+.topbar{flex-shrink:0;height:54px;background:var(--anth);display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:3px solid var(--red);}
+.tb-back{width:34px;height:34px;background:rgba(255,255,255,.1);border:none;border-radius:6px;color:#fff;font-size:18px;cursor:pointer;}
+.tb-title{color:#fff;font-size:14px;font-weight:700;}
+.tb-sub{color:rgba(255,255,255,.5);font-size:10px;}
+.body{flex:1;overflow-y:auto;padding:14px;}
+
+.mission-btn{width:100%;padding:22px;background:#fff;border:1px solid var(--border);border-left:5px solid var(--red);border-radius:8px;margin-bottom:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:16px;}
+.mission-btn:active{background:var(--bg);}
+.mission-ico{font-size:32px;}
+.mission-lbl{font-size:16px;font-weight:700;}
+.mission-desc{font-size:12px;color:var(--gray);margin-top:2px;}
+
+.fg{margin-bottom:16px;}
+.fl{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;}
+.fi{width:100%;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:#1a1a1a;}
+.fi:focus{outline:none;border-color:var(--red);}
+.readonly-val{font-size:13px;color:var(--gray);padding:9px 12px;background:#fff;border-radius:8px;border:1px solid var(--border);}
+
+.counter-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
+.counter-lbl{font-size:13px;font-weight:700;margin-bottom:12px;text-align:center;}
+.counter-row{display:flex;align-items:center;justify-content:center;gap:18px;}
+.counter-btn{width:52px;height:52px;border-radius:50%;border:none;background:var(--anth);color:#fff;font-size:26px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.counter-btn:active{background:var(--red);}
+.counter-btn.minus{background:var(--bg);color:var(--anth);border:2px solid var(--border2);}
+.counter-val{font-size:34px;font-weight:900;min-width:70px;text-align:center;border:none;background:transparent;color:var(--red);}
+.counter-val:focus{outline:none;}
+
+.btn-submit{margin:18px 0 30px;width:100%;padding:15px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-submit:disabled{opacity:.5;}
+
+#toasts{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:999;width:calc(100% - 24px);max-width:380px;}
+.toast{background:var(--anth);color:#fff;padding:9px 13px;border-radius:9px;font-size:12.5px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);}
+.toast.err{background:#991b1b;}
+</style>
+</head>
+<body>
+
+<!-- ÉCRAN 1 : CHOIX MISSION -->
+<div class="screen" id="s-home">
+  <div class="topbar">
+    <div><div class="tb-title">📚 Bibliothèque IHEID</div><div class="tb-sub" id="home-sub">RDZ Security Management</div></div>
+  </div>
+  <div class="body">
+    <button class="mission-btn" onclick="openComptage()">
+      <div class="mission-ico">📊</div>
+      <div><div class="mission-lbl">Comptage</div><div class="mission-desc">Ronde : places occupées, ambiance, rappels/évictions</div></div>
+    </button>
+    <button class="mission-btn" onclick="openFiltrage()">
+      <div class="mission-ico">🚪</div>
+      <div><div class="mission-lbl">Filtrage</div><div class="mission-desc">Contrôle des entrées par établissement</div></div>
+    </button>
+  </div>
+</div>
+
+<!-- ÉCRAN 2 : COMPTAGE -->
+<div class="screen hidden" id="s-comptage">
+  <div class="topbar">
+    <button class="tb-back" onclick="showScreen('s-home')">←</button>
+    <div><div class="tb-title">📊 Comptage</div><div class="tb-sub">Bibliothèque IHEID</div></div>
+  </div>
+  <div class="body">
+    <div class="counter-card">
+      <div class="counter-lbl">Affluence — places occupées</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incr('affluence',-1)">−</button>
+        <input class="counter-val" id="c-affluence" type="number" value="0" onchange="setVal('affluence',this.value)">
+        <button class="counter-btn" onclick="incr('affluence',1)">+</button>
+      </div>
+    </div>
+    <div class="counter-card">
+      <div class="counter-lbl">Rappels au règlement</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incr('rappels',-1)">−</button>
+        <input class="counter-val" id="c-rappels" type="number" value="0" onchange="setVal('rappels',this.value)">
+        <button class="counter-btn" onclick="incr('rappels',1)">+</button>
+      </div>
+    </div>
+    <div class="counter-card">
+      <div class="counter-lbl">Évictions / Refus</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incr('evictions',-1)">−</button>
+        <input class="counter-val" id="c-evictions" type="number" value="0" onchange="setVal('evictions',this.value)">
+        <button class="counter-btn" onclick="incr('evictions',1)">+</button>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Ambiance générale du lieu</label>
+      <select class="fi" id="f-ambiance"><option value="">— Sélectionner —</option></select>
+    </div>
+    <div class="fg"><label class="fl">Agent</label><div class="readonly-val" id="f-agent-c">—</div></div>
+    <div class="fg"><label class="fl">Poste de garde</label><input class="fi" id="f-poste-c" value="IHEID - MDP"></div>
+
+    <button class="btn-submit" id="btn-submit-c" onclick="submitComptage()">✅ Enregistrer le rapport</button>
+  </div>
+</div>
+
+<!-- ÉCRAN 3 : FILTRAGE -->
+<div class="screen hidden" id="s-filtrage">
+  <div class="topbar">
+    <button class="tb-back" onclick="showScreen('s-home')">←</button>
+    <div><div class="tb-title">🚪 Filtrage</div><div class="tb-sub">Bibliothèque IHEID</div></div>
+  </div>
+  <div class="body" id="filtrage-counters"></div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
+
+let ambiances = [], origines = [];
+let counters = { affluence:0, rappels:0, evictions:0 };
+let filtrageCounters = {}; // { origineLabel: n }
+let filtrageExtra = { rappels:0, evictions:0 };
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+function toast(msg, err){
+  const t = document.createElement('div');
+  t.className = 'toast' + (err?' err':'');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 2400);
+}
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function nowTimeStr(){ return new Date().toTimeString().slice(0,8); }
+
+async function loadConfig(){
+  try{
+    const [{data:a},{data:o}] = await Promise.all([
+      sb.from('bibliotheque_config_ambiances').select('*').eq('actif',true).order('ordre'),
+      sb.from('bibliotheque_config_origines').select('*').eq('actif',true).order('ordre')
+    ]);
+    ambiances = a||[]; origines = o||[];
+    document.getElementById('f-ambiance').innerHTML = '<option value="">— Sélectionner —</option>' +
+      ambiances.map(x=>`<option value="${escHtml(x.label)}">${escHtml(x.label)}</option>`).join('');
+  }catch(e){ toast('Erreur chargement config : '+e.message, true); }
+}
+
+// ═══ COMPTAGE ═══
+function openComptage(){
+  counters = { affluence:0, rappels:0, evictions:0 };
+  ['affluence','rappels','evictions'].forEach(k=>document.getElementById('c-'+k).value=0);
+  document.getElementById('f-agent-c').textContent = AGENT_NOM;
+  document.getElementById('f-ambiance').value='';
+  showScreen('s-comptage');
+}
+function incr(key, delta){
+  counters[key] = Math.max(0, (counters[key]||0) + delta);
+  document.getElementById('c-'+key).value = counters[key];
+}
+function setVal(key, val){
+  counters[key] = Math.max(0, parseInt(val)||0);
+  document.getElementById('c-'+key).value = counters[key];
+}
+async function submitComptage(){
+  const ambiance = document.getElementById('f-ambiance').value;
+  const poste = document.getElementById('f-poste-c').value.trim() || 'IHEID - MDP';
+  if(!ambiance){ toast('⚠️ Sélectionnez une ambiance', true); return; }
+  const btn = document.getElementById('btn-submit-c');
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  try{
+    const { error } = await sb.from('bibliotheque_comptages').insert({
+      agent_nom: AGENT_NOM, poste_garde: poste,
+      date_rapport: todayStr(), heure_rapport: nowTimeStr(),
+      affluence: counters.affluence, ambiance,
+      rappels_reglement: counters.rappels, evictions: counters.evictions
+    });
+    if(error) throw error;
+    toast('✅ Rapport de comptage enregistré');
+    showScreen('s-home');
+  }catch(e){ toast('Erreur : '+e.message, true); }
+  finally{ btn.disabled=false; btn.textContent='✅ Enregistrer le rapport'; }
+}
+
+// ═══ FILTRAGE ═══
+function openFiltrage(){
+  filtrageCounters = {}; filtrageExtra = { rappels:0, evictions:0 };
+  origines.forEach(o => filtrageCounters[o.label] = 0);
+  renderFiltrage();
+  showScreen('s-filtrage');
+}
+function renderFiltrage(){
+  const el = document.getElementById('filtrage-counters');
+  let html = origines.map(o => `
+    <div class="counter-card">
+      <div class="counter-lbl">Entrées ${escHtml(o.label)}</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incrF('${escHtml(o.label)}',-1)">−</button>
+        <input class="counter-val" type="number" value="${filtrageCounters[o.label]||0}" onchange="setValF('${escHtml(o.label)}',this.value)">
+        <button class="counter-btn" onclick="incrF('${escHtml(o.label)}',1)">+</button>
+      </div>
+    </div>`).join('');
+
+  html += `
+    <div class="counter-card">
+      <div class="counter-lbl">Rappels au règlement</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incrFExtra('rappels',-1)">−</button>
+        <input class="counter-val" id="cf-rappels" type="number" value="${filtrageExtra.rappels}" onchange="setValFExtra('rappels',this.value)">
+        <button class="counter-btn" onclick="incrFExtra('rappels',1)">+</button>
+      </div>
+    </div>
+    <div class="counter-card">
+      <div class="counter-lbl">Entrée refusée / Éviction</div>
+      <div class="counter-row">
+        <button class="counter-btn minus" onclick="incrFExtra('evictions',-1)">−</button>
+        <input class="counter-val" id="cf-evictions" type="number" value="${filtrageExtra.evictions}" onchange="setValFExtra('evictions',this.value)">
+        <button class="counter-btn" onclick="incrFExtra('evictions',1)">+</button>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Agent</label><div class="readonly-val">${escHtml(AGENT_NOM)}</div></div>
+    <div class="fg"><label class="fl">Poste de garde</label><input class="fi" id="f-poste-f" value="IHEID - MDP"></div>
+    <button class="btn-submit" id="btn-submit-f" onclick="submitFiltrage()">✅ Enregistrer le rapport</button>
+  `;
+  el.innerHTML = html;
+}
+function incrF(label, delta){
+  filtrageCounters[label] = Math.max(0, (filtrageCounters[label]||0)+delta);
+  renderFiltrage();
+}
+function setValF(label, val){
+  filtrageCounters[label] = Math.max(0, parseInt(val)||0);
+  renderFiltrage();
+}
+function incrFExtra(key, delta){
+  filtrageExtra[key] = Math.max(0, (filtrageExtra[key]||0)+delta);
+  document.getElementById('cf-'+key).value = filtrageExtra[key];
+}
+function setValFExtra(key, val){
+  filtrageExtra[key] = Math.max(0, parseInt(val)||0);
+  document.getElementById('cf-'+key).value = filtrageExtra[key];
+}
+async function submitFiltrage(){
+  const poste = document.getElementById('f-poste-f').value.trim() || 'IHEID - MDP';
+  const btn = document.getElementById('btn-submit-f');
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  try{
+    const { error } = await sb.from('bibliotheque_filtrages').insert({
+      agent_nom: AGENT_NOM, poste_garde: poste,
+      date_rapport: todayStr(), heure_rapport: nowTimeStr(),
+      entrees: filtrageCounters,
+      rappels_reglement: filtrageExtra.rappels, evictions_refus: filtrageExtra.evictions
+    });
+    if(error) throw error;
+    toast('✅ Rapport de filtrage enregistré');
+    showScreen('s-home');
+  }catch(e){ toast('Erreur : '+e.message, true); }
+  finally{ btn.disabled=false; btn.textContent='✅ Enregistrer le rapport'; }
+}
+
+loadConfig();
+</script>
+
+</body>
+</html>
