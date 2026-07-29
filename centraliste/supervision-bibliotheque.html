@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Supervision Bibliothèque IHEID</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A; --rdz-red-dark: #6B1212; --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a; --rdz-border: #d0ccc5; --rdz-bg: #f5f4f2; --green:#166534; --green-l:#dcfce7; --blue:#2563eb; --blue-l:#eff6ff;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 1100px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; margin-bottom: 20px; }
+
+    .tabs-row { display: flex; gap: 4px; background: #fff; border-radius: 2px; padding: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 18px; }
+    .tab-btn { flex: 1; padding: 9px; text-align: center; font-size: 12.5px; font-weight: 700; border: none; border-radius: 2px; cursor: pointer; background: none; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .03em; font-family: inherit; }
+    .tab-btn.active { background: var(--rdz-red); color: #fff; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .toolbar { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tlabel { font-size: 11px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; }
+    .tsel { padding: 7px 10px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; }
+
+    table.etable { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--rdz-border); }
+    table.etable thead th { background: var(--rdz-black); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 9px 12px; text-align: left; white-space: nowrap; }
+    table.etable tbody td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid var(--rdz-border); }
+    table.etable tbody tr:hover { background: var(--rdz-bg); cursor: pointer; }
+    table.etable tbody tr:last-child td { border-bottom: none; }
+    .badge-type { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
+    .bt-comptage { background: var(--blue-l); color: var(--blue); }
+    .bt-filtrage { background: var(--green-l); color: var(--green); }
+    .state-msg { text-align: center; padding: 40px 20px; font-size: 14px; color: var(--rdz-gray); }
+
+    /* Stats */
+    .stat-row { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); border-radius: 2px; padding: 14px 18px; flex: 1; min-width: 150px; }
+    .stat-num { font-size: 22px; font-weight: 700; }
+    .stat-lbl { font-size: 10.5px; color: var(--rdz-gray); margin-top: 3px; text-transform: uppercase; letter-spacing: .03em; }
+    .sec-title { font-size: 12px; font-weight: 700; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 10px; }
+    .card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 14px 16px; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+
+    /* ── Style du moteur "RDZ Reports" (repris à l'identique) ── */
+    .rpt-wrap{max-width:800px;margin:20px auto;padding:0;display:none;}
+    .rpt-wrap.open{display:block;}
+    .rpt-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+    .rpt-page{background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1);}
+    .rpt-hdr-strip{height:6px;background:#C8102E;}
+    .rpt-privacy{background:#C8102E;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px;}
+    .rpt-cat-bar{background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-align:right;padding:6px 20px;}
+    .rpt-poste{text-align:right;font-size:12px;color:#888;padding:14px 20px 0;}
+    .rpt-titre-wrap{text-align:center;padding:14px 20px 18px;}
+    .rpt-titre{font-size:17px;font-weight:700;color:#1a1a1a;}
+    .rpt-meta{width:100%;border-collapse:collapse;margin:0 0 18px;}
+    .rpt-meta td{padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;}
+    .rpt-meta td:first-child{font-weight:700;width:180px;background:#fafafa;}
+    .rpt-body{padding:0 20px 20px;}
+    .rpt-sec-title{font-size:15px;font-weight:700;color:#1a1a1a;margin:18px 0 8px;}
+    .rpt-field-row{display:flex;padding:8px 0;border-bottom:1px solid #eee;font-size:12.5px;}
+    .rpt-field-lbl{width:60%;color:#4a4a4a;padding-right:12px;}
+    .rpt-field-val{width:40%;font-weight:600;color:#1a1a1a;}
+    .rpt-ftr{border-top:2px solid #eee;padding:10px 20px;display:flex;justify-content:space-between;font-size:10.5px;color:#9a9a9a;}
+    @media print{
+      .header,.content > .page-title,.content > .page-sub,#view-list,.toolbar,.footer{display:none!important;}
+      body{background:#fff;}
+      .rpt-wrap{display:block!important;margin:0;max-width:100%;}
+      .rpt-toolbar{display:none!important;}
+      .rpt-page{box-shadow:none;border-radius:0;}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+      @page{margin:12mm;size:A4;}
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Supervision — Bibliothèque IHEID</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="../admin/bibliotheque-config.html">⚙ Paramétrage</a>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+  <div class="page-title">Bibliothèque IHEID</div>
+  <div class="page-sub">Consultation des rapports individuels et statistiques d'affluence.</div>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" id="tab-list" onclick="switchTab('list')">📊 Rapports individuels</button>
+    <button class="tab-btn" id="tab-stats" onclick="switchTab('stats')">📈 Statistiques</button>
+  </div>
+
+  <!-- RAPPORTS INDIVIDUELS -->
+  <div class="view active" id="view-list">
+    <div class="toolbar">
+      <span class="tlabel">Type</span>
+      <select class="tsel" id="f-type" onchange="renderList()">
+        <option value="all">Tous</option>
+        <option value="comptage">Comptage</option>
+        <option value="filtrage">Filtrage</option>
+      </select>
+      <span class="tlabel">Du</span><input type="date" class="tsel" id="f-debut" onchange="renderList()">
+      <span class="tlabel">Au</span><input type="date" class="tsel" id="f-fin" onchange="renderList()">
+      <span style="margin-left:auto;font-size:12px;color:var(--rdz-gray)" id="list-count"></span>
+    </div>
+    <div id="list-wrap"><div class="state-msg">⏳ Chargement…</div></div>
+  </div>
+
+  <!-- STATISTIQUES -->
+  <div class="view" id="view-stats">
+    <div class="toolbar">
+      <span class="tlabel">Période</span>
+      <select class="tsel" id="s-periode" onchange="onPeriodeChange()">
+        <option value="jour">Jour</option>
+        <option value="semaine">Semaine</option>
+        <option value="mois">Mois</option>
+        <option value="annee">Année</option>
+      </select>
+      <span class="tlabel">Date de référence</span>
+      <input type="date" class="tsel" id="s-date">
+      <button class="btn-nav" style="background:var(--rdz-red);border-color:var(--rdz-red-dark);color:#fff" onclick="genererStats()">📊 Générer</button>
+    </div>
+    <div id="stats-wrap"><div class="state-msg">Choisis une période puis clique "Générer".</div></div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<div class="rpt-wrap" id="rpt-wrap">
+  <div class="rpt-toolbar">
+    <button class="btn-nav" style="background:var(--rdz-red);border-color:var(--rdz-red-dark);color:#fff" onclick="window.print()">🖨 Imprimer</button>
+    <div style="flex:1"></div>
+    <button class="btn-nav" style="background:#fff;border-color:var(--rdz-border);color:var(--rdz-gray)" onclick="closePrintView()">✕ Fermer l'aperçu</button>
+  </div>
+  <div id="rpt-content"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let comptages = [], filtrages = [];
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDate(d){ if(!d) return '—'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function fmtDateTime(d,h){ return fmtDate(d)+' '+(h||'').slice(0,5); }
+
+function switchTab(t){
+  document.getElementById('tab-list').classList.toggle('active', t==='list');
+  document.getElementById('tab-stats').classList.toggle('active', t==='stats');
+  document.getElementById('view-list').classList.toggle('active', t==='list');
+  document.getElementById('view-stats').classList.toggle('active', t==='stats');
+}
+
+async function loadAll(){
+  try{
+    const [{data:c},{data:f}] = await Promise.all([
+      sb.from('bibliotheque_comptages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false}),
+      sb.from('bibliotheque_filtrages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false})
+    ]);
+    comptages = c||[]; filtrages = f||[];
+    renderList();
+  }catch(e){
+    document.getElementById('list-wrap').innerHTML = `<div class="state-msg">Erreur : ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderList(){
+  const type = document.getElementById('f-type').value;
+  const dDebut = document.getElementById('f-debut').value;
+  const dFin = document.getElementById('f-fin').value;
+
+  let rows = [];
+  if(type!=='filtrage') comptages.forEach(c => rows.push({kind:'comptage', data:c, date:c.date_rapport, heure:c.heure_rapport}));
+  if(type!=='comptage') filtrages.forEach(f => rows.push({kind:'filtrage', data:f, date:f.date_rapport, heure:f.heure_rapport}));
+  rows = rows.filter(r => (!dDebut || r.date>=dDebut) && (!dFin || r.date<=dFin));
+  rows.sort((a,b) => (b.date+b.heure).localeCompare(a.date+a.heure));
+
+  document.getElementById('list-count').textContent = rows.length + ' rapport(s)';
+  const el = document.getElementById('list-wrap');
+  if(!rows.length){ el.innerHTML = `<div class="state-msg">Aucun rapport pour ces filtres.</div>`; return; }
+
+  el.innerHTML = `<table class="etable"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th>Agent</th><th>Résumé</th></tr></thead><tbody>` +
+    rows.map((r,i) => {
+      const resume = r.kind==='comptage'
+        ? `Affluence ${r.data.affluence} · ${r.data.ambiance||'—'}`
+        : `Total entrées ${Object.values(r.data.entrees||{}).reduce((a,b)=>a+(parseInt(b)||0),0)}`;
+      return `<tr onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})'>
+        <td>${fmtDate(r.date)}</td>
+        <td>${(r.heure||'').slice(0,5)}</td>
+        <td><span class="badge-type ${r.kind==='comptage'?'bt-comptage':'bt-filtrage'}">${r.kind==='comptage'?'📊 Comptage':'🚪 Filtrage'}</span></td>
+        <td>${escHtml(r.data.agent_nom)}</td>
+        <td style="font-size:12px;color:var(--rdz-gray)">${resume}</td>
+      </tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+function openIndividualReport(kind, id){
+  const item = (kind==='comptage' ? comptages : filtrages).find(x=>x.id===id);
+  if(!item) return;
+  document.getElementById('rpt-content').innerHTML = kind==='comptage' ? buildComptageReport(item) : buildFiltrageReport(item);
+  document.getElementById('rpt-wrap').classList.add('open');
+  window.scrollTo(0,0);
+}
+function closePrintView(){ document.getElementById('rpt-wrap').classList.remove('open'); }
+
+function retentionDate(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setFullYear(d.getFullYear()+5);
+  return fmtDate(d.toISOString().slice(0,10));
+}
+function fullDateTimeStr(dateStr, heureStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return fmtDate(dateStr) + ' ' + (heureStr||'').slice(0,5) + ':' + (heureStr||'').slice(6,8);
+}
+
+function rptShell(titre, poste, meta, bodyHtml, footerLabel){
+  return `<div class="rpt-page">
+    <div class="rpt-hdr-strip"></div>
+    <div class="rpt-privacy">Ce rapport contient des données personnelles. Vous devez le supprimer au plus tard le ${meta.retention}</div>
+    <div class="rpt-cat-bar">Evènement //</div>
+    <div class="rpt-poste">${escHtml(poste)}</div>
+    <div class="rpt-titre-wrap"><div class="rpt-titre">${escHtml(titre)}</div></div>
+    <table class="rpt-meta">
+      <tr><td>Catégorie</td><td>Controle</td></tr>
+      <tr><td>Priorité</td><td>Moyenne</td></tr>
+      <tr><td>Poste de garde</td><td>${escHtml(poste)}</td></tr>
+      <tr><td>Déclaration par</td><td>${escHtml(meta.agent)}</td></tr>
+      <tr><td>Date de début</td><td>${escHtml(meta.debut)}</td></tr>
+    </table>
+    <div class="rpt-body">${bodyHtml}</div>
+    <div class="rpt-ftr"><span>${escHtml(meta.debut)}</span><span>${escHtml(footerLabel)}</span><span>Page 1 / 1</span></div>
+  </div>`;
+}
+
+function buildComptageReport(c){
+  const meta = { agent:c.agent_nom, debut:fullDateTimeStr(c.date_rapport,c.heure_rapport), retention:retentionDate(c.date_rapport) };
+  const body = `
+    <div class="rpt-sec-title">Date</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Date</div><div class="rpt-field-val">${fmtDate(c.date_rapport)}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">L'heure</div><div class="rpt-field-val">${(c.heure_rapport||'').slice(0,5)}</div></div>
+
+    <div class="rpt-sec-title">Type</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Type</div><div class="rpt-field-val">Patrouille</div></div>
+
+    <div class="rpt-sec-title">Localisation</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Précisez la localisation (si incident/nécessaire)</div><div class="rpt-field-val">—</div></div>
+
+    <div class="rpt-sec-title">Rapport</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Affluence (Nbre de personnes dans l'enceinte de la bibliothèque)</div><div class="rpt-field-val">${c.affluence}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Physionomie</div><div class="rpt-field-val">${escHtml(c.ambiance||'—')}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Rappel(s) au règlement (nombre / relève identité / motif)</div><div class="rpt-field-val">${c.rappels_reglement||'—'}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Eviction(s) / Refus (nombre / relève identité / motif)</div><div class="rpt-field-val">${c.evictions||'—'}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Informations complémentaires (si nécessaire)</div><div class="rpt-field-val">—</div></div>
+  `;
+  return rptShell('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+}
+
+function buildFiltrageReport(f){
+  const meta = { agent:f.agent_nom, debut:fullDateTimeStr(f.date_rapport,f.heure_rapport), retention:retentionDate(f.date_rapport) };
+  const entrees = f.entrees||{};
+  const entreesRows = Object.entries(entrees).map(([label,n]) =>
+    `<div class="rpt-field-row"><div class="rpt-field-lbl">Entrées ${escHtml(label)}</div><div class="rpt-field-val">${n}</div></div>`
+  ).join('');
+  const body = `
+    <div class="rpt-sec-title">Date</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Date</div><div class="rpt-field-val">${fmtDate(f.date_rapport)}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">L'heure</div><div class="rpt-field-val">${(f.heure_rapport||'').slice(0,5)}</div></div>
+
+    <div class="rpt-sec-title">Type</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Type</div><div class="rpt-field-val">Filtrage entrée</div></div>
+
+    <div class="rpt-sec-title">Localisation</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Précisez la localisation (si incident/nécessaire)</div><div class="rpt-field-val">—</div></div>
+
+    <div class="rpt-sec-title">Comptages Filtrage</div>
+    ${entreesRows}
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Rappels au règlement</div><div class="rpt-field-val">${f.rappels_reglement||'—'}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Entrée refusée / Éviction</div><div class="rpt-field-val">${f.evictions_refus||'—'}</div></div>
+  `;
+  return rptShell('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', f.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+}
+
+// ═══ STATISTIQUES ═══
+function onPeriodeChange(){}
+
+function periodRange(periode, refDateStr){
+  const ref = new Date(refDateStr+'T00:00:00');
+  let start, end, label;
+  if(periode==='jour'){
+    start = new Date(ref); end = new Date(ref); end.setDate(end.getDate()+1);
+    label = fmtDate(refDateStr);
+  } else if(periode==='semaine'){
+    const day = (ref.getDay()+6)%7;
+    start = new Date(ref); start.setDate(start.getDate()-day);
+    end = new Date(start); end.setDate(end.getDate()+7);
+    label = 'Semaine du '+fmtDate(start.toISOString().slice(0,10));
+  } else if(periode==='mois'){
+    start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+    end = new Date(ref.getFullYear(), ref.getMonth()+1, 1);
+    label = start.toLocaleDateString('fr-CH',{month:'long',year:'numeric'});
+  } else {
+    start = new Date(ref.getFullYear(), 0, 1);
+    end = new Date(ref.getFullYear()+1, 0, 1);
+    label = 'Année ' + ref.getFullYear();
+  }
+  return { start, end, label };
+}
+
+async function genererStats(){
+  const periode = document.getElementById('s-periode').value;
+  const refDate = document.getElementById('s-date').value || new Date().toISOString().slice(0,10);
+  const { start, end, label } = periodRange(periode, refDate);
+  const startStr = start.toISOString().slice(0,10), endStr = end.toISOString().slice(0,10);
+
+  const wrap = document.getElementById('stats-wrap');
+  wrap.innerHTML = `<div class="state-msg">⏳ Calcul en cours…</div>`;
+
+  const cs = comptages.filter(c => c.date_rapport>=startStr && c.date_rapport<endStr);
+  const fs = filtrages.filter(f => f.date_rapport>=startStr && f.date_rapport<endStr);
+
+  if(!cs.length && !fs.length){
+    wrap.innerHTML = `<div class="state-msg">Aucune donnée sur cette période (${escHtml(label)}).</div>`;
+    return;
+  }
+
+  // Comptage : affluence moyenne, pic + heure, ambiances, rappels/évictions
+  const affluences = cs.map(c=>c.affluence||0);
+  const moyenne = affluences.length ? Math.round(affluences.reduce((a,b)=>a+b,0)/affluences.length) : 0;
+  let pic = 0, picHeure = '—', picDate = '—';
+  cs.forEach(c => { if((c.affluence||0) > pic){ pic=c.affluence; picHeure=(c.heure_rapport||'').slice(0,5); picDate=fmtDate(c.date_rapport); } });
+  const totalRappelsC = cs.reduce((a,c)=>a+(c.rappels_reglement||0),0);
+  const totalEvictionsC = cs.reduce((a,c)=>a+(c.evictions||0),0);
+  const ambianceCounts = {};
+  cs.forEach(c => { const a=c.ambiance||'Non renseignée'; ambianceCounts[a]=(ambianceCounts[a]||0)+1; });
+
+  // Filtrage : totaux par origine, rappels/évictions
+  const origineTotals = {};
+  fs.forEach(f => Object.entries(f.entrees||{}).forEach(([label2,n]) => { origineTotals[label2]=(origineTotals[label2]||0)+(parseInt(n)||0); }));
+  const totalRappelsF = fs.reduce((a,f)=>a+(f.rappels_reglement||0),0);
+  const totalEvictionsF = fs.reduce((a,f)=>a+(f.evictions_refus||0),0);
+
+  window._lastStats = { periode, label, startStr, endStr, cs, fs, moyenne, pic, picHeure, picDate, totalRappelsC, totalEvictionsC, ambianceCounts, origineTotals, totalRappelsF, totalEvictionsF };
+
+  wrap.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num">${cs.length}</div><div class="stat-lbl">Rondes comptage</div></div>
+      <div class="stat-card"><div class="stat-num">${moyenne}</div><div class="stat-lbl">Affluence moyenne</div></div>
+      <div class="stat-card"><div class="stat-num">${pic}</div><div class="stat-lbl">Pic (${escHtml(picHeure)} le ${escHtml(picDate)})</div></div>
+      <div class="stat-card"><div class="stat-num">${fs.length}</div><div class="stat-lbl">Rapports filtrage</div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num" style="color:#b45309">${totalRappelsC+totalRappelsF}</div><div class="stat-lbl">Rappels au règlement (total)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#991b1b">${totalEvictionsC+totalEvictionsF}</div><div class="stat-lbl">Évictions / Refus (total)</div></div>
+    </div>
+    <div class="sec-title">Répartition des ambiances (comptage)</div>
+    <div class="card">${Object.keys(ambianceCounts).length ? Object.entries(ambianceCounts).map(([a,n])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--rdz-border);font-size:13px"><span>${escHtml(a)}</span><strong>${n}</strong></div>`).join('') : '<div style="color:var(--rdz-gray);font-size:13px">Aucune donnée</div>'}</div>
+    <div class="sec-title">Entrées par origine (filtrage) — total période</div>
+    <div class="card">${Object.keys(origineTotals).length ? Object.entries(origineTotals).map(([o,n])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--rdz-border);font-size:13px"><span>${escHtml(o)}</span><strong>${n}</strong></div>`).join('') : '<div style="color:var(--rdz-gray);font-size:13px">Aucune donnée</div>'}</div>
+    <button class="btn-nav" style="background:var(--rdz-red);border-color:var(--rdz-red-dark);color:#fff;margin-top:16px" onclick="printStatsReport()">🖨 Générer le rapport imprimable</button>
+  `;
+}
+
+function printStatsReport(){
+  const s = window._lastStats;
+  if(!s) return;
+  const meta = { agent:'Direction RDZ', debut: new Date().toLocaleString('fr-CH'), retention: retentionDate(new Date().toISOString().slice(0,10)) };
+  const body = `
+    <div class="rpt-sec-title">Période analysée</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Période</div><div class="rpt-field-val">${escHtml(s.label)}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Du</div><div class="rpt-field-val">${fmtDate(s.startStr)}</div></div>
+
+    <div class="rpt-sec-title">Affluence (comptages)</div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Nombre de rondes de comptage</div><div class="rpt-field-val">${s.cs.length}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Affluence moyenne</div><div class="rpt-field-val">${s.moyenne}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Pic d'affluence</div><div class="rpt-field-val">${s.pic} personnes — ${escHtml(s.picHeure)} le ${escHtml(s.picDate)}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Rappels au règlement (comptage)</div><div class="rpt-field-val">${s.totalRappelsC}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Évictions / Refus (comptage)</div><div class="rpt-field-val">${s.totalEvictionsC}</div></div>
+
+    <div class="rpt-sec-title">Répartition des ambiances</div>
+    ${Object.entries(s.ambianceCounts).map(([a,n])=>`<div class="rpt-field-row"><div class="rpt-field-lbl">${escHtml(a)}</div><div class="rpt-field-val">${n} ronde(s)</div></div>`).join('') || '<div class="rpt-field-row"><div class="rpt-field-lbl">Aucune donnée</div><div class="rpt-field-val">—</div></div>'}
+
+    <div class="rpt-sec-title">Filtrage — entrées par origine (total période)</div>
+    ${Object.entries(s.origineTotals).map(([o,n])=>`<div class="rpt-field-row"><div class="rpt-field-lbl">${escHtml(o)}</div><div class="rpt-field-val">${n}</div></div>`).join('') || '<div class="rpt-field-row"><div class="rpt-field-lbl">Aucune donnée</div><div class="rpt-field-val">—</div></div>'}
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Rappels au règlement (filtrage)</div><div class="rpt-field-val">${s.totalRappelsF}</div></div>
+    <div class="rpt-field-row"><div class="rpt-field-lbl">Évictions / Refus (filtrage)</div><div class="rpt-field-val">${s.totalEvictionsF}</div></div>
+  `;
+  document.getElementById('rpt-content').innerHTML = rptShell(
+    'RAPPORT STATISTIQUE — BIBLIOTHÈQUE IHEID', 'IHEID - MDP', meta, body,
+    'Rapport statistique interne — Bibliothèque IHEID //'
+  );
+  document.getElementById('rpt-wrap').classList.add('open');
+  window.scrollTo(0,0);
+}
+
+document.getElementById('s-date').value = new Date().toISOString().slice(0,10);
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
