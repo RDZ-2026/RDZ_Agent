@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Paramétrage Bibliothèque IHEID</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A; --rdz-red-dark: #6B1212; --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a; --rdz-border: #d0ccc5; --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 900px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+
+    .content { max-width: 900px; margin: 0 auto; padding: 24px 28px 48px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; margin-bottom: 20px; }
+
+    .tabs-row { display: flex; gap: 4px; background: #fff; border-radius: 2px; padding: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 18px; }
+    .tab-btn { flex: 1; padding: 9px; text-align: center; font-size: 12.5px; font-weight: 700; border: none; border-radius: 2px; cursor: pointer; background: none; color: var(--rdz-gray); text-transform: uppercase; letter-spacing: .03em; font-family: inherit; }
+    .tab-btn.active { background: var(--rdz-red); color: #fff; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .btn-add { width: 100%; padding: 10px; border: 1.5px dashed var(--rdz-border); border-radius: 2px; background: #fff; color: var(--rdz-gray); font-size: 12.5px; font-weight: 700; cursor: pointer; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .03em; }
+    .btn-add:hover { border-color: var(--rdz-red); color: var(--rdz-red); }
+
+    .card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; }
+    .row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--rdz-border); }
+    .row:last-child { border-bottom: none; }
+    .row-label { flex: 1; font-size: 13px; font-weight: 600; }
+    .ord-btns { display: flex; gap: 2px; }
+    .ord-btn { width: 24px; height: 24px; border: 1px solid var(--rdz-border); background: #fff; border-radius: 2px; cursor: pointer; font-size: 11px; }
+    .ord-btn:hover { background: var(--rdz-bg); }
+    .row-btn { padding: 5px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); background: #fff; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .row-btn:hover { background: var(--rdz-bg); }
+    .row-btn.del:hover { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+    .state-msg { text-align: center; padding: 30px 20px; font-size: 13px; color: var(--rdz-gray); }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: flex-start; justify-content: center; padding: 70px 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border-top: 3px solid var(--rdz-red); padding: 24px; width: 100%; max-width: 420px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 14px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 18px; }
+    .fl { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rdz-gray); margin-bottom: 6px; }
+    .fi { width: 100%; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; font-family: inherit; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: 1px solid transparent; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 900px; margin: 0 auto; display: flex; justify-content: space-between; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Paramétrage — Bibliothèque IHEID</div>
+    </div>
+    <a class="btn-nav" href="../index.html">← Accueil</a>
+  </div>
+</header>
+
+<div class="content">
+  <div class="page-title">Bibliothèque IHEID</div>
+  <div class="page-sub">Gère les listes utilisées par l'application mobile — ajoute, renomme, réordonne ou retire un élément sans toucher au code.</div>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" id="tab-ambiances" onclick="switchTab('ambiances')">🌡️ Ambiances</button>
+    <button class="tab-btn" id="tab-origines" onclick="switchTab('origines')">🎓 Origines (filtrage)</button>
+  </div>
+
+  <div class="view active" id="view-ambiances">
+    <button class="btn-add" onclick="openModal('ambiances')">+ Ajouter une ambiance</button>
+    <div class="card" id="list-ambiances"></div>
+  </div>
+
+  <div class="view" id="view-origines">
+    <button class="btn-add" onclick="openModal('origines')">+ Ajouter une origine</button>
+    <div class="card" id="list-origines"></div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Ajouter</div>
+    <label class="fl">Libellé</label>
+    <input type="text" class="fi" id="f-label" placeholder="">
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveItem()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TABLES = { ambiances: 'bibliotheque_config_ambiances', origines: 'bibliotheque_config_origines' };
+let DATA = { ambiances: [], origines: [] };
+let editCtx = { table: null, id: null };
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+async function loadAll(){
+  try{
+    const [{data:a},{data:o}] = await Promise.all([
+      sb.from(TABLES.ambiances).select('*').order('ordre'),
+      sb.from(TABLES.origines).select('*').order('ordre')
+    ]);
+    DATA.ambiances = a||[]; DATA.origines = o||[];
+    render('ambiances'); render('origines');
+  }catch(e){
+    document.getElementById('list-ambiances').innerHTML = `<div class="state-msg">Erreur : ${escHtml(e.message)}</div>`;
+  }
+}
+
+function switchTab(t){
+  document.getElementById('tab-ambiances').classList.toggle('active', t==='ambiances');
+  document.getElementById('tab-origines').classList.toggle('active', t==='origines');
+  document.getElementById('view-ambiances').classList.toggle('active', t==='ambiances');
+  document.getElementById('view-origines').classList.toggle('active', t==='origines');
+}
+
+function render(table){
+  const items = DATA[table].slice().sort((a,b)=>a.ordre-b.ordre);
+  const el = document.getElementById('list-'+table);
+  if(!items.length){ el.innerHTML = `<div class="state-msg">Aucun élément — clique "+ Ajouter" ci-dessus.</div>`; return; }
+  el.innerHTML = items.map((it, idx) => `<div class="row">
+    <div class="ord-btns">
+      <button class="ord-btn" ${idx===0?'disabled style="opacity:.3"':''} onclick="move('${table}','${it.id}',-1)">↑</button>
+      <button class="ord-btn" ${idx===items.length-1?'disabled style="opacity:.3"':''} onclick="move('${table}','${it.id}',1)">↓</button>
+    </div>
+    <div class="row-label">${escHtml(it.label)}</div>
+    <button class="row-btn" onclick="openModal('${table}','${it.id}')">✎ Renommer</button>
+    <button class="row-btn del" onclick="del('${table}','${it.id}')">🗑 Supprimer</button>
+  </div>`).join('');
+}
+
+function openModal(table, id){
+  editCtx = { table, id: id||null };
+  const it = id ? DATA[table].find(x=>x.id===id) : null;
+  document.getElementById('modal-title').textContent = id ? 'Renommer' : 'Nouvel élément';
+  document.getElementById('f-label').value = it ? it.label : '';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+
+async function saveItem(){
+  const label = document.getElementById('f-label').value.trim();
+  if(!label){ alert('Merci de saisir un libellé.'); return; }
+  const table = editCtx.table, tableName = TABLES[table];
+  try{
+    if(editCtx.id){
+      await sb.from(tableName).update({label}).eq('id',editCtx.id);
+    }else{
+      const maxOrdre = Math.max(0, ...DATA[table].map(x=>x.ordre));
+      await sb.from(tableName).insert({label, ordre:maxOrdre+1, actif:true});
+    }
+    closeModal();
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function del(table, id){
+  if(!confirm('Supprimer cet élément ?')) return;
+  try{
+    await sb.from(TABLES[table]).delete().eq('id',id);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function move(table, id, dir){
+  const items = DATA[table].slice().sort((a,b)=>a.ordre-b.ordre);
+  const idx = items.findIndex(x=>x.id===id);
+  const swapWith = items[idx+dir];
+  if(!swapWith) return;
+  const it = items[idx];
+  try{
+    await Promise.all([
+      sb.from(TABLES[table]).update({ordre:swapWith.ordre}).eq('id',it.id),
+      sb.from(TABLES[table]).update({ordre:it.ordre}).eq('id',swapWith.id)
+    ]);
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+document.getElementById('modal').addEventListener('click', e => { if(e.target.id==='modal') closeModal(); });
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
