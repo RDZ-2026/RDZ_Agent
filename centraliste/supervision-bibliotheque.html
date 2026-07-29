@@ -372,27 +372,29 @@ function ambianceMeta(label){
 }
 
 function periodRange(periode, refDateStr){
-  const ref = new Date(refDateStr+'T00:00:00');
+  const [ry,rm,rd] = refDateStr.split('-').map(Number);
+  const ref = new Date(Date.UTC(ry, rm-1, rd));
   let start, end, label, tag;
   if(periode==='jour'){
-    start = new Date(ref); end = new Date(ref); end.setDate(end.getDate()+1);
+    start = new Date(ref);
+    end = new Date(ref); end.setUTCDate(end.getUTCDate()+1);
     label = fmtDate(refDateStr); tag = 'Jour · ' + label;
   } else if(periode==='semaine'){
-    const day = (ref.getDay()+6)%7;
-    start = new Date(ref); start.setDate(start.getDate()-day);
-    end = new Date(start); end.setDate(end.getDate()+7);
-    const endIncl = new Date(end); endIncl.setDate(endIncl.getDate()-1);
+    const day = (ref.getUTCDay()+6)%7;
+    start = new Date(ref); start.setUTCDate(start.getUTCDate()-day);
+    end = new Date(start); end.setUTCDate(end.getUTCDate()+7);
+    const endIncl = new Date(end); endIncl.setUTCDate(endIncl.getUTCDate()-1);
     label = fmtDate(start.toISOString().slice(0,10)) + ' – ' + fmtDate(endIncl.toISOString().slice(0,10));
     tag = 'Semaine du ' + fmtDate(start.toISOString().slice(0,10));
   } else if(periode==='mois'){
-    start = new Date(ref.getFullYear(), ref.getMonth(), 1);
-    end = new Date(ref.getFullYear(), ref.getMonth()+1, 1);
-    label = start.toLocaleDateString('fr-CH',{month:'long',year:'numeric'});
+    start = new Date(Date.UTC(ry, rm-1, 1));
+    end = new Date(Date.UTC(rm===12?ry+1:ry, rm===12?0:rm, 1));
+    label = start.toLocaleDateString('fr-CH',{month:'long',year:'numeric', timeZone:'UTC'});
     tag = label;
   } else {
-    start = new Date(ref.getFullYear(), 0, 1);
-    end = new Date(ref.getFullYear()+1, 0, 1);
-    label = 'Année ' + ref.getFullYear();
+    start = new Date(Date.UTC(ry, 0, 1));
+    end = new Date(Date.UTC(ry+1, 0, 1));
+    label = 'Année ' + ry;
     tag = label;
   }
   return { start, end, label, tag };
@@ -401,7 +403,7 @@ function periodRange(periode, refDateStr){
 function daysBetween(start, end){
   const days = [];
   let d = new Date(start);
-  while(d < end){ days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+  while(d < end){ days.push(d.toISOString().slice(0,10)); d.setUTCDate(d.getUTCDate()+1); }
   return days;
 }
 
