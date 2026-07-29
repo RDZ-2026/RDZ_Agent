@@ -45,6 +45,23 @@
     .bt-comptage { background: var(--blue-l); color: var(--blue); }
     .bt-filtrage { background: var(--green-l); color: var(--green); }
     .state-msg { text-align: center; padding: 40px 20px; font-size: 14px; color: var(--rdz-gray); }
+    .row-act { padding: 5px 9px; border-radius: 2px; border: 1px solid var(--rdz-border); background: #fff; font-size: 12px; cursor: pointer; margin-right: 4px; }
+    .row-act:hover { background: var(--rdz-bg); }
+    .row-act.del:hover { background: #fef2f2; border-color: #fca5a5; }
+
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 300; align-items: flex-start; justify-content: center; padding: 60px 20px; overflow-y: auto; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border-top: 3px solid var(--rdz-red); padding: 24px; width: 100%; max-width: 480px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 14px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 18px; }
+    .mfg { margin-bottom: 12px; }
+    .mfl { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rdz-gray); margin-bottom: 5px; }
+    .mfi { width: 100%; padding: 8px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; font-family: inherit; }
+    .mfr { display: flex; gap: 10px; }
+    .mfr .mfg { flex: 1; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: 1px solid transparent; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
 
     .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
 
@@ -226,16 +243,128 @@
   <div id="rp-content"></div>
 </div>
 
+<!-- MODAL ÉDITION RAPPORT -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-title" id="edit-title">Modifier le rapport</div>
+    <div id="edit-body"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeEditModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveEdit()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let comptages = [], filtrages = [], origines = [];
+let comptages = [], filtrages = [], origines = [], ambiancesCache = [];
 
 function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function fmtDate(d){ if(!d) return '—'; const p=d.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
 function fmtDateShort(d){ const dt=new Date(d+'T12:00:00'); return dt.toLocaleDateString('fr-CH',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+
+// ═══ ÉDITION / SUPPRESSION D'UN RAPPORT INDIVIDUEL ═══
+let editCtx = { kind:null, id:null };
+
+function openEditModal(kind, id){
+  const item = (kind==='comptage' ? comptages : filtrages).find(x=>x.id===id);
+  if(!item) return;
+  editCtx = { kind, id };
+  document.getElementById('edit-title').textContent = kind==='comptage' ? '✏️ Modifier — Comptage' : '✏️ Modifier — Filtrage';
+
+  if(kind==='comptage'){
+    document.getElementById('edit-body').innerHTML = `
+      <div class="mfr">
+        <div class="mfg"><label class="mfl">Date</label><input type="date" class="mfi" id="e-date" value="${item.date_rapport}"></div>
+        <div class="mfg"><label class="mfl">Heure</label><input type="time" class="mfi" id="e-heure" value="${(item.heure_rapport||'').slice(0,5)}"></div>
+      </div>
+      <div class="mfg"><label class="mfl">Agent</label><input type="text" class="mfi" id="e-agent" value="${escHtml(item.agent_nom)}"></div>
+      <div class="mfg"><label class="mfl">Poste de garde</label><input type="text" class="mfi" id="e-poste" value="${escHtml(item.poste_garde)}"></div>
+      <div class="mfr">
+        <div class="mfg"><label class="mfl">Affluence</label><input type="number" min="0" class="mfi" id="e-affluence" value="${item.affluence}"></div>
+        <div class="mfg"><label class="mfl">Rappels</label><input type="number" min="0" class="mfi" id="e-rappels" value="${item.rappels_reglement||0}"></div>
+        <div class="mfg"><label class="mfl">Évictions</label><input type="number" min="0" class="mfi" id="e-evictions" value="${item.evictions||0}"></div>
+      </div>
+      <div class="mfg"><label class="mfl">Ambiance</label>
+        <select class="mfi" id="e-ambiance">${ambianceOptionsHtml(item.ambiance)}</select>
+      </div>
+    `;
+  } else {
+    const entrees = item.entrees || {};
+    const rowsHtml = origines.map(o => `
+      <div class="mfg"><label class="mfl">Entrées ${escHtml(o.label)}</label>
+        <input type="number" min="0" class="mfi" data-origine="${escHtml(o.label)}" value="${entrees[o.label]||0}">
+      </div>`).join('');
+    document.getElementById('edit-body').innerHTML = `
+      <div class="mfr">
+        <div class="mfg"><label class="mfl">Date</label><input type="date" class="mfi" id="e-date" value="${item.date_rapport}"></div>
+        <div class="mfg"><label class="mfl">Heure</label><input type="time" class="mfi" id="e-heure" value="${(item.heure_rapport||'').slice(0,5)}"></div>
+      </div>
+      <div class="mfg"><label class="mfl">Agent</label><input type="text" class="mfi" id="e-agent" value="${escHtml(item.agent_nom)}"></div>
+      <div class="mfg"><label class="mfl">Poste de garde</label><input type="text" class="mfi" id="e-poste" value="${escHtml(item.poste_garde)}"></div>
+      <div id="e-entrees-wrap">${rowsHtml}</div>
+      <div class="mfr">
+        <div class="mfg"><label class="mfl">Rappels</label><input type="number" min="0" class="mfi" id="e-rappels" value="${item.rappels_reglement||0}"></div>
+        <div class="mfg"><label class="mfl">Évictions/Refus</label><input type="number" min="0" class="mfi" id="e-evictions" value="${item.evictions_refus||0}"></div>
+      </div>
+    `;
+  }
+  document.getElementById('modal-edit').classList.add('open');
+}
+function ambianceOptionsHtml(current){
+  const list = ambiancesCache.length ? ambiancesCache : (current ? [{label:current}] : []);
+  return list.map(a => `<option value="${escHtml(a.label)}" ${a.label===current?'selected':''}>${escHtml(a.label)}</option>`).join('');
+}
+function closeEditModal(){ document.getElementById('modal-edit').classList.remove('open'); }
+
+async function saveEdit(){
+  const { kind, id } = editCtx;
+  const date_rapport = document.getElementById('e-date').value;
+  const heure_rapport = document.getElementById('e-heure').value + ':00';
+  const agent_nom = document.getElementById('e-agent').value.trim();
+  const poste_garde = document.getElementById('e-poste').value.trim();
+
+  try{
+    if(kind==='comptage'){
+      const payload = {
+        date_rapport, heure_rapport, agent_nom, poste_garde,
+        affluence: parseInt(document.getElementById('e-affluence').value)||0,
+        rappels_reglement: parseInt(document.getElementById('e-rappels').value)||0,
+        evictions: parseInt(document.getElementById('e-evictions').value)||0,
+        ambiance: document.getElementById('e-ambiance').value
+      };
+      const { error } = await sb.from('bibliotheque_comptages').update(payload).eq('id', id);
+      if(error) throw error;
+    } else {
+      const entrees = {};
+      document.querySelectorAll('#e-entrees-wrap input').forEach(inp => { entrees[inp.dataset.origine] = parseInt(inp.value)||0; });
+      const payload = {
+        date_rapport, heure_rapport, agent_nom, poste_garde, entrees,
+        rappels_reglement: parseInt(document.getElementById('e-rappels').value)||0,
+        evictions_refus: parseInt(document.getElementById('e-evictions').value)||0
+      };
+      const { error } = await sb.from('bibliotheque_filtrages').update(payload).eq('id', id);
+      if(error) throw error;
+    }
+    closeEditModal();
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+async function deleteReport(kind, id){
+  if(!confirm('Supprimer définitivement ce rapport ?')) return;
+  try{
+    const table = kind==='comptage' ? 'bibliotheque_comptages' : 'bibliotheque_filtrages';
+    const { error } = await sb.from(table).delete().eq('id', id);
+    if(error) throw error;
+    await loadAll();
+  }catch(e){ alert('Erreur : '+e.message); }
+}
+
+document.getElementById('modal-edit').addEventListener('click', e => { if(e.target.id==='modal-edit') closeEditModal(); });
 
 function switchTab(t){
   document.getElementById('tab-list').classList.toggle('active', t==='list');
@@ -246,12 +375,13 @@ function switchTab(t){
 
 async function loadAll(){
   try{
-    const [{data:c},{data:f},{data:o}] = await Promise.all([
+    const [{data:c},{data:f},{data:o},{data:amb}] = await Promise.all([
       sb.from('bibliotheque_comptages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false}),
       sb.from('bibliotheque_filtrages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false}),
-      sb.from('bibliotheque_config_origines').select('*').eq('actif',true).order('ordre')
+      sb.from('bibliotheque_config_origines').select('*').eq('actif',true).order('ordre'),
+      sb.from('bibliotheque_config_ambiances').select('*').eq('actif',true).order('ordre')
     ]);
-    comptages = c||[]; filtrages = f||[]; origines = o||[];
+    comptages = c||[]; filtrages = f||[]; origines = o||[]; ambiancesCache = amb||[];
     renderList();
   }catch(e){
     document.getElementById('list-wrap').innerHTML = `<div class="state-msg">Erreur : ${escHtml(e.message)}</div>`;
@@ -273,17 +403,21 @@ function renderList(){
   const el = document.getElementById('list-wrap');
   if(!rows.length){ el.innerHTML = `<div class="state-msg">Aucun rapport pour ces filtres.</div>`; return; }
 
-  el.innerHTML = `<table class="etable"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th>Agent</th><th>Résumé</th></tr></thead><tbody>` +
+  el.innerHTML = `<table class="etable"><thead><tr><th>Date</th><th>Heure</th><th>Type</th><th>Agent</th><th>Résumé</th><th>Actions</th></tr></thead><tbody>` +
     rows.map((r,i) => {
       const resume = r.kind==='comptage'
         ? `Affluence ${r.data.affluence} · ${r.data.ambiance||'—'}`
         : `Total entrées ${Object.values(r.data.entrees||{}).reduce((a,b)=>a+(parseInt(b)||0),0)}`;
-      return `<tr onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})'>
-        <td>${fmtDate(r.date)}</td>
-        <td>${(r.heure||'').slice(0,5)}</td>
-        <td><span class="badge-type ${r.kind==='comptage'?'bt-comptage':'bt-filtrage'}">${r.kind==='comptage'?'📊 Comptage':'🚪 Filtrage'}</span></td>
-        <td>${escHtml(r.data.agent_nom)}</td>
-        <td style="font-size:12px;color:var(--rdz-gray)">${resume}</td>
+      return `<tr>
+        <td onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})' style="cursor:pointer">${fmtDate(r.date)}</td>
+        <td onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})' style="cursor:pointer">${(r.heure||'').slice(0,5)}</td>
+        <td onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})' style="cursor:pointer"><span class="badge-type ${r.kind==='comptage'?'bt-comptage':'bt-filtrage'}">${r.kind==='comptage'?'📊 Comptage':'🚪 Filtrage'}</span></td>
+        <td onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})' style="cursor:pointer">${escHtml(r.data.agent_nom)}</td>
+        <td onclick='openIndividualReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})' style="cursor:pointer;font-size:12px;color:var(--rdz-gray)">${resume}</td>
+        <td style="white-space:nowrap">
+          <button class="row-act" onclick='event.stopPropagation();openEditModal(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})'>✏️</button>
+          <button class="row-act del" onclick='event.stopPropagation();deleteReport(${JSON.stringify(r.kind)},${JSON.stringify(r.data.id)})'>🗑</button>
+        </td>
       </tr>`;
     }).join('') + `</tbody></table>`;
 }
