@@ -175,6 +175,15 @@ function switchTab(tab){
 let viewMode = 'jour'; // 'semaine' | 'jour'
 let selectedDay = null;   // 'YYYY-MM-DD', utilisé en mode 'jour'
 
+// Jour par défaut = aujourd'hui s'il est dans la plage du planning chargé,
+// sinon le jour disponible le plus proche (bord de la plage).
+function pickDefaultDay(minKey, maxKey){
+  const t = new Date().toISOString().slice(0,10);
+  if (t < minKey) return minKey;
+  if (t > maxKey) return maxKey;
+  return t;
+}
+
 function setViewMode(mode){
   viewMode = mode;
   document.getElementById('mode-semaine').classList.toggle('active', mode==='semaine');
@@ -182,7 +191,9 @@ function setViewMode(mode){
   document.getElementById('day-picker').style.display = mode==='jour' ? 'inline-block' : 'none';
   document.getElementById('btn-print-day').style.display = mode==='jour' ? 'inline-flex' : 'none';
   if (mode==='jour' && !selectedDay && shifts.length) {
-    selectedDay = dateKey(new Date(Math.max(...shifts.map(s=>s.debut))));
+    const minKey = dateKey(new Date(Math.min(...shifts.map(s=>s.debut))));
+    const maxKey = dateKey(new Date(Math.max(...shifts.map(s=>s.debut))));
+    selectedDay = pickDefaultDay(minKey, maxKey);
     document.getElementById('day-picker').value = selectedDay;
   }
   renderGantt();
@@ -292,7 +303,7 @@ function afterShiftsReady(skipPdsaReload){
   const dp = document.getElementById('day-picker');
   dp.min = dateKey(new Date(Math.min(...shifts.map(s=>s.debut))));
   dp.max = dateKey(lastDate);
-  if (!selectedDay) selectedDay = dateKey(lastDate);
+  if (!selectedDay) selectedDay = pickDefaultDay(dp.min, dp.max);
   dp.value = selectedDay;
 
   const doRender = () => setViewMode(viewMode); // applique le mode courant (Jour par défaut) et affiche
