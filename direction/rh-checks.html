@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDZ — RH Checks (Direction)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#8B1A1A;--red-dark:#6B1212;--black:#1a1a1a;--white:#fff;
+  --gray-light:#f5f4f2;--gray-border:#d0ccc5;--gray-mid:#888;--gray-dark:#555;
+  --green:#1e7a1e;--green-light:#f0f8f0;--green-border:#86c986;
+  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fbbf24;
+  --blue:#2563eb;--blue-light:#eff6ff;--blue-border:#93c5fd;
+}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);color:var(--black);min-height:100vh}
+.header{background:var(--red);border-bottom:4px solid var(--red-dark)}
+.header-inner{max-width:1200px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-brand{padding:14px 0}
+.header-brand-name{font-size:14px;font-weight:700;color:#fff;letter-spacing:.07em;text-transform:uppercase}
+.header-brand-sub{font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.03em;margin-top:2px}
+.btn-nav{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:2px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;border:1.5px solid rgba(255,255,255,.85);background:rgba(255,255,255,.12);color:#fff;text-decoration:none}
+.btn-nav:hover{background:rgba(255,255,255,.25)}
+.sync-wrap{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.75)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
+.sync-dot.ok{background:#86efac}.sync-dot.loading{background:#fde68a;animation:blink 1s infinite}.sync-dot.err{background:#fca5a5}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.content{max-width:1200px;margin:0 auto;padding:24px 28px 48px}
+.page-title{font-size:18px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.page-sub{font-size:12px;color:var(--gray-dark);margin-top:4px;margin-bottom:20px}
+
+.group-row{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.group-btn{flex:1;min-width:150px;background:#fff;border:1px solid var(--gray-border);border-radius:2px;padding:14px 16px;cursor:pointer;text-align:left;transition:all .15s;font-family:inherit}
+.group-btn:hover{border-color:var(--red);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.group-btn .gico{font-size:20px;margin-bottom:5px}
+.group-btn .glbl{font-size:12.5px;font-weight:700;color:var(--black)}
+.group-btn .gdesc{font-size:10.5px;color:var(--gray-mid);margin-top:2px}
+
+.subnav{display:none;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+.subnav.show{display:flex}
+.subnav-back{padding:7px 12px;border-radius:2px;border:1px solid var(--gray-border);background:#fff;color:var(--gray-dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.subnav-btn{padding:7px 14px;border-radius:20px;border:1.5px solid var(--gray-border);background:#fff;color:var(--gray-dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.subnav-btn.active{background:var(--red);border-color:var(--red-dark);color:#fff}
+
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid var(--gray-border);border-radius:2px;padding:16px 18px;margin-bottom:14px}
+.toolbar{background:#fff;border:1px solid var(--gray-border);border-radius:2px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tlabel{font-size:11px;font-weight:700;color:var(--gray-dark);text-transform:uppercase;letter-spacing:.04em}
+.fc{padding:8px 11px;border-radius:2px;border:1px solid var(--gray-border);font-size:13px;font-family:inherit;background:#fff}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:2px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;font-family:inherit}
+.btn-p{background:var(--red);color:#fff;border-color:var(--red-dark)}
+.btn-p:hover{background:var(--red-dark)}
+.btn-g{background:var(--gray-light);color:var(--gray-dark);border-color:var(--gray-border)}
+.btn-g:hover{background:#ebe9e6}
+.btn-sm{padding:5px 11px;font-size:11px}
+
+table.tbl{width:100%;border-collapse:collapse}
+table.tbl thead th{background:var(--gray-light);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--gray-dark);padding:8px 10px;text-align:left;border-bottom:1px solid var(--gray-border);white-space:nowrap}
+table.tbl tbody td{padding:8px 10px;font-size:12.5px;border-bottom:1px solid var(--gray-border)}
+table.tbl tbody tr:last-child td{border-bottom:none}
+table.tbl tbody tr:hover td{background:var(--gray-light)}
+
+.badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.bok{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
+.bwarn{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-border)}
+.balert{background:#fef2f2;color:var(--red);border:1px solid #fca5a5}
+.bgray{background:var(--gray-light);color:var(--gray-mid);border:1px solid var(--gray-border)}
+.binfo{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border)}
+
+.state-msg{text-align:center;color:var(--gray-mid);padding:24px;font-size:13px}
+.sec-title{font-size:12px;font-weight:700;color:var(--gray-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+
+.footer{border-top:1px solid var(--gray-border);padding:16px 28px;max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#9a9a9a}
+
+.moverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-start;justify-content:center;padding:60px 20px;overflow-y:auto}
+.moverlay.show{display:flex}
+.modal{background:#fff;border-radius:2px;border-top:3px solid var(--red);padding:22px;width:100%;max-width:440px}
+.mhead{display:flex;justify-content:space-between;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--gray-border);margin-bottom:16px}
+.mtitle{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--red)}
+.mclose{background:none;border:none;font-size:18px;cursor:pointer;color:var(--gray-mid)}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-border)}
+.fg{margin-bottom:12px}.fl{display:block;font-size:11px;font-weight:700;color:var(--gray-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.fr{display:flex;gap:10px}.fr .fg{flex:1}
+
+.toast{position:fixed;bottom:22px;right:22px;background:var(--black);color:#fff;padding:10px 18px;border-radius:2px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;border-left:4px solid var(--red)}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">RH Checks — Direction</div>
+    </div>
+    <nav style="display:flex;gap:8px;align-items:center">
+      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <div class="sync-wrap"><div class="sync-dot loading" id="sdot"></div><span id="slbl">Chargement…</span></div>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+<div class="subnav" id="subnav">
+  <button class="subnav-back" onclick="goHome()">← Toutes les rubriques</button>
+</div>
+
+<!-- ACCUEIL -->
+<div class="panel active" id="panel-home">
+  <div class="page-title">RH Checks</div>
+  <div class="page-sub">Contrôles RH à partir des exports Agendrix (plages horaires, congés, entrées de temps réelles) — réservé à la direction.</div>
+  <div class="group-row">
+    <button class="group-btn" onclick="goGroup('import')"><div class="gico">📥</div><div class="glbl">Import</div><div class="gdesc" id="imp-desc">—</div></button>
+    <button class="group-btn" onclick="goGroup('ou')"><div class="gico">📅</div><div class="glbl">Qui est où</div><div class="gdesc">Roster à un instant donné</div></button>
+    <button class="group-btn" onclick="goGroup('temps')"><div class="gico">⏱️</div><div class="glbl">Temps de travail</div><div class="gdesc">Réel vs contrat</div></button>
+    <button class="group-btn" onclick="goGroup('repos')"><div class="gico">😴</div><div class="glbl">Temps de repos</div><div class="gdesc" id="repos-desc">—</div></button>
+    <button class="group-btn" onclick="goGroup('conges')"><div class="gico">🏖️</div><div class="glbl">Congés</div><div class="gdesc">Calendrier et conflits</div></button>
+    <button class="group-btn" onclick="goGroup('ecarts')"><div class="gico">📊</div><div class="glbl">Écarts Planning / Réel</div><div class="gdesc">Divergences plage vs entrée</div></button>
+    <button class="group-btn" onclick="goGroup('couverture')"><div class="gico">📍</div><div class="glbl">Couverture sites</div><div class="gdesc">Effectif minimum</div></button>
+    <button class="group-btn" onclick="goGroup('incompat')"><div class="gico">⚠️</div><div class="glbl">Incompatibilités</div><div class="gdesc">Paires à ne pas croiser</div></button>
+    <button class="group-btn" onclick="goGroup('config')"><div class="gico">⚙️</div><div class="glbl">Paramétrage</div><div class="gdesc">Couverture, contrats, seuils</div></button>
+  </div>
+</div>
+
+<!-- IMPORT -->
+<div class="panel" id="panel-import">
+  <div class="card">
+    <div class="sec-title">📥 Plages horaires & congés</div>
+    <p style="font-size:12.5px;color:var(--gray-mid);margin-bottom:10px">Fichier « Agendrix — plages-horaires-et-congés ». Planifie qui travaille où, plus les congés payés/non payés.</p>
+    <input type="file" id="file-plages" accept=".xlsx" style="display:none" onchange="onFilePlages(this)">
+    <button class="btn btn-p" onclick="document.getElementById('file-plages').click()">📂 Importer</button>
+    <span id="plages-status" style="margin-left:10px;font-size:12px;color:var(--gray-mid)"></span>
+  </div>
+  <div class="card">
+    <div class="sec-title">📥 Entrées de temps</div>
+    <p style="font-size:12.5px;color:var(--gray-mid);margin-bottom:10px">Fichier « Agendrix — entrées-de-temps ». Horaires réellement saisis/corrigés par les agents.</p>
+    <input type="file" id="file-entrees" accept=".xlsx" style="display:none" onchange="onFileEntrees(this)">
+    <button class="btn btn-p" onclick="document.getElementById('file-entrees').click()">📂 Importer</button>
+    <span id="entrees-status" style="margin-left:10px;font-size:12px;color:var(--gray-mid)"></span>
+  </div>
+</div>
+
+<!-- QUI EST OÙ -->
+<div class="panel" id="panel-ou">
+  <div class="toolbar">
+    <span class="tlabel">Date</span><input type="date" class="fc" id="ou-date">
+    <span class="tlabel">Heure</span><input type="time" class="fc" id="ou-heure">
+    <button class="btn btn-p btn-sm" onclick="renderQuiEstOu()">🔍 Afficher</button>
+  </div>
+  <div id="ou-result"><div class="state-msg">Choisis une date et une heure.</div></div>
+</div>
+
+<!-- TEMPS DE TRAVAIL -->
+<div class="panel" id="panel-temps">
+  <div class="toolbar">
+    <span class="tlabel">Mois</span><input type="month" class="fc" id="temps-mois">
+    <button class="btn btn-p btn-sm" onclick="renderTempsTravail()">🔍 Calculer</button>
+  </div>
+  <div id="temps-result"><div class="state-msg">Choisis un mois.</div></div>
+</div>
+
+<!-- TEMPS DE REPOS -->
+<div class="panel" id="panel-repos">
+  <div class="toolbar">
+    <span class="tlabel">Du</span><input type="date" class="fc" id="repos-debut">
+    <span class="tlabel">Au</span><input type="date" class="fc" id="repos-fin">
+    <button class="btn btn-p btn-sm" onclick="renderRepos()">🔍 Vérifier</button>
+  </div>
+  <div id="repos-result"><div class="state-msg">Choisis une période.</div></div>
+</div>
+
+<!-- CONGÉS -->
+<div class="panel" id="panel-conges">
+  <div class="toolbar">
+    <span class="tlabel">Du</span><input type="date" class="fc" id="conges-debut">
+    <span class="tlabel">Au</span><input type="date" class="fc" id="conges-fin">
+    <button class="btn btn-p btn-sm" onclick="renderConges()">🔍 Afficher</button>
+  </div>
+  <div id="conges-result"><div class="state-msg">Choisis une période.</div></div>
+</div>
+
+<!-- ÉCARTS PLANNING / RÉEL -->
+<div class="panel" id="panel-ecarts">
+  <div class="toolbar">
+    <span class="tlabel">Du</span><input type="date" class="fc" id="ecarts-debut">
+    <span class="tlabel">Au</span><input type="date" class="fc" id="ecarts-fin">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--gray-dark)"><input type="checkbox" id="ecarts-tout"> Afficher aussi les services identiques</label>
+    <button class="btn btn-p btn-sm" onclick="renderEcarts()">🔍 Comparer</button>
+  </div>
+  <div id="ecarts-result"><div class="state-msg">Choisis une période.</div></div>
+</div>
+
+<!-- COUVERTURE SITES -->
+<div class="panel" id="panel-couverture">
+  <div class="toolbar">
+    <span class="tlabel">Date</span><input type="date" class="fc" id="couv-date">
+    <button class="btn btn-p btn-sm" onclick="renderCouverture()">🔍 Vérifier</button>
+  </div>
+  <div id="couv-result"><div class="state-msg">Choisis une date.</div></div>
+</div>
+
+<!-- INCOMPATIBILITÉS -->
+<div class="panel" id="panel-incompat">
+  <div class="toolbar">
+    <span class="tlabel">Du</span><input type="date" class="fc" id="incompat-debut">
+    <span class="tlabel">Au</span><input type="date" class="fc" id="incompat-fin">
+    <button class="btn btn-p btn-sm" onclick="renderIncompat()">🔍 Vérifier</button>
+  </div>
+  <div id="incompat-result"><div class="state-msg">Choisis une période.</div></div>
+</div>
+
+<!-- CONFIGURATION -->
+<div class="panel" id="panel-config">
+  <div class="subnav show" style="margin-bottom:14px">
+    <button class="subnav-btn active" id="cfgtab-couv" onclick="setCfgTab('couv')">📍 Couverture</button>
+    <button class="subnav-btn" id="cfgtab-contrats" onclick="setCfgTab('contrats')">📄 Contrats</button>
+    <button class="subnav-btn" id="cfgtab-incompat" onclick="setCfgTab('incompat')">⚠️ Incompatibilités</button>
+    <button class="subnav-btn" id="cfgtab-param" onclick="setCfgTab('param')">🔧 Paramètres</button>
+  </div>
+  <div id="cfg-couv">
+    <button class="btn btn-p btn-sm" style="margin-bottom:12px" onclick="openCouvModal()">➕ Nouvelle règle de couverture</button>
+    <div class="card" id="cfg-couv-list"></div>
+  </div>
+  <div id="cfg-contrats" style="display:none">
+    <button class="btn btn-p btn-sm" style="margin-bottom:12px" onclick="openContratModal()">➕ Nouveau contrat</button>
+    <div class="card" id="cfg-contrats-list"></div>
+  </div>
+  <div id="cfg-incompat" style="display:none">
+    <button class="btn btn-p btn-sm" style="margin-bottom:12px" onclick="openIncompatModal()">➕ Nouvelle incompatibilité</button>
+    <div class="card" id="cfg-incompat-list"></div>
+  </div>
+  <div id="cfg-param" style="display:none">
+    <div class="card">
+      <div class="fg"><label class="fl">Temps de repos minimum entre deux services (heures)</label>
+        <input type="number" class="fc" id="param-repos-min" style="width:120px" min="0" step="0.5">
+      </div>
+      <button class="btn btn-p btn-sm" onclick="saveParametres()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<!-- MODALS CONFIG -->
+<div class="moverlay" id="m-couv"><div class="modal">
+  <div class="mhead"><div class="mtitle" id="couv-modal-title">Nouvelle règle</div><button class="mclose" onclick="closeM('m-couv')">✕</button></div>
+  <input type="hidden" id="couv-id">
+  <div class="fg"><label class="fl">Site</label><input type="text" class="fc" id="couv-site" style="width:100%"></div>
+  <div class="fr">
+    <div class="fg"><label class="fl">De</label><input type="time" class="fc" id="couv-hd" style="width:100%"></div>
+    <div class="fg"><label class="fl">À</label><input type="time" class="fc" id="couv-hf" style="width:100%"></div>
+    <div class="fg"><label class="fl">Min. agents</label><input type="number" class="fc" id="couv-min" min="1" value="1" style="width:100%"></div>
+  </div>
+  <div class="fg"><label class="fl">Label (optionnel)</label><input type="text" class="fc" id="couv-label" style="width:100%" placeholder="Ex : Nuit"></div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-couv')">Annuler</button><button class="btn btn-p" onclick="saveCouv()">✓ Enregistrer</button></div>
+</div></div>
+
+<div class="moverlay" id="m-contrat"><div class="modal">
+  <div class="mhead"><div class="mtitle" id="contrat-modal-title">Nouveau contrat</div><button class="mclose" onclick="closeM('m-contrat')">✕</button></div>
+  <input type="hidden" id="contrat-id">
+  <div class="fg"><label class="fl">Agent</label><input type="text" class="fc" id="contrat-agent" style="width:100%" placeholder="Prénom Nom"></div>
+  <div class="fg"><label class="fl">Heures par mois</label><input type="number" class="fc" id="contrat-heures" style="width:100%" min="0" step="0.5"></div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-contrat')">Annuler</button><button class="btn btn-p" onclick="saveContrat()">✓ Enregistrer</button></div>
+</div></div>
+
+<div class="moverlay" id="m-incompat"><div class="modal">
+  <div class="mhead"><div class="mtitle">Nouvelle incompatibilité</div><button class="mclose" onclick="closeM('m-incompat')">✕</button></div>
+  <div class="fr">
+    <div class="fg"><label class="fl">Agent 1</label><input type="text" class="fc" id="incompat-a1" style="width:100%"></div>
+    <div class="fg"><label class="fl">Agent 2</label><input type="text" class="fc" id="incompat-a2" style="width:100%"></div>
+  </div>
+  <div class="fg"><label class="fl">Note (optionnel)</label><input type="text" class="fc" id="incompat-note" style="width:100%"></div>
+  <div class="mfoot"><button class="btn btn-g" onclick="closeM('m-incompat')">Annuler</button><button class="btn btn-p" onclick="saveIncompat()">✓ Enregistrer</button></div>
+</div></div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const SB_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+let CURRENT_GROUP=null;
+let DB={plages:[],entrees:[],couverture:[],contrats:[],incompat:[],parametres:{}};
+
+function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function closeM(id){document.getElementById(id).classList.remove('show');}
+function sync(s,l){document.getElementById('sdot').className='sync-dot '+s;if(l)document.getElementById('slbl').textContent=l;}
+function fmtDate(d){ return d.split('-').reverse().join('.'); }
+function dateKey(d){ return d.toISOString().slice(0,10); }
+
+// ═══ NAVIGATION ═══
+function goHome(){
+  CURRENT_GROUP=null;
+  document.getElementById('subnav').classList.remove('show');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-home').classList.add('active');
+}
+function goGroup(g){
+  CURRENT_GROUP=g;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+g).classList.add('active');
+  const sn=document.getElementById('subnav');
+  sn.innerHTML='<button class="subnav-back" onclick="goHome()">← Toutes les rubriques</button>';
+  sn.classList.add('show');
+  if(g==='config') renderConfig();
+}
+
+// ═══ CONVERSION EXCEL SÛRE (fuseau horaire) — identique à Planning Agendrix ═══
+function excelSerialToUTCDate(serial){
+  const approxDate = new Date(Math.floor(serial - 25569) * 86400 * 1000);
+  const tzOffsetMin = approxDate.getTimezoneOffset();
+  const corrected = serial - (tzOffsetMin / 1440);
+  const utcDays = Math.floor(corrected - 25569);
+  const dayMs = utcDays * 86400 * 1000;
+  const dayBase = new Date(dayMs);
+  const fractionalDay = corrected - Math.floor(corrected) + 1e-7;
+  let totalSeconds = Math.round(86400 * fractionalDay);
+  const seconds = totalSeconds % 60; totalSeconds -= seconds;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  return new Date(Date.UTC(dayBase.getUTCFullYear(), dayBase.getUTCMonth(), dayBase.getUTCDate(), hours, minutes, seconds));
+}
+
+// ═══ IMPORT : PLAGES HORAIRES & CONGÉS ═══
+function onFilePlages(input){
+  const file = input.files[0]; if(!file) return;
+  document.getElementById('plages-status').textContent = 'Lecture…';
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:false});
+      const ws = wb.Sheets['Sommaire'] || wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      const parsed = [];
+      rows.forEach(r => {
+        const [prenom,nom,matricule,type,type_conge,debut,fin,pnp,pp,succ,pos,souspos,ress,total,note] = r;
+        if(!prenom || prenom==='Prénom' || typeof debut!=='number' || typeof fin!=='number') return;
+        const debutD = excelSerialToUTCDate(debut), finD = excelSerialToUTCDate(fin);
+        const agent = prenom+' '+nom;
+        parsed.push({
+          import_key: agent+'|'+debutD.toISOString(),
+          agent_nom: agent, matricule: matricule?String(matricule):null,
+          type, type_conge: type_conge||null,
+          debut: debutD.toISOString(), fin: finD.toISOString(),
+          pause_non_payee: typeof pnp==='number'?pnp:null, pause_payee: typeof pp==='number'?pp:null,
+          succursale: succ||null, position: pos||null, sous_position: souspos||null, ressource: ress||null,
+          total_h: typeof total==='number'?total:null, note: note||null,
+          updated_at: new Date().toISOString()
+        });
+      });
+      if(!parsed.length){ document.getElementById('plages-status').textContent = '⚠️ Aucune ligne reconnue'; return; }
+      document.getElementById('plages-status').textContent = 'Enregistrement de '+parsed.length+' ligne(s)…';
+      // upsert par lots de 500
+      for(let i=0;i<parsed.length;i+=500){
+        const { error } = await sb.from('rh_plages').upsert(parsed.slice(i,i+500), {onConflict:'import_key'});
+        if(error) throw error;
+      }
+      document.getElementById('plages-status').textContent = '✅ '+parsed.length+' ligne(s) importée(s)';
+      await loadAll();
+    }catch(err){ document.getElementById('plages-status').textContent = '❌ '+err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══ IMPORT : ENTRÉES DE TEMPS ═══
+function onFileEntrees(input){
+  const file = input.files[0]; if(!file) return;
+  document.getElementById('entrees-status').textContent = 'Lecture…';
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:false});
+      const ws = wb.Sheets['Sommaire'] || wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      const parsed = [];
+      rows.forEach(r => {
+        const [prenom,nom,matricule,type,type_conge,dateS,hd,hf,pnp,pp,succ,pos,ress,lte,lts,total,ne,ns,nr] = r;
+        if(!prenom || prenom==='Prénom' || typeof dateS!=='number') return;
+        const dateD = excelSerialToUTCDate(dateS);
+        const dk = dateKey(dateD);
+        const agent = prenom+' '+nom;
+        parsed.push({
+          import_key: agent+'|'+dk+'|'+(hd||''),
+          agent_nom: agent, matricule: matricule?String(matricule):null,
+          type, type_conge: type_conge||null,
+          date_entree: dk, heure_debut: hd||null, heure_fin: hf||null,
+          pause_non_payee: typeof pnp==='number'?pnp:null, pause_payee: typeof pp==='number'?pp:null,
+          succursale: succ||null, position: pos||null,
+          lieu_travail_entree: lte||null, lieu_travail_sortie: lts||null,
+          total_h: typeof total==='number'?total:null,
+          notes_entree: ne||null, notes_sortie: ns||null, notes_responsable: nr||null,
+          updated_at: new Date().toISOString()
+        });
+      });
+      if(!parsed.length){ document.getElementById('entrees-status').textContent = '⚠️ Aucune ligne reconnue'; return; }
+      document.getElementById('entrees-status').textContent = 'Enregistrement de '+parsed.length+' ligne(s)…';
+      for(let i=0;i<parsed.length;i+=500){
+        const { error } = await sb.from('rh_entrees').upsert(parsed.slice(i,i+500), {onConflict:'import_key'});
+        if(error) throw error;
+      }
+      document.getElementById('entrees-status').textContent = '✅ '+parsed.length+' ligne(s) importée(s)';
+      await loadAll();
+    }catch(err){ document.getElementById('entrees-status').textContent = '❌ '+err.message; }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══ CHARGEMENT GLOBAL ═══
+async function loadAll(){
+  sync('loading','Synchronisation…');
+  try{
+    const [{data:plages},{data:entrees},{data:couverture},{data:contrats},{data:incompat},{data:parametres}] = await Promise.all([
+      sb.from('rh_plages').select('*').order('debut'),
+      sb.from('rh_entrees').select('*').order('date_entree'),
+      sb.from('rh_config_couverture').select('*').eq('actif',true).order('site').order('ordre'),
+      sb.from('rh_config_contrats').select('*').eq('actif',true).order('agent_nom'),
+      sb.from('rh_config_incompatibilites').select('*').eq('actif',true),
+      sb.from('rh_config_parametres').select('*'),
+    ]);
+    DB.plages=plages||[]; DB.entrees=entrees||[]; DB.couverture=couverture||[]; DB.contrats=contrats||[]; DB.incompat=incompat||[];
+    DB.parametres={}; (parametres||[]).forEach(p=>DB.parametres[p.cle]=p.valeur);
+    document.getElementById('imp-desc').textContent = DB.plages.length+' plage(s) · '+DB.entrees.length+' entrée(s)';
+    document.getElementById('repos-desc').textContent = 'Seuil : '+(DB.parametres.repos_min_heures||11)+'h';
+    sync('ok','Synchronisé — '+new Date().toLocaleTimeString('fr-FR'));
+  }catch(e){ sync('err','Erreur de connexion'); console.error(e); }
+}
+
+// ═══ QUI EST OÙ ═══
+function renderQuiEstOu(){
+  const d = document.getElementById('ou-date').value, h = document.getElementById('ou-heure').value;
+  if(!d || !h){ toast('Choisis une date et une heure'); return; }
+  const instant = new Date(d+'T'+h+':00Z');
+  const actifs = DB.plages.filter(p => p.type==='Plage horaire' && new Date(p.debut)<=instant && new Date(p.fin)>instant);
+  const bySite = {};
+  actifs.forEach(p => { (bySite[p.succursale||'—']=bySite[p.succursale||'—']||[]).push(p); });
+  const el = document.getElementById('ou-result');
+  if(!actifs.length){ el.innerHTML = '<div class="state-msg">Personne en service à cet instant (selon le planning importé).</div>'; return; }
+  el.innerHTML = Object.keys(bySite).sort().map(site => `
+    <div class="card">
+      <div class="sec-title">📍 ${escHtml(site)} — ${bySite[site].length} agent(s)</div>
+      <table class="tbl"><thead><tr><th>Agent</th><th>Poste</th><th>Horaire</th></tr></thead><tbody>
+        ${bySite[site].map(p => `<tr><td><strong>${escHtml(p.agent_nom)}</strong></td><td>${escHtml(p.position||'—')}</td><td class="mono">${new Date(p.debut).toISOString().slice(11,16)}–${new Date(p.fin).toISOString().slice(11,16)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>`).join('');
+}
+
+// ═══ TEMPS DE TRAVAIL VS CONTRAT ═══
+function renderTempsTravail(){
+  const mois = document.getElementById('temps-mois').value; // YYYY-MM
+  if(!mois){ toast('Choisis un mois'); return; }
+  const el = document.getElementById('temps-result');
+  if(!DB.contrats.length){ el.innerHTML = '<div class="state-msg">Aucun contrat configuré — va dans Paramétrage → Contrats.</div>'; return; }
+  const rows = DB.contrats.map(c => {
+    const heuresReelles = DB.entrees.filter(en => en.agent_nom===c.agent_nom && en.date_entree.startsWith(mois) && en.type==='Plage horaire')
+      .reduce((a,en)=>a+(parseFloat(en.total_h)||0),0);
+    const ecart = heuresReelles - c.heures_mois;
+    const pct = c.heures_mois ? (ecart/c.heures_mois*100) : 0;
+    const cls = Math.abs(pct)<=10 ? 'bok' : Math.abs(pct)<=25 ? 'bwarn' : 'balert';
+    return `<tr><td><strong>${escHtml(c.agent_nom)}</strong></td><td>${c.heures_mois}h</td><td>${heuresReelles.toFixed(1)}h</td>
+      <td><span class="badge ${cls}">${ecart>=0?'+':''}${ecart.toFixed(1)}h (${pct>=0?'+':''}${pct.toFixed(0)}%)</span></td></tr>`;
+  }).join('');
+  el.innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Agent</th><th>Contrat</th><th>Réel (mois)</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ═══ ÉCARTS PLANNING / RÉEL ═══
+function renderEcarts(){
+  const d1 = document.getElementById('ecarts-debut').value, d2 = document.getElementById('ecarts-fin').value;
+  if(!d1||!d2){ toast('Choisis une période'); return; }
+  const showAll = document.getElementById('ecarts-tout').checked;
+
+  const plagesRange = DB.plages.filter(p => p.type==='Plage horaire' && dateKey(new Date(p.debut))>=d1 && dateKey(new Date(p.debut))<=d2);
+  const entreesRange = DB.entrees.filter(e => e.type==='Plage horaire' && e.date_entree>=d1 && e.date_entree<=d2);
+
+  const keys = new Set([
+    ...plagesRange.map(p=>p.agent_nom+'|'+dateKey(new Date(p.debut))),
+    ...entreesRange.map(e=>e.agent_nom+'|'+e.date_entree)
+  ]);
+
+  const rows = [];
+  keys.forEach(k => {
+    const sep = k.lastIndexOf('|');
+    const agent = k.slice(0,sep), jour = k.slice(sep+1);
+    const ps = plagesRange.filter(p=>p.agent_nom===agent && dateKey(new Date(p.debut))===jour).sort((a,b)=>new Date(a.debut)-new Date(b.debut));
+    const es = entreesRange.filter(e=>e.agent_nom===agent && e.date_entree===jour).sort((a,b)=>(a.heure_debut||'').localeCompare(b.heure_debut||''));
+    const n = Math.max(ps.length, es.length);
+    for(let i=0;i<n;i++){
+      const p = ps[i], e = es[i];
+      const pDeb = p ? new Date(p.debut).toISOString().slice(11,16) : null;
+      const pFin = p ? new Date(p.fin).toISOString().slice(11,16) : null;
+      const pSite = p ? p.succursale : null;
+      const eDeb = e ? (e.heure_debut||'').slice(0,5) : null;
+      const eFin = e ? (e.heure_fin||'').slice(0,5) : null;
+      const eSite = e ? (e.lieu_travail_entree || e.succursale) : null;
+      const diff = !p || !e || pDeb!==eDeb || pFin!==eFin || pSite!==eSite;
+      if(diff || showAll) rows.push({ agent, jour, pDeb, pFin, pSite, eDeb, eFin, eSite, diff, sansPlan: !p, sansReel: !e });
+    }
+  });
+  rows.sort((a,b)=> (a.jour+a.agent).localeCompare(b.jour+b.agent));
+
+  const el = document.getElementById('ecarts-result');
+  const nbEcarts = rows.filter(r=>r.diff).length;
+  if(!rows.length){ el.innerHTML = '<div class="state-msg">Aucune donnée sur cette période (ni plage, ni entrée).</div>'; return; }
+  el.innerHTML = `<div class="card">
+    <div class="sec-title">${nbEcarts ? '⚠️ '+nbEcarts+' écart(s) détecté(s) entre planning et réel' : '✅ Aucun écart — le réel correspond au planning'}</div>
+    <p style="font-size:11.5px;color:var(--gray-mid);margin-bottom:10px">En cas d'écart, c'est toujours le réel (fichier « entrées de temps ») qui fait foi pour les autres contrôles (temps de travail, etc.).</p>
+    <table class="tbl"><thead><tr><th>Agent</th><th>Date</th><th>Site prévu</th><th>Prévu</th><th>Site réel</th><th>Réel</th><th>Statut</th></tr></thead><tbody>
+    ${rows.map(r => `<tr class="${r.diff?'':''}">
+      <td><strong>${escHtml(r.agent)}</strong></td>
+      <td class="mono">${fmtDate(r.jour)}</td>
+      <td>${r.pSite?escHtml(r.pSite):'<span class="badge bgray">—</span>'}</td>
+      <td class="mono">${r.pDeb?r.pDeb+'–'+r.pFin:'<span class="badge bgray">Non planifié</span>'}</td>
+      <td>${r.eSite?escHtml(r.eSite):'<span class="badge bgray">—</span>'}</td>
+      <td class="mono">${r.eDeb?r.eDeb+'–'+r.eFin:'<span class="badge bgray">Non saisi</span>'}</td>
+      <td>${r.diff ? '<span class="badge balert">⚠️ Écart</span>' : '<span class="badge bok">✅ Identique</span>'}</td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ TEMPS DE REPOS ═══
+function shiftInstants(en){
+  // reconstruit début/fin réels (Date) d'une entrée, gère le passage de minuit
+  if(!en.heure_debut || !en.heure_fin) return null;
+  const [dh,dm] = en.heure_debut.split(':').map(Number);
+  const [fh,fm] = en.heure_fin.split(':').map(Number);
+  const debut = new Date(en.date_entree+'T00:00:00Z'); debut.setUTCHours(dh,dm,0,0);
+  let fin = new Date(en.date_entree+'T00:00:00Z'); fin.setUTCHours(fh,fm,0,0);
+  if(fin <= debut) fin.setUTCDate(fin.getUTCDate()+1);
+  return {debut, fin};
+}
+function renderRepos(){
+  const d1 = document.getElementById('repos-debut').value, d2 = document.getElementById('repos-fin').value;
+  if(!d1||!d2){ toast('Choisis une période'); return; }
+  const seuil = parseFloat(DB.parametres.repos_min_heures||11);
+  const byAgent = {};
+  DB.entrees.filter(en => en.type==='Plage horaire' && en.date_entree>=d1 && en.date_entree<=d2).forEach(en => {
+    const inst = shiftInstants(en); if(!inst) return;
+    (byAgent[en.agent_nom]=byAgent[en.agent_nom]||[]).push(inst);
+  });
+  const violations = [];
+  Object.keys(byAgent).forEach(agent => {
+    const shifts = byAgent[agent].sort((a,b)=>a.debut-b.debut);
+    for(let i=1;i<shifts.length;i++){
+      const gapH = (shifts[i].debut - shifts[i-1].fin)/3600000;
+      if(gapH < seuil){
+        violations.push({agent, finPrec: shifts[i-1].fin, debutSuiv: shifts[i].debut, gapH});
+      }
+    }
+  });
+  const el = document.getElementById('repos-result');
+  if(!violations.length){ el.innerHTML = `<div class="state-msg">✅ Aucune violation du repos minimum (${seuil}h) sur cette période.</div>`; return; }
+  violations.sort((a,b)=>a.gapH-b.gapH);
+  el.innerHTML = `<div class="card"><div class="sec-title">⚠️ ${violations.length} violation(s) du repos minimum (${seuil}h)</div>
+    <table class="tbl"><thead><tr><th>Agent</th><th>Fin service précédent</th><th>Début service suivant</th><th>Repos réel</th></tr></thead><tbody>
+    ${violations.map(v => `<tr><td><strong>${escHtml(v.agent)}</strong></td>
+      <td class="mono">${v.finPrec.toISOString().slice(0,16).replace('T',' ')}</td>
+      <td class="mono">${v.debutSuiv.toISOString().slice(0,16).replace('T',' ')}</td>
+      <td><span class="badge balert">${v.gapH.toFixed(1)}h</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ═══ CONGÉS ═══
+function renderConges(){
+  const d1 = document.getElementById('conges-debut').value, d2 = document.getElementById('conges-fin').value;
+  if(!d1||!d2){ toast('Choisis une période'); return; }
+  const rangeStart = new Date(d1+'T00:00:00Z'), rangeEnd = new Date(d2+'T23:59:59Z');
+  const conges = DB.plages.filter(p => p.type!=='Plage horaire' && new Date(p.debut)<=rangeEnd && new Date(p.fin)>=rangeStart);
+  const el = document.getElementById('conges-result');
+  if(!conges.length){ el.innerHTML = '<div class="state-msg">Aucun congé sur cette période.</div>'; return; }
+  // conflits : congé qui chevauche une plage horaire du même agent
+  const conflicts = conges.filter(c => DB.plages.some(p => p.type==='Plage horaire' && p.agent_nom===c.agent_nom &&
+    new Date(p.debut) < new Date(c.fin) && new Date(p.fin) > new Date(c.debut)));
+  el.innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Agent</th><th>Type</th><th>Début</th><th>Fin</th><th>Note</th><th>Statut</th></tr></thead><tbody>
+    ${conges.map(c => {
+      const isConflict = conflicts.includes(c);
+      return `<tr><td><strong>${escHtml(c.agent_nom)}</strong></td><td>${escHtml(c.type_conge||c.type)}</td>
+        <td class="mono">${fmtDate(dateKey(new Date(c.debut)))}</td><td class="mono">${fmtDate(dateKey(new Date(c.fin)))}</td>
+        <td style="font-size:11.5px;color:var(--gray-mid)">${escHtml(c.note||'—')}</td>
+        <td>${isConflict?'<span class="badge balert">⚠️ Planifié en même temps</span>':'<span class="badge bok">✅ OK</span>'}</td></tr>`;
+    }).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ COUVERTURE SITES ═══
+function timeToMin(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function renderCouverture(){
+  const d = document.getElementById('couv-date').value;
+  if(!d){ toast('Choisis une date'); return; }
+  if(!DB.couverture.length){ document.getElementById('couv-result').innerHTML = '<div class="state-msg">Aucune règle de couverture configurée — va dans Paramétrage → Couverture.</div>'; return; }
+
+  const dayStart = new Date(d+'T00:00:00Z');
+  const rows = DB.couverture.map(rule => {
+    let hd = timeToMin(rule.heure_debut.slice(0,5)), hf = timeToMin(rule.heure_fin.slice(0,5));
+    const overnight = hf <= hd;
+    const windowStart = new Date(dayStart.getTime() + hd*60000);
+    const windowEnd = new Date(dayStart.getTime() + (overnight ? hf+1440 : hf)*60000);
+
+    // échantillonnage toutes les 30 min pour trouver le minimum de couverture simultanée
+    let minCouverture = Infinity, minInstant = null;
+    for(let t=windowStart.getTime(); t<windowEnd.getTime(); t+=30*60000){
+      const instant = new Date(t);
+      const count = DB.plages.filter(p => p.type==='Plage horaire' && p.succursale===rule.site &&
+        new Date(p.debut)<=instant && new Date(p.fin)>instant).length;
+      if(count < minCouverture){ minCouverture = count; minInstant = instant; }
+    }
+    if(minCouverture===Infinity) minCouverture = 0;
+    const ok = minCouverture >= rule.min_agents;
+    return { rule, minCouverture, minInstant, ok };
+  });
+
+  const el = document.getElementById('couv-result');
+  el.innerHTML = `<div class="card"><table class="tbl"><thead><tr><th>Site</th><th>Plage</th><th>Requis</th><th>Constaté (min)</th><th>Statut</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td><strong>${escHtml(r.rule.site)}</strong>${r.rule.label?' <span style="color:var(--gray-mid);font-size:11px">('+escHtml(r.rule.label)+')</span>':''}</td>
+      <td class="mono">${r.rule.heure_debut.slice(0,5)}–${r.rule.heure_fin.slice(0,5)}</td>
+      <td>${r.rule.min_agents}</td>
+      <td>${r.minCouverture}${r.minInstant?' <span style="color:var(--gray-mid);font-size:11px">(à '+r.minInstant.toISOString().slice(11,16)+')</span>':''}</td>
+      <td>${r.ok?'<span class="badge bok">✅ OK</span>':'<span class="badge balert">🚨 Sous-effectif</span>'}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ INCOMPATIBILITÉS ═══
+function renderIncompat(){
+  const d1 = document.getElementById('incompat-debut').value, d2 = document.getElementById('incompat-fin').value;
+  if(!d1||!d2){ toast('Choisis une période'); return; }
+  if(!DB.incompat.length){ document.getElementById('incompat-result').innerHTML = '<div class="state-msg">Aucune paire incompatible configurée — va dans Paramétrage → Incompatibilités.</div>'; return; }
+  const rangeStart = new Date(d1+'T00:00:00Z'), rangeEnd = new Date(d2+'T23:59:59Z');
+  const plagesRange = DB.plages.filter(p => p.type==='Plage horaire' && new Date(p.debut)<=rangeEnd && new Date(p.fin)>=rangeStart);
+
+  const conflicts = [];
+  DB.incompat.forEach(pair => {
+    const p1s = plagesRange.filter(p=>p.agent_nom===pair.agent1);
+    const p2s = plagesRange.filter(p=>p.agent_nom===pair.agent2);
+    p1s.forEach(p1 => p2s.forEach(p2 => {
+      if(p1.succursale===p2.succursale && new Date(p1.debut) < new Date(p2.fin) && new Date(p2.debut) < new Date(p1.fin)){
+        conflicts.push({pair, p1, p2});
+      }
+    }));
+  });
+
+  const el = document.getElementById('incompat-result');
+  if(!conflicts.length){ el.innerHTML = '<div class="state-msg">✅ Aucun croisement détecté pour les paires configurées, sur cette période.</div>'; return; }
+  el.innerHTML = `<div class="card"><div class="sec-title">⚠️ ${conflicts.length} croisement(s) détecté(s)</div>
+    <table class="tbl"><thead><tr><th>Agent 1</th><th>Agent 2</th><th>Site</th><th>Date</th><th>Horaires</th></tr></thead><tbody>
+    ${conflicts.map(c => `<tr><td><strong>${escHtml(c.p1.agent_nom)}</strong></td><td><strong>${escHtml(c.p2.agent_nom)}</strong></td>
+      <td>${escHtml(c.p1.succursale)}</td><td class="mono">${fmtDate(dateKey(new Date(c.p1.debut)))}</td>
+      <td class="mono">${new Date(c.p1.debut).toISOString().slice(11,16)}–${new Date(c.p1.fin).toISOString().slice(11,16)} / ${new Date(c.p2.debut).toISOString().slice(11,16)}–${new Date(c.p2.fin).toISOString().slice(11,16)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ═══ CONFIGURATION ═══
+function setCfgTab(t){
+  ['couv','contrats','incompat','param'].forEach(k=>{
+    document.getElementById('cfgtab-'+k).classList.toggle('active', k===t);
+    document.getElementById('cfg-'+k).style.display = k===t ? 'block':'none';
+  });
+}
+function renderConfig(){
+  document.getElementById('cfg-couv-list').innerHTML = DB.couverture.length ? DB.couverture.map(r => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
+      <div style="flex:1"><strong>${escHtml(r.site)}</strong> ${r.label?'<span style="color:var(--gray-mid);font-size:11px">— '+escHtml(r.label)+'</span>':''}
+        <div style="font-size:11.5px;color:var(--gray-mid)">${r.heure_debut.slice(0,5)}–${r.heure_fin.slice(0,5)} · min. ${r.min_agents} agent(s)</div></div>
+      <button class="btn btn-g btn-sm" onclick='openCouvModal(${JSON.stringify(r.id)})'>✏️</button>
+      <button class="btn btn-sm" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="delCouv('${r.id}')">🗑</button>
+    </div>`).join('') : '<div class="state-msg">Aucune règle</div>';
+
+  document.getElementById('cfg-contrats-list').innerHTML = DB.contrats.length ? DB.contrats.map(c => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
+      <div style="flex:1"><strong>${escHtml(c.agent_nom)}</strong><div style="font-size:11.5px;color:var(--gray-mid)">${c.heures_mois}h / mois</div></div>
+      <button class="btn btn-g btn-sm" onclick='openContratModal(${JSON.stringify(c.id)})'>✏️</button>
+      <button class="btn btn-sm" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="delContrat('${c.id}')">🗑</button>
+    </div>`).join('') : '<div class="state-msg">Aucun contrat</div>';
+
+  document.getElementById('cfg-incompat-list').innerHTML = DB.incompat.length ? DB.incompat.map(i => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gray-border)">
+      <div style="flex:1"><strong>${escHtml(i.agent1)}</strong> ⚡ <strong>${escHtml(i.agent2)}</strong>${i.note?' <span style="color:var(--gray-mid);font-size:11.5px">— '+escHtml(i.note)+'</span>':''}</div>
+      <button class="btn btn-sm" style="background:#fef2f2;color:var(--red);border:1px solid #fca5a5" onclick="delIncompat('${i.id}')">🗑</button>
+    </div>`).join('') : '<div class="state-msg">Aucune incompatibilité</div>';
+
+  document.getElementById('param-repos-min').value = DB.parametres.repos_min_heures || 11;
+}
+
+function openCouvModal(id){
+  const r = id ? DB.couverture.find(x=>x.id===id) : null;
+  document.getElementById('couv-id').value = id||'';
+  document.getElementById('couv-modal-title').textContent = id ? 'Modifier la règle' : 'Nouvelle règle';
+  document.getElementById('couv-site').value = r?r.site:'';
+  document.getElementById('couv-hd').value = r?r.heure_debut.slice(0,5):'';
+  document.getElementById('couv-hf').value = r?r.heure_fin.slice(0,5):'';
+  document.getElementById('couv-min').value = r?r.min_agents:1;
+  document.getElementById('couv-label').value = r?(r.label||''):'';
+  document.getElementById('m-couv').classList.add('show');
+}
+async function saveCouv(){
+  const id = document.getElementById('couv-id').value;
+  const payload = {
+    site: document.getElementById('couv-site').value.trim(),
+    heure_debut: document.getElementById('couv-hd').value+':00',
+    heure_fin: document.getElementById('couv-hf').value+':00',
+    min_agents: parseInt(document.getElementById('couv-min').value)||1,
+    label: document.getElementById('couv-label').value.trim()||null,
+  };
+  if(!payload.site || !payload.heure_debut || !payload.heure_fin){ toast('Champs incomplets'); return; }
+  try{
+    if(id) await sb.from('rh_config_couverture').update(payload).eq('id',id);
+    else await sb.from('rh_config_couverture').insert({...payload, actif:true, ordre:DB.couverture.length});
+    closeM('m-couv'); await loadAll(); renderConfig();
+    toast('✓ Enregistré');
+  }catch(e){ toast('❌ '+e.message); }
+}
+async function delCouv(id){ if(!confirm('Supprimer cette règle ?'))return; await sb.from('rh_config_couverture').delete().eq('id',id); await loadAll(); renderConfig(); }
+
+function openContratModal(id){
+  const c = id ? DB.contrats.find(x=>x.id===id) : null;
+  document.getElementById('contrat-id').value = id||'';
+  document.getElementById('contrat-modal-title').textContent = id ? 'Modifier le contrat' : 'Nouveau contrat';
+  document.getElementById('contrat-agent').value = c?c.agent_nom:'';
+  document.getElementById('contrat-heures').value = c?c.heures_mois:'';
+  document.getElementById('m-contrat').classList.add('show');
+}
+async function saveContrat(){
+  const id = document.getElementById('contrat-id').value;
+  const payload = { agent_nom: document.getElementById('contrat-agent').value.trim(), heures_mois: parseFloat(document.getElementById('contrat-heures').value)||0 };
+  if(!payload.agent_nom){ toast('Nom requis'); return; }
+  try{
+    if(id) await sb.from('rh_config_contrats').update(payload).eq('id',id);
+    else await sb.from('rh_config_contrats').upsert({...payload, actif:true}, {onConflict:'agent_nom'});
+    closeM('m-contrat'); await loadAll(); renderConfig();
+    toast('✓ Enregistré');
+  }catch(e){ toast('❌ '+e.message); }
+}
+async function delContrat(id){ if(!confirm('Supprimer ce contrat ?'))return; await sb.from('rh_config_contrats').delete().eq('id',id); await loadAll(); renderConfig(); }
+
+async function saveIncompat(){
+  const a1 = document.getElementById('incompat-a1').value.trim(), a2 = document.getElementById('incompat-a2').value.trim();
+  if(!a1||!a2){ toast('Les deux agents sont requis'); return; }
+  try{
+    await sb.from('rh_config_incompatibilites').insert({ agent1:a1, agent2:a2, note: document.getElementById('incompat-note').value.trim()||null, actif:true });
+    closeM('m-incompat'); await loadAll(); renderConfig();
+    toast('✓ Enregistré');
+  }catch(e){ toast('❌ '+e.message); }
+}
+function openIncompatModal(){ document.getElementById('incompat-a1').value=''; document.getElementById('incompat-a2').value=''; document.getElementById('incompat-note').value=''; document.getElementById('m-incompat').classList.add('show'); }
+async function delIncompat(id){ if(!confirm('Supprimer cette incompatibilité ?'))return; await sb.from('rh_config_incompatibilites').delete().eq('id',id); await loadAll(); renderConfig(); }
+
+async function saveParametres(){
+  const v = document.getElementById('param-repos-min').value;
+  try{
+    await sb.from('rh_config_parametres').upsert({cle:'repos_min_heures', valeur:String(v)}, {onConflict:'cle'});
+    await loadAll();
+    toast('✓ Paramètre enregistré');
+  }catch(e){ toast('❌ '+e.message); }
+}
+
+document.querySelectorAll('.moverlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('show'); }));
+document.getElementById('ou-date').value = new Date().toISOString().slice(0,10);
+document.getElementById('ou-heure').value = new Date().toISOString().slice(11,16);
+document.getElementById('temps-mois').value = new Date().toISOString().slice(0,7);
+document.getElementById('ecarts-debut').value = new Date().toISOString().slice(0,10);
+document.getElementById('ecarts-fin').value = new Date().toISOString().slice(0,10);
+document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+loadAll();
+</script>
+
+</body>
+</html>
