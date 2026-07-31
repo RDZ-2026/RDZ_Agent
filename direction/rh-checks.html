@@ -362,13 +362,18 @@ function onFilePlages(input){
         });
       });
       if(!parsed.length){ document.getElementById('plages-status').textContent = '⚠️ Aucune ligne reconnue'; return; }
-      document.getElementById('plages-status').textContent = 'Enregistrement de '+parsed.length+' ligne(s)…';
-      // upsert par lots de 500
-      for(let i=0;i<parsed.length;i+=500){
-        const { error } = await sb.from('rh_plages').upsert(parsed.slice(i,i+500), {onConflict:'import_key'});
+      // Déduplication par clé d'import : le fichier Agendrix peut lister deux fois
+      // la même plage/congé (ex : deux positions différentes pour le même congé) —
+      // Supabase refuse de mettre à jour la même ligne deux fois dans un seul lot.
+      const dedupMap = new Map();
+      parsed.forEach(p => dedupMap.set(p.import_key, p));
+      const deduped = [...dedupMap.values()];
+      document.getElementById('plages-status').textContent = 'Enregistrement de '+deduped.length+' ligne(s)…';
+      for(let i=0;i<deduped.length;i+=500){
+        const { error } = await sb.from('rh_plages').upsert(deduped.slice(i,i+500), {onConflict:'import_key'});
         if(error) throw error;
       }
-      document.getElementById('plages-status').textContent = '✅ '+parsed.length+' ligne(s) importée(s)';
+      document.getElementById('plages-status').textContent = '✅ '+deduped.length+' ligne(s) importée(s)'+(parsed.length!==deduped.length?' ('+(parsed.length-deduped.length)+' doublon(s) fusionné(s))':'');
       await loadAll();
     }catch(err){ document.getElementById('plages-status').textContent = '❌ '+err.message; }
   };
@@ -406,12 +411,15 @@ function onFileEntrees(input){
         });
       });
       if(!parsed.length){ document.getElementById('entrees-status').textContent = '⚠️ Aucune ligne reconnue'; return; }
-      document.getElementById('entrees-status').textContent = 'Enregistrement de '+parsed.length+' ligne(s)…';
-      for(let i=0;i<parsed.length;i+=500){
-        const { error } = await sb.from('rh_entrees').upsert(parsed.slice(i,i+500), {onConflict:'import_key'});
+      const dedupMap = new Map();
+      parsed.forEach(p => dedupMap.set(p.import_key, p));
+      const deduped = [...dedupMap.values()];
+      document.getElementById('entrees-status').textContent = 'Enregistrement de '+deduped.length+' ligne(s)…';
+      for(let i=0;i<deduped.length;i+=500){
+        const { error } = await sb.from('rh_entrees').upsert(deduped.slice(i,i+500), {onConflict:'import_key'});
         if(error) throw error;
       }
-      document.getElementById('entrees-status').textContent = '✅ '+parsed.length+' ligne(s) importée(s)';
+      document.getElementById('entrees-status').textContent = '✅ '+deduped.length+' ligne(s) importée(s)'+(parsed.length!==deduped.length?' ('+(parsed.length-deduped.length)+' doublon(s) fusionné(s))':'');
       await loadAll();
     }catch(err){ document.getElementById('entrees-status').textContent = '❌ '+err.message; }
   };
