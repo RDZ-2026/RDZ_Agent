@@ -1,4 +1,4 @@
-<!-- RDZ · ouverture-agent · v2 · 2026-08-02 -->
+<!-- RDZ · ouverture-agent · v3 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -240,24 +240,30 @@
     function next() {
       if (i >= q.length) { _flushingText = false; return; }
       var it = q[i]; var qb = _client.from(it.table);
+      // Pas de .select() après écriture : ne dépend que du droit d'ÉCRITURE,
+      // jamais d'un droit de LECTURE en plus, absent sur une table plus ancienne.
       var req = (it.op === 'upsert')
-        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined).select()
-        : qb.insert(it.row).select();
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
       req.then(function (res) {
         if (res && res.error) throw res.error;
-        var savedRow = (res.data && res.data[0]) || null;
         var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
         if (idx > -1) cur.splice(idx, 1);
         writeLS(Q_TEXT, cur);
         pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
-        if (it.pendingPhotos && it.pendingPhotos.length && savedRow && savedRow.id != null) {
-          var pq = readLS(Q_PHOTO);
-          it.pendingPhotos.forEach(function (p) {
-            pq.push({ id: uid(), module: it.module, table: it.table, rowId: savedRow.id, bucket: it.bucket,
-                      field: p.field || it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
-                      ts: new Date().toISOString(), tries: 0 });
-          });
-          writeLS(Q_PHOTO, pq); tryAutoPhotos();
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({ id: uid(), module: it.module, table: it.table, rowId: rowId, bucket: it.bucket,
+                        field: p.field || it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
+                        ts: new Date().toISOString(), tries: 0 });
+            });
+            writeLS(Q_PHOTO, pq); tryAutoPhotos();
+          }
         }
         i++; next();
       }).catch(function () {
