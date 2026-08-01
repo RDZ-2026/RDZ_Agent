@@ -1,4 +1,4 @@
-<!-- RDZ · fin-de-service · v2 · 2026-08-02 -->
+<!-- RDZ · fin-de-service · v3 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -158,7 +158,7 @@
           var pq = readLS(Q_PHOTO);
           it.pendingPhotos.forEach(function (p) {
             pq.push({ id: uid(), module: it.module, table: it.table, rowId: savedRow.id, bucket: it.bucket,
-                      field: it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
+                      field: p.field || it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
                       ts: new Date().toISOString(), tries: 0 });
           });
           writeLS(Q_PHOTO, pq); tryAutoPhotos();

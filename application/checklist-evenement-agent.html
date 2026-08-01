@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · v2 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -204,9 +205,132 @@ body{font-family:Arial,Helvetica,sans-serif;color:var(--black);}
 <div class="print-doc" id="print-doc"></div>
 
 <script>
+// ═══ RDZSync v3 — brique commune, collée telle quelle (voir rdz-sync-v3.js) ═══
+(function (global) {
+  'use strict';
+  var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
+  var _client = null, _onChange = null, _flushingText = false, _flushingPhotos = false;
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+  function notify() { var st = getStatus(); if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} } }
+  function uidRdz() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(','); var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+  function pushLog(entry) { var log = readLS(Q_LOG); log.unshift(entry); if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX); writeLS(Q_LOG, log); }
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      return null;
+    } catch (e) { return null; }
+  }
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') c.addEventListener('change', tryAutoPhotos);
+    } catch (e) {}
+    flushText(); tryAutoPhotos(); notify();
+    return API;
+  }
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+  function save(item) {
+    var textEntry = {
+      id: uidRdz(), module: item.module || 'inconnu', table: item.table, op: item.op || 'insert',
+      onConflict: item.onConflict || null, row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null, bucket: item.bucket || null,
+      pendingPhotos: item.photos || [], ts: new Date().toISOString(), tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true; var q = readLS(Q_TEXT); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i]; var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined).select()
+        : qb.insert(it.row).select();
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var savedRow = (res.data && res.data[0]) || null;
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+        if (it.pendingPhotos && it.pendingPhotos.length && savedRow && savedRow.id != null) {
+          var pq = readLS(Q_PHOTO);
+          it.pendingPhotos.forEach(function (p) {
+            pq.push({ id: uidRdz(), module: it.module, table: it.table, rowId: savedRow.id, bucket: it.bucket,
+                      field: p.field || it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
+                      ts: new Date().toISOString(), tries: 0 });
+          });
+          writeLS(Q_PHOTO, pq); tryAutoPhotos();
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true; var q = readLS(Q_PHOTO); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i]; var path = p.module + '/' + Date.now() + '_' + p.name; var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+  function getStatus() { return { textPending: readLS(Q_TEXT).length, photoPending: readLS(Q_PHOTO).length, log: readLS(Q_LOG), isWifi: isWifi() }; }
+  var API = { init: init, save: save, flushText: flushText, flushPhotos: flushPhotos, getStatus: getStatus };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+function uid(){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); }); }
+
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+RDZSync.init({ client: sb });
 
 const AGENT_ID  = localStorage.getItem('rdz_agent_id');
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
@@ -216,6 +340,7 @@ let currentEvent = null;
 let sections = [], items = [], reponses = [];
 let currentFormulaire = null;
 let pendingPhoto = { depart: null, fin: null };
+let pendingPhotoDataUrl = { depart: null, fin: null };
 
 function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -368,6 +493,7 @@ async function openRapport(){
   document.getElementById('rp-depart-heure').value = (currentRapport?.depart_invites_heure||'').slice(0,5);
   document.getElementById('rp-fin-heure').value = (currentRapport?.heure_fin_service||'').slice(0,5);
   pendingPhoto = { depart:null, fin:null };
+  pendingPhotoDataUrl = { depart:null, fin:null };
   ['depart','fin'].forEach(k => {
     const box = document.getElementById('photo-'+k);
     const url = k==='depart' ? currentRapport?.photo_depart_invites_url : currentRapport?.photo_fin_service_url;
@@ -386,58 +512,63 @@ function onPhoto(input, key){
   if(!file) return;
   pendingPhoto[key] = file;
   const reader = new FileReader();
-  reader.onload = e => { document.getElementById('photo-'+key).innerHTML = `<img src="${e.target.result}">`; };
+  reader.onload = e => {
+    document.getElementById('photo-'+key).innerHTML = `<img src="${e.target.result}">`;
+    pendingPhotoDataUrl[key] = e.target.result;
+  };
   reader.readAsDataURL(file);
 }
-async function uploadPhoto(file, label){
-  const filename = currentEvent.id + '_' + label + '_' + Date.now() + '.jpg';
-  const { error } = await sb.storage.from('evenements-photos').upload(filename, file, { contentType:'image/jpeg', upsert:true });
-  if(error) throw error;
-  return sb.storage.from('evenements-photos').getPublicUrl(filename).data.publicUrl;
-}
+// (upload photo géré par RDZSync.save — voir saveRapport)
 
 async function saveRapport(cloture){
   const btn = document.getElementById('btn-save-rapport');
   btn.disabled = true;
-  try{
-    let photoDepartUrl = currentRapport?.photo_depart_invites_url || null;
-    let photoFinUrl = currentRapport?.photo_fin_service_url || null;
-    if(pendingPhoto.depart) photoDepartUrl = await uploadPhoto(pendingPhoto.depart, 'depart');
-    if(pendingPhoto.fin) photoFinUrl = await uploadPhoto(pendingPhoto.fin, 'fin');
 
-    const payload = {
-      evenement_id: currentEvent.id,
-      evenement_nom: currentEvent.titre,
-      site: siteNom(currentEvent.site_id) || currentEvent.lieu || null,
-      agent_nom: AGENT_NOM,
-      date_evenement: document.getElementById('rp-date').value || null,
-      heure_debut_evenement: document.getElementById('rp-heure-debut').value ? document.getElementById('rp-heure-debut').value+':00' : null,
-      lieu_evenement: document.getElementById('rp-lieu').value.trim() || null,
-      controle_issues_secours: controleVal,
-      affluence_max: document.getElementById('rp-affluence').value.trim() || null,
-      evenement_particulier_1: document.getElementById('rp-evp1').value.trim() || null,
-      evenement_particulier_2: document.getElementById('rp-evp2').value.trim() || null,
-      depart_invites_heure: document.getElementById('rp-depart-heure').value ? document.getElementById('rp-depart-heure').value+':00' : null,
-      photo_depart_invites_url: photoDepartUrl,
-      heure_fin_service: document.getElementById('rp-fin-heure').value ? document.getElementById('rp-fin-heure').value+':00' : null,
-      photo_fin_service_url: photoFinUrl,
-      updated_at: new Date().toISOString()
-    };
-    if(cloture){ payload.statut = 'cloture'; payload.cloture_par = AGENT_NOM; payload.cloture_at = new Date().toISOString(); }
+  // Id généré côté agent dès la 1ère sauvegarde : permet à des sauvegardes
+  // successives (même hors-ligne, même avant que la 1ère n'ait atteint le
+  // serveur) de cibler la même ligne via upsert(onConflict:'id').
+  if (!currentRapport) currentRapport = { id: uid() };
 
-    if(currentRapport){
-      const { error } = await sb.from('evenements_rapports').update(payload).eq('id', currentRapport.id);
-      if(error) throw error;
-    }else{
-      payload.statut = cloture ? 'cloture' : 'ouvert';
-      const { data, error } = await sb.from('evenements_rapports').insert(payload).select().single();
-      if(error) throw error;
-      currentRapport = data;
-    }
-    toast(cloture ? '✓ Rapport clôturé' : '💾 Rapport enregistré');
-    if(cloture) showScreen('s-fiche');
-  }catch(e){ toast('Erreur : '+e.message, true); }
-  finally{ btn.disabled = false; }
+  const payload = {
+    id: currentRapport.id,
+    evenement_id: currentEvent.id,
+    evenement_nom: currentEvent.titre,
+    site: siteNom(currentEvent.site_id) || currentEvent.lieu || null,
+    agent_nom: AGENT_NOM,
+    date_evenement: document.getElementById('rp-date').value || null,
+    heure_debut_evenement: document.getElementById('rp-heure-debut').value ? document.getElementById('rp-heure-debut').value+':00' : null,
+    lieu_evenement: document.getElementById('rp-lieu').value.trim() || null,
+    controle_issues_secours: controleVal,
+    affluence_max: document.getElementById('rp-affluence').value.trim() || null,
+    evenement_particulier_1: document.getElementById('rp-evp1').value.trim() || null,
+    evenement_particulier_2: document.getElementById('rp-evp2').value.trim() || null,
+    depart_invites_heure: document.getElementById('rp-depart-heure').value ? document.getElementById('rp-depart-heure').value+':00' : null,
+    photo_depart_invites_url: currentRapport.photo_depart_invites_url || null,
+    heure_fin_service: document.getElementById('rp-fin-heure').value ? document.getElementById('rp-fin-heure').value+':00' : null,
+    photo_fin_service_url: currentRapport.photo_fin_service_url || null,
+    statut: currentRapport.statut || (cloture ? 'cloture' : 'ouvert'),
+    updated_at: new Date().toISOString()
+  };
+  if(cloture){ payload.statut = 'cloture'; payload.cloture_par = AGENT_NOM; payload.cloture_at = new Date().toISOString(); }
+
+  const photos = [];
+  if (pendingPhotoDataUrl.depart) photos.push({ name: currentEvent.id + '_depart.jpg', field: 'photo_depart_invites_url', dataUrl: pendingPhotoDataUrl.depart });
+  if (pendingPhotoDataUrl.fin) photos.push({ name: currentEvent.id + '_fin.jpg', field: 'photo_fin_service_url', dataUrl: pendingPhotoDataUrl.fin });
+
+  RDZSync.save({
+    module: 'checklist-evenement', table: 'evenements_rapports', row: payload,
+    op: 'upsert', onConflict: 'id',
+    bucket: 'evenements-photos', photos
+  });
+
+  // Mise à jour optimiste locale : la prochaine sauvegarde connaît déjà l'id et le statut
+  currentRapport = Object.assign({}, currentRapport, payload);
+  pendingPhoto = { depart:null, fin:null };
+  pendingPhotoDataUrl = { depart:null, fin:null };
+
+  toast((cloture ? '✓ Rapport clôturé' : '💾 Rapport pris en compte') + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
+  if(cloture) showScreen('s-fiche');
+  btn.disabled = false;
 }
 
 loadEvents();

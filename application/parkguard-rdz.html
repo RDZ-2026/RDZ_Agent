@@ -1,3 +1,4 @@
+<!-- RDZ · parkguard-rdz · v2 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -396,6 +397,126 @@ input[type="file"]{display:none}
 <input type="file" id="file-input-camera" accept="image/*" capture="environment">
 
 <script>
+// ═══ RDZSync v3 — brique commune, collée telle quelle (voir rdz-sync-v3.js) ═══
+(function (global) {
+  'use strict';
+  var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
+  var _client = null, _onChange = null, _flushingText = false, _flushingPhotos = false;
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+  function notify() { var st = getStatus(); if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} } }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(','); var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+  function pushLog(entry) { var log = readLS(Q_LOG); log.unshift(entry); if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX); writeLS(Q_LOG, log); }
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      return null;
+    } catch (e) { return null; }
+  }
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') c.addEventListener('change', tryAutoPhotos);
+    } catch (e) {}
+    flushText(); tryAutoPhotos(); notify();
+    return API;
+  }
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+  function save(item) {
+    var textEntry = {
+      id: uid(), module: item.module || 'inconnu', table: item.table, op: item.op || 'insert',
+      onConflict: item.onConflict || null, row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null, bucket: item.bucket || null,
+      pendingPhotos: item.photos || [], ts: new Date().toISOString(), tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true; var q = readLS(Q_TEXT); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i]; var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined).select()
+        : qb.insert(it.row).select();
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var savedRow = (res.data && res.data[0]) || null;
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+        if (it.pendingPhotos && it.pendingPhotos.length && savedRow && savedRow.id != null) {
+          var pq = readLS(Q_PHOTO);
+          it.pendingPhotos.forEach(function (p) {
+            pq.push({ id: uid(), module: it.module, table: it.table, rowId: savedRow.id, bucket: it.bucket,
+                      field: p.field || it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
+                      ts: new Date().toISOString(), tries: 0 });
+          });
+          writeLS(Q_PHOTO, pq); tryAutoPhotos();
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true; var q = readLS(Q_PHOTO); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i]; var path = p.module + '/' + Date.now() + '_' + p.name; var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+  function getStatus() { return { textPending: readLS(Q_TEXT).length, photoPending: readLS(Q_PHOTO).length, log: readLS(Q_LOG), isWifi: isWifi() }; }
+  var API = { init: init, save: save, flushText: flushText, flushPhotos: flushPhotos, getStatus: getStatus };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
 // ═══ CONFIG ═══
 const SUPA_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
@@ -404,6 +525,7 @@ var db;
 function initDB() {
   if (typeof supabase !== 'undefined' && !db) {
     db = supabase.createClient(SUPA_URL, SUPA_KEY);
+    RDZSync.init({ client: db, onChange: updatePendingInfo });
   }
   return !!db;
 }
@@ -600,9 +722,14 @@ function savePending(entry) {
   updatePendingInfo();
 }
 function updatePendingInfo() {
-  const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
+  const legacy = JSON.parse(localStorage.getItem('pg_pending') || '[]').length; // comptages, non encore migré
+  const st = (typeof RDZSync !== 'undefined') ? RDZSync.getStatus() : { textPending: 0, photoPending: 0 };
   const el = document.getElementById('pending-info');
-  if (el) el.textContent = p.length > 0 ? p.length + ' entrée(s) en attente de synchronisation' : '';
+  if (!el) return;
+  const parts = [];
+  if (legacy + st.textPending > 0) parts.push((legacy + st.textPending) + ' donnée(s) en attente de réseau');
+  if (st.photoPending > 0) parts.push(st.photoPending + ' photo(s) en attente de WiFi');
+  el.textContent = parts.join(' · ');
 }
 async function syncPending() {
   if (!isOnline) return;
@@ -686,7 +813,9 @@ async function forceSync() {
     return;
   }
   isOnline = true;
-  await syncPending();
+  RDZSync.flushText();
+  RDZSync.flushPhotos(true); // bouton manuel : on force aussi les photos, pas seulement le texte
+  await syncPending(); // legacy, encore utilisé par les comptages
   await confirmSupabaseSync();
   btn.disabled = false;
   btn.textContent = '🔄 Forcer la synchronisation';
@@ -1155,11 +1284,21 @@ function removeVidePhoto(i) {
   renderVidePhotos();
 }
 
+function fileToDataUrl(fileOrBlob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(fileOrBlob);
+  });
+}
+
 async function saveVideRonde() {
   const time     = nowStr();
   const remarque = document.getElementById('vide-remarque').value.trim();
+  const entryId = uid();
   const entry = {
-    id: uid(),
+    id: entryId,
     round_id: currentRoundId,
     site: currentSite,
     agent_name: currentAgent,
@@ -1172,27 +1311,21 @@ async function saveVideRonde() {
     created_at: new Date().toISOString()
   };
 
-  // Upload photos si en ligne
-  if (isOnline) {
-    for (let i = 0; i < videPhotos.length; i++) {
-      const filename = entry.id + '_vide_' + (i+1) + '.jpg';
-      try {
-        const resp = await db.storage.from('parkguard-photos').upload(filename, videPhotos[i].file, { contentType: 'image/jpeg', upsert: true });
-        if (i === 0) entry.photo_vehicule_url     = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
-        if (i === 1) entry.photo_denonciation_url = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
-        if (i === 2) entry.photo_parebrise_url    = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
-        if (i === 3) entry.photo_macaron_url      = (await db.storage.from('parkguard-photos').getPublicUrl(filename)).data.publicUrl;
-      } catch(e) {}
-    }
+  const photoFieldByIndex = ['photo_vehicule_url', 'photo_denonciation_url', 'photo_parebrise_url', 'photo_macaron_url'];
+  const photos = [];
+  for (let i = 0; i < videPhotos.length && i < 4; i++) {
+    photos.push({ name: entryId + '_vide_' + (i + 1) + '.jpg', field: photoFieldByIndex[i], file: videPhotos[i].file });
   }
+  // Conversion en dataURL : nécessaire pour que les photos survivent en localStorage
+  // même si l'agent est hors-ligne et ferme l'appli avant le retour du réseau.
+  const photosWithDataUrl = await Promise.all(photos.map(p => fileToDataUrl(p.file).then(dataUrl => ({ name: p.name, field: p.field, dataUrl }))));
 
-  let synced = false;
-  if (isOnline) {
-    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
-  }
-  if (!synced) savePending(entry);
+  RDZSync.save({
+    module: 'parkguard', table: 'vehicles', row: entry,
+    bucket: 'parkguard-photos', photos: photosWithDataUrl
+  });
 
-  roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: {} }));
+  roundVehicles.push(Object.assign({}, entry, { time, synced: navigator.onLine, _photos: {} }));
   updateRoundStats();
 
   document.getElementById('recap-vide-meta').textContent = videPhotos.length + ' photo(s) · ' + time + (remarque ? ' · ' + remarque : '');
@@ -1306,44 +1439,23 @@ function prevFlowStep() {
   }
 }
 
-// ═══ UPLOAD PHOTO ═══
-async function uploadPhoto(blob, filename) {
-  try {
-    const { data, error } = await db.storage
-      .from('parkguard-photos')
-      .upload(filename, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
-    if (error) throw error;
-    const { data: urlData } = db.storage.from('parkguard-photos').getPublicUrl(filename);
-    return urlData.publicUrl;
-  } catch(e) {
-    console.warn('Upload photo failed:', e.message);
-    return null;
-  }
-}
-
-async function uploadAllPhotos(entryId) {
-  const urls = {};
+// ═══ COLLECTE DES PHOTOS EN DATAURL (pour survivre hors-ligne dans RDZSync) ═══
+async function collectFlowPhotosAsDataUrl() {
   const photoMap = {
     vehicule:     'photo_vehicule_url',
     denonciation: 'photo_denonciation_url',
     parebrise:    'photo_parebrise_url',
     macaron:      'photo_macaron_url'
   };
-  for (const [key, col] of Object.entries(photoMap)) {
-    if (!flowBlobs[key] && !flowPhotos[key]) continue;
-    const filename = entryId + '_' + key + '.jpg';
-    let url = null;
+  const out = [];
+  for (const [key, field] of Object.entries(photoMap)) {
     if (flowBlobs[key]) {
-      url = await uploadPhoto(flowBlobs[key], filename);
+      out.push({ name: key + '.jpg', field, dataUrl: await fileToDataUrl(flowBlobs[key]) });
     } else if (flowPhotos[key]) {
-      // Convertir dataUrl en blob
-      const res  = await fetch(flowPhotos[key]);
-      const blob = await res.blob();
-      url = await uploadPhoto(blob, filename);
+      out.push({ name: key + '.jpg', field, dataUrl: flowPhotos[key] }); // déjà une dataURL
     }
-    if (url) urls[col] = url;
   }
-  return urls;
+  return out;
 }
 
 // ═══ SAVE ENTRY ═══
@@ -1352,12 +1464,7 @@ async function saveEntry() {
   const time = nowStr();
   const entryId = uid();
 
-  // Upload photos si en ligne
-  let photoUrls = {};
-  if (isOnline) {
-    toast('📸 Upload photos en cours...', 5000);
-    photoUrls = await uploadAllPhotos(entryId);
-  }
+  const photos = await collectFlowPhotosAsDataUrl();
 
   const entry = {
     id: entryId,
@@ -1366,16 +1473,15 @@ async function saveEntry() {
     motif: flowFields.motif || null, remarque: flowFields.remarque || null,
     plaque: null, num_denonciation: null, num_macaron: null,
     photos_count: Object.keys(flowPhotos).length,
-    ia_pending: true, created_at: now,
-    ...photoUrls
+    ia_pending: true, created_at: now
   };
 
-  let synced = false;
-  if (isOnline) {
-    try { const { error } = await db.from('vehicles').insert(entry); if (!error) synced = true; } catch(e) {}
-  }
-  if (!synced) savePending(entry);
+  RDZSync.save({
+    module: 'parkguard', table: 'vehicles', row: entry,
+    bucket: 'parkguard-photos', photos: photos
+  });
 
+  const synced = navigator.onLine;
   roundVehicles.push(Object.assign({}, entry, { time, synced, _photos: Object.assign({}, flowPhotos) }));
   updateRoundStats();
 
