@@ -173,6 +173,16 @@
       </select>
     </div>
     <div class="field"><label>Note</label><textarea id="e-note" rows="2"></textarea></div>
+    <div class="field">
+      <label>Photo</label>
+      <div id="e-photo-preview" style="width:100%;height:130px;border:2px dashed var(--rdz-border);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--rdz-gray);background:#fafafa;overflow:hidden;margin-bottom:6px">📷</div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="mbtn mbtn-cancel" style="flex:1" onclick="document.getElementById('e-photo-camera').click()">📷 Caméra</button>
+        <button type="button" class="mbtn mbtn-cancel" style="flex:1" onclick="document.getElementById('e-photo-gallery').click()">🖼 Galerie</button>
+      </div>
+      <input type="file" id="e-photo-camera" accept="image/*" capture="environment" style="display:none" onchange="onEditPhotoChange(this)">
+      <input type="file" id="e-photo-gallery" accept="image/*" style="display:none" onchange="onEditPhotoChange(this)">
+    </div>
     <div class="modal-footer">
       <button class="mbtn mbtn-cancel" onclick="closeEditModal()">Annuler</button>
       <button class="mbtn mbtn-save" onclick="saveEdit()">✓ Enregistrer</button>
@@ -413,16 +423,37 @@ function openEdit(id) {
   document.getElementById('e-personne').value = o.personne || '';
   document.getElementById('e-motif').value = o.motif || 'Ouverture, carte oubliée';
   document.getElementById('e-note').value = o.note || '';
+  pendingEditPhoto = null;
+  document.getElementById('e-photo-preview').innerHTML = o.photo_url
+    ? `<img src="${escHtml(o.photo_url)}" style="width:100%;height:100%;object-fit:cover">`
+    : '📷';
   document.getElementById('modal-edit').classList.add('open');
 }
-function closeEditModal() { document.getElementById('modal-edit').classList.remove('open'); editId = null; }
+function onEditPhotoChange(input){
+  const file = input.files[0];
+  if (!file) return;
+  pendingEditPhoto = file;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('e-photo-preview').innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`; };
+  reader.readAsDataURL(file);
+}
+function closeEditModal() { document.getElementById('modal-edit').classList.remove('open'); editId = null; pendingEditPhoto = null; }
+
+let pendingEditPhoto = null;
 
 async function saveEdit() {
   if (!editId) return;
   const personne = document.getElementById('e-personne').value.trim();
   if (!personne) { alert('Veuillez indiquer le nom de la personne.'); return; }
   try {
-    const { error } = await sb.from('ouvertures').update({
+    let photo_url;
+    if (pendingEditPhoto) {
+      const filename = editId + '_' + Date.now() + '.jpg';
+      const { error: upErr } = await sb.storage.from('ouvertures-photos').upload(filename, pendingEditPhoto, { contentType: pendingEditPhoto.type || 'image/jpeg', upsert: true });
+      if (upErr) throw upErr;
+      photo_url = sb.storage.from('ouvertures-photos').getPublicUrl(filename).data.publicUrl;
+    }
+    const payload = {
       date_ouverture: document.getElementById('e-date').value,
       heure_ouverture: document.getElementById('e-heure').value + ':00',
       site: document.getElementById('e-site').value.trim(),
@@ -430,7 +461,9 @@ async function saveEdit() {
       personne,
       motif: document.getElementById('e-motif').value,
       note: document.getElementById('e-note').value.trim() || null
-    }).eq('id', editId);
+    };
+    if (photo_url) payload.photo_url = photo_url;
+    const { error } = await sb.from('ouvertures').update(payload).eq('id', editId);
     if (error) throw error;
     closeEditModal();
     await loadAll();
