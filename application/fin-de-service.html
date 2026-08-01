@@ -1,0 +1,455 @@
+<!-- RDZ · fin-de-service · v2 · 2026-08-02 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Fin de service</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .content { padding: 16px; padding-bottom: 60px; }
+  .state-msg { text-align: center; padding: 40px 20px; font-size: 13.5px; color: var(--rdz-gray); }
+  .state-msg .big { font-size: 32px; margin-bottom: 10px; }
+
+  .summary-banner { border-radius: 2px; padding: 14px; margin-bottom: 16px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .summary-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .summary-warn { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .summary-ico { font-size: 20px; }
+
+  .block { margin-bottom: 14px; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; background: #fff; }
+  .block-hdr { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--rdz-black); }
+  .block-title { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #fff; display: flex; align-items: center; gap: 7px; }
+  .block-status { font-size: 9.5px; font-weight: 700; padding: 2px 8px; border-radius: 2px; letter-spacing: .03em; text-transform: uppercase; }
+  .st-ok { background: #dcfce7; color: #166534; }
+  .st-warn { background: #fef9c3; color: #854d0e; }
+  .st-neutral { background: #e8edf5; color: #1e3a5f; }
+
+  .item-row { padding: 11px 14px; border-bottom: 1px solid var(--rdz-border); display: flex; align-items: flex-start; gap: 10px; }
+  .item-row:last-child { border-bottom: none; }
+  .item-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .dot-warn { background: #b8860b; }
+  .dot-ok { background: #1b7a3d; }
+  .item-txt { flex: 1; }
+  .item-main { font-size: 13px; color: var(--rdz-black); font-weight: 600; margin-bottom: 3px; }
+  .item-meta { font-size: 10.5px; color: var(--rdz-gray); }
+  .item-action { flex-shrink: 0; }
+  .link-btn { background: var(--rdz-bg); border: 1px solid var(--rdz-border); color: var(--rdz-black); font-size: 11px; font-weight: 700; padding: 7px 11px; border-radius: 2px; text-decoration: none; white-space: nowrap; }
+  .link-btn:active { background: #ebe9e6; }
+
+  .empty-block { padding: 14px; font-size: 12px; color: #9a9a9a; font-style: italic; }
+
+  .sync-row { padding: 11px 14px; border-bottom: 1px solid var(--rdz-border); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .sync-row:last-child { border-bottom: none; }
+  .sync-lbl { font-size: 12.5px; color: var(--rdz-black); }
+  .sync-count { font-size: 12.5px; font-weight: 700; }
+  .count-ok { color: #166534; }
+  .count-warn { color: #854d0e; }
+  .btn-sync { background: var(--rdz-red); color: #fff; border: none; padding: 8px 13px; border-radius: 2px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; cursor: pointer; white-space: nowrap; }
+  .btn-sync:active { background: var(--rdz-red-dark); }
+  .btn-sync:disabled { background: #c9c2b8; cursor: default; }
+  .sync-note { padding: 10px 14px; font-size: 10.5px; color: var(--rdz-gray); background: var(--rdz-bg); line-height: 1.5; }
+
+  .refresh-btn { display: block; width: 100%; background: #fff; border: 1px solid var(--rdz-border); color: var(--rdz-gray); font-size: 12px; font-weight: 700; padding: 11px; border-radius: 2px; margin-top: 6px; cursor: pointer; }
+  .refresh-btn:active { background: #ebe9e6; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub">Fin de service</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="content" id="content">
+  <div class="state-msg"><div class="big">⏳</div>Vérification en cours…</div>
+</div>
+
+<!-- ============================================================
+     RDZSync v2 — brique commune, collée telle quelle (voir rdz-sync-v2.js)
+     ============================================================ -->
+<script>
+(function (global) {
+  'use strict';
+  var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
+  var _client = null, _onChange = null, _flushingText = false, _flushingPhotos = false;
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+  function notify() { var st = getStatus(); if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} } }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(','); var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+  function pushLog(entry) { var log = readLS(Q_LOG); log.unshift(entry); if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX); writeLS(Q_LOG, log); }
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      return null;
+    } catch (e) { return null; }
+  }
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') c.addEventListener('change', tryAutoPhotos);
+    } catch (e) {}
+    flushText(); tryAutoPhotos();
+    return API;
+  }
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+  function save(item) {
+    var textEntry = {
+      id: uid(), module: item.module || 'inconnu', table: item.table, op: item.op || 'insert',
+      onConflict: item.onConflict || null, row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null, bucket: item.bucket || null,
+      pendingPhotos: item.photos || [], ts: new Date().toISOString(), tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true; var q = readLS(Q_TEXT); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i]; var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined).select()
+        : qb.insert(it.row).select();
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var savedRow = (res.data && res.data[0]) || null;
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+        if (it.pendingPhotos && it.pendingPhotos.length && savedRow && savedRow.id != null) {
+          var pq = readLS(Q_PHOTO);
+          it.pendingPhotos.forEach(function (p) {
+            pq.push({ id: uid(), module: it.module, table: it.table, rowId: savedRow.id, bucket: it.bucket,
+                      field: it.photoField, name: p.name || 'photo.jpg', dataUrl: p.dataUrl,
+                      ts: new Date().toISOString(), tries: 0 });
+          });
+          writeLS(Q_PHOTO, pq); tryAutoPhotos();
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true; var q = readLS(Q_PHOTO); var i = 0;
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i]; var path = p.module + '/' + Date.now() + '_' + p.name; var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+  function getStatus() { return { textPending: readLS(Q_TEXT).length, photoPending: readLS(Q_PHOTO).length, log: readLS(Q_LOG), isWifi: isWifi() }; }
+  var API = { init: init, save: save, flushText: flushText, flushPhotos: flushPhotos, getStatus: getStatus };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+</script>
+
+<script>
+// ── SUPABASE (base principale) ────────────────────────────────────────────────
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── SUPABASE (base Flotte / RouteOps — véhicules & feuilles de route) ────────
+// Même schéma que vehicule-agent.html : fleet_movements/fleet_damages exigent
+// une authentification de compte de service (pas un simple accès anon), à la
+// différence des tables sites/missions/sheets/travel qui, elles, acceptent
+// la clé anon directement. On réutilise ici EXACTEMENT le même compte et la
+// même clé de cache token (flt_tok_v2) que vehicule-agent.html, afin que le
+// jeton soit partagé/réutilisé entre modules sur le même appareil.
+const FLEET_SB = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const FLEET_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const FLEET_AEMAIL = 'surveillance@rdz-security-management.ch';
+const FLEET_APASS = 'RDZ2026?/';
+const FLEET_TOK_K = 'flt_tok_v2';
+let fleetAuthToken = null;
+
+async function fleetSilentLogin() {
+  try {
+    const s = JSON.parse(localStorage.getItem(FLEET_TOK_K) || '{}');
+    if (s.t && s.e && Date.now() / 1000 < s.e - 60) { fleetAuthToken = s.t; return; }
+  } catch (_) {}
+  const r = await fetch(`${FLEET_SB}/auth/v1/token?grant_type=password`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': FLEET_KEY },
+    body: JSON.stringify({ email: FLEET_AEMAIL, password: FLEET_APASS })
+  });
+  if (!r.ok) throw new Error('Auth Flotte échouée');
+  const d = await r.json();
+  fleetAuthToken = d.access_token;
+  localStorage.setItem(FLEET_TOK_K, JSON.stringify({ t: d.access_token, e: Math.floor(Date.now() / 1000) + (d.expires_in || 3600) }));
+}
+async function fleetApi(path) {
+  const r = await fetch(`${FLEET_SB}/rest/v1/${path}`, {
+    headers: { 'apikey': FLEET_KEY, 'Content-Type': 'application/json', ...(fleetAuthToken ? { 'Authorization': `Bearer ${fleetAuthToken}` } : {}) }
+  });
+  if (!r.ok) throw new Error(await r.text() || `HTTP ${r.status}`);
+  return r.json();
+}
+// sites/missions/sheets/travel acceptent la clé anon directement (pas d'auth requise)
+async function fleetApiAnon(path) {
+  const r = await fetch(`${FLEET_SB}/rest/v1/${path}`, { headers: { 'apikey': FLEET_KEY, 'Authorization': 'Bearer ' + FLEET_KEY } });
+  if (!r.ok) throw new Error(await r.text() || `HTTP ${r.status}`);
+  return r.json();
+}
+
+// ── SESSION AGENT ──────────────────────────────────────────────────────────────
+const AGENT_ID = localStorage.getItem('rdz_agent_id');
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || '';
+if (!AGENT_ID) { window.location.href = 'mobile.html'; }
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDT(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('fr-CH') + ' ' + d.toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'}); }
+function escHtml(s) { return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function sameAgent(nom) { return (nom || '').trim().toLowerCase() === AGENT_NOM.trim().toLowerCase(); }
+
+let RESULT = { vehicules: [], materiel: [], consignesOk: null, feuilleRoute: [] };
+
+async function loadAll() {
+  await Promise.all([loadVehicules(), loadMateriel(), loadConsignes(), loadFeuilleRoute()]);
+  render();
+}
+
+// 1) VÉHICULE — dernier mouvement par véhicule pour cet agent (base Flotte, compte de service)
+async function loadVehicules() {
+  RESULT.vehicules = [];
+  try {
+    await fleetSilentLogin();
+    const [mv, vs] = await Promise.all([
+      fleetApi('fleet_movements?select=*&order=created_at.desc'),
+      fleetApi('fleet_vehicles?select=*')
+    ]);
+    const vehiclesById = {}; (vs || []).forEach(v => vehiclesById[v.id] = v);
+    const lastByVehicle = {};
+    (mv || []).filter(m => sameAgent(m.agent_name)).forEach(m => {
+      if (!lastByVehicle[m.vehicle_id]) lastByVehicle[m.vehicle_id] = m; // déjà trié desc
+    });
+    Object.values(lastByVehicle).forEach(m => {
+      if (m.type === 'prise') {
+        const v = vehiclesById[m.vehicle_id];
+        RESULT.vehicules.push({ plate: v ? v.plate : m.vehicle_id, since: m.datetime || m.created_at });
+      }
+    });
+  } catch (err) { console.warn('loadVehicules:', err.message); }
+}
+
+// 2) MATÉRIEL & ACCÈS — attributions actives pour cet agent
+async function loadMateriel() {
+  RESULT.materiel = [];
+  try {
+    const [{ data: attrs, error: e1 }, { data: acces, error: e2 }] = await Promise.all([
+      sb.from('stock_attributions').select('*').eq('statut', 'actif'),
+      sb.from('stock_acces').select('*').eq('statut', 'actif')
+    ]);
+    if (e1 || e2) throw e1 || e2;
+    (attrs || []).filter(a => sameAgent(a.agent_nom)).forEach(a => {
+      RESULT.materiel.push({ nom: a.materiel_nom, qty: a.quantite, since: a.date_sortie, kind: 'materiel' });
+    });
+    (acces || []).filter(a => sameAgent(a.agent_nom)).forEach(a => {
+      RESULT.materiel.push({ nom: a.item_nom, site: a.site_nom, since: a.date_remise, kind: 'acces' });
+    });
+  } catch (err) { console.warn('loadMateriel:', err.message); }
+}
+
+// 3) CONSIGNES — validation du jour pour cet agent
+async function loadConsignes() {
+  RESULT.consignesOk = null;
+  try {
+    const { data, error } = await sb.from('consignes_lectures')
+      .select('*').eq('agent_id', AGENT_ID).eq('date_lecture', today());
+    if (error) throw error;
+    RESULT.consignesOk = (data || []).length > 0;
+  } catch (err) { console.warn('loadConsignes:', err.message); RESULT.consignesOk = null; }
+}
+
+// 4) FEUILLE DE ROUTE — feuilles touchées aujourd'hui par l'agent, sans confirmation explicite
+async function loadFeuilleRoute() {
+  RESULT.feuilleRoute = [];
+  try {
+    const [{ data: pointages, error: e1 }, { data: validations, error: e2 }] = await Promise.all([
+      sb.from('feuille_pointages').select('*').eq('sheet_date', today()),
+      sb.from('feuille_validations').select('*').eq('sheet_date', today()).eq('agent_nom', AGENT_NOM)
+    ]);
+    if (e1 || e2) throw e1 || e2;
+    const touchedSheetIds = [...new Set((pointages || []).filter(p => sameAgent(p.agent_nom)).map(p => p.sheet_id))];
+    const validatedIds = new Set((validations || []).map(v => v.sheet_id));
+    const missingIds = touchedSheetIds.filter(id => !validatedIds.has(id));
+    if (missingIds.length === 0) return;
+
+    // résolution du nom de la feuille (best-effort, base Flotte, accès anon)
+    let names = {};
+    try {
+      const sheets = await fleetApiAnon('sheets?select=id,name&id=in.(' + missingIds.join(',') + ')');
+      (sheets || []).forEach(s => names[s.id] = s.name);
+    } catch (e) { /* pas grave : on affichera l'identifiant brut */ }
+
+    missingIds.forEach(id => RESULT.feuilleRoute.push({ sheetId: id, name: names[id] || id }));
+  } catch (err) { console.warn('loadFeuilleRoute:', err.message); }
+}
+
+function render() {
+  const st = RDZSync.getStatus();
+  const anyWarn = RESULT.vehicules.length > 0 || RESULT.materiel.length > 0
+    || RESULT.consignesOk === false || RESULT.feuilleRoute.length > 0
+    || st.textPending > 0 || st.photoPending > 0;
+
+  let html = anyWarn
+    ? `<div class="summary-banner summary-warn"><span class="summary-ico">⚠️</span>Des éléments restent en suspens avant de terminer votre service.</div>`
+    : `<div class="summary-banner summary-ok"><span class="summary-ico">✅</span>Rien à signaler — vous pouvez terminer votre service.</div>`;
+
+  // Véhicule
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">🚗 Véhicule</div>
+    <span class="block-status ${RESULT.vehicules.length ? 'st-warn' : 'st-ok'}">${RESULT.vehicules.length ? RESULT.vehicules.length + ' en cours' : 'OK'}</span></div>`;
+  if (RESULT.vehicules.length === 0) {
+    html += `<div class="empty-block">Aucun véhicule en cours sur votre nom.</div>`;
+  } else {
+    RESULT.vehicules.forEach(v => {
+      html += `<div class="item-row"><div class="item-dot dot-warn"></div>
+        <div class="item-txt"><div class="item-main">${escHtml(v.plate)} — non restitué</div>
+        <div class="item-meta">Pris le ${fmtDT(v.since)}</div></div>
+        <div class="item-action"><a class="link-btn" href="vehicule-agent.html">Restituer</a></div></div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Matériel & accès
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">🎒 Matériel &amp; accès</div>
+    <span class="block-status ${RESULT.materiel.length ? 'st-warn' : 'st-ok'}">${RESULT.materiel.length ? RESULT.materiel.length + ' à rendre' : 'OK'}</span></div>`;
+  if (RESULT.materiel.length === 0) {
+    html += `<div class="empty-block">Rien en votre possession.</div>`;
+  } else {
+    RESULT.materiel.forEach(m => {
+      html += `<div class="item-row"><div class="item-dot dot-warn"></div>
+        <div class="item-txt"><div class="item-main">${escHtml(m.nom)}${m.qty ? ' ×' + m.qty : ''}</div>
+        <div class="item-meta">${m.site ? escHtml(m.site) + ' — ' : ''}depuis le ${fmtDT(m.since)}</div></div>
+        <div class="item-action"><a class="link-btn" href="materiel-agent.html">Rendre</a></div></div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Consignes
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">📋 Consignes</div>
+    <span class="block-status ${RESULT.consignesOk === false ? 'st-warn' : (RESULT.consignesOk === true ? 'st-ok' : 'st-neutral')}">${RESULT.consignesOk === false ? 'Non validées' : (RESULT.consignesOk === true ? 'OK' : '—')}</span></div>`;
+  if (RESULT.consignesOk === true) {
+    html += `<div class="empty-block">Consignes validées aujourd'hui.</div>`;
+  } else if (RESULT.consignesOk === false) {
+    html += `<div class="item-row"><div class="item-dot dot-warn"></div>
+      <div class="item-txt"><div class="item-main">Aucune prise de connaissance enregistrée aujourd'hui</div></div>
+      <div class="item-action"><a class="link-btn" href="prise-de-poste.html">Valider</a></div></div>`;
+  } else {
+    html += `<div class="empty-block">Vérification indisponible.</div>`;
+  }
+  html += `</div>`;
+
+  // Feuille de route
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">🕐 Feuille de route</div>
+    <span class="block-status ${RESULT.feuilleRoute.length ? 'st-warn' : 'st-ok'}">${RESULT.feuilleRoute.length ? RESULT.feuilleRoute.length + ' non confirmée(s)' : 'OK'}</span></div>`;
+  if (RESULT.feuilleRoute.length === 0) {
+    html += `<div class="empty-block">Aucune feuille de route en attente de confirmation aujourd'hui.</div>`;
+  } else {
+    RESULT.feuilleRoute.forEach(f => {
+      html += `<div class="item-row"><div class="item-dot dot-warn"></div>
+        <div class="item-txt"><div class="item-main">${escHtml(f.name)}</div>
+        <div class="item-meta">Pas encore confirmée complète pour aujourd'hui</div></div>
+        <div class="item-action"><a class="link-btn" href="feuille-route-agent.html">Confirmer</a></div></div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Rapports & photos en attente (RDZSync)
+  const logRecent = st.log.slice(0, 5);
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">📡 Rapports &amp; photos</div>
+    <span class="block-status ${(st.textPending || st.photoPending) ? 'st-warn' : 'st-ok'}">${(st.textPending || st.photoPending) ? 'En attente' : 'OK'}</span></div>`;
+  html += `<div class="sync-row"><div class="sync-lbl">Données texte en attente de réseau</div>
+    <div class="sync-count ${st.textPending ? 'count-warn' : 'count-ok'}">${st.textPending}</div></div>`;
+  html += `<div class="sync-row"><div class="sync-lbl">Photos en attente de WiFi</div>
+    <div class="sync-count ${st.photoPending ? 'count-warn' : 'count-ok'}">${st.photoPending}</div>
+    ${st.photoPending ? `<button class="btn-sync" onclick="forceSync()">📶 Envoyer maintenant</button>` : ''}</div>`;
+  html += `<div class="sync-note">Les données texte partent automatiquement dès qu'il y a du réseau (4G/5G/WiFi). Les photos attendent le WiFi pour économiser vos données mobiles — vous pouvez forcer l'envoi à tout moment.</div>`;
+  if (logRecent.length) {
+    html += `<div class="sync-note" style="border-top:1px solid var(--rdz-border)"><b>Dernières remontées :</b><br>` +
+      logRecent.map(l => `${l.kind === 'photo' ? '📷' : '📝'} ${escHtml(l.module)} — ${fmtDT(l.ts)}`).join('<br>') + `</div>`;
+  }
+  html += `</div>`;
+
+  html += `<button class="refresh-btn" onclick="loadAll()">↻ Actualiser</button>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function forceSync() {
+  RDZSync.flushText();
+  RDZSync.flushPhotos(true);
+  setTimeout(render, 400);
+}
+
+RDZSync.init({ client: sb, onChange: render });
+loadAll();
+</script>
+</body>
+</html>

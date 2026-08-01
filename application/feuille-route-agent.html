@@ -1,3 +1,4 @@
+<!-- RDZ · feuille-route-agent · v2 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -79,6 +80,14 @@
   .note-input { width: 100%; padding: 6px 8px; border: 1px solid var(--rdz-border); border-radius: 2px; background: var(--rdz-bg); font-family: Arial, sans-serif; font-size: 12.5px; color: var(--rdz-black); resize: vertical; min-height: 40px; }
   .note-input:focus { outline: none; border-color: var(--rdz-red); background: #fff; }
   .saved-by-line { font-size: 9.5px; color: #9a9a9a; margin-top: 6px; text-align: right; }
+
+  /* VALIDATION FEUILLE DE ROUTE */
+  .valid-banner { margin: 14px 0 8px; padding: 10px 12px; border-radius: 2px; font-size: 11.5px; line-height: 1.5; }
+  .valid-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .valid-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .valid-missing { font-size: 10.5px; margin-top: 4px; }
+  .valid-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; padding: 12px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; margin-top: 8px; }
+  .valid-btn:active { background: var(--rdz-red-dark); }
 </style>
 </head>
 <body>
@@ -131,6 +140,7 @@ if (!AGENT_ID) { window.location.href = 'mobile.html'; }
 let S = { sites: [], missions: [], sheets: [], travel: {} };
 let pointagesMap = {}; // task_index -> { heure_arrivee_reelle, heure_depart_reelle }
 let currentSheet = null;
+let sheetValidation = null; // ligne feuille_validations pour la feuille/date/agent en cours, ou null
 
 // ═══ HELPERS (portés depuis RouteOps) ═══
 function todayStr() { return new Date().toISOString().slice(0,10); }
@@ -284,7 +294,22 @@ async function openSheet(sheetId, date) {
   detailEl.innerHTML = `<div class="state-msg"><div class="ico">⏳</div><p>Chargement des saisies…</p></div>`;
 
   await loadPointages(sheetId, date);
+  await loadValidation(sheetId, date);
   renderSheetDetail(sh, date);
+}
+
+async function loadValidation(sheetId, date) {
+  sheetValidation = null;
+  try {
+    const { data, error } = await sb.from('feuille_validations')
+      .select('*')
+      .eq('sheet_id', sheetId).eq('sheet_date', date).eq('agent_nom', AGENT_NOM)
+      .maybeSingle();
+    if (error) throw error;
+    sheetValidation = data || null;
+  } catch (err) {
+    // silencieux : si ça échoue, on considère non-validée (par prudence)
+  }
 }
 
 async function loadPointages(sheetId, date) {
@@ -321,6 +346,8 @@ function renderSheetDetail(sh, date) {
     html += `<div class="obs-box"><div class="obs-lbl">📌 Consignes</div>${escHtml(sh.observations).replace(/\n/g,'<br>')}</div>`;
   }
 
+  let missingCount = 0;
+  const missingNames = [];
   html += calc.map((r, idx) => {
     const m = getMission(r.mId);
     if (!m) return '';
@@ -332,6 +359,7 @@ function renderSheetDetail(sh, date) {
     const depart = (pointage.heure_depart_reelle || '').slice(0,5);
     const noteVal = pointage.note || '';
     const savedBy = pointage.agent_nom ? `Dernière saisie par ${escHtml(pointage.agent_nom)}` : '';
+    if (!r.alert && (!arrivee || !depart)) { missingCount++; missingNames.push(m.name); }
     return `<div class="task-card ${cls}">
       <div class="task-top">
         ${site ? `<span class="task-dot" style="background:${site.color}"></span>` : ''}
@@ -362,7 +390,33 @@ function renderSheetDetail(sh, date) {
     </div>`;
   }).join('');
 
+  if (sheetValidation) {
+    html += `<div class="valid-banner valid-ok">✓ Feuille de route confirmée complète le ${fmtDateShort(sheetValidation.validated_at.slice(0,10))} à ${new Date(sheetValidation.validated_at).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'})} par ${escHtml(sheetValidation.agent_nom)}</div>`;
+  } else {
+    html += `<div class="valid-banner valid-pending">⚠️ Feuille de route pas encore confirmée pour aujourd'hui
+      ${missingCount > 0 ? `<div class="valid-missing">${missingCount} mission(s) avec une heure d'arrivée ou de départ manquante : ${escHtml(missingNames.join(', '))}</div>` : ''}
+    </div>
+    <button class="valid-btn" onclick="confirmSheetComplete('${sh.id}', '${date}', ${missingCount})">✓ Je confirme que ma feuille de route est complète</button>`;
+  }
+
   document.getElementById('sheet-detail').innerHTML = html;
+}
+
+async function confirmSheetComplete(sheetId, date, missingCount) {
+  if (missingCount > 0) {
+    const ok = window.confirm(`Il manque une heure pour ${missingCount} mission(s). Confirmer quand même ?`);
+    if (!ok) return;
+  }
+  try {
+    const payload = { sheet_id: sheetId, sheet_date: date, agent_nom: AGENT_NOM, validated_at: new Date().toISOString() };
+    const { error } = await sb.from('feuille_validations')
+      .upsert(payload, { onConflict: 'sheet_id,sheet_date,agent_nom' });
+    if (error) throw error;
+    sheetValidation = payload;
+    renderSheetDetail(currentSheet, date);
+  } catch (err) {
+    alert('Erreur lors de la confirmation : ' + err.message);
+  }
 }
 
 // ═══ SAUVEGARDE (upsert — ne touche que le champ modifié) ═══
