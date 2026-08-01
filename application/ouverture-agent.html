@@ -68,6 +68,9 @@
   .photo-retake { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); color: #fff; border: none; padding: 4px 9px; border-radius: 4px; font-size: 10.5px; cursor: pointer; }
   .photo-taken-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(30,92,46,.88); color: #fff; text-align: center; font-size: 11.5px; font-weight: 600; padding: 6px; }
   input[type="file"] { display: none; }
+  .photo-btns { display: flex; gap: 8px; margin-top: 8px; }
+  .photo-btn { flex: 1; text-align: center; font-size: 12px; font-weight: 700; padding: 9px 0; border: 1.5px solid var(--rdz-border); border-radius: 2px; cursor: pointer; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+  .photo-btn:active { background: var(--rdz-bg); }
 
   .prefill-banner { background: #dbeafe; border: 1px solid #bfdbfe; color: #1e3a8a; font-size: 12px; padding: 9px 12px; border-radius: 2px; margin-bottom: 14px; line-height: 1.5; }
 
@@ -156,11 +159,16 @@
     </div>
     <div class="field-group">
       <label class="field-label">Photo de la pièce de légitimation</label>
-      <div class="photo-zone" id="photo-zone" onclick="triggerPhoto()">
+      <div class="photo-zone" id="photo-zone">
         <div class="photo-zone-icon">📷</div>
-        <div class="photo-zone-label">Prendre une photo</div>
+        <div class="photo-zone-label">Aucune photo</div>
         <div class="photo-zone-sub">Carte d'identité, passeport, carte étudiante…</div>
       </div>
+      <div class="photo-btns">
+        <div class="photo-btn" onclick="triggerCamera()">📷 Caméra</div>
+        <div class="photo-btn" onclick="triggerGallery()">🖼 Galerie</div>
+      </div>
+      <input type="file" id="photo-input-camera" accept="image/*" capture="environment">
       <input type="file" id="photo-input" accept="image/*">
     </div>
     <button class="submit-btn" id="btn-submit" onclick="saveOuverture()">✓ Enregistrer l'ouverture</button>
@@ -276,10 +284,13 @@ function toast(msg) {
 let photoFile = null;
 let photoDataUrl = null;
 
-function triggerPhoto() {
+function triggerCamera() {
+  document.getElementById('photo-input-camera').click();
+}
+function triggerGallery() {
   document.getElementById('photo-input').click();
 }
-document.getElementById('photo-input').addEventListener('change', function () {
+function handlePhotoFile() {
   const file = this.files[0];
   if (!file) return;
   photoFile = file;
@@ -290,18 +301,19 @@ document.getElementById('photo-input').addEventListener('change', function () {
   };
   reader.readAsDataURL(file);
   this.value = '';
-});
+}
+document.getElementById('photo-input').addEventListener('change', handlePhotoFile);
+document.getElementById('photo-input-camera').addEventListener('change', handlePhotoFile);
 function renderPhotoZone() {
   const zone = document.getElementById('photo-zone');
   if (photoDataUrl) {
     zone.className = 'photo-zone taken';
     zone.innerHTML = `<img src="${photoDataUrl}">
-      <button class="photo-retake" onclick="event.stopPropagation();triggerPhoto()">Reprendre</button>
-      <div class="photo-taken-bar">✅ Photo prise</div>`;
+      <div class="photo-taken-bar">✅ Photo prise — utilisez les boutons ci-dessous pour la remplacer</div>`;
   } else {
     zone.className = 'photo-zone';
     zone.innerHTML = `<div class="photo-zone-icon">📷</div>
-      <div class="photo-zone-label">Prendre une photo</div>
+      <div class="photo-zone-label">Aucune photo</div>
       <div class="photo-zone-sub">Carte d'identité, passeport, carte étudiante…</div>`;
   }
 }
