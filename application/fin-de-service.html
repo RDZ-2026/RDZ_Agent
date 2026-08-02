@@ -1,4 +1,4 @@
-<!-- RDZ · fin-de-service · v4 · 2026-08-02 -->
+<!-- RDZ · fin-de-service · v5 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -70,6 +70,11 @@
 
   .refresh-btn { display: block; width: 100%; background: #fff; border: 1px solid var(--rdz-border); color: var(--rdz-gray); font-size: 12px; font-weight: 700; padding: 11px; border-radius: 2px; margin-top: 6px; cursor: pointer; }
   .refresh-btn:active { background: #ebe9e6; }
+
+  .end-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rdz-border); }
+  .end-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; font-size: 13px; font-weight: 700; letter-spacing: .02em; padding: 15px; border-radius: 2px; cursor: pointer; }
+  .end-btn:active { background: var(--rdz-red-dark); }
+  .end-note { font-size: 10.5px; color: var(--rdz-gray); text-align: center; margin-top: 8px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -445,6 +450,11 @@ function render() {
 
   html += `<button class="refresh-btn" onclick="loadAll()">↻ Actualiser</button>`;
 
+  html += `<div class="end-block">
+    <button class="end-btn" onclick="confirmEndOfService()">🔒 Confirmer la fin de service — Déconnexion</button>
+    <div class="end-note">Vous serez déconnecté de l'application sur cet appareil. L'agent suivant devra ressaisir son nom et son code PIN.</div>
+  </div>`;
+
   document.getElementById('content').innerHTML = html;
 }
 
@@ -452,6 +462,44 @@ function forceSync() {
   RDZSync.flushText();
   RDZSync.flushPhotos(true);
   setTimeout(render, 400);
+}
+
+// ── FIN DE SERVICE / DÉCONNEXION ────────────────────────────────────────────────
+// Liste les éléments encore en suspens (mêmes critères que l'affichage des blocs
+// ci-dessus), pour un avertissement explicite avant confirmation — cohérent avec
+// le principe de validation explicite du reste de l'application : on ne bloque
+// pas la fin de service, mais on ne laisse jamais l'agent se déconnecter sans
+// avoir vu clairement ce qui reste ouvert.
+function buildMissingList() {
+  const st = RDZSync.getStatus();
+  const items = [];
+  if (RESULT.vehicules.length) items.push(`🚗 ${RESULT.vehicules.length} véhicule(s) non restitué(s)`);
+  if (RESULT.materiel.length) items.push(`🎒 ${RESULT.materiel.length} matériel/accès à rendre`);
+  if (RESULT.consignesOk === false) items.push(`📋 Consignes non validées aujourd'hui`);
+  if (RESULT.feuilleRoute.length) items.push(`🕐 ${RESULT.feuilleRoute.length} feuille(s) de route non confirmée(s)`);
+  if (st.textPending) items.push(`📡 ${st.textPending} donnée(s) texte en attente de réseau`);
+  if (st.photoPending) items.push(`📷 ${st.photoPending} photo(s) en attente d'envoi`);
+  return items;
+}
+
+function confirmEndOfService() {
+  const missing = buildMissingList();
+  const msg = missing.length
+    ? `Des éléments restent en suspens avant de terminer votre service :\n\n${missing.map(m => '• ' + m).join('\n')}\n\nConfirmer quand même la fin de service et vous déconnecter de l'application ?`
+    : `Confirmer la fin de service et vous déconnecter de l'application ?`;
+  if (!window.confirm(msg)) return;
+  endOfServiceLogout();
+}
+
+function endOfServiceLogout() {
+  // On retire uniquement l'identité de l'agent connecté. On ne touche JAMAIS aux
+  // files RDZSync (rdz_sync_queue / rdz_sync_photo_queue / rdz_sync_log) : elles
+  // sont partagées par appareil, pas par agent, et doivent survivre au changement
+  // d'agent pour ne perdre aucune donnée encore en attente de réseau/WiFi.
+  localStorage.removeItem('rdz_agent_id');
+  localStorage.removeItem('rdz_agent_nom');
+  localStorage.removeItem('rdz_agent_pin_hash');
+  window.location.href = 'mobile.html';
 }
 
 RDZSync.init({ client: sb, onChange: render });
