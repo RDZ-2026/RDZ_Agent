@@ -1,4 +1,4 @@
-<!-- RDZ · badge-externe · v2 · 2026-08-02 -->
+<!-- RDZ · badge-externe · v3 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -305,11 +305,15 @@ button,input,select,textarea{font-family:inherit}
           }
         }
         i++; next();
-      }).catch(function () {
+      }).catch(function (err) {
+        // Consigné en console pour le diagnostic : une écriture qui échoue de façon
+        // permanente (colonne/contrainte invalide côté Supabase, par ex.) bloque cette
+        // entrée ET tout ce qui la suit dans la file, tant qu'elle n'est pas résolue.
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
         var cur = readLS(Q_TEXT);
         var idx = cur.findIndex(function (x) { return x.id === it.id; });
-        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
-        _flushingText = false; // réseau probablement absent : on retentera au prochain online/ouverture
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
+        _flushingText = false; // réseau probablement absent, ou écriture invalide : on retentera au prochain online/ouverture
       });
     }
     next();
@@ -345,10 +349,11 @@ button,input,select,textarea{font-family:inherit}
           pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
           i++; next();
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.warn('RDZSync: échec envoi photo', p.module, p.table, err && (err.message || err));
           var cur = readLS(Q_PHOTO);
           var idx = cur.findIndex(function (x) { return x.id === p.id; });
-          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
           _flushingPhotos = false;
         });
     }
@@ -385,7 +390,7 @@ let STOCK_AGENT=null;
 let accesItems=[], accesSites=[], accesActifs=[], accesRecept=[];
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function normalizeName(s){return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');}
 function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
 function currentAgent(){ return STOCK_AGENT ? {id:STOCK_AGENT.id, nom:STOCK_AGENT.nom} : {id:null, nom:AGENT_NOM_SESSION}; }
@@ -634,9 +639,16 @@ function drawRetourList(){
 
 async function doRetour(id, btn){
   btn.disabled=true; btn.textContent='…';
+  // Bug corrigé le 2026-08-05 (piège technique n°9 des instructions du projet) : un upsert
+  // avec seulement {id, statut, date_retour_reel} échoue sur les colonnes NOT NULL de
+  // stock_acces (site_nom, item_nom, agent_id, receptionnaire_nom, etc.) car PostgREST
+  // valide la ligne complète de la tentative d'INSERT avant même de résoudre le conflit.
+  // On repart donc de la ligne complète déjà en cache (retourExternes) et on n'y
+  // surcharge que les champs qui changent.
+  const accesRow = retourExternes.find(a=>a.id===id);
   RDZSync.save({
     module: 'badge-externe', table: 'stock_acces', op: 'upsert', onConflict: 'id',
-    row: { id, statut:'rendu', date_retour_reel:new Date().toISOString() }
+    row: { ...accesRow, id, statut:'rendu', date_retour_reel:new Date().toISOString() }
   });
   toast('📥 Badge/clé pris en compte' + (navigator.onLine ? ' ✓' : ' (hors-ligne — remontera dès le retour du réseau)'));
   retourExternes = retourExternes.filter(a=>a.id!==id);
