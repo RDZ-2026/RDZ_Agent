@@ -1,4 +1,4 @@
-<!-- RDZ · feuille-route-agent · v2 · 2026-08-02 -->
+<!-- RDZ · feuille-route-agent · v1 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -80,14 +80,6 @@
   .note-input { width: 100%; padding: 6px 8px; border: 1px solid var(--rdz-border); border-radius: 2px; background: var(--rdz-bg); font-family: Arial, sans-serif; font-size: 12.5px; color: var(--rdz-black); resize: vertical; min-height: 40px; }
   .note-input:focus { outline: none; border-color: var(--rdz-red); background: #fff; }
   .saved-by-line { font-size: 9.5px; color: #9a9a9a; margin-top: 6px; text-align: right; }
-
-  /* VALIDATION FEUILLE DE ROUTE */
-  .valid-banner { margin: 14px 0 8px; padding: 10px 12px; border-radius: 2px; font-size: 11.5px; line-height: 1.5; }
-  .valid-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-  .valid-pending { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
-  .valid-missing { font-size: 10.5px; margin-top: 4px; }
-  .valid-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; padding: 12px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; margin-top: 8px; }
-  .valid-btn:active { background: var(--rdz-red-dark); }
 </style>
 </head>
 <body>
@@ -123,6 +115,229 @@
 </div>
 
 <script>
+/* ═══ RDZSync v4 — copie de référence, collée telle quelle (voir application/rdz-sync-v4.js) ═══ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uidSync() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var textEntry = {
+      id: uidSync(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uidSync(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
 // ═══ CONFIG — deux Supabase distincts ═══
 // 1) RouteOps (lecture seule) : planning théorique
 const RO_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co';
@@ -131,6 +346,7 @@ const RO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+RDZSync.init({ client: sb });
 
 const AGENT_ID = localStorage.getItem('rdz_agent_id');
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom');
@@ -140,7 +356,6 @@ if (!AGENT_ID) { window.location.href = 'mobile.html'; }
 let S = { sites: [], missions: [], sheets: [], travel: {} };
 let pointagesMap = {}; // task_index -> { heure_arrivee_reelle, heure_depart_reelle }
 let currentSheet = null;
-let sheetValidation = null; // ligne feuille_validations pour la feuille/date/agent en cours, ou null
 
 // ═══ HELPERS (portés depuis RouteOps) ═══
 function todayStr() { return new Date().toISOString().slice(0,10); }
@@ -294,22 +509,7 @@ async function openSheet(sheetId, date) {
   detailEl.innerHTML = `<div class="state-msg"><div class="ico">⏳</div><p>Chargement des saisies…</p></div>`;
 
   await loadPointages(sheetId, date);
-  await loadValidation(sheetId, date);
   renderSheetDetail(sh, date);
-}
-
-async function loadValidation(sheetId, date) {
-  sheetValidation = null;
-  try {
-    const { data, error } = await sb.from('feuille_validations')
-      .select('*')
-      .eq('sheet_id', sheetId).eq('sheet_date', date).eq('agent_nom', AGENT_NOM)
-      .maybeSingle();
-    if (error) throw error;
-    sheetValidation = data || null;
-  } catch (err) {
-    // silencieux : si ça échoue, on considère non-validée (par prudence)
-  }
 }
 
 async function loadPointages(sheetId, date) {
@@ -346,8 +546,6 @@ function renderSheetDetail(sh, date) {
     html += `<div class="obs-box"><div class="obs-lbl">📌 Consignes</div>${escHtml(sh.observations).replace(/\n/g,'<br>')}</div>`;
   }
 
-  let missingCount = 0;
-  const missingNames = [];
   html += calc.map((r, idx) => {
     const m = getMission(r.mId);
     if (!m) return '';
@@ -359,7 +557,6 @@ function renderSheetDetail(sh, date) {
     const depart = (pointage.heure_depart_reelle || '').slice(0,5);
     const noteVal = pointage.note || '';
     const savedBy = pointage.agent_nom ? `Dernière saisie par ${escHtml(pointage.agent_nom)}` : '';
-    if (!r.alert && (!arrivee || !depart)) { missingCount++; missingNames.push(m.name); }
     return `<div class="task-card ${cls}">
       <div class="task-top">
         ${site ? `<span class="task-dot" style="background:${site.color}"></span>` : ''}
@@ -390,37 +587,11 @@ function renderSheetDetail(sh, date) {
     </div>`;
   }).join('');
 
-  if (sheetValidation) {
-    html += `<div class="valid-banner valid-ok">✓ Feuille de route confirmée complète le ${fmtDateShort(sheetValidation.validated_at.slice(0,10))} à ${new Date(sheetValidation.validated_at).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'})} par ${escHtml(sheetValidation.agent_nom)}</div>`;
-  } else {
-    html += `<div class="valid-banner valid-pending">⚠️ Feuille de route pas encore confirmée pour aujourd'hui
-      ${missingCount > 0 ? `<div class="valid-missing">${missingCount} mission(s) avec une heure d'arrivée ou de départ manquante : ${escHtml(missingNames.join(', '))}</div>` : ''}
-    </div>
-    <button class="valid-btn" onclick="confirmSheetComplete('${sh.id}', '${date}', ${missingCount})">✓ Je confirme que ma feuille de route est complète</button>`;
-  }
-
   document.getElementById('sheet-detail').innerHTML = html;
 }
 
-async function confirmSheetComplete(sheetId, date, missingCount) {
-  if (missingCount > 0) {
-    const ok = window.confirm(`Il manque une heure pour ${missingCount} mission(s). Confirmer quand même ?`);
-    if (!ok) return;
-  }
-  try {
-    const payload = { sheet_id: sheetId, sheet_date: date, agent_nom: AGENT_NOM, validated_at: new Date().toISOString() };
-    const { error } = await sb.from('feuille_validations')
-      .upsert(payload, { onConflict: 'sheet_id,sheet_date,agent_nom' });
-    if (error) throw error;
-    sheetValidation = payload;
-    renderSheetDetail(currentSheet, date);
-  } catch (err) {
-    alert('Erreur lors de la confirmation : ' + err.message);
-  }
-}
-
-// ═══ SAUVEGARDE (upsert — ne touche que le champ modifié) ═══
-async function saveRealTime(taskIndex, field, value) {
+// ═══ SAUVEGARDE (upsert via RDZSync — file hors-ligne, ne touche que le champ modifié) ═══
+function saveRealTime(taskIndex, field, value) {
   if (!currentSheet) return;
   const date = document.getElementById('date-picker').value || todayStr();
   const m = getMission(currentSheet.tasks[taskIndex]?.mId);
@@ -436,25 +607,25 @@ async function saveRealTime(taskIndex, field, value) {
   };
   payload[field] = value ? value + ':00' : null;
 
-  try {
-    const { error } = await sb.from('feuille_pointages')
-      .upsert(payload, { onConflict: 'sheet_id,task_index,sheet_date' });
-    if (error) throw error;
-    pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), [field]: payload[field], agent_nom: AGENT_NOM };
-    const okId = field === 'heure_arrivee_reelle' ? 'ok-arr-' + taskIndex : 'ok-dep-' + taskIndex;
-    const okEl = document.getElementById(okId);
-    if (okEl) {
-      okEl.classList.add('show');
-      setTimeout(() => okEl.classList.remove('show'), 1500);
-    }
-    updateSavedByCaption(taskIndex);
-  } catch (err) {
-    alert('Erreur d\'enregistrement : ' + err.message);
+  RDZSync.save({
+    module: 'feuille-route-agent', table: 'feuille_pointages',
+    op: 'upsert', onConflict: 'sheet_id,task_index,sheet_date',
+    row: payload
+  });
+
+  // Mise à jour optimiste immédiate : l'agent ne doit jamais attendre le réseau pour voir sa saisie prise en compte.
+  pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), [field]: payload[field], agent_nom: AGENT_NOM };
+  const okId = field === 'heure_arrivee_reelle' ? 'ok-arr-' + taskIndex : 'ok-dep-' + taskIndex;
+  const okEl = document.getElementById(okId);
+  if (okEl) {
+    okEl.classList.add('show');
+    setTimeout(() => okEl.classList.remove('show'), 1500);
   }
+  updateSavedByCaption(taskIndex);
 }
 
 // ═══ NOTE PAR LIGNE ═══
-async function saveNote(taskIndex, value) {
+function saveNote(taskIndex, value) {
   if (!currentSheet) return;
   const date = document.getElementById('date-picker').value || todayStr();
   const m = getMission(currentSheet.tasks[taskIndex]?.mId);
@@ -470,20 +641,19 @@ async function saveNote(taskIndex, value) {
     updated_at: new Date().toISOString()
   };
 
-  try {
-    const { error } = await sb.from('feuille_pointages')
-      .upsert(payload, { onConflict: 'sheet_id,task_index,sheet_date' });
-    if (error) throw error;
-    pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), note: value || null, agent_nom: AGENT_NOM };
-    const okEl = document.getElementById('ok-note-' + taskIndex);
-    if (okEl) {
-      okEl.classList.add('show');
-      setTimeout(() => okEl.classList.remove('show'), 1500);
-    }
-    updateSavedByCaption(taskIndex);
-  } catch (err) {
-    alert('Erreur d\'enregistrement : ' + err.message);
+  RDZSync.save({
+    module: 'feuille-route-agent', table: 'feuille_pointages',
+    op: 'upsert', onConflict: 'sheet_id,task_index,sheet_date',
+    row: payload
+  });
+
+  pointagesMap[taskIndex] = { ...(pointagesMap[taskIndex] || {}), note: value || null, agent_nom: AGENT_NOM };
+  const okEl = document.getElementById('ok-note-' + taskIndex);
+  if (okEl) {
+    okEl.classList.add('show');
+    setTimeout(() => okEl.classList.remove('show'), 1500);
   }
+  updateSavedByCaption(taskIndex);
 }
 
 function updateSavedByCaption(taskIndex) {

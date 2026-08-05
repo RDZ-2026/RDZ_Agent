@@ -155,9 +155,235 @@ button,input,select,textarea{font-family:inherit}
 <div id="toasts"></div>
 
 <script>
+/* ═══ RDZSync v4 — copie de référence, collée telle quelle (voir application/rdz-sync-v4.js) ═══ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uidSync() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var textEntry = {
+      id: uidSync(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uidSync(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
 const SUPABASE_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+RDZSync.init({ client: sb });
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
 const AGENT_ID_SESSION=localStorage.getItem('rdz_agent_id');
 const AGENT_NOM_SESSION=localStorage.getItem('rdz_agent_nom')||'';
@@ -171,7 +397,7 @@ let cart=[]; // {kind:'materiel'|'acces', id, nom, icon, qty, max, item_type, si
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function toast(msg,type='ok'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3000);}
-function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function normalize(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function normalizeName(s){
   return normalize(s).split(/\s+/).filter(Boolean).sort().join(' ');
 }
@@ -351,12 +577,20 @@ function renderPanier(){
 
 async function doSortie(){
   if(!cart.length){toast('⚠️ Ajoutez au moins un article','err');return;}
+  // Exception « collision en direct » : la remise d'une clé/badge doit vérifier en ligne
+  // qu'elle n'a pas été prise entre-temps — ces écritures ne peuvent pas passer par la file
+  // hors-ligne RDZSync (voir principe directeur du projet / badge-externe.html).
+  const hasAcces = cart.some(c=>c.kind==='acces');
+  if(hasAcces && !navigator.onLine){
+    toast('📵 Réseau requis pour sortir une clé/badge (vérification anti-collision)','err');
+    return;
+  }
   const note=document.getElementById('sortie-note').value.trim();
   const btn=document.getElementById('btn-sortie');
   btn.disabled=true;btn.textContent='Enregistrement…';
 
   // Revérifie qu'aucune clé n'a été prise entre-temps par quelqu'un d'autre
-  await refreshAcces();
+  if(hasAcces) await refreshAcces();
   const takenIds=new Set(accesActifs.map(a=>a.item_id));
   const conflict=cart.find(c=>c.kind==='acces'&&takenIds.has(c.id));
   if(conflict){
@@ -372,16 +606,21 @@ async function doSortie(){
       if(c.kind==='materiel'){
         const item=materielItems.find(m=>m.id===c.id);
         if(!item||item.quantite_dispo<c.qty) throw new Error('Stock insuffisant : '+c.nom);
-        await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo-c.qty}).eq('id',c.id);
-        await sb.from('stock_attributions').insert({
-          agent_id:ag.id, agent_nom:ag.nom,
+        // Écritures non bloquantes via RDZSync : la sortie de matériel n'a pas de vérification
+        // de collision en direct (contrairement aux clés/badges ci-dessous) et doit donc survivre
+        // à une absence de réseau plutôt que de bloquer l'agent.
+        RDZSync.save({module:'materiel-agent', table:'stock_materiel_items', op:'upsert', onConflict:'id',
+          row:{ id:c.id, quantite_dispo:item.quantite_dispo-c.qty }});
+        RDZSync.save({module:'materiel-agent', table:'stock_attributions', row:{
+          id: uid(), agent_id:ag.id, agent_nom:ag.nom,
           materiel_id:c.id, materiel_nom:c.nom, quantite:c.qty, note:note||null, statut:'actif'
-        });
+        }});
         // Pas de stock_log : la table stock_attributions sert déjà de trace complète
         item.quantite_dispo-=c.qty;
       } else {
         // Méthode robuste : supprimer toute ancienne ligne pour cette clé/badge,
-        // puis en recréer une neuve — élimine tout risque de conflit de contrainte
+        // puis en recréer une neuve — élimine tout risque de conflit de contrainte.
+        // Écriture directe en ligne uniquement (exception collision en direct, voir plus haut).
         const { error: delErr } = await sb.from('stock_acces').delete().eq('item_id', c.id);
         if (delErr) console.warn('Nettoyage stock_acces:', delErr.message);
 
@@ -436,25 +675,20 @@ function selMType(el){
   el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
 }
-async function doMaint(){
+function doMaint(){
   const mat=document.getElementById('m-mat').value;
   const desc=document.getElementById('m-desc').value.trim();
   const type=document.querySelector('#m-type-chips .chip.sel')?.dataset.v||'panne';
   if(!mat||!desc){toast('⚠️ Complétez tous les champs','err');return;}
   const btn=document.getElementById('btn-maint');
   btn.disabled=true;btn.textContent='Envoi…';
-  try{
-    const ag=currentAgent();
-    await sb.from('stock_maintenances').insert({
-      materiel_nom:mat, type_probleme:type, description:desc,
-      agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
-    });
-    toast('🔧 Problème signalé');
-    goScreen('s-home');
-  }catch(e){
-    toast('❌ '+e.message,'err');
-    btn.disabled=false;btn.textContent='🔧 Signaler';
-  }
+  const ag=currentAgent();
+  RDZSync.save({module:'materiel-agent', table:'stock_maintenances', row:{
+    id: uid(), materiel_nom:mat, type_probleme:type, description:desc,
+    agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
+  }});
+  toast('🔧 Problème signalé');
+  goScreen('s-home');
 }
 
 // ═══ EN COURS (avec réintégration possible par n'importe quel agent) ═══
@@ -557,35 +791,46 @@ function onRetCheck(cb){
   btn.textContent = `↩️ Confirmer le retour (${n})`;
 }
 
-async function confirmReturnGroupe(){
+function confirmReturnGroupe(){
   const checks=[...document.querySelectorAll('.ret-check:checked')];
   if(!checks.length)return;
-  const btn=document.getElementById('btn-ret-groupe');
-  btn.disabled=true;btn.textContent='Enregistrement…';
   const ag=currentAgent();
-  let ok=0, fail=0;
-  for(const cb of checks){
-    try{
-      if(cb.dataset.kind==='materiel'){
-        const attrId=cb.dataset.id, materielId=cb.dataset.mat, qty=parseInt(cb.dataset.qty);
-        const etat=document.querySelector(`#ret-etat-${attrId} .chip.sel`)?.dataset.v || 'ok';
-        if(etat!=='hs'){
-          const {data:item}=await sb.from('stock_materiel_items').select('quantite_dispo').eq('id',materielId).single();
-          if(item) await sb.from('stock_materiel_items').update({quantite_dispo:item.quantite_dispo+qty}).eq('id',materielId);
+  // Aucune de ces écritures ne dépend d'une vérification de collision en direct (à la différence
+  // de la remise de clé/badge dans doSortie) : elles passent donc toutes par RDZSync, non bloquant,
+  // avec mise à jour optimiste immédiate de l'état local plutôt que d'attendre une relecture réseau.
+  checks.forEach(cb=>{
+    if(cb.dataset.kind==='materiel'){
+      const attrId=cb.dataset.id, materielId=cb.dataset.mat, qty=parseInt(cb.dataset.qty);
+      const etat=document.querySelector(`#ret-etat-${attrId} .chip.sel`)?.dataset.v || 'ok';
+      if(etat!=='hs'){
+        const item=materielItems.find(m=>m.id===materielId);
+        if(item){
+          RDZSync.save({module:'materiel-agent', table:'stock_materiel_items', op:'upsert', onConflict:'id',
+            row:{ id:materielId, quantite_dispo:item.quantite_dispo+qty }});
+          item.quantite_dispo+=qty;
+        } else {
+          console.warn('materielItems: introuvable pour', materielId, '— stock non réintégré');
         }
-        await sb.from('stock_attributions').update({statut:'rendu',date_retour:new Date().toISOString(),etat_retour:etat}).eq('id',attrId);
-        if(etat==='hs'){
-          const attr=encoursData.attrs.find(a=>a.id===attrId);
-          await sb.from('stock_maintenances').insert({materiel_nom:attr?.materiel_nom||'—',type_probleme:'panne',description:'Retourné hors service',agent_id:ag.id,agent_nom:ag.nom,statut:'ouvert'});
-        }
-      } else {
-        await sb.from('stock_acces').update({statut:'rendu',date_retour_reel:new Date().toISOString()}).eq('id',cb.dataset.id);
       }
-      ok++;
-    }catch(e){ fail++; console.warn(e.message); }
-  }
-  toast(fail ? `📥 ${ok} retour(s) enregistré(s), ${fail} échec(s)` : `📥 ${ok} retour(s) enregistré(s)`, fail?'err':'ok');
-  renderEnCours();
+      RDZSync.save({module:'materiel-agent', table:'stock_attributions', op:'upsert', onConflict:'id',
+        row:{ id:attrId, statut:'rendu', date_retour:new Date().toISOString(), etat_retour:etat }});
+      if(etat==='hs'){
+        const attr=encoursData.attrs.find(a=>a.id===attrId);
+        RDZSync.save({module:'materiel-agent', table:'stock_maintenances', row:{
+          id: uid(), materiel_nom:attr?.materiel_nom||'—', type_probleme:'panne',
+          description:'Retourné hors service', agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
+        }});
+      }
+      encoursData.attrs = encoursData.attrs.filter(a=>a.id!==attrId);
+    } else {
+      const accesId=cb.dataset.id;
+      RDZSync.save({module:'materiel-agent', table:'stock_acces', op:'upsert', onConflict:'id',
+        row:{ id:accesId, statut:'rendu', date_retour_reel:new Date().toISOString() }});
+      encoursData.acces = encoursData.acces.filter(a=>a.id!==accesId);
+    }
+  });
+  toast(`📥 ${checks.length} retour(s) pris en compte`);
+  drawEnCours();
 }
 
 function selRetChip(el){

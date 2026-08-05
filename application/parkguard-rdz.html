@@ -1,4 +1,4 @@
-<!-- RDZ · parkguard-rdz · v3 · 2026-08-02 -->
+<!-- RDZ · parkguard-rdz · v4 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -397,7 +397,8 @@ input[type="file"]{display:none}
 <input type="file" id="file-input-camera" accept="image/*" capture="environment">
 
 <script>
-// ═══ RDZSync v3 — brique commune, collée telle quelle (voir rdz-sync-v3.js) ═══
+// ═══ RDZSync v4 — brique commune, collée telle quelle (voir rdz-sync-v4.js). Variante réduite :
+// sans le badge flottant auto-rendu, puisque cet écran a déjà son propre indicateur (#pending-info). ═══
 (function (global) {
   'use strict';
   var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
@@ -657,7 +658,7 @@ function buildRappelBlock() {
 
     // Site
     '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">' +
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Lieu de l\u2019infraction</div>' +
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray-mid);margin-bottom:6px">Lieu de l’infraction</div>' +
       '<div style="font-size:13px;font-weight:700;color:var(--black)">' + adresseSite + '</div>' +
     '</div>' +
 
@@ -728,16 +729,17 @@ function savePending(entry) {
   updatePendingInfo();
 }
 function updatePendingInfo() {
-  const legacy = JSON.parse(localStorage.getItem('pg_pending') || '[]').length; // comptages, non encore migré
   const st = (typeof RDZSync !== 'undefined') ? RDZSync.getStatus() : { textPending: 0, photoPending: 0 };
   const el = document.getElementById('pending-info');
   if (!el) return;
   const parts = [];
-  if (legacy + st.textPending > 0) parts.push((legacy + st.textPending) + ' donnée(s) en attente de réseau');
+  if (st.textPending > 0) parts.push(st.textPending + ' donnée(s) en attente de réseau');
   if (st.photoPending > 0) parts.push(st.photoPending + ' photo(s) en attente de WiFi');
   el.textContent = parts.join(' · ');
 }
 async function syncPending() {
+  // Ancienne file véhicules "pg_pending" (savePending) — laissée par précaution, mais plus alimentée :
+  // les véhicules (RDZSync) et désormais les comptages (RDZSync) ne l'utilisent plus.
   if (!isOnline) return;
   const p = JSON.parse(localStorage.getItem('pg_pending') || '[]');
   if (!p.length) return;
@@ -821,7 +823,7 @@ async function forceSync() {
   isOnline = true;
   RDZSync.flushText();
   RDZSync.flushPhotos(true); // bouton manuel : on force aussi les photos, pas seulement le texte
-  await syncPending(); // legacy, encore utilisé par les comptages
+  await syncPending(); // ancienne file véhicules pg_pending, laissée par précaution (voir syncPending)
   await confirmSupabaseSync();
   btn.disabled = false;
   btn.textContent = '🔄 Forcer la synchronisation';
@@ -1115,9 +1117,9 @@ function renderComptageZones() {
     var question = z.question ||
       (isDisponible
         ? 'Combien de places sont disponibles sur ' + z.nom + ' ?'
-        : 'Combien de v\u00e9hicules stationnent sur ' + z.nom + ' ?');
-    var unitLabel = isDisponible ? 'places libres' : 'v\u00e9hicules';
-    var icon = isDisponible ? '\uD83D\uDD35' : '\uD83D\uDE97'; // 🔵 ou 🚗
+        : 'Combien de véhicules stationnent sur ' + z.nom + ' ?');
+    var unitLabel = isDisponible ? 'places libres' : 'véhicules';
+    var icon = isDisponible ? '🔵' : '🚗'; // 🔵 ou 🚗
 
     return '<div style="background:var(--gray-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:4px">' +
       // Zone nom + capacité
@@ -1129,7 +1131,7 @@ function renderComptageZones() {
       '<div style="font-size:13px;color:var(--gray-dark);margin-bottom:12px;font-style:italic">' + question + '</div>' +
       // Saisie
       '<div style="display:flex;align-items:center;gap:10px">' +
-        '<button onclick="adjustComptage(' + i + ',-1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">\u2212</button>' +
+        '<button onclick="adjustComptage(' + i + ',-1)" style="width:48px;height:56px;font-size:28px;font-weight:700;background:#fff;border:1.5px solid var(--gray-border);border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0">−</button>' +
         '<input type="number" id="comptage-input-' + i + '" value="0" min="0" max="' + (z.places_totales + 10) + '"' +
           ' oninput="onComptageInput(' + i + ')"' +
           ' style="flex:1;text-align:center;font-size:36px;font-weight:800;color:var(--black);border:2px solid var(--gray-border);border-radius:var(--radius-sm);padding:8px 0;background:#fff;-moz-appearance:textfield;appearance:textfield;width:100%">' +
@@ -1140,7 +1142,7 @@ function renderComptageZones() {
       '<div style="margin-top:10px;height:10px;background:#e0e0e0;border-radius:5px;overflow:hidden">' +
         '<div id="comptage-bar-' + i + '" style="height:100%;background:#1d4ed8;border-radius:5px;width:0%;transition:width .3s"></div>' +
       '</div>' +
-      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' \u2014 0%</div>' +
+      '<div id="comptage-taux-' + i + '" style="font-size:12px;color:var(--gray-mid);margin-top:4px;text-align:right;font-weight:600">0 / ' + z.places_totales + ' — 0%</div>' +
     '</div>';
   }).join('');
   window._comptageVals = comptageZones.map(function() { return 0; });
@@ -1191,7 +1193,7 @@ function adjustComptage(idx, delta) {
   updateComptageDisplay(idx);
 }
 
-async function saveComptage() {
+function saveComptage() {
   const vals     = window._comptageVals || [];
   const now      = new Date().toISOString();
   const remarque = document.getElementById('comptage-remarque').value.trim();
@@ -1227,19 +1229,12 @@ async function saveComptage() {
     });
   });
 
-  let synced = false;
-  if (isOnline) {
-    try {
-      const { error } = await db.from('comptages').insert(entries);
-      if (error) { console.error(error); toast('Erreur: ' + error.message); }
-      else synced = true;
-    } catch(e) { console.warn('Erreur comptage:', e); }
-  }
-  if (!synced) {
-    const p = JSON.parse(localStorage.getItem('pg_pending_comptages') || '[]');
-    entries.forEach(function(e) { p.push(e); });
-    localStorage.setItem('pg_pending_comptages', JSON.stringify(p));
-  }
+  // Chaque relevé de zone part via RDZSync (file hors-ligne partagée avec les autres modules) —
+  // plus d'ancienne file dédiée pg_pending_comptages : un relevé pris en zone sans réseau ne doit
+  // jamais se perdre, et l'agent n'attend jamais le réseau pour voir son relevé pris en compte.
+  entries.forEach(function(entry) {
+    RDZSync.save({ module: 'parkguard', table: 'comptages', row: entry });
+  });
 
   // Recap
   document.getElementById('recap-comptage-meta').textContent =
@@ -1582,7 +1577,7 @@ function renderAgentsList(agents) {
   el.innerHTML = agents.map(function(a, i) {
     var safeNom = a.nom.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     return '<div class="card" onclick="selectAgentIdx(' + i + ')" data-agent="' + safeNom + '">' +
-      '<div class="card-icon">\uD83D\uDC64</div>' +
+      '<div class="card-icon">👤</div>' +
       '<div><div class="card-name">' + a.nom + '</div>' +
       '<div class="card-meta">' + (a.matricule || 'Agent de surveillance') + '</div></div>' +
       '<div class="card-arrow">&#8250;</div></div>';
@@ -1597,11 +1592,11 @@ function renderSitesList(sites) {
     return;
   }
   window._sitesCache = sites;
-  const icons = { standard: '\uD83C\uDFE2', guidage: '\uD83D\uDE97' };
-  const metas = { standard: 'R\u00e9sidence priv\u00e9e', guidage: 'Guidage & surveillance' };
+  const icons = { standard: '🏢', guidage: '🚗' };
+  const metas = { standard: 'Résidence privée', guidage: 'Guidage & surveillance' };
   el.innerHTML = sites.map(function(s, i) {
     return '<div class="card" onclick="selectSiteIdx(' + i + ')">' +
-      '<div class="card-icon">' + (icons[s.type] || '\uD83C\uDFE2') + '</div>' +
+      '<div class="card-icon">' + (icons[s.type] || '🏢') + '</div>' +
       '<div><div class="card-name">' + s.nom + '</div>' +
       '<div class="card-meta">' + (s.adresse || metas[s.type] || '') + '</div></div>' +
       '<div class="card-arrow">&#8250;</div></div>';
@@ -1614,14 +1609,14 @@ function selectAgentIdx(i) {
   currentAgent = ((a.prenom||'').trim()+' '+(a.nom||'').trim()).trim() || a.nom;
   window._currentAgentData = a;
   const agentBadge = document.getElementById('agent-badge');
-  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + currentAgent;
+  if (agentBadge) agentBadge.textContent = '👤 ' + currentAgent;
   startRonde();
 }
 function selectAgent(nom) {
   currentAgent = nom;
   window._currentAgentData = {nom: nom};
   const agentBadge = document.getElementById('agent-badge');
-  if (agentBadge) agentBadge.textContent = '\uD83D\uDC64 ' + nom;
+  if (agentBadge) agentBadge.textContent = '👤 ' + nom;
   startRonde();
 }
 function selectSiteIdx(i) {
