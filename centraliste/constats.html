@@ -1,3 +1,4 @@
+<!-- RDZ · constats · v1 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -51,14 +52,15 @@
     .stat-pill:hover { background: rgba(255,255,255,.14); }
     .stat-pill.active { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.3); color: #fff; }
     .stat-num { font-size: 15px; font-weight: 700; color: #fff; }
-    .stat-pill.s-attente .stat-num { color: #fbbf24; }
-    .stat-pill.s-cours .stat-num { color: #60a5fa; }
-    .stat-pill.s-transmis .stat-num { color: #a78bfa; }
-    .stat-pill.s-surveiller .stat-num { color: #fb923c; }
+    .stat-pill.s-active .stat-num { color: #60a5fa; }
     .stat-pill.s-resolu .stat-num { color: #4ade80; }
 
     /* CONTENT */
     .content { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
+
+    /* SITE GROUP */
+    .site-group-header { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); background: #ebe9e6; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 7px 12px; margin: 18px 0 8px; }
+    .site-group-header:first-child { margin-top: 0; }
 
     /* CONSTAT CARD */
     .constat-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-border); border-radius: 2px; margin-bottom: 10px; transition: border-left-color .15s; }
@@ -186,20 +188,11 @@
 <!-- STATS BAR -->
 <div class="stats-bar">
   <div class="stats-inner" id="stats-bar">
-    <div class="stat-pill active" data-s="all" onclick="setStatFilter(this)">
+    <div class="stat-pill" data-s="all" onclick="setStatFilter(this)">
       <span class="stat-num" id="stat-all">—</span> Tous
     </div>
-    <div class="stat-pill s-attente" data-s="En attente" onclick="setStatFilter(this)">
-      <span class="stat-num" id="stat-attente">—</span> En attente
-    </div>
-    <div class="stat-pill s-cours" data-s="En cours" onclick="setStatFilter(this)">
-      <span class="stat-num" id="stat-cours">—</span> En cours
-    </div>
-    <div class="stat-pill s-surveiller" data-s="A surveiller" onclick="setStatFilter(this)">
-      <span class="stat-num" id="stat-surveiller">—</span> À surveiller
-    </div>
-    <div class="stat-pill s-transmis" data-s="Transmis au client" onclick="setStatFilter(this)">
-      <span class="stat-num" id="stat-transmis">—</span> Transmis client
+    <div class="stat-pill s-active active" data-s="active" onclick="setStatFilter(this)">
+      <span class="stat-num" id="stat-active">—</span> En cours
     </div>
     <div class="stat-pill s-resolu" data-s="Résolu" onclick="setStatFilter(this)">
       <span class="stat-num" id="stat-resolu">—</span> Résolus
@@ -353,7 +346,7 @@ let sites = [];
 let constats = [];
 let journaux = {}; // id_constat -> entries[]
 let categories = ['Technique', 'Sécurité', 'Incivilité', 'Tag', 'Autre'];
-let statFilter = 'all';
+let statFilter = 'active'; // par défaut : uniquement les constats non résolus
 let editId = null;
 let journalConstatId = null;
 
@@ -472,14 +465,11 @@ function rebuildFilters() {
 }
 
 function updateStats() {
-  const counts = { 'En attente': 0, 'En cours': 0, 'A surveiller': 0, 'Transmis au client': 0, 'Résolu': 0 };
-  constats.forEach(c => { if (counts[c.statut] !== undefined) counts[c.statut]++; });
+  const resolu = constats.filter(c => c.statut === 'Résolu').length;
+  const active = constats.length - resolu;
   document.getElementById('stat-all').textContent = constats.length;
-  document.getElementById('stat-attente').textContent = counts['En attente'];
-  document.getElementById('stat-cours').textContent = counts['En cours'];
-  document.getElementById('stat-surveiller').textContent = counts['A surveiller'];
-  document.getElementById('stat-transmis').textContent = counts['Transmis au client'];
-  document.getElementById('stat-resolu').textContent = counts['Résolu'];
+  document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-resolu').textContent = resolu;
 }
 
 function setStatFilter(btn) {
@@ -496,7 +486,8 @@ function render() {
   const search = document.getElementById('filter-search').value.toLowerCase().trim();
 
   let filtered = constats.filter(c => {
-    if (statFilter !== 'all' && c.statut !== statFilter) return false;
+    if (statFilter === 'active' && c.statut === 'Résolu') return false;
+    if (statFilter === 'Résolu' && c.statut !== 'Résolu') return false;
     if (siteF !== 'all' && c.site_id !== siteF) return false;
     if (catF !== 'all' && c.categorie !== catF) return false;
     if (search) {
@@ -507,14 +498,32 @@ function render() {
     return true;
   });
 
+  // Tri par site (ordre alphabétique), puis par date de rapport la plus récente
+  filtered.sort((a, b) => {
+    const nomA = sites.find(s => s.id === a.site_id)?.nom || 'ZZZ Sans site';
+    const nomB = sites.find(s => s.id === b.site_id)?.nom || 'ZZZ Sans site';
+    const cmp = nomA.localeCompare(nomB, 'fr');
+    if (cmp !== 0) return cmp;
+    return (b.date_rapport || '').localeCompare(a.date_rapport || '');
+  });
+
   const el = document.getElementById('content');
   if (filtered.length === 0) {
     el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun constat pour ces filtres.</div>`;
     return;
   }
 
-  el.innerHTML = filtered.map(c => {
+  let lastSiteKey = null;
+  let html = '';
+
+  filtered.forEach(c => {
     const site = sites.find(s => s.id === c.site_id);
+    const siteKey = c.site_id || '__nosite__';
+    if (siteKey !== lastSiteKey) {
+      html += `<div class="site-group-header">📍 ${site ? site.nom : 'Sans site'}</div>`;
+      lastSiteKey = siteKey;
+    }
+
     const journal = journaux[c.id] || [];
     const sClass = statClass(c.statut);
 
@@ -534,7 +543,7 @@ function render() {
         ${c.procedure}
       </div>` : '';
 
-    return `<div class="constat-card ${sClass}">
+    html += `<div class="constat-card ${sClass}">
       <div class="card-header">
         <div class="card-meta-left">
           <div class="card-date">📅 ${fmt(c.date_rapport)}${c.heure_rapport ? ' ' + c.heure_rapport.slice(0,5) : ''}</div>
@@ -567,7 +576,9 @@ function render() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  });
+
+  el.innerHTML = html;
 }
 
 // ─── STATUT RAPIDE ────────────────────────────────────────────────────────────
