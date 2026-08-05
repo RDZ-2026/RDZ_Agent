@@ -1,3 +1,4 @@
+<!-- RDZ · planning-agendrix · v2 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -334,6 +335,14 @@ function excelSerialToUTCDate(serial){
   return new Date(Date.UTC(dayBase.getUTCFullYear(), dayBase.getUTCMonth(), dayBase.getUTCDate(), hours, minutes, seconds));
 }
 
+// v2 : la clé n'inclut plus l'heure de début exacte (debut.toISOString()) — un correctif
+// horaire ou un léger décalage d'export ne doit plus jamais faire perdre le PDSA / l'heure
+// de prise de service déjà saisis pour un service. La clé est basée sur site + agent + jour
+// (+ un numéro d'ordre si un même agent a plusieurs services le même jour sur le même site).
+function buildShiftKey(site, agent, debut, occurrenceIndex){
+  return site + '|' + agent + '|' + dateKey(debut) + (occurrenceIndex > 0 ? ('#' + occurrenceIndex) : '');
+}
+
 function parseAgendrix(rows){
   const out = [];
   let currentSite = null;
@@ -349,10 +358,18 @@ function parseAgendrix(rows){
       const debut = excelSerialToUTCDate(e), fin = excelSerialToUTCDate(f);
       out.push({
         agent: a, matricule: b, site: currentSite, poste: d || '',
-        debut, fin, totalH: parseFloat(g) || 0,
-        key: currentSite + '|' + a + '|' + debut.toISOString()
+        debut, fin, totalH: parseFloat(g) || 0
       });
     }
+  });
+  // Numéro d'ordre par site+agent+jour, dans l'ordre d'apparition dans le fichier
+  // (nécessaire uniquement pour distinguer plusieurs services du même agent le même jour).
+  const seenCount = {};
+  out.forEach(s => {
+    const baseKey = s.site + '|' + s.agent + '|' + dateKey(s.debut);
+    const idx = seenCount[baseKey] || 0;
+    seenCount[baseKey] = idx + 1;
+    s.key = buildShiftKey(s.site, s.agent, s.debut, idx);
   });
   return out;
 }
@@ -527,7 +544,7 @@ function onPdsaInput(el){
   savePdsaField(shift, field, el.value);
 }
 
-document.getElementById('footer-date').textContent = 'Version 1.0 — ' + new Date().getFullYear();
+document.getElementById('footer-date').textContent = 'Version 2.0 — ' + new Date().getFullYear();
 loadSavedPlanning();
 </script>
 
