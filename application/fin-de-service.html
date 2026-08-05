@@ -1,4 +1,4 @@
-<!-- RDZ · fin-de-service · v6 · 2026-08-05 -->
+<!-- RDZ · fin-de-service · v7 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -477,7 +477,8 @@ function render() {
   html += `<div class="block"><div class="block-hdr"><div class="block-title">📡 Rapports &amp; photos</div>
     <span class="block-status ${(st.textPending || st.photoPending) ? 'st-warn' : 'st-ok'}">${(st.textPending || st.photoPending) ? 'En attente' : 'OK'}</span></div>`;
   html += `<div class="sync-row"><div class="sync-lbl">Données texte en attente de réseau</div>
-    <div class="sync-count ${st.textPending ? 'count-warn' : 'count-ok'}">${st.textPending}</div></div>`;
+    <div class="sync-count ${st.textPending ? 'count-warn' : 'count-ok'}">${st.textPending}</div>
+    ${st.textPending ? `<button class="btn-sync" onclick="forceSync()">🔄 Réessayer maintenant</button>` : ''}</div>`;
   html += `<div class="sync-row"><div class="sync-lbl">Photos en attente de WiFi</div>
     <div class="sync-count ${st.photoPending ? 'count-warn' : 'count-ok'}">${st.photoPending}</div>
     ${st.photoPending ? `<button class="btn-sync" onclick="forceSync()">📶 Envoyer maintenant</button>` : ''}</div>`;
@@ -492,7 +493,7 @@ function render() {
       }).join('') +
       `</div>`;
   }
-  html += `<div class="sync-note">Les données texte partent automatiquement dès qu'il y a du réseau (4G/5G/WiFi). Les photos attendent le WiFi pour économiser vos données mobiles — vous pouvez forcer l'envoi à tout moment. Si un élément affiche plusieurs "échecs de tentative" avec un message d'erreur, il ne partira pas tout seul : signalez-le au centraliste/à la direction avec le détail ci-dessus.</div>`;
+  html += `<div class="sync-note">Les données texte partent automatiquement dès qu'il y a du réseau (4G/5G/WiFi). Les photos attendent le WiFi pour économiser vos données mobiles — vous pouvez forcer l'envoi à tout moment avec les boutons ci-dessus. Si un élément affiche plusieurs "échecs de tentative" avec le même message d'erreur, forcer l'envoi ne suffira pas à le débloquer (la donnée déjà enregistrée dans la file est mal formée et rejetée par le serveur à chaque tentative) : signalez-le au centraliste/à la direction avec le détail ci-dessus, qui pourra la supprimer via l'outil de dépannage.</div>`;
   if (logRecent.length) {
     html += `<div class="sync-note" style="border-top:1px solid var(--rdz-border)"><b>Dernières remontées :</b><br>` +
       logRecent.map(l => `${l.kind === 'photo' ? '📷' : '📝'} ${escHtml(l.module)} — ${fmtDT(l.ts)}`).join('<br>') + `</div>`;
