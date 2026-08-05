@@ -1,0 +1,176 @@
+<!-- RDZ · reset-sync · v1 · 2026-08-05 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDZ Admin — Réinitialisation file RDZSync</title>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;
+  --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);padding-bottom:40px}
+.hdr{background:var(--red);color:#fff;padding:18px 20px}
+.hdr-name{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.hdr-sub{font-size:12px;color:rgba(255,255,255,.75);margin-top:3px}
+.hdr a{color:#fff;font-size:12px;text-decoration:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);padding:6px 10px;border-radius:var(--radius-ui);display:inline-block;margin-top:8px}
+.wrap{max-width:640px;margin:0 auto;padding:20px}
+.warn-box{background:#fff7ed;border:1.5px solid var(--warn);border-radius:var(--radius-section);padding:14px 16px;margin-bottom:20px;font-size:13px;line-height:1.5}
+.warn-box b{color:var(--warn)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-section);padding:16px;margin-bottom:16px}
+.card-title{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--red);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--line-soft)}
+.state-msg{text-align:center;padding:24px;color:#9a9a9a;font-size:13px}
+.item{border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:10px 12px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px}
+.item-info{flex:1;min-width:0}
+.item-title{font-size:13px;font-weight:700}
+.item-meta{font-size:11.5px;color:#666;margin-top:2px}
+.item-err{font-size:11px;color:var(--danger);margin-top:4px;word-break:break-word}
+.item-del{flex-shrink:0;background:var(--danger);color:#fff;border:none;padding:8px 12px;border-radius:var(--radius-ui);font-size:11.5px;font-weight:700;cursor:pointer}
+.item-del:active{background:var(--red-dark)}
+.btn-row{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;padding:12px;border:none;border-radius:var(--radius-ui);font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:active{background:var(--red-dark)}
+.btn-outline{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn-outline:active{background:var(--bg-meta)}
+.raw-toggle{font-size:12px;color:#666;text-decoration:underline;cursor:pointer;margin-top:10px;display:inline-block}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg-meta);padding:10px;border-radius:var(--radius-ui);font-size:11px;margin-top:8px;max-height:300px;overflow:auto}
+#toasts{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:999;width:calc(100% - 32px);max-width:400px}
+.toast{background:var(--ink);color:#fff;padding:10px 14px;border-radius:6px;font-size:12.5px;margin-bottom:6px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.toast.ok{background:var(--ok)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-name">RDZ Security Management SA</div>
+  <div class="hdr-sub">Diagnostic &amp; réinitialisation — file d'attente RDZSync</div>
+  <a href="mobile.html">‹ Accueil</a>
+</div>
+
+<div class="wrap">
+  <div class="warn-box">
+    <b>⚠️ Outil de dépannage.</b> Cette page lit et modifie directement la file d'attente hors-ligne stockée sur <b>cet appareil, dans ce navigateur</b> — elle n'affecte aucune autre donnée déjà envoyée à la direction. Ne supprimer une entrée que si vous êtes sûr qu'elle est erronée ou déjà obsolète (ex. un retour de badge concernant un objet qui a de toute façon été remis à nouveau depuis) : une suppression est définitive et cette saisie ne partira jamais vers Supabase.
+    <br><br>
+    Cette page fonctionne pour <b>tous les modules</b> (matériel, badges, feuilles de route, etc.) car la file RDZSync est partagée entre eux.
+  </div>
+
+  <div class="card">
+    <div class="card-title">⏳ Texte en attente d'envoi</div>
+    <div id="text-list"><div class="state-msg">Chargement…</div></div>
+    <div class="btn-row" id="text-actions" style="display:none">
+      <button class="btn btn-outline" onclick="forceFlush()">🔄 Forcer une tentative d'envoi</button>
+      <button class="btn btn-danger" onclick="clearAll('text')">🗑 Vider toute la file texte</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📷 Photos en attente d'envoi</div>
+    <div id="photo-list"><div class="state-msg">Chargement…</div></div>
+    <div class="btn-row" id="photo-actions" style="display:none">
+      <button class="btn btn-danger" onclick="clearAll('photo')">🗑 Vider toute la file photos</button>
+    </div>
+  </div>
+
+  <span class="raw-toggle" onclick="toggleRaw()">Afficher/masquer le contenu brut (JSON)</span>
+  <pre id="raw" style="display:none"></pre>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const Q_TEXT='rdz_sync_queue', Q_PHOTO='rdz_sync_photo_queue';
+
+function readLS(key){ try{ return JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){ return []; } }
+function writeLS(key, arr){ try{ localStorage.setItem(key, JSON.stringify(arr)); }catch(e){} }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg,type='ok'){
+  const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+function ts(d){ try{ return new Date(d).toLocaleString('fr-CH'); }catch(e){ return d; } }
+
+function render(){
+  const text=readLS(Q_TEXT), photos=readLS(Q_PHOTO);
+
+  const textEl=document.getElementById('text-list');
+  if(!text.length){
+    textEl.innerHTML='<div class="state-msg">✅ Rien en attente.</div>';
+    document.getElementById('text-actions').style.display='none';
+  }else{
+    textEl.innerHTML=text.map(it=>`
+      <div class="item">
+        <div class="item-info">
+          <div class="item-title">${esc(it.module)} — ${esc(it.table)}</div>
+          <div class="item-meta">Saisi le ${ts(it.ts)}${it.tries?' · '+it.tries+' échec(s) de tentative':''}</div>
+          ${it.lastError?`<div class="item-err">❌ ${esc(it.lastError)}</div>`:''}
+        </div>
+        <button class="item-del" onclick="deleteOne('text','${it.id}')">Supprimer</button>
+      </div>`).join('');
+    document.getElementById('text-actions').style.display='flex';
+  }
+
+  const photoEl=document.getElementById('photo-list');
+  if(!photos.length){
+    photoEl.innerHTML='<div class="state-msg">✅ Rien en attente.</div>';
+    document.getElementById('photo-actions').style.display='none';
+  }else{
+    photoEl.innerHTML=photos.map(p=>`
+      <div class="item">
+        <div class="item-info">
+          <div class="item-title">${esc(p.module)} — ${esc(p.table)}</div>
+          <div class="item-meta">${esc(p.name||'photo.jpg')} · saisie le ${ts(p.ts)}${p.tries?' · '+p.tries+' échec(s)':''}</div>
+          ${p.lastError?`<div class="item-err">❌ ${esc(p.lastError)}</div>`:''}
+        </div>
+        <button class="item-del" onclick="deleteOne('photo','${p.id}')">Supprimer</button>
+      </div>`).join('');
+    document.getElementById('photo-actions').style.display='flex';
+  }
+
+  document.getElementById('raw').textContent = JSON.stringify({rdz_sync_queue:text, rdz_sync_photo_queue:photos}, null, 2);
+}
+
+function deleteOne(kind, id){
+  if(!confirm('Supprimer définitivement cette entrée de la file ? Elle ne sera jamais envoyée à Supabase.')) return;
+  const key = kind==='text' ? Q_TEXT : Q_PHOTO;
+  const cur = readLS(key).filter(x=>x.id!==id);
+  writeLS(key, cur);
+  toast('🗑 Entrée supprimée');
+  render();
+}
+
+function clearAll(kind){
+  const key = kind==='text' ? Q_TEXT : Q_PHOTO;
+  const n = readLS(key).length;
+  if(!confirm(`Vider TOUTE la file ${kind==='text'?'texte':'photos'} (${n} élément(s)) ? Ces saisies ne seront jamais envoyées à Supabase.`)) return;
+  writeLS(key, []);
+  toast('🗑 File vidée');
+  render();
+}
+
+function forceFlush(){
+  if(typeof RDZSync !== 'undefined'){
+    toast('⚠️ RDZSync non chargé sur cette page — ouvrez un module agent (ex. mobile.html) pour forcer un envoi réseau.', 'err');
+  } else {
+    toast('ℹ️ Ouvrez un module agent (ex. badge-externe.html) : l\'envoi se relance automatiquement dès l\'ouverture si le réseau est disponible.');
+  }
+}
+
+function toggleRaw(){
+  const el=document.getElementById('raw');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+render();
+</script>
+</body>
+</html>
