@@ -1,4 +1,4 @@
-<!-- RDZ · fin-de-service · v5 · 2026-08-02 -->
+<!-- RDZ · fin-de-service · v6 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -67,6 +67,11 @@
   .btn-sync:active { background: var(--rdz-red-dark); }
   .btn-sync:disabled { background: #c9c2b8; cursor: default; }
   .sync-note { padding: 10px 14px; font-size: 10.5px; color: var(--rdz-gray); background: var(--rdz-bg); line-height: 1.5; }
+  .sync-pending-detail { padding: 10px 14px; border-bottom: 1px solid var(--rdz-border); }
+  .sync-pending-detail-lbl { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--rdz-gray); margin-bottom: 6px; }
+  .sync-pending-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--rdz-black); padding: 4px 0; }
+  .sync-pending-item .cnt { font-weight: 700; color: #854d0e; flex-shrink: 0; }
+  .sync-pending-item .tries { font-size: 10px; color: #dc2626; font-weight: 700; }
 
   .refresh-btn { display: block; width: 100%; background: #fff; border: 1px solid var(--rdz-border); color: var(--rdz-gray); font-size: 12px; font-weight: 700; padding: 11px; border-radius: 2px; margin-top: 6px; cursor: pointer; }
   .refresh-btn:active { background: #ebe9e6; }
@@ -92,7 +97,7 @@
 </div>
 
 <!-- ============================================================
-     RDZSync v2 — brique commune, collée telle quelle (voir rdz-sync-v2.js)
+     RDZSync v4 — brique commune, collée telle quelle (voir application/rdz-sync-v4.js)
      ============================================================ -->
 <script>
 (function (global) {
@@ -127,7 +132,7 @@
       var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       if (c && typeof c.addEventListener === 'function') c.addEventListener('change', tryAutoPhotos);
     } catch (e) {}
-    flushText(); tryAutoPhotos();
+    flushText(); tryAutoPhotos(); notify();
     return API;
   }
   function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
@@ -175,9 +180,14 @@
           }
         }
         i++; next();
-      }).catch(function () {
+      }).catch(function (err) {
+        // Consigné en console pour le diagnostic (voir aussi le détail affiché sur cet écran) :
+        // une écriture qui échoue de façon permanente (colonne/contrainte invalide côté Supabase,
+        // par ex.) bloque cette entrée ET tout ce qui la suit dans la file, tant qu'elle n'est pas
+        // résolue ou retirée manuellement.
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
         var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
-        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
         _flushingText = false;
       });
     }
@@ -207,9 +217,10 @@
           pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
           i++; next();
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.warn('RDZSync: échec upload photo', p.module, p.table, err && (err.message || err));
           var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
-          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
           _flushingPhotos = false;
         });
     }
@@ -363,6 +374,33 @@ async function loadFeuilleRoute() {
   } catch (err) { console.warn('loadFeuilleRoute:', err.message); }
 }
 
+// ── DÉTAIL DES ÉLÉMENTS EN FILE (texte + photos) ────────────────────────────────
+// RDZSync.getStatus() ne renvoie qu'un compteur global — insuffisant pour savoir CE QUI
+// reste bloqué (ex. un module dont une écriture échoue en boucle, bloquant tout ce qui
+// est derrière dans la file). On relit directement les files localStorage pour afficher
+// un détail par module/table, avec le nombre de tentatives et la dernière erreur connue
+// si RDZSync l'a consignée (voir rdz-sync-v4.js, fonction flushText/flushPhotos).
+function readQueueRaw(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
+}
+function buildPendingDetail() {
+  const text = readQueueRaw('rdz_sync_queue');
+  const photos = readQueueRaw('rdz_sync_photo_queue');
+  const groups = {};
+  function addTo(list, kind) {
+    list.forEach(it => {
+      const key = (it.module || '?') + ' — ' + it.table + (kind === 'photo' ? ' (photo)' : '');
+      if (!groups[key]) groups[key] = { count: 0, maxTries: 0, lastError: null };
+      groups[key].count++;
+      groups[key].maxTries = Math.max(groups[key].maxTries, it.tries || 0);
+      if (it.lastError) groups[key].lastError = it.lastError;
+    });
+  }
+  addTo(text, 'texte');
+  addTo(photos, 'photo');
+  return groups;
+}
+
 function render() {
   const st = RDZSync.getStatus();
   const anyWarn = RESULT.vehicules.length > 0 || RESULT.materiel.length > 0
@@ -434,6 +472,8 @@ function render() {
 
   // Rapports & photos en attente (RDZSync)
   const logRecent = st.log.slice(0, 5);
+  const pendingDetail = buildPendingDetail();
+  const pendingKeys = Object.keys(pendingDetail);
   html += `<div class="block"><div class="block-hdr"><div class="block-title">📡 Rapports &amp; photos</div>
     <span class="block-status ${(st.textPending || st.photoPending) ? 'st-warn' : 'st-ok'}">${(st.textPending || st.photoPending) ? 'En attente' : 'OK'}</span></div>`;
   html += `<div class="sync-row"><div class="sync-lbl">Données texte en attente de réseau</div>
@@ -441,7 +481,18 @@ function render() {
   html += `<div class="sync-row"><div class="sync-lbl">Photos en attente de WiFi</div>
     <div class="sync-count ${st.photoPending ? 'count-warn' : 'count-ok'}">${st.photoPending}</div>
     ${st.photoPending ? `<button class="btn-sync" onclick="forceSync()">📶 Envoyer maintenant</button>` : ''}</div>`;
-  html += `<div class="sync-note">Les données texte partent automatiquement dès qu'il y a du réseau (4G/5G/WiFi). Les photos attendent le WiFi pour économiser vos données mobiles — vous pouvez forcer l'envoi à tout moment.</div>`;
+  if (pendingKeys.length) {
+    html += `<div class="sync-pending-detail"><div class="sync-pending-detail-lbl">📦 Détail de ce qui reste en attente</div>` +
+      pendingKeys.map(k => {
+        const d = pendingDetail[k];
+        const triesTxt = d.maxTries > 0 ? `<span class="tries">${d.maxTries} échec(s) de tentative</span>` : '';
+        const errTxt = d.lastError ? `<div class="item-meta" style="margin-top:2px;color:#dc2626">${escHtml(d.lastError)}</div>` : '';
+        return `<div class="sync-pending-item"><span>${escHtml(k)}</span><span class="cnt">×${d.count}</span></div>` +
+          (triesTxt || errTxt ? `<div style="padding-left:2px;margin-bottom:4px">${triesTxt}${errTxt}</div>` : '');
+      }).join('') +
+      `</div>`;
+  }
+  html += `<div class="sync-note">Les données texte partent automatiquement dès qu'il y a du réseau (4G/5G/WiFi). Les photos attendent le WiFi pour économiser vos données mobiles — vous pouvez forcer l'envoi à tout moment. Si un élément affiche plusieurs "échecs de tentative" avec un message d'erreur, il ne partira pas tout seul : signalez-le au centraliste/à la direction avec le détail ci-dessus.</div>`;
   if (logRecent.length) {
     html += `<div class="sync-note" style="border-top:1px solid var(--rdz-border)"><b>Dernières remontées :</b><br>` +
       logRecent.map(l => `${l.kind === 'photo' ? '📷' : '📝'} ${escHtml(l.module)} — ${fmtDT(l.ts)}`).join('<br>') + `</div>`;
