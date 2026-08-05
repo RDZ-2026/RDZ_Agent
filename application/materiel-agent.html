@@ -1,4 +1,4 @@
-<!-- RDZ · materiel-agent · v1 · 2026-08-05 -->
+<!-- RDZ · materiel-agent · v2 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -610,8 +610,11 @@ async function doSortie(){
         // Écritures non bloquantes via RDZSync : la sortie de matériel n'a pas de vérification
         // de collision en direct (contrairement aux clés/badges ci-dessous) et doit donc survivre
         // à une absence de réseau plutôt que de bloquer l'agent.
+        // Toujours repartir de la ligne complète en cache (item) pour l'upsert : un payload partiel
+        // (juste id + quantite_dispo) fait échouer l'upsert sur les colonnes NOT NULL de la table
+        // (voir explication détaillée dans confirmReturnGroupe ci-dessous — bug corrigé le 2026-08-05).
         RDZSync.save({module:'materiel-agent', table:'stock_materiel_items', op:'upsert', onConflict:'id',
-          row:{ id:c.id, quantite_dispo:item.quantite_dispo-c.qty }});
+          row:{ ...item, quantite_dispo:item.quantite_dispo-c.qty }});
         RDZSync.save({module:'materiel-agent', table:'stock_attributions', row:{
           id: uid(), agent_id:ag.id, agent_nom:ag.nom,
           materiel_id:c.id, materiel_nom:c.nom, quantite:c.qty, note:note||null, statut:'actif'
@@ -799,6 +802,14 @@ function confirmReturnGroupe(){
   // Aucune de ces écritures ne dépend d'une vérification de collision en direct (à la différence
   // de la remise de clé/badge dans doSortie) : elles passent donc toutes par RDZSync, non bloquant,
   // avec mise à jour optimiste immédiate de l'état local plutôt que d'attendre une relecture réseau.
+  //
+  // IMPORTANT (bug corrigé le 2026-08-05) : un upsert Postgres/PostgREST re-forme la ligne complète
+  // pour la branche INSERT avant même de vérifier s'il y a conflit — les colonnes NOT NULL absentes
+  // du payload sont donc évaluées à NULL et rejettent l'écriture ("violates not-null constraint"),
+  // MÊME quand la ligne visée existe déjà et qu'on ne voulait qu'une mise à jour partielle. RDZSync
+  // n'ayant pas de verbe "update" dédié (voir conventions du projet), on ne doit donc jamais construire
+  // un `row` d'upsert avec seulement l'id + les champs modifiés : il faut toujours repartir de la ligne
+  // complète déjà en cache (chargée via select('*')) et n'y surcharger que les champs qui changent.
   checks.forEach(cb=>{
     if(cb.dataset.kind==='materiel'){
       const attrId=cb.dataset.id, materielId=cb.dataset.mat, qty=parseInt(cb.dataset.qty);
@@ -807,26 +818,27 @@ function confirmReturnGroupe(){
         const item=materielItems.find(m=>m.id===materielId);
         if(item){
           RDZSync.save({module:'materiel-agent', table:'stock_materiel_items', op:'upsert', onConflict:'id',
-            row:{ id:materielId, quantite_dispo:item.quantite_dispo+qty }});
+            row:{ ...item, quantite_dispo:item.quantite_dispo+qty }});
           item.quantite_dispo+=qty;
         } else {
           console.warn('materielItems: introuvable pour', materielId, '— stock non réintégré');
         }
       }
+      const attrRow = encoursData.attrs.find(a=>a.id===attrId);
       RDZSync.save({module:'materiel-agent', table:'stock_attributions', op:'upsert', onConflict:'id',
-        row:{ id:attrId, statut:'rendu', date_retour:new Date().toISOString(), etat_retour:etat }});
+        row:{ ...attrRow, id:attrId, statut:'rendu', date_retour:new Date().toISOString(), etat_retour:etat }});
       if(etat==='hs'){
-        const attr=encoursData.attrs.find(a=>a.id===attrId);
         RDZSync.save({module:'materiel-agent', table:'stock_maintenances', row:{
-          id: uid(), materiel_nom:attr?.materiel_nom||'—', type_probleme:'panne',
+          id: uid(), materiel_nom:attrRow?.materiel_nom||'—', type_probleme:'panne',
           description:'Retourné hors service', agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
         }});
       }
       encoursData.attrs = encoursData.attrs.filter(a=>a.id!==attrId);
     } else {
       const accesId=cb.dataset.id;
+      const accesRow = encoursData.acces.find(a=>a.id===accesId);
       RDZSync.save({module:'materiel-agent', table:'stock_acces', op:'upsert', onConflict:'id',
-        row:{ id:accesId, statut:'rendu', date_retour_reel:new Date().toISOString() }});
+        row:{ ...accesRow, id:accesId, statut:'rendu', date_retour_reel:new Date().toISOString() }});
       encoursData.acces = encoursData.acces.filter(a=>a.id!==accesId);
     }
   });
