@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agendrix · v2 · 2026-08-05 -->
+<!-- RDZ · planning-agendrix · v3 · 2026-08-05 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -61,6 +61,9 @@
     .gantt-row-lbl { width: 130px; flex-shrink: 0; font-size: 11.5px; font-weight: 700; padding-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .gantt-track { flex: 1; position: relative; height: 24px; background: repeating-linear-gradient(to right, var(--rdz-bg) 0, var(--rdz-bg) 1px, transparent 1px, transparent calc(100%/7)); border-radius: 2px; }
     .gantt-bar { position: absolute; top: 0; height: 24px; border-radius: 3px; font-size: 9.5px; color: #fff; font-weight: 700; display: flex; align-items: center; padding: 0 6px; overflow: hidden; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    .poste-group + .poste-group { margin-top: 6px; }
+    .poste-group-title { display: flex; align-items: center; gap: 6px; margin-left: 130px; padding: 3px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--rdz-gray); background: var(--rdz-bg); border-radius: 2px; margin-bottom: 2px; }
+    .poste-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
     /* ── TABLEAU JOURNALIER PDSA ── */
     .day-block { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
@@ -432,28 +435,44 @@ function renderGantt(){
   wrap.innerHTML = sites.map((site) => {
     const siteColor = hashColor(site, SITE_COLORS);
     const siteShifts = viewShifts.filter(s=>s.site===site);
-    const agents = [...new Set(siteShifts.map(s=>s.agent))].sort((a,b)=>a.localeCompare(b,'fr'));
+    const agentsAll = [...new Set(siteShifts.map(s=>s.agent))];
 
-    const rows = agents.map(agent => {
-      const bars = siteShifts.filter(s=>s.agent===agent).map(s => {
-        const startH = Math.max(0, (s.debut - rangeStart) / 3600000);
-        const endH = Math.min(totalHours, (s.fin - rangeStart) / 3600000);
-        const leftPct = (startH/totalHours)*100;
-        const widthPct = Math.max(0.5, ((endH-startH)/totalHours)*100);
-        const color = hashColor(agent, AGENT_COLORS);
-        return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)} · ${fmtTime(s.debut)}–${fmtTime(s.fin)}</div>`;
+    // Regroupement par poste à l'intérieur du site : toutes les barres d'un même poste
+    // partagent la même couleur (au lieu d'une couleur par agent), pour repérer d'un
+    // coup d'œil la couverture par poste. Postes triés alphabétiquement, "Sans poste"
+    // regroupe les créneaux sans intitulé de poste renseigné.
+    const postes = [...new Set(siteShifts.map(s => s.poste || 'Sans poste'))].sort((a,b)=>a.localeCompare(b,'fr'));
+
+    const posteBlocks = postes.map(poste => {
+      const posteColor = hashColor(poste, AGENT_COLORS);
+      const posteShifts = siteShifts.filter(s => (s.poste || 'Sans poste') === poste);
+      const agents = [...new Set(posteShifts.map(s=>s.agent))].sort((a,b)=>a.localeCompare(b,'fr'));
+
+      const rows = agents.map(agent => {
+        const bars = posteShifts.filter(s=>s.agent===agent).map(s => {
+          const startH = Math.max(0, (s.debut - rangeStart) / 3600000);
+          const endH = Math.min(totalHours, (s.fin - rangeStart) / 3600000);
+          const leftPct = (startH/totalHours)*100;
+          const widthPct = Math.max(0.5, ((endH-startH)/totalHours)*100);
+          return `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${posteColor}" title="${escHtml(agent)} — ${escHtml(s.poste)} — ${fmtTime(s.debut)} → ${fmtTime(s.fin)}">${escHtml(s.poste)} · ${fmtTime(s.debut)}–${fmtTime(s.fin)}</div>`;
+        }).join('');
+        return `<div class="gantt-row">
+          <div class="gantt-row-lbl">${escHtml(agent)}</div>
+          <div class="gantt-track" style="background:repeating-linear-gradient(to right, var(--rdz-bg) 0, var(--rdz-bg) 1px, transparent 1px, transparent calc(100%/${colDivisions}))">${bars}</div>
+        </div>`;
       }).join('');
-      return `<div class="gantt-row">
-        <div class="gantt-row-lbl">${escHtml(agent)}</div>
-        <div class="gantt-track" style="background:repeating-linear-gradient(to right, var(--rdz-bg) 0, var(--rdz-bg) 1px, transparent 1px, transparent calc(100%/${colDivisions}))">${bars}</div>
+
+      return `<div class="poste-group">
+        <div class="poste-group-title"><span class="poste-dot" style="background:${posteColor}"></span>${escHtml(poste)}</div>
+        ${rows}
       </div>`;
     }).join('');
 
     return `<div class="site-block">
-      <div class="site-block-title" style="border-left:5px solid ${siteColor}">📍 ${escHtml(site)} — ${agents.length} agent(s), ${siteShifts.length} service(s)</div>
+      <div class="site-block-title" style="border-left:5px solid ${siteColor}">📍 ${escHtml(site)} — ${agentsAll.length} agent(s), ${siteShifts.length} service(s)</div>
       <div class="gantt-scroll"><div class="gantt-inner">
         <div class="gantt-days">${dayLabels.map(l=>`<div class="gantt-day-lbl">${l}</div>`).join('')}</div>
-        ${rows}
+        ${posteBlocks}
       </div></div>
     </div>`;
   }).join('');
@@ -544,7 +563,7 @@ function onPdsaInput(el){
   savePdsaField(shift, field, el.value);
 }
 
-document.getElementById('footer-date').textContent = 'Version 2.0 — ' + new Date().getFullYear();
+document.getElementById('footer-date').textContent = 'Version 3.0 — ' + new Date().getFullYear();
 loadSavedPlanning();
 </script>
 
