@@ -1,4 +1,4 @@
-<!-- RDZ · prise-de-poste · v1 · 2026-08-05 -->
+<!-- RDZ · prise-de-poste · v2 · 2026-08-06 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -478,9 +478,15 @@ function validateSite(siteId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
 
   const nowIso = new Date().toISOString();
+  // Pas de row.id ici (bug corrigé le 2026-08-06, piège technique n°10 des instructions du
+  // projet) : uid() génère une chaîne type "msh62oxochqbbf" (horodatage + aléatoire en base36),
+  // pas un UUID valide, et la colonne id de consignes_lectures est de type uuid côté Postgres
+  // ("invalid input syntax for type uuid"). Un id généré côté agent n'est utile que si des
+  // photos accompagnent la saisie (piège n°6) ou si une écriture suivante doit retrouver cette
+  // ligne par cet id — aucun des deux cas ici (pas de photos, localValidations est indexé par
+  // site_id, pas par l'id de la ligne) : on laisse simplement Postgres générer l'id.
   RDZSync.save({
     module: 'prise-de-poste', table: 'consignes_lectures', row: {
-      id: uid(),
       agent_id: AGENT_ID,
       agent_nom: AGENT_NOM,
       site_id: siteId,
