@@ -1,4 +1,4 @@
-<!-- RDZ · materiel-agent · v2 · 2026-08-05 -->
+<!-- RDZ · materiel-agent · v3 · 2026-08-06 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -615,8 +615,10 @@ async function doSortie(){
         // (voir explication détaillée dans confirmReturnGroupe ci-dessous — bug corrigé le 2026-08-05).
         RDZSync.save({module:'materiel-agent', table:'stock_materiel_items', op:'upsert', onConflict:'id',
           row:{ ...item, quantite_dispo:item.quantite_dispo-c.qty }});
+        // Pas de row.id ici (piège technique n°10) : uid() n'est pas un UUID valide et cette
+        // colonne est de type uuid côté Postgres — on laisse la base générer l'id elle-même.
         RDZSync.save({module:'materiel-agent', table:'stock_attributions', row:{
-          id: uid(), agent_id:ag.id, agent_nom:ag.nom,
+          agent_id:ag.id, agent_nom:ag.nom,
           materiel_id:c.id, materiel_nom:c.nom, quantite:c.qty, note:note||null, statut:'actif'
         }});
         // Pas de stock_log : la table stock_attributions sert déjà de trace complète
@@ -687,8 +689,9 @@ function doMaint(){
   const btn=document.getElementById('btn-maint');
   btn.disabled=true;btn.textContent='Envoi…';
   const ag=currentAgent();
+  // Pas de row.id ici (piège technique n°10) : uid() n'est pas un UUID valide.
   RDZSync.save({module:'materiel-agent', table:'stock_maintenances', row:{
-    id: uid(), materiel_nom:mat, type_probleme:type, description:desc,
+    materiel_nom:mat, type_probleme:type, description:desc,
     agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
   }});
   toast('🔧 Problème signalé');
@@ -828,8 +831,9 @@ function confirmReturnGroupe(){
       RDZSync.save({module:'materiel-agent', table:'stock_attributions', op:'upsert', onConflict:'id',
         row:{ ...attrRow, id:attrId, statut:'rendu', date_retour:new Date().toISOString(), etat_retour:etat }});
       if(etat==='hs'){
+        // Pas de row.id ici (piège technique n°10) : uid() n'est pas un UUID valide.
         RDZSync.save({module:'materiel-agent', table:'stock_maintenances', row:{
-          id: uid(), materiel_nom:attrRow?.materiel_nom||'—', type_probleme:'panne',
+          materiel_nom:attrRow?.materiel_nom||'—', type_probleme:'panne',
           description:'Retourné hors service', agent_id:ag.id, agent_nom:ag.nom, statut:'ouvert'
         }});
       }
