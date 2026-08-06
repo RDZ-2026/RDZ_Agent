@@ -1,4 +1,4 @@
-<!-- RDZ · bibliotheque-agent · v2 · 2026-08-02 -->
+<!-- RDZ · bibliotheque-agent · v3 · 2026-08-06 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -33,7 +33,16 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
 .fl{font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;}
 .fi{width:100%;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:#1a1a1a;}
 .fi:focus{outline:none;border-color:var(--red);}
+.fi-ta{min-height:70px;resize:vertical;font-family:inherit;}
 .readonly-val{font-size:13px;color:var(--gray);padding:9px 12px;background:#fff;border-radius:8px;border:1px solid var(--border);}
+
+.photo-btns{display:flex;gap:10px;margin-bottom:8px;}
+.photo-btn{flex:1;background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:#1a1a1a;cursor:pointer;text-align:center;}
+.photo-btn:active{background:var(--bg);}
+.photo-preview{margin-top:6px;}
+.photo-thumb-wrap{position:relative;display:inline-block;}
+.photo-thumb{max-width:140px;max-height:140px;border-radius:8px;border:1px solid var(--border);display:block;}
+.photo-thumb-del{position:absolute;top:-8px;right:-8px;background:#991b1b;color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;line-height:1;}
 
 .counter-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
 .counter-lbl{font-size:13px;font-weight:700;margin-bottom:12px;text-align:center;}
@@ -109,6 +118,21 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
     </div>
     <div class="fg"><label class="fl">Agent</label><div class="readonly-val" id="f-agent-c">—</div></div>
     <div class="fg"><label class="fl">Poste de garde</label><input class="fi" id="f-poste-c" value="IHEID - MDP"></div>
+
+    <div class="fg">
+      <label class="fl">Notes (facultatif)</label>
+      <textarea class="fi fi-ta" id="f-note-c" placeholder="Précision à ajouter au rapport…"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">Photo (facultatif)</label>
+      <div class="photo-btns">
+        <button type="button" class="photo-btn" onclick="document.getElementById('photo-camera-c').click()">📷 Caméra</button>
+        <button type="button" class="photo-btn" onclick="document.getElementById('photo-gallery-c').click()">🖼 Galerie</button>
+      </div>
+      <input type="file" id="photo-camera-c" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(this,'c')">
+      <input type="file" id="photo-gallery-c" accept="image/*" style="display:none" onchange="onPhotoSelected(this,'c')">
+      <div class="photo-preview" id="photo-preview-c"></div>
+    </div>
 
     <button class="btn-submit" id="btn-submit-c" onclick="submitComptage()">✅ Enregistrer le rapport</button>
   </div>
@@ -300,10 +324,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
           }
         }
         i++; next();
-      }).catch(function () {
+      }).catch(function (err) {
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
         var cur = readLS(Q_TEXT);
         var idx = cur.findIndex(function (x) { return x.id === it.id; });
-        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
         _flushingText = false; // réseau probablement absent : on retentera au prochain online/ouverture
       });
     }
@@ -340,10 +365,11 @@ body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;}
           pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
           i++; next();
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.warn('RDZSync: échec envoi photo', p.module, p.table, err && (err.message || err));
           var cur = readLS(Q_PHOTO);
           var idx = cur.findIndex(function (x) { return x.id === p.id; });
-          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
           _flushingPhotos = false;
         });
     }
@@ -374,10 +400,23 @@ RDZSync.init({ client: sb });
 
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
 
+// Générateur d'UUID v4 valide (piège technique n°10 des instructions du projet) : à utiliser
+// UNIQUEMENT quand un id connu côté agent est nécessaire pour rattacher une photo après coup
+// (piège n°6) — ne jamais utiliser le uid() interne de RDZSync (non-UUID) pour ce cas, les
+// colonnes id des tables du projet étant de type uuid côté Postgres.
+function uuidv4(){
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0'));
+  return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+}
+
 let ambiances = [], origines = [];
 let counters = { affluence:0, rappels:0, evictions:0 };
 let filtrageCounters = {}; // { origineLabel: n }
 let filtrageExtra = { rappels:0, evictions:0 };
+let photoDataC = null, photoDataF = null;
 
 function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
@@ -390,6 +429,31 @@ function toast(msg, err){
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function nowTimeStr(){ return new Date().toTimeString().slice(0,8); }
+
+// ═══ PHOTO (caméra / galerie — voir piège technique n°3) ═══
+function onPhotoSelected(input, ctx){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    if(ctx==='c'){ photoDataC = reader.result; } else { photoDataF = reader.result; }
+    renderPhotoPreview(ctx);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function renderPhotoPreview(ctx){
+  const data = ctx==='c' ? photoDataC : photoDataF;
+  const el = document.getElementById('photo-preview-'+ctx);
+  if(!el) return;
+  el.innerHTML = data
+    ? `<div class="photo-thumb-wrap"><img class="photo-thumb" src="${data}"><button type="button" class="photo-thumb-del" onclick="clearPhoto('${ctx}')">✕</button></div>`
+    : '';
+}
+function clearPhoto(ctx){
+  if(ctx==='c') photoDataC = null; else photoDataF = null;
+  renderPhotoPreview(ctx);
+}
 
 async function loadConfig(){
   try{
@@ -409,6 +473,8 @@ function openComptage(){
   ['affluence','rappels','evictions'].forEach(k=>document.getElementById('c-'+k).value=0);
   document.getElementById('f-agent-c').textContent = AGENT_NOM;
   document.getElementById('f-ambiance').value='';
+  document.getElementById('f-note-c').value='';
+  photoDataC = null; renderPhotoPreview('c');
   showScreen('s-comptage');
 }
 function incr(key, delta){
@@ -422,17 +488,23 @@ function setVal(key, val){
 async function submitComptage(){
   const ambiance = document.getElementById('f-ambiance').value;
   const poste = document.getElementById('f-poste-c').value.trim() || 'IHEID - MDP';
+  const note = document.getElementById('f-note-c').value.trim();
   if(!ambiance){ toast('⚠️ Sélectionnez une ambiance', true); return; }
   const btn = document.getElementById('btn-submit-c');
   btn.disabled = true; btn.textContent = 'Envoi…';
   try{
     RDZSync.save({
-      module: 'bibliotheque', table: 'bibliotheque_comptages', row: {
-        agent_nom: AGENT_NOM, poste_garde: poste,
+      module: 'bibliotheque', table: 'bibliotheque_comptages',
+      row: {
+        id: uuidv4(), agent_nom: AGENT_NOM, poste_garde: poste,
         date_rapport: todayStr(), heure_rapport: nowTimeStr(),
         affluence: counters.affluence, ambiance,
-        rappels_reglement: counters.rappels, evictions: counters.evictions
-      }
+        rappels_reglement: counters.rappels, evictions: counters.evictions,
+        note: note || null
+      },
+      bucket: photoDataC ? 'bibliotheque-photos' : null,
+      photoField: 'photo_url',
+      photos: photoDataC ? [{ name: 'comptage.jpg', dataUrl: photoDataC }] : []
     });
     toast('✅ Rapport pris en compte' + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
     showScreen('s-home');
@@ -444,6 +516,7 @@ async function submitComptage(){
 function openFiltrage(){
   filtrageCounters = {}; filtrageExtra = { rappels:0, evictions:0 };
   origines.forEach(o => filtrageCounters[o.label] = 0);
+  photoDataF = null;
   renderFiltrage();
   showScreen('s-filtrage');
 }
@@ -478,9 +551,24 @@ function renderFiltrage(){
     </div>
     <div class="fg"><label class="fl">Agent</label><div class="readonly-val">${escHtml(AGENT_NOM)}</div></div>
     <div class="fg"><label class="fl">Poste de garde</label><input class="fi" id="f-poste-f" value="IHEID - MDP"></div>
+    <div class="fg">
+      <label class="fl">Notes (facultatif)</label>
+      <textarea class="fi fi-ta" id="f-note-f" placeholder="Précision à ajouter au rapport…"></textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">Photo (facultatif)</label>
+      <div class="photo-btns">
+        <button type="button" class="photo-btn" onclick="document.getElementById('photo-camera-f').click()">📷 Caméra</button>
+        <button type="button" class="photo-btn" onclick="document.getElementById('photo-gallery-f').click()">🖼 Galerie</button>
+      </div>
+      <input type="file" id="photo-camera-f" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(this,'f')">
+      <input type="file" id="photo-gallery-f" accept="image/*" style="display:none" onchange="onPhotoSelected(this,'f')">
+      <div class="photo-preview" id="photo-preview-f"></div>
+    </div>
     <button class="btn-submit" id="btn-submit-f" onclick="submitFiltrage()">✅ Enregistrer le rapport</button>
   `;
   el.innerHTML = html;
+  renderPhotoPreview('f');
 }
 function incrF(label, delta){
   filtrageCounters[label] = Math.max(0, (filtrageCounters[label]||0)+delta);
@@ -500,16 +588,22 @@ function setValFExtra(key, val){
 }
 async function submitFiltrage(){
   const poste = document.getElementById('f-poste-f').value.trim() || 'IHEID - MDP';
+  const note = document.getElementById('f-note-f').value.trim();
   const btn = document.getElementById('btn-submit-f');
   btn.disabled = true; btn.textContent = 'Envoi…';
   try{
     RDZSync.save({
-      module: 'bibliotheque', table: 'bibliotheque_filtrages', row: {
-        agent_nom: AGENT_NOM, poste_garde: poste,
+      module: 'bibliotheque', table: 'bibliotheque_filtrages',
+      row: {
+        id: uuidv4(), agent_nom: AGENT_NOM, poste_garde: poste,
         date_rapport: todayStr(), heure_rapport: nowTimeStr(),
         entrees: filtrageCounters,
-        rappels_reglement: filtrageExtra.rappels, evictions_refus: filtrageExtra.evictions
-      }
+        rappels_reglement: filtrageExtra.rappels, evictions_refus: filtrageExtra.evictions,
+        note: note || null
+      },
+      bucket: photoDataF ? 'bibliotheque-photos' : null,
+      photoField: 'photo_url',
+      photos: photoDataF ? [{ name: 'filtrage.jpg', dataUrl: photoDataF }] : []
     });
     toast('✅ Rapport pris en compte' + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
     showScreen('s-home');
