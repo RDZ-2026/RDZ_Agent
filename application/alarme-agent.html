@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-agent · v1 · 2026-08-07 -->
+<!-- RDZ · alarme-agent · v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -65,6 +65,15 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
 .ck .lbl{font-size:14.5px;line-height:1.4;padding-top:2px}
 .ck.done .lbl{color:#777;text-decoration:line-through}
 .ck .tm{margin-left:auto;font-size:11.5px;color:#aaa;white-space:nowrap;padding-top:4px}
+.ck-h{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 13px;margin-bottom:9px}
+.ck-h.set{border-color:var(--ok);background:#f4faf5}
+.ck-h .lbl{font-size:14.5px;font-weight:bold;margin-bottom:8px}
+.ck-h .hrow{display:flex;gap:8px}
+.ck-h .hrow input{flex:1;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:var(--radius-ui)}
+.ck-h .hrow button{background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:0 16px;font-weight:bold;cursor:pointer}
+.ck-n{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 13px;margin-bottom:9px}
+.ck-n .lbl{font-size:14.5px;font-weight:bold;margin-bottom:8px}
+.ck-n textarea{width:100%;min-height:70px;font-family:var(--font);font-size:15px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px;resize:vertical}
 
 .res-btns{display:flex;gap:8px;margin-bottom:6px}
 .res-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px 6px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
@@ -109,7 +118,7 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
     <!-- Écran 1 : code transmetteur -->
     <section id="screen-code">
       <div class="screen-title">🚨 Alarme reçue</div>
-      <div class="code-intro">Entrez le <b>numéro de transmetteur</b> communiqué par Sertas. Il charge le site, l'emplacement des clés et la marche à suivre.</div>
+      <div class="code-intro">Entrez le <b>numéro de transmetteur</b> communiqué par CERTAS. Il charge le site, l'emplacement des clés et la marche à suivre.</div>
       <div id="code-err"></div>
       <div class="code-box">
         <input type="text" id="f-code" inputmode="numeric" autocomplete="off" placeholder="N° transmetteur">
@@ -141,15 +150,6 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
       </div>
 
       <div id="op-err"></div>
-
-      <div class="section-h">Horodatage</div>
-      <div class="timebtns">
-        <button id="bt-arrivee" onclick="stampArrivee()">📍 Je suis arrivé</button>
-      </div>
-      <div class="row2">
-        <div class="field"><label>Heure d'appel</label><input type="time" id="f-appel"></div>
-        <div class="field"><label>Heure d'arrivée</label><input type="time" id="f-arrivee"></div>
-      </div>
 
       <div class="section-h">Marche à suivre</div>
       <div id="checklist"><div class="state-msg">Chargement…</div></div>
@@ -543,7 +543,7 @@ async function loadChecklist(code){
   try{
     const { data } = await sb.from('alarme_checklist_items').select('*')
       .eq('transmetteur_code',code).eq('actif',true).order('ordre');
-    checklist = (data||[]).map(i=>({ libelle:i.libelle, fait:false, heure:null }));
+    checklist = (data||[]).map(i=>({ libelle:i.libelle, type:i.type||'check', fait:false, heure:null, valeur:'' }));
   }catch(e){/* checklist facultative */}
 }
 
@@ -556,9 +556,6 @@ function openOp(){
   document.getElementById('m-agent').textContent = AGENT_NOM;
   document.getElementById('b-keys').textContent = trans.emplacement_cles || 'Non renseigné';
   document.getElementById('b-cons').textContent = trans.consignes || 'Non renseigné';
-  document.getElementById('f-appel').value = nowHM();
-  document.getElementById('f-arrivee').value = '';
-  document.getElementById('bt-arrivee').classList.remove('set');
   document.getElementById('f-situation').value='';
   document.getElementById('f-actions').value='';
   document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel'));
@@ -568,19 +565,39 @@ function openOp(){
 }
 function backToCode(){ show('screen-code'); }
 
-function stampArrivee(){ document.getElementById('f-arrivee').value = nowHM(); document.getElementById('bt-arrivee').classList.add('set'); }
-
 function renderChecklist(){
   const box = document.getElementById('checklist');
   if(!checklist.length){ box.innerHTML='<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
-  box.innerHTML = checklist.map((c,i)=>`
-    <div class="ck ${c.fait?'done':''}" onclick="toggleCk(${i})">
+  box.innerHTML = checklist.map((c,i)=>{
+    if(c.type==='heure'){
+      return `<div class="ck-h ${c.valeur?'set':''}">
+        <div class="lbl">⏱ ${esc(c.libelle)}</div>
+        <div class="hrow">
+          <input type="time" value="${esc(c.valeur||'')}" onchange="setHeure(${i},this.value)">
+          <button type="button" onclick="setHeureNow(${i})">Maintenant</button>
+        </div>
+      </div>`;
+    }
+    if(c.type==='note'){
+      return `<div class="ck-n">
+        <div class="lbl">📝 ${esc(c.libelle)}</div>
+        <div class="dictable">
+          <textarea id="note-${i}" placeholder="Écrire ou dicter…" oninput="checklist[${i}].valeur=this.value">${esc(c.valeur||'')}</textarea>
+          <button type="button" class="mic" data-target="note-${i}">🎤 Dicter</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="ck ${c.fait?'done':''}" onclick="toggleCk(${i})">
       <div class="bx">${c.fait?'✓':''}</div>
       <div class="lbl">${esc(c.libelle)}</div>
       ${c.heure?`<div class="tm">${esc(c.heure)}</div>`:''}
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  bindMics();
 }
 function toggleCk(i){ checklist[i].fait=!checklist[i].fait; checklist[i].heure = checklist[i].fait?nowHM():null; renderChecklist(); }
+function setHeure(i,val){ checklist[i].valeur=val; checklist[i].fait=!!val; renderChecklist(); }
+function setHeureNow(i){ checklist[i].valeur=nowHM(); checklist[i].fait=true; renderChecklist(); }
 
 function pickRes(btn){ resultat = btn.dataset.res;
   document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel')); btn.classList.add('sel'); }
@@ -643,22 +660,26 @@ function closeOp(){
   const err=document.getElementById('op-err'); err.innerHTML='';
   const situation=document.getElementById('f-situation').value.trim();
   const actions=document.getElementById('f-actions').value.trim();
-  const nonCoches = checklist.filter(c=>!c.fait).length;
+  // Étapes "à faire" = vérifications non cochées + horodatages non renseignés (les notes restent libres).
+  const aFaire = checklist.filter(c=>(c.type==='check'||c.type==='heure') && !c.fait).length;
 
-  // Validation explicite : avertir si étapes non cochées ou résultat non choisi, mais laisser confirmer.
-  if(!closeOp._confirmed && (nonCoches>0 || !resultat)){
+  // Validation explicite : avertir si étapes manquantes ou résultat non choisi, mais laisser confirmer.
+  if(!closeOp._confirmed && (aFaire>0 || !resultat)){
     let msg='<div class="warn-box"><b>Avant de clôturer :</b><ul style="margin:6px 0 0 18px">';
-    if(nonCoches>0) msg+=`<li>${nonCoches} étape(s) de la marche à suivre non cochée(s)</li>`;
+    if(aFaire>0) msg+=`<li>${aFaire} étape(s) de la marche à suivre non complétée(s)</li>`;
     if(!resultat) msg+='<li>Aucun résultat sélectionné (RAS / Levée de doute / Intervention)</li>';
     msg+='</ul><div style="margin-top:8px">Ré-appuyez sur « Clôturer » pour confirmer quand même.</div></div>';
     err.innerHTML=msg; window.scrollTo(0,document.body.scrollHeight); closeOp._confirmed=true; return;
   }
 
+  // Horodatages : on récupère les heures saisies dans la checklist pour les colonnes dédiées
+  // (première "heure" = réception, dernière = arrivée), le détail complet restant dans le jsonb.
+  const heures = checklist.filter(c=>c.type==='heure' && c.valeur).map(c=>c.valeur);
   const row={
     id:opId, transmetteur_code:trans.code, site_id:trans.site_id||null, site_nom:trans.site_nom||null,
     zone:trans.zone||null, agent_nom:AGENT_NOM,
-    heure_appel:document.getElementById('f-appel').value||null,
-    heure_arrivee:document.getElementById('f-arrivee').value||null,
+    heure_appel: heures[0] || null,
+    heure_arrivee: heures.length>1 ? heures[heures.length-1] : null,
     heure_fin:nowHM(),
     resultat:resultat||null,
     checklist:JSON.stringify(checklist),
