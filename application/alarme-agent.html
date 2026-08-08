@@ -1,0 +1,686 @@
+<!-- RDZ · alarme-agent · v1 · 2026-08-07 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Intervention alarme</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;
+  --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 14px;color:var(--ink)}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:10px}
+
+.code-intro{color:#555;font-size:14px;margin-bottom:14px;line-height:1.5}
+.code-box{display:flex;gap:10px;margin-bottom:12px}
+#f-code{flex:1;font-size:22px;font-weight:bold;letter-spacing:1px;text-align:center;padding:14px;border:2px solid var(--line);border-radius:var(--radius-ui)}
+.btn-go{background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:0 20px;font-size:16px;font-weight:bold;cursor:pointer}
+.or{font-size:12.5px;color:#999;text-align:center;margin:10px 0}
+select#f-list{width:100%;padding:12px;font-size:15px;border:1px solid var(--line);border-radius:var(--radius-ui);background:#fff}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
+.field .hint{font-size:12px;color:#999;font-weight:normal;text-transform:none;letter-spacing:0;margin-top:2px}
+input[type=text],input[type=time],textarea{width:100%;font-family:var(--font);font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
+textarea{min-height:90px;resize:vertical;line-height:1.45}
+.row2{display:flex;gap:10px}.row2>*{flex:1}
+
+.meta-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 14px;margin-bottom:14px}
+.meta-card .mrow{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0}
+.meta-card .mrow .k{color:#888}.meta-card .mrow .v{font-weight:bold;text-align:right}
+
+.brief{background:#fff8e6;border:1px solid #ecd9a0;border-radius:var(--radius-section);padding:12px 14px;margin-bottom:16px}
+.brief .bt{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--warn);font-weight:bold;margin-bottom:4px}
+.brief .keys{font-size:16px;font-weight:bold;color:var(--ink);margin-bottom:8px}
+.brief .cons{font-size:13.5px;color:#444;line-height:1.5;white-space:pre-wrap}
+
+.section-h{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin:18px 0 8px}
+
+.timebtns{display:flex;gap:10px;margin-bottom:14px}
+.timebtns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px 8px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.timebtns button.set{background:#eef6ef;border-color:var(--ok);color:var(--ok)}
+
+.ck{display:flex;align-items:flex-start;gap:12px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:13px;margin-bottom:9px;cursor:pointer}
+.ck .bx{width:26px;height:26px;border:2px solid var(--line);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff}
+.ck.done .bx{background:var(--ok);border-color:var(--ok)}
+.ck .lbl{font-size:14.5px;line-height:1.4;padding-top:2px}
+.ck.done .lbl{color:#777;text-decoration:line-through}
+.ck .tm{margin-left:auto;font-size:11.5px;color:#aaa;white-space:nowrap;padding-top:4px}
+
+.res-btns{display:flex;gap:8px;margin-bottom:6px}
+.res-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px 6px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.res-btns button.sel{background:var(--red);border-color:var(--red);color:#fff}
+
+.dictable{position:relative}
+.mic{position:absolute;right:6px;bottom:6px;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:7px 10px;font-size:13px;font-weight:bold;cursor:pointer}
+.mic.rec{background:#c0392b;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.photo-btns{display:flex;gap:10px;margin-bottom:10px}
+.photo-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px;font-size:14px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.photo-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:10px;margin-bottom:10px;display:flex;gap:10px}
+.photo-item img{width:74px;height:74px;object-fit:cover;border-radius:var(--radius-ui);flex-shrink:0;border:1px solid var(--line-soft)}
+.photo-item .pmeta{flex:1;display:flex;flex-direction:column;gap:6px}
+.photo-item .rm{background:none;border:none;color:var(--danger);font-size:12.5px;font-weight:bold;cursor:pointer;align-self:flex-start;padding:0}
+
+.save-bar{position:sticky;bottom:0;background:var(--bg-soft);padding:14px 0 4px;margin-top:8px}
+.btn-primary{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:16px;font-size:16px;font-weight:bold;cursor:pointer}
+.btn-primary:active{background:var(--red-dark)}
+.confirm{text-align:center;padding:40px 20px}
+.confirm .big{font-size:52px}.confirm h2{font-size:19px;margin:14px 0 6px}
+.confirm p{color:#666;font-size:14px;margin-bottom:24px}
+.confirm .ci{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-ui);color:var(--red);font-weight:bold;padding:14px;width:100%;cursor:pointer;font-size:15px;margin-bottom:10px;display:block;text-decoration:none}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.warn-box{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:20px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub">Intervention alarme</div>
+      </div>
+      <a class="home" href="journal-de-bord.html">← Journal</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Écran 1 : code transmetteur -->
+    <section id="screen-code">
+      <div class="screen-title">🚨 Alarme reçue</div>
+      <div class="code-intro">Entrez le <b>numéro de transmetteur</b> communiqué par Sertas. Il charge le site, l'emplacement des clés et la marche à suivre.</div>
+      <div id="code-err"></div>
+      <div class="code-box">
+        <input type="text" id="f-code" inputmode="numeric" autocomplete="off" placeholder="N° transmetteur">
+        <button class="btn-go" onclick="validateCode()">OK</button>
+      </div>
+      <div class="or">— ou —</div>
+      <select id="f-list" onchange="if(this.value){document.getElementById('f-code').value=this.value;validateCode();}">
+        <option value="">Choisir dans la liste…</option>
+      </select>
+    </section>
+
+    <!-- Écran 2 : intervention -->
+    <section id="screen-op" class="hidden">
+      <button class="back-btn" onclick="backToCode()">← Autre transmetteur</button>
+      <div class="screen-title">Intervention</div>
+
+      <div class="meta-card">
+        <div class="mrow"><span class="k">Transmetteur</span><span class="v" id="m-code">—</span></div>
+        <div class="mrow"><span class="k">Site</span><span class="v" id="m-site">—</span></div>
+        <div class="mrow"><span class="k">Zone</span><span class="v" id="m-zone">—</span></div>
+        <div class="mrow"><span class="k">Agent</span><span class="v" id="m-agent">—</span></div>
+      </div>
+
+      <div class="brief">
+        <div class="bt">🔑 Clés</div>
+        <div class="keys" id="b-keys">—</div>
+        <div class="bt">Consignes d'accès</div>
+        <div class="cons" id="b-cons">—</div>
+      </div>
+
+      <div id="op-err"></div>
+
+      <div class="section-h">Horodatage</div>
+      <div class="timebtns">
+        <button id="bt-arrivee" onclick="stampArrivee()">📍 Je suis arrivé</button>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Heure d'appel</label><input type="time" id="f-appel"></div>
+        <div class="field"><label>Heure d'arrivée</label><input type="time" id="f-arrivee"></div>
+      </div>
+
+      <div class="section-h">Marche à suivre</div>
+      <div id="checklist"><div class="state-msg">Chargement…</div></div>
+
+      <div class="section-h">Résultat de l'intervention</div>
+      <div class="res-btns" id="res-btns">
+        <button data-res="RAS" onclick="pickRes(this)">✅ RAS</button>
+        <button data-res="Levée de doute" onclick="pickRes(this)">🔎 Levée de doute</button>
+        <button data-res="Intervention" onclick="pickRes(this)">⚠️ Intervention</button>
+      </div>
+
+      <div class="field" style="margin-top:14px">
+        <label>Que se passe-t-il&nbsp;? <span class="hint">Ce que vous constatez sur place.</span></label>
+        <div class="dictable">
+          <textarea id="f-situation" placeholder="Décrivez ou dictez…"></textarea>
+          <button type="button" class="mic" data-target="f-situation">🎤 Dicter</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Qu'avez-vous fait&nbsp;? <span class="hint">Vos actions, la remise en état, la levée de doute.</span></label>
+        <div class="dictable">
+          <textarea id="f-actions" placeholder="Décrivez ou dictez…"></textarea>
+          <button type="button" class="mic" data-target="f-actions">🎤 Dicter</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Photos</label>
+        <div class="photo-btns">
+          <button type="button" onclick="document.getElementById('photo-camera').click()">📷 Caméra</button>
+          <button type="button" onclick="document.getElementById('photo-gallery').click()">🖼 Galerie</button>
+        </div>
+        <input type="file" id="photo-camera" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="photo-gallery" accept="image/*" style="display:none">
+        <div id="photo-list"></div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-primary" onclick="closeOp()">🏁 Clôturer l'intervention</button>
+      </div>
+    </section>
+
+    <!-- Confirmation -->
+    <section id="screen-done" class="hidden">
+      <div class="confirm">
+        <div class="big">✅</div>
+        <h2>Intervention clôturée</h2>
+        <p id="done-sub">Le rapport est dans le journal de bord.</p>
+        <a class="ci" href="alarme-agent.html">🚨 Nouvelle alarme</a>
+        <a class="ci" href="journal-de-bord.html">↩ Retour au journal</a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================================
+   RDZ · rdz-sync · v4 · file d'attente hors-ligne PARTAGÉE entre tous les modules
+   ----------------------------------------------------------------------------
+   v4 : suppression de .select() après écriture. v3 dépendait du retour serveur
+   pour connaître l'id de la ligne créée, ce qui exige une permission de LECTURE
+   en plus de l'ÉCRITURE — sur une table plus ancienne où le SELECT anonyme ne
+   serait pas aussi large que l'INSERT, .select() échoue silencieusement et la
+   ligne reste bloquée en file indéfiniment (texte ET photos ne remontent jamais,
+   sans erreur visible). v4 utilise à la place l'id fourni côté agent dans
+   row.id (déjà généré via uid() par tous les modules), donc ne dépend plus que
+   du droit d'écriture. **Obligatoire : toujours fournir un `id` dans `row`
+   lors de l'appel à save() si des photos accompagnent la saisie.**
+   ----------------------------------------------------------------------------
+   v3 : chaque photo peut désormais cibler SON PROPRE champ de destination
+   (photos:[{name,dataUrl,field}]) — nécessaire pour les modules à plusieurs
+   photos visant des colonnes différentes (ex. photo_vehicule_url,
+   photo_denonciation_url... dans ParkGuard). `photoField` au niveau de save()
+   reste utilisable comme valeur par défaut si une photo ne précise pas `field`.
+   ----------------------------------------------------------------------------
+   v2 : séparation TEXTE / PHOTOS.
+     - Le TEXTE (la ligne de données) part automatiquement dès qu'il y a
+       n'importe quel réseau (4G/5G/WiFi) — c'est la remontée à la direction,
+       elle doit arriver vite et elle coûte quasi rien en data.
+     - Les PHOTOS sont mises de côté et ne partent PAS automatiquement en
+       réseau mobile : elles attendent soit le WiFi (best-effort, selon
+       navigateur), soit un appui manuel de l'agent sur "Envoyer les photos".
+       Tant qu'elles n'ont pas été envoyées, l'agent peut voir "n photo(s)
+       en attente de WiFi" sans que ça bloque quoi que ce soit d'autre.
+   Deux files persistées dans localStorage, partagées entre TOUS les modules :
+     rdz_sync_queue        -> lignes de texte en attente d'envoi
+     rdz_sync_photo_queue  -> photos en attente d'upload (liées à une ligne déjà envoyée)
+     rdz_sync_log          -> historique des 30 derniers éléments envoyés (visibilité agent)
+   ----------------------------------------------------------------------------
+   Usage :
+     RDZSync.init({ client: supabase });
+     RDZSync.save({
+       module: 'parkguard', table: 'vehicles',
+       row: { id: uid(), ... },   // <-- id obligatoire si des photos accompagnent la saisie
+       bucket: 'parkguard-photos', photoField: 'photo_vehicule_url', // valeur par défaut
+       photos: [
+         { name:'p1.jpg', dataUrl:'data:image/...', field:'photo_vehicule_url' },
+         { name:'p2.jpg', dataUrl:'data:image/...', field:'photo_denonciation_url' }
+       ]
+     });
+     RDZSync.flushPhotos(true);   // forcer l'envoi des photos (bouton manuel)
+     RDZSync.getStatus();         // { textPending, photoPending, log, isWifi }
+   ============================================================================ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  /* ---------- détection WiFi (best-effort, jamais garantie) ---------- */
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;               // inconnu (iPhone/Safari notamment)
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null; // effectiveType = vitesse, pas le support
+      return null;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- badge visuel ---------- */
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  /* ---------- API publique ---------- */
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  /* save() : NON bloquant. Le texte est mis en file et une tentative
+     d'envoi part immédiatement (auto, sur n'importe quel réseau).
+     Les photos sont mises de côté et attendent le WiFi ou un geste manuel. */
+  function save(item) {
+    var textEntry = {
+      id: uid(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],   // gardées ici jusqu'à ce que le texte soit parti
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  /* ---------- file TEXTE : envoi auto, tout réseau ---------- */
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      // Pas de .select() après écriture : on ne dépend jamais d'une permission de
+      // LECTURE en plus de la permission d'ÉCRITURE (une table plus ancienne peut
+      // autoriser l'insert sans autoriser le select en retour — .select() y échouerait
+      // silencieusement et la ligne resterait bloquée en file indéfiniment).
+      // On utilise l'id fourni côté agent (row.id, déjà généré via uid() par tous les
+      // modules) pour rattacher les photos ensuite.
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        // succès texte : retirer de la file texte + logguer
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        // s'il y avait des photos en attente, les basculer dans la file photo
+        // (rattachées via l'id fourni côté agent dans row.id)
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uid(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false; // réseau probablement absent : on retentera au prochain online/ouverture
+      });
+    }
+    next();
+  }
+
+  /* ---------- file PHOTOS : envoi WiFi (best-effort) ou manuel (force=true) ---------- */
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return; // pas de WiFi détecté et pas d'appui manuel -> on attend
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+/* ===================== Intervention alarme — logique ===================== */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+RDZSync.init({ client: sb });
+
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
+
+let trans = null;            // ligne alarme_transmetteurs
+let checklist = [];          // [{libelle, fait, heure}]
+let resultat = '';
+let photos = [];
+let opId = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nowHM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function show(id){ ['screen-code','screen-op','screen-done'].forEach(s=>{
+  document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
+
+async function loadList(){
+  try{
+    const { data } = await sb.from('alarme_transmetteurs').select('code,site_nom,zone').eq('actif',true).order('code');
+    const sel = document.getElementById('f-list');
+    (data||[]).forEach(t=>{ const o=document.createElement('option');
+      o.value=t.code; o.textContent = t.code+' — '+(t.site_nom||'')+(t.zone?' ('+t.zone+')':''); sel.appendChild(o); });
+  }catch(e){/* liste facultative */}
+}
+
+async function validateCode(){
+  const err = document.getElementById('code-err'); err.innerHTML='';
+  const code = document.getElementById('f-code').value.trim();
+  if(!code){ err.innerHTML='<div class="err">Entrez un numéro de transmetteur.</div>'; return; }
+  try{
+    const { data, error } = await sb.from('alarme_transmetteurs').select('*').eq('code',code).eq('actif',true).maybeSingle();
+    if(error) throw error;
+    if(!data){ err.innerHTML='<div class="err">Transmetteur inconnu ou inactif. Vérifiez le numéro.</div>'; return; }
+    trans = data;
+    await loadChecklist(code);
+    openOp();
+  }catch(e){ err.innerHTML='<div class="err">Réseau indisponible — impossible de charger le transmetteur. Réessayez dès que possible.</div>'; }
+}
+
+async function loadChecklist(code){
+  checklist = [];
+  try{
+    const { data } = await sb.from('alarme_checklist_items').select('*')
+      .eq('transmetteur_code',code).eq('actif',true).order('ordre');
+    checklist = (data||[]).map(i=>({ libelle:i.libelle, fait:false, heure:null }));
+  }catch(e){/* checklist facultative */}
+}
+
+function openOp(){
+  opId = uid(); resultat=''; photos=[]; renderPhotos();
+  document.getElementById('op-err').innerHTML='';
+  document.getElementById('m-code').textContent = trans.code;
+  document.getElementById('m-site').textContent = trans.site_nom || '—';
+  document.getElementById('m-zone').textContent = trans.zone || '—';
+  document.getElementById('m-agent').textContent = AGENT_NOM;
+  document.getElementById('b-keys').textContent = trans.emplacement_cles || 'Non renseigné';
+  document.getElementById('b-cons').textContent = trans.consignes || 'Non renseigné';
+  document.getElementById('f-appel').value = nowHM();
+  document.getElementById('f-arrivee').value = '';
+  document.getElementById('bt-arrivee').classList.remove('set');
+  document.getElementById('f-situation').value='';
+  document.getElementById('f-actions').value='';
+  document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel'));
+  renderChecklist();
+  bindMics();
+  show('screen-op');
+}
+function backToCode(){ show('screen-code'); }
+
+function stampArrivee(){ document.getElementById('f-arrivee').value = nowHM(); document.getElementById('bt-arrivee').classList.add('set'); }
+
+function renderChecklist(){
+  const box = document.getElementById('checklist');
+  if(!checklist.length){ box.innerHTML='<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
+  box.innerHTML = checklist.map((c,i)=>`
+    <div class="ck ${c.fait?'done':''}" onclick="toggleCk(${i})">
+      <div class="bx">${c.fait?'✓':''}</div>
+      <div class="lbl">${esc(c.libelle)}</div>
+      ${c.heure?`<div class="tm">${esc(c.heure)}</div>`:''}
+    </div>`).join('');
+}
+function toggleCk(i){ checklist[i].fait=!checklist[i].fait; checklist[i].heure = checklist[i].fait?nowHM():null; renderChecklist(); }
+
+function pickRes(btn){ resultat = btn.dataset.res;
+  document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel')); btn.classList.add('sel'); }
+
+/* ---------- photos ---------- */
+function compressImage(file){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{ const img=new Image();
+      img.onload=()=>{ const max=1280; let w=img.width,h=img.height;
+        if(w>max||h>max){ const r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h); resolve(cv.toDataURL('image/jpeg',0.7)); };
+      img.onerror=()=>resolve(e.target.result); img.src=e.target.result; };
+    reader.readAsDataURL(file);
+  });
+}
+async function onPhotoPicked(input){ const file=input.files&&input.files[0]; input.value=''; if(!file) return;
+  const dataUrl=await compressImage(file); photos.push({name:'photo_'+uid()+'.jpg',dataUrl,legende:''}); renderPhotos(); }
+document.getElementById('photo-camera').addEventListener('change', e=>onPhotoPicked(e.target));
+document.getElementById('photo-gallery').addEventListener('change', e=>onPhotoPicked(e.target));
+function renderPhotos(){
+  const box=document.getElementById('photo-list');
+  box.innerHTML = photos.map((p,i)=>`
+    <div class="photo-item"><img src="${p.dataUrl}" alt="">
+      <div class="pmeta">
+        <div class="dictable">
+          <input type="text" placeholder="Légende…" value="${esc(p.legende)}" oninput="photos[${i}].legende=this.value" id="leg-${i}">
+          <button type="button" class="mic" data-target="leg-${i}" style="bottom:4px">🎤</button>
+        </div>
+        <button type="button" class="rm" onclick="removePhoto(${i})">✕ Retirer</button>
+      </div></div>`).join('');
+  bindMics();
+}
+function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
+
+/* ---------- dictée ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer=null, recTargetBtn=null;
+function bindMics(){ document.querySelectorAll('.mic').forEach(btn=>{
+  if(btn.dataset.bound) return; btn.dataset.bound='1';
+  if(!SR){ btn.style.display='none'; return; }
+  btn.addEventListener('click', ()=>toggleDictation(btn)); }); }
+function toggleDictation(btn){
+  if(!SR) return;
+  if(recognizer && recTargetBtn===btn){ recognizer.stop(); return; }
+  if(recognizer){ try{recognizer.stop();}catch(e){} }
+  const el=document.getElementById(btn.dataset.target); if(!el) return;
+  recognizer=new SR(); recognizer.lang='fr-FR'; recognizer.interimResults=false; recognizer.continuous=true;
+  recTargetBtn=btn; btn.classList.add('rec'); btn.textContent='● Stop';
+  recognizer.onresult=ev=>{ let txt=''; for(let k=ev.resultIndex;k<ev.results.length;k++){ if(ev.results[k].isFinal) txt+=ev.results[k][0].transcript; }
+    if(txt){ el.value=(el.value?el.value.trim()+' ':'')+txt.trim(); el.dispatchEvent(new Event('input')); } };
+  recognizer.onerror=()=>stopDictationUI(btn); recognizer.onend=()=>stopDictationUI(btn);
+  try{ recognizer.start(); }catch(e){ stopDictationUI(btn); }
+}
+function stopDictationUI(btn){ btn.classList.remove('rec'); btn.textContent=btn.dataset.target.startsWith('leg-')?'🎤':'🎤 Dicter'; recognizer=null; recTargetBtn=null; }
+
+/* ---------- clôture ---------- */
+function closeOp(){
+  const err=document.getElementById('op-err'); err.innerHTML='';
+  const situation=document.getElementById('f-situation').value.trim();
+  const actions=document.getElementById('f-actions').value.trim();
+  const nonCoches = checklist.filter(c=>!c.fait).length;
+
+  // Validation explicite : avertir si étapes non cochées ou résultat non choisi, mais laisser confirmer.
+  if(!closeOp._confirmed && (nonCoches>0 || !resultat)){
+    let msg='<div class="warn-box"><b>Avant de clôturer :</b><ul style="margin:6px 0 0 18px">';
+    if(nonCoches>0) msg+=`<li>${nonCoches} étape(s) de la marche à suivre non cochée(s)</li>`;
+    if(!resultat) msg+='<li>Aucun résultat sélectionné (RAS / Levée de doute / Intervention)</li>';
+    msg+='</ul><div style="margin-top:8px">Ré-appuyez sur « Clôturer » pour confirmer quand même.</div></div>';
+    err.innerHTML=msg; window.scrollTo(0,document.body.scrollHeight); closeOp._confirmed=true; return;
+  }
+
+  const row={
+    id:opId, transmetteur_code:trans.code, site_id:trans.site_id||null, site_nom:trans.site_nom||null,
+    zone:trans.zone||null, agent_nom:AGENT_NOM,
+    heure_appel:document.getElementById('f-appel').value||null,
+    heure_arrivee:document.getElementById('f-arrivee').value||null,
+    heure_fin:nowHM(),
+    resultat:resultat||null,
+    checklist:JSON.stringify(checklist),
+    situation:situation||null, actions:actions||null,
+    created_at:new Date().toISOString()
+  };
+  RDZSync.save({ module:'alarme-agent', table:'alarme_interventions', row, op:'upsert', onConflict:'id' });
+
+  photos.forEach(p=>{
+    RDZSync.save({ module:'alarme-agent', table:'journal_photos',
+      row:{ id:uid(), entree_id:opId, legende:p.legende||null, created_at:new Date().toISOString() },
+      op:'upsert', onConflict:'id', bucket:'journal-photos', photoField:'url',
+      photos:[{ name:p.name, dataUrl:p.dataUrl }] });
+  });
+
+  closeOp._confirmed=false;
+  document.getElementById('done-sub').textContent =
+    photos.length ? `Rapport enregistré. ${photos.length} photo(s) partiront en WiFi.` : 'Le rapport est dans le journal de bord.';
+  show('screen-done');
+}
+
+loadList();
+</script>
+</body>
+</html>
