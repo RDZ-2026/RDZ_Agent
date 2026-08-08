@@ -1,0 +1,302 @@
+<!-- RDZ · supervision-journal · v1 · 2026-08-08 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDZ — Supervision journal de bord</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --blue:#2a4b8d;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink)}
+.wrap{max-width:920px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 18px}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:18px}
+
+.filters{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-bottom:14px}
+.frow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold}
+.fg input,.fg select{font-family:var(--font);font-size:14px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px;background:#fff}
+.pills{display:flex;gap:6px}
+.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:8px 13px;font-size:13px;font-weight:bold;cursor:pointer;color:#555}
+.pill.on{background:var(--red);color:#fff;border-color:var(--red)}
+.btn{border:none;border-radius:var(--radius-ui);padding:9px 16px;font-size:14px;font-weight:bold;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff}
+.btn:active{background:var(--red-dark)}
+
+.summary{font-size:13px;color:#666;margin:2px 2px 12px}
+
+.entry{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--line);border-radius:var(--radius-section);
+  padding:13px 15px;margin-bottom:10px;cursor:pointer;display:flex;gap:14px;align-items:flex-start}
+.entry:hover{border-color:var(--line)}
+.entry.j{border-left-color:var(--blue)}
+.entry.a{border-left-color:var(--report-red)}
+.entry .when{min-width:92px;flex-shrink:0}
+.entry .when .d{font-weight:bold;font-size:13px}
+.entry .when .h{font-size:12px;color:#888}
+.entry .mid{flex:1;min-width:0}
+.entry .title{font-weight:bold;font-size:14.5px;margin-bottom:3px}
+.entry .snip{font-size:13px;color:#555;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.entry .meta2{font-size:11.5px;color:#999;margin-top:5px}
+.entry .rgt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.tag{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.tag.j{background:#eaf0fb;color:var(--blue)}
+.tag.a{background:#fdeceb;color:var(--report-red)}
+.tag.ph{background:var(--bg-meta);color:#777}
+.res{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px}
+.res.RAS{background:#e9f4ec;color:var(--ok)}
+.res.Levée{background:#fff5e0;color:var(--warn)}
+.res.Interv{background:#fdeceb;color:var(--danger)}
+
+.state-msg{text-align:center;color:#999;font-size:14px;padding:40px 10px}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:20px;overflow:auto;z-index:100}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:var(--radius-card);max-width:640px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.modal .mh{padding:16px 18px;color:#fff;position:relative}
+.modal .mh.j{background:var(--blue)}
+.modal .mh.a{background:var(--report-red)}
+.modal .mh .k{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.85}
+.modal .mh h3{font-size:18px;margin-top:2px}
+.modal .mh .x{position:absolute;top:14px;right:16px;color:#fff;font-size:22px;cursor:pointer;background:none;border:none}
+.modal .mb{padding:18px}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.mcell{background:var(--bg-soft);border-radius:var(--radius-ui);padding:9px 11px}
+.mcell .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#999;font-weight:bold}
+.mcell .v{font-size:14px;font-weight:bold;margin-top:2px}
+.msec{margin-bottom:16px}
+.msec .st{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--red);font-weight:bold;margin-bottom:6px}
+.msec .txt{font-size:14px;line-height:1.5;white-space:pre-wrap;background:var(--bg-soft);border-radius:var(--radius-ui);padding:10px 12px}
+.ckline{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+.ckline:last-child{border-bottom:none}
+.ckline .ico{width:22px;flex-shrink:0}
+.ckline .val{margin-left:auto;font-weight:bold;color:var(--ink);white-space:nowrap}
+.ckline .note-v{margin-left:0;font-weight:normal;color:#555;flex-basis:100%;margin-top:3px;padding-left:31px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.photo{border:1px solid var(--line-soft);border-radius:var(--radius-ui);overflow:hidden}
+.photo img{width:100%;height:110px;object-fit:cover;display:block}
+.photo .lg{font-size:11.5px;color:#666;padding:6px 8px}
+.photo .pend{height:110px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:var(--bg-soft);text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub">Supervision — journal de bord &amp; alarmes</div>
+      </div>
+      <a class="home" href="../index.html">← Accueil</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="filters">
+      <div class="frow">
+        <div class="fg"><label>Du</label><input type="date" id="f-du"></div>
+        <div class="fg"><label>Au</label><input type="date" id="f-au"></div>
+        <div class="fg"><label>Site</label><select id="f-site"><option value="">Tous</option></select></div>
+        <div class="fg"><label>Agent</label><select id="f-agent"><option value="">Tous</option></select></div>
+        <div class="fg">
+          <label>Type</label>
+          <div class="pills">
+            <button class="pill on" data-type="all" onclick="setType('all')">Tout</button>
+            <button class="pill" data-type="journal" onclick="setType('journal')">📓 Journal</button>
+            <button class="pill" data-type="alarme" onclick="setType('alarme')">🚨 Alarme</button>
+          </div>
+        </div>
+        <div class="fg"><label>&nbsp;</label><button class="btn" onclick="refresh()">🔄 Actualiser</button></div>
+      </div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+    <div id="list"><div class="state-msg">Choisissez vos filtres et cliquez « Actualiser ».</div></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let curType = 'all';
+let allItems = [];          // items fusionnés {kind,id,dt,site_nom,agent_nom,raw,photos:[]}
+let photosByEntry = {};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
+function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function setType(t){ curType=t; document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on',p.dataset.type===t)); render(); }
+
+async function loadSites(){
+  try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom');
+    document.getElementById('f-site').innerHTML = '<option value="">Tous</option>' + (data||[]).map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join('');
+  }catch(e){}
+}
+
+function rangeISO(){
+  const du = document.getElementById('f-du').value || todayStr();
+  const au = document.getElementById('f-au').value || du;
+  return { gte: new Date(du+'T00:00:00').toISOString(), lte: new Date(au+'T23:59:59.999').toISOString() };
+}
+
+async function refresh(){
+  const list = document.getElementById('list');
+  list.innerHTML = '<div class="state-msg">Chargement…</div>';
+  const {gte,lte} = rangeISO();
+  const siteId = document.getElementById('f-site').value;
+  allItems = [];
+  try{
+    // Journal
+    let jq = sb.from('journal_entrees').select('*').gte('created_at',gte).lte('created_at',lte);
+    if(siteId) jq = jq.eq('site_id',siteId);
+    const { data: jdata } = await jq;
+    (jdata||[]).forEach(r=>allItems.push({ kind:'journal', id:r.id, dt:r.created_at, site_nom:r.site_nom, agent_nom:r.agent_nom, raw:r }));
+
+    // Alarme
+    let aq = sb.from('alarme_interventions').select('*').gte('created_at',gte).lte('created_at',lte);
+    if(siteId) aq = aq.eq('site_id',siteId);
+    const { data: adata } = await aq;
+    (adata||[]).forEach(r=>allItems.push({ kind:'alarme', id:r.id, dt:r.created_at, site_nom:r.site_nom, agent_nom:r.agent_nom, raw:r }));
+
+    // Photos rattachées
+    const ids = allItems.map(i=>i.id);
+    photosByEntry = {};
+    if(ids.length){
+      const { data: pdata } = await sb.from('journal_photos').select('*').in('entree_id', ids);
+      (pdata||[]).forEach(p=>{ (photosByEntry[p.entree_id]=photosByEntry[p.entree_id]||[]).push(p); });
+    }
+    allItems.forEach(i=>i.photos = photosByEntry[i.id]||[]);
+    allItems.sort((a,b)=> new Date(b.dt)-new Date(a.dt));
+
+    // Agents présents
+    const agents = [...new Set(allItems.map(i=>i.agent_nom).filter(Boolean))].sort();
+    const sel = document.getElementById('f-agent'); const cur = sel.value;
+    sel.innerHTML = '<option value="">Tous</option>' + agents.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    if(agents.includes(cur)) sel.value = cur;
+
+    render();
+  }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; }
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const agent = document.getElementById('f-agent').value;
+  let items = allItems.filter(i=> curType==='all' || i.kind===curType);
+  if(agent) items = items.filter(i=>i.agent_nom===agent);
+
+  document.getElementById('summary').textContent = `${items.length} entrée(s)`;
+  if(!items.length){ list.innerHTML = '<div class="state-msg">Aucune entrée pour ces filtres.</div>'; return; }
+
+  list.innerHTML = items.map(i=>{
+    const r=i.raw, nPh=i.photos.length;
+    let title, snip;
+    if(i.kind==='journal'){
+      title = esc(r.activite||'Entrée') + ' — ' + esc(r.site_nom||'');
+      snip = esc((r.situation||r.actions||'').slice(0,180)) || '<i>Sans description</i>';
+    }else{
+      title = '🚨 Alarme' + (r.zone?' · '+esc(r.zone):'') + ' — ' + esc(r.site_nom||'');
+      snip = esc((r.situation||r.actions||'').slice(0,180)) || '<i>Voir la marche à suivre</i>';
+    }
+    let resTag='';
+    if(i.kind==='alarme' && r.resultat){ const cls = r.resultat.startsWith('Levée')?'Levée':(r.resultat.startsWith('Interv')?'Interv':'RAS'); resTag=`<span class="res ${cls}">${esc(r.resultat)}</span>`; }
+    return `<div class="entry ${i.kind==='journal'?'j':'a'}" onclick="openDetail('${i.kind}','${esc(i.id)}')">
+      <div class="when"><div class="d">${fmtDate(i.dt)}</div><div class="h">${fmtTime(i.dt)}</div></div>
+      <div class="mid">
+        <div class="title">${title}</div>
+        <div class="snip">${snip}</div>
+        <div class="meta2">👤 ${esc(i.agent_nom||'—')}</div>
+      </div>
+      <div class="rgt">
+        <span class="tag ${i.kind==='journal'?'j':'a'}">${i.kind==='journal'?'Journal':'Alarme'}</span>
+        ${resTag}
+        ${nPh?`<span class="tag ph">📷 ${nPh}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- détail ---------- */
+function photoHtml(photos){
+  if(!photos.length) return '';
+  return `<div class="msec"><div class="st">Photos (${photos.length})</div><div class="photos">` +
+    photos.map(p=>`<div class="photo">${p.url?`<a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>`:`<div class="pend">📷 En attente d'envoi (WiFi)</div>`}<div class="lg">${esc(p.legende||'')}</div></div>`).join('') +
+    `</div></div>`;
+}
+function openDetail(kind,id){
+  const item = allItems.find(i=>i.kind===kind && String(i.id)===String(id));
+  if(!item) return;
+  const r=item.raw; const m=document.getElementById('modal');
+  let html='';
+  if(kind==='journal'){
+    html = `<div class="mh j"><button class="x" onclick="closeModal()">✕</button>
+      <div class="k">Journal de bord</div><h3>${esc(r.activite||'Entrée')} — ${esc(r.site_nom||'')}</h3></div>
+      <div class="mb">
+        <div class="mgrid">
+          <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent_nom||'—')}</div></div>
+          <div class="mcell"><div class="k">Date / heure</div><div class="v">${esc((r.date_rapport||fmtDate(r.created_at))+' '+(r.heure_rapport||''))}</div></div>
+          <div class="mcell"><div class="k">Localisation</div><div class="v">${esc(r.localisation||'—')}</div></div>
+          <div class="mcell"><div class="k">Précision</div><div class="v">${esc(r.localisation_autre||'—')}</div></div>
+        </div>
+        ${r.situation?`<div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation)}</div></div>`:''}
+        ${r.actions?`<div class="msec"><div class="st">Qu'a-t-il fait ?</div><div class="txt">${esc(r.actions)}</div></div>`:''}
+        ${photoHtml(item.photos)}
+      </div>`;
+  }else{
+    let ck=[]; try{ ck = typeof r.checklist==='string'?JSON.parse(r.checklist||'[]'):(r.checklist||[]); }catch(e){ ck=[]; }
+    const ckHtml = ck.length ? `<div class="msec"><div class="st">Marche à suivre</div>` + ck.map(c=>{
+      if(c.type==='heure') return `<div class="ckline"><span class="ico">⏱</span><span>${esc(c.libelle)}</span><span class="val">${esc(c.valeur||'—')}</span></div>`;
+      if(c.type==='note')  return `<div class="ckline"><span class="ico">📝</span><span>${esc(c.libelle)}</span>${c.valeur?`<div class="note-v">${esc(c.valeur)}</div>`:''}</div>`;
+      return `<div class="ckline"><span class="ico">${c.fait?'✅':'⬜'}</span><span>${esc(c.libelle)}</span>${c.heure?`<span class="val">${esc(c.heure)}</span>`:''}</div>`;
+    }).join('') + `</div>` : '';
+    html = `<div class="mh a"><button class="x" onclick="closeModal()">✕</button>
+      <div class="k">Intervention alarme</div><h3>🚨 ${esc(r.zone||'Alarme')} — ${esc(r.site_nom||'')}</h3></div>
+      <div class="mb">
+        <div class="mgrid">
+          <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent_nom||'—')}</div></div>
+          <div class="mcell"><div class="k">Transmetteur</div><div class="v">${esc(r.transmetteur_code||'—')}</div></div>
+          <div class="mcell"><div class="k">Appel / Arrivée / Fin</div><div class="v">${esc((r.heure_appel||'—')+' · '+(r.heure_arrivee||'—')+' · '+(r.heure_fin||'—'))}</div></div>
+          <div class="mcell"><div class="k">Résultat</div><div class="v">${esc(r.resultat||'—')}</div></div>
+        </div>
+        ${ckHtml}
+        ${r.situation?`<div class="msec"><div class="st">Constat sur place</div><div class="txt">${esc(r.situation)}</div></div>`:''}
+        ${r.actions?`<div class="msec"><div class="st">Actions menées</div><div class="txt">${esc(r.actions)}</div></div>`:''}
+        ${photoHtml(item.photos)}
+      </div>`;
+  }
+  m.innerHTML = html;
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* init */
+document.getElementById('f-du').value = todayStr();
+document.getElementById('f-au').value = todayStr();
+loadSites();
+refresh();
+</script>
+</body>
+</html>
