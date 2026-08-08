@@ -1,0 +1,157 @@
+<!-- RDZ · pilote · v2 · 2026-08-08 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Espace pilote</title>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+main{flex:1;padding:16px}
+
+.pilot-banner{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);
+  padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:18px}
+.pilot-banner b{color:var(--warn)}
+
+.agent-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-bottom:22px}
+.agent-card .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:8px}
+.agent-row{display:flex;gap:8px}
+.agent-row input{flex:1;font-family:var(--font);font-size:15px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
+.agent-row button{background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:0 16px;font-weight:bold;cursor:pointer}
+.agent-ok{font-size:12.5px;color:var(--ok);margin-top:6px;display:none}
+
+.section-h{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin:0 0 10px}
+.section-h.spaced{margin-top:22px}
+
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);
+  border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;text-decoration:none;color:inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);transition:border-color .1s}
+.group-btn:active{border-color:var(--red)}
+.group-btn.tool{border-left:4px solid var(--report-red)}
+.group-btn.fix{border-left:4px solid var(--warn)}
+.group-btn .ic{font-size:27px;width:38px;text-align:center;flex-shrink:0}
+.group-btn .txt .t{font-weight:bold;font-size:15.5px;color:var(--ink)}
+.group-btn .txt .d{font-size:12.5px;color:#666;margin-top:3px;line-height:1.4}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:22px}
+
+.foot{text-align:center;color:#aaa;font-size:11.5px;padding:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+    <div class="sub">Espace pilote</div>
+  </header>
+
+  <main>
+    <div class="pilot-banner">
+      🧪 <b>Version d'essai.</b> Ces outils tournent <b>en parallèle</b> de vos applications habituelles.
+      Continuez à utiliser vos rapports actuels ; ici, c'est uniquement pour le test.
+    </div>
+
+    <div class="agent-card">
+      <div class="lbl">Agent connecté</div>
+      <div class="agent-row">
+        <input type="text" id="agent" placeholder="Votre nom" autocomplete="name">
+        <button onclick="saveAgent()">OK</button>
+      </div>
+      <div class="agent-ok" id="agent-ok">✓ Enregistré</div>
+    </div>
+
+    <!-- Vacation -->
+    <div class="section-h">Vacation</div>
+
+    <a class="group-btn" href="../prise-de-poste.html">
+      <span class="ic">☀️</span>
+      <span class="txt">
+        <span class="t">Prise de poste</span>
+        <span class="d">Démarrer la vacation : véhicule, matériel, consignes.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <a class="group-btn" href="../feuille-route-agent.html">
+      <span class="ic">🗺️</span>
+      <span class="txt">
+        <span class="t">Feuille de route</span>
+        <span class="d">Missions du jour, heures réelles et notes.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <a class="group-btn" href="../fin-de-service.html">
+      <span class="ic">🌙</span>
+      <span class="txt">
+        <span class="t">Fin de poste</span>
+        <span class="d">Ce qui reste en suspens avant de quitter : véhicule, matériel, synchro.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <!-- Outils pilote -->
+    <div class="section-h spaced">Outils pilote</div>
+
+    <a class="group-btn tool" href="../alarme-agent.html">
+      <span class="ic">🚨</span>
+      <span class="txt">
+        <span class="t">Alarme</span>
+        <span class="d">Code transmetteur → site, clés, marche à suivre, rapport.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <a class="group-btn tool" href="../journal-de-bord.html">
+      <span class="ic">📓</span>
+      <span class="txt">
+        <span class="t">Journal de bord</span>
+        <span class="d">Site → activité → le bon outil. Rapports, passages, tâches.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <!-- Dépannage -->
+    <div class="section-h spaced">Dépannage</div>
+
+    <a class="group-btn fix" href="../claude_reset-sync.html">
+      <span class="ic">🛠️</span>
+      <span class="txt">
+        <span class="t">Dépannage synchro</span>
+        <span class="d">Réinitialiser la file d'envoi RDZSync si une saisie reste bloquée.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <div class="foot">RDZ · Espace pilote · v2</div>
+  </main>
+</div>
+
+<script>
+const inp = document.getElementById('agent');
+inp.value = localStorage.getItem('rdz_agent_nom') || '';
+function saveAgent(){
+  const v = inp.value.trim();
+  if(!v) return;
+  localStorage.setItem('rdz_agent_nom', v);
+  const ok = document.getElementById('agent-ok');
+  ok.style.display = 'block';
+  setTimeout(()=>{ ok.style.display='none'; }, 2000);
+}
+inp.addEventListener('keydown', e=>{ if(e.key==='Enter') saveAgent(); });
+</script>
+</body>
+</html>
