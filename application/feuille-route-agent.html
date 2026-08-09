@@ -1,4 +1,4 @@
-<!-- RDZ · feuille-route-agent · v1 · 2026-08-05 -->
+<!-- RDZ · feuille-route-agent · v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -358,7 +358,8 @@ let pointagesMap = {}; // task_index -> { heure_arrivee_reelle, heure_depart_ree
 let currentSheet = null;
 
 // ═══ HELPERS (portés depuis RouteOps) ═══
-function todayStr() { return new Date().toISOString().slice(0,10); }
+function serviceDate(d){ d = d ? new Date(d) : new Date(); d = new Date(d.getTime() - (6*60+30)*60000); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), j=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${j}`; } /* Journée de service RDZ : 06:30 -> 06:29 le lendemain */
+function todayStr() { return serviceDate(); }
 function tMin(t) {
   if (!t || !t.includes(':')) return null;
   const [h,m] = t.split(':').map(Number);

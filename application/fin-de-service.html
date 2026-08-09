@@ -1,4 +1,4 @@
-<!-- RDZ · fin-de-service · v7 · 2026-08-05 -->
+<!-- RDZ · fin-de-service · v8 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -285,7 +285,8 @@ const AGENT_ID = localStorage.getItem('rdz_agent_id');
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || '';
 if (!AGENT_ID) { window.location.href = 'mobile.html'; }
 
-function today() { return new Date().toISOString().split('T')[0]; }
+function serviceDate(d){ d = d ? new Date(d) : new Date(); d = new Date(d.getTime() - (6*60+30)*60000); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), j=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${j}`; } /* Journée de service RDZ : 06:30 -> 06:29 le lendemain */
+function today() { return serviceDate(); }
 function fmtDT(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('fr-CH') + ' ' + d.toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'}); }
 function escHtml(s) { return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function sameAgent(nom) { return (nom || '').trim().toLowerCase() === AGENT_NOM.trim().toLowerCase(); }
