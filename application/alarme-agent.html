@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-agent · v6 · 2026-08-09 -->
+<!-- RDZ · alarme-agent · v7 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -560,7 +560,7 @@ async function loadChecklist(code){
     checklist = (data||[]).map(i=>({
       id:i.id, type:i.type||'etape', libelle:i.libelle,
       options:Array.isArray(i.options)?i.options:[],
-      depend_item_id:i.depend_item_id||null, depend_valeur:i.depend_valeur||null,
+      depend_item_id:i.depend_item_id||null, depend_valeur:i.depend_valeur||null, depend_conditions:i.depend_conditions||null, depend_mode:i.depend_mode||'et',
       fait:false, heure:null, reponse:null, note:''
     }));
   }catch(e){/* checklist facultative */}
@@ -588,10 +588,16 @@ function backToCode(){ show('screen-code'); }
 /* Un item sans dépendance est toujours visible. Un item dépendant n'est
    visible que si la question dont il dépend a reçu exactement la réponse
    attendue (depend_valeur). */
+function itemConds(c){
+  return (Array.isArray(c.depend_conditions) && c.depend_conditions.length)
+    ? c.depend_conditions
+    : (c.depend_item_id ? [{item_id:c.depend_item_id, valeur:c.depend_valeur}] : []);
+}
 function itemVisible(c){
-  if(!c.depend_item_id) return true;
-  const parent = checklist.find(x=>x.id===c.depend_item_id);
-  return !!(parent && parent.reponse===c.depend_valeur);
+  const conds = itemConds(c);
+  if(!conds.length) return true;
+  const ok = cond => { const p = checklist.find(x=>x.id===cond.item_id); return !!(p && p.reponse===cond.valeur); };
+  return c.depend_mode==='ou' ? conds.some(ok) : conds.every(ok);
 }
 
 /* Si on change la réponse à une question, tout ce qui dépendait d'elle (et
@@ -600,7 +606,7 @@ function itemVisible(c){
    une branche qu'on a quittée. */
 function invalidateDescendants(itemId){
   checklist.forEach(c=>{
-    if(c.depend_item_id===itemId){
+    if(itemConds(c).some(x=>x.item_id===itemId)){
       c.fait=false; c.heure=null; c.reponse=null; c.note='';
       invalidateDescendants(c.id);
     }
