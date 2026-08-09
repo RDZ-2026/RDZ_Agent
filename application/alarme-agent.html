@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-agent · v2 · 2026-08-09 -->
+<!-- RDZ · alarme-agent · v3 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -98,6 +98,15 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
 .err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
 .warn-box{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
 .state-msg{text-align:center;color:#999;font-size:14px;padding:20px 10px}
+.hr-block{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--warn);border-radius:var(--radius-section);padding:13px;margin-bottom:9px}
+.hr-block.done{border-left-color:var(--ok)}
+.hr-lbl{font-size:14.5px;font-weight:bold;margin-bottom:10px}
+.hr-btn{width:100%;padding:11px;border:1px solid var(--line);border-radius:var(--radius-ui);background:var(--bg-soft);font-weight:bold;font-size:14px;cursor:pointer;color:var(--ink)}
+.hr-block.done .hr-btn{background:#e8f5ec;border-color:var(--ok);color:var(--ok)}
+.note-block{background:#fff;border:1px solid var(--line-soft);border-left:4px solid #3b5b7a;border-radius:var(--radius-section);padding:13px;margin-bottom:9px}
+.note-lbl{font-size:14.5px;font-weight:bold;margin-bottom:10px}
+.note-input{position:relative}
+.note-input textarea{width:100%;padding:10px 48px 10px 10px;border:1px solid var(--line);border-radius:var(--radius-ui);font-family:var(--font);font-size:14px;line-height:1.4;resize:vertical;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -560,7 +569,7 @@ async function loadChecklist(code){
       id:i.id, type:i.type||'etape', libelle:i.libelle,
       options:Array.isArray(i.options)?i.options:[],
       depend_item_id:i.depend_item_id||null, depend_valeur:i.depend_valeur||null,
-      fait:false, heure:null, reponse:null
+      fait:false, heure:null, reponse:null, note:''
     }));
   }catch(e){/* checklist facultative */}
 }
@@ -604,7 +613,7 @@ function itemVisible(c){
 function invalidateDescendants(itemId){
   checklist.forEach(c=>{
     if(c.depend_item_id===itemId){
-      c.fait=false; c.heure=null; c.reponse=null;
+      c.fait=false; c.heure=null; c.reponse=null; c.note='';
       invalidateDescendants(c.id);
     }
   });
@@ -623,14 +632,31 @@ function renderChecklist(){
         `).join('')}</div>
       </div>`;
     }
+    if(c.type==='heure'){
+      return `<div class="hr-block ${c.heure?'done':''}">
+        <div class="hr-lbl">${esc(c.libelle)}</div>
+        <button type="button" class="hr-btn" onclick="stampItem(${i})">${c.heure?('🕐 '+esc(c.heure)+' · modifier'):'🕐 Horodater maintenant'}</button>
+      </div>`;
+    }
+    if(c.type==='note'){
+      return `<div class="note-block">
+        <div class="note-lbl">${esc(c.libelle)}</div>
+        <div class="note-input">
+          <textarea id="note-${i}" rows="2" placeholder="Saisir ou dicter…" oninput="checklist[${i}].note=this.value">${esc(c.note||'')}</textarea>
+          <button type="button" class="mic" data-target="note-${i}">🎤</button>
+        </div>
+      </div>`;
+    }
     return `<div class="ck ${c.fait?'done':''}" onclick="toggleCk(${i})">
       <div class="bx">${c.fait?'✓':''}</div>
       <div class="lbl">${esc(c.libelle)}</div>
       ${c.heure?`<div class="tm">${esc(c.heure)}</div>`:''}
     </div>`;
   }).join('');
+  bindMics();
 }
 function toggleCk(i){ checklist[i].fait=!checklist[i].fait; checklist[i].heure = checklist[i].fait?nowHM():null; renderChecklist(); }
+function stampItem(i){ checklist[i].heure = nowHM(); renderChecklist(); }
 function pickQuestionAnswer(i,val){
   checklist[i].reponse = val; checklist[i].heure = nowHM();
   invalidateDescendants(checklist[i].id);
@@ -702,13 +728,13 @@ function closeOp(){
   // On ne réclame que les items effectivement visibles sur le chemin suivi
   // (une étape masquée par une branche non prise ne doit pas bloquer la clôture).
   const visibles = checklist.filter(itemVisible);
-  const nonCoches = visibles.filter(c=>c.type!=='question' && !c.fait).length;
+  const nonCoches = visibles.filter(c=>(c.type==='etape' && !c.fait) || (c.type==='heure' && !c.heure)).length;
   const nonRepondues = visibles.filter(c=>c.type==='question' && !c.reponse).length;
 
   // Validation explicite : avertir si étapes non cochées ou résultat non choisi, mais laisser confirmer.
   if(!closeOp._confirmed && (nonCoches>0 || nonRepondues>0 || !resultat)){
     let msg='<div class="warn-box"><b>Avant de clôturer :</b><ul style="margin:6px 0 0 18px">';
-    if(nonCoches>0) msg+=`<li>${nonCoches} étape(s) de la marche à suivre non cochée(s)</li>`;
+    if(nonCoches>0) msg+=`<li>${nonCoches} étape(s)/horodatage(s) de la marche à suivre à compléter</li>`;
     if(nonRepondues>0) msg+=`<li>${nonRepondues} question(s) de la marche à suivre sans réponse</li>`;
     if(!resultat) msg+='<li>Aucun résultat d\'intervention sélectionné</li>';
     msg+='</ul><div style="margin-top:8px">Ré-appuyez sur « Clôturer » pour confirmer quand même.</div></div>';
