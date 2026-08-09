@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v1 · 2026-08-08 -->
+<!-- RDZ · supervision-journal · v2 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -13,13 +13,12 @@
   --line:#d0d0d0; --line-soft:#e0e0e0;
   --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
   --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
-  --blue:#2a4b8d;
   --radius-ui:2px; --radius-card:10px; --radius-section:8px;
   --font:Arial, Helvetica, sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg-soft);color:var(--ink)}
-.wrap{max-width:920px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+.wrap{max-width:980px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
 header{background:var(--red);color:#fff;padding:12px 18px}
 header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
 header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
@@ -32,19 +31,20 @@ main{flex:1;padding:18px}
 .fg{display:flex;flex-direction:column;gap:5px}
 .fg label{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold}
 .fg input,.fg select{font-family:var(--font);font-size:14px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px;background:#fff}
-.pills{display:flex;gap:6px}
-.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:8px 13px;font-size:13px;font-weight:bold;cursor:pointer;color:#555}
-.pill.on{background:var(--red);color:#fff;border-color:var(--red)}
 .btn{border:none;border-radius:var(--radius-ui);padding:9px 16px;font-size:14px;font-weight:bold;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff}
 .btn:active{background:var(--red-dark)}
+.btn-sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.types{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:12.5px;font-weight:bold;cursor:pointer;color:#555;display:flex;align-items:center;gap:5px}
+.pill.on{color:#fff;border-color:transparent}
+.pill .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.hint{font-size:12px;color:#999;margin-top:8px}
 
-.summary{font-size:13px;color:#666;margin:2px 2px 12px}
+.summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 
 .entry{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--line);border-radius:var(--radius-section);
   padding:13px 15px;margin-bottom:10px;cursor:pointer;display:flex;gap:14px;align-items:flex-start}
 .entry:hover{border-color:var(--line)}
-.entry.j{border-left-color:var(--blue)}
-.entry.a{border-left-color:var(--report-red)}
 .entry .when{min-width:92px;flex-shrink:0}
 .entry .when .d{font-weight:bold;font-size:13px}
 .entry .when .h{font-size:12px;color:#888}
@@ -53,14 +53,9 @@ main{flex:1;padding:18px}
 .entry .snip{font-size:13px;color:#555;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .entry .meta2{font-size:11.5px;color:#999;margin-top:5px}
 .entry .rgt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
-.tag{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap}
-.tag.j{background:#eaf0fb;color:var(--blue)}
-.tag.a{background:#fdeceb;color:var(--report-red)}
+.tag{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap;color:#fff}
+.tag.sub{background:var(--bg-meta);color:#777}
 .tag.ph{background:var(--bg-meta);color:#777}
-.res{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px}
-.res.RAS{background:#e9f4ec;color:var(--ok)}
-.res.Levée{background:#fff5e0;color:var(--warn)}
-.res.Interv{background:#fdeceb;color:var(--danger)}
 
 .state-msg{text-align:center;color:#999;font-size:14px;padding:40px 10px}
 
@@ -69,8 +64,6 @@ main{flex:1;padding:18px}
 .overlay.show{display:flex}
 .modal{background:#fff;border-radius:var(--radius-card);max-width:640px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3)}
 .modal .mh{padding:16px 18px;color:#fff;position:relative}
-.modal .mh.j{background:var(--blue)}
-.modal .mh.a{background:var(--report-red)}
 .modal .mh .k{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.85}
 .modal .mh h3{font-size:18px;margin-top:2px}
 .modal .mh .x{position:absolute;top:14px;right:16px;color:#fff;font-size:22px;cursor:pointer;background:none;border:none}
@@ -78,20 +71,29 @@ main{flex:1;padding:18px}
 .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .mcell{background:var(--bg-soft);border-radius:var(--radius-ui);padding:9px 11px}
 .mcell .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#999;font-weight:bold}
-.mcell .v{font-size:14px;font-weight:bold;margin-top:2px}
+.mcell .v{font-size:14px;font-weight:bold;margin-top:2px;word-break:break-word}
 .msec{margin-bottom:16px}
 .msec .st{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--red);font-weight:bold;margin-bottom:6px}
 .msec .txt{font-size:14px;line-height:1.5;white-space:pre-wrap;background:var(--bg-soft);border-radius:var(--radius-ui);padding:10px 12px}
-.ckline{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
-.ckline:last-child{border-bottom:none}
-.ckline .ico{width:22px;flex-shrink:0}
-.ckline .val{margin-left:auto;font-weight:bold;color:var(--ink);white-space:nowrap}
-.ckline .note-v{margin-left:0;font-weight:normal;color:#555;flex-basis:100%;margin-top:3px;padding-left:31px}
 .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
 .photo{border:1px solid var(--line-soft);border-radius:var(--radius-ui);overflow:hidden}
 .photo img{width:100%;height:110px;object-fit:cover;display:block}
 .photo .lg{font-size:11.5px;color:#666;padding:6px 8px}
-.photo .pend{height:110px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:var(--bg-soft);text-align:center;padding:8px}
+
+/* édition */
+.editbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px}
+.efield{margin-bottom:11px}
+.efield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold;margin-bottom:5px}
+.efield.warn label{color:var(--warn)}
+.efield input,.efield select,.efield textarea{width:100%;font-family:var(--font);font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px}
+.efield textarea{min-height:70px;resize:vertical}
+.efield.check{display:flex;align-items:center;gap:8px;flex-direction:row}
+.efield.check label{margin:0}
+.esave{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.readonly-note{font-size:11.5px;color:#999;margin-bottom:14px}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:11px 18px;border-radius:var(--radius-ui);font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:200}
+.toast.show{opacity:1}.toast.err{background:var(--danger)}
 </style>
 </head>
 <body>
@@ -100,7 +102,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord &amp; alarmes</div>
+        <div class="sub">Supervision — journal de bord unifié</div>
       </div>
       <a class="home" href="../index.html">← Accueil</a>
     </div>
@@ -113,19 +115,14 @@ main{flex:1;padding:18px}
         <div class="fg"><label>Au</label><input type="date" id="f-au"></div>
         <div class="fg"><label>Site</label><select id="f-site"><option value="">Tous</option></select></div>
         <div class="fg"><label>Agent</label><select id="f-agent"><option value="">Tous</option></select></div>
-        <div class="fg">
-          <label>Type</label>
-          <div class="pills">
-            <button class="pill on" data-type="all" onclick="setType('all')">Tout</button>
-            <button class="pill" data-type="journal" onclick="setType('journal')">📓 Journal</button>
-            <button class="pill" data-type="alarme" onclick="setType('alarme')">🚨 Alarme</button>
-          </div>
-        </div>
         <div class="fg"><label>&nbsp;</label><button class="btn" onclick="refresh()">🔄 Actualiser</button></div>
+        <div class="fg"><label>&nbsp;</label><button class="btn btn-sec" onclick="resetTypes()">Cocher tout</button></div>
       </div>
+      <div class="types" id="types"></div>
+      <div class="hint">Le filtre « Site » ne s'applique qu'aux sources qui ont une notion de site (véhicules, badges tiers, bibliothèque : affichés quel que soit le site choisi).</div>
     </div>
 
-    <div class="summary" id="summary"></div>
+    <div class="summary"><span id="summary-txt"></span></div>
     <div id="list"><div class="state-msg">Choisissez vos filtres et cliquez « Actualiser ».</div></div>
   </main>
 </div>
@@ -133,170 +130,536 @@ main{flex:1;padding:18px}
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modal"></div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
+/* ============================================================
+   RDZ — Supervision journal de bord unifié (v2)
+   Fusionne en un flux chronologique unique les écritures de :
+   journal de bord, alarmes, consignes, événements, constats
+   (+ suivi), validations de consignes, matériel, clés/badges
+   (internes + tiers), véhicules (mouvements/dégâts/main
+   courante), ouvertures résidents, ParkGuard (constats +
+   comptages), bibliothèque (filtrages + comptages).
+   Toute entrée est éditable ; l'écriture se fait directement
+   sur la table source (pas de file RDZSync ici : outil de
+   supervision desktop, écritures en ligne uniquement).
+   ============================================================ */
+
+/* ---------- Base principale ---------- */
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let curType = 'all';
-let allItems = [];          // items fusionnés {kind,id,dt,site_nom,agent_nom,raw,photos:[]}
-let photosByEntry = {};
+/* ---------- Base Flotte / RouteOps (véhicules) ---------- */
+const FLT_URL  = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const FLT_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const FLT_EMAIL = 'surveillance@rdz-security-management.ch';
+const FLT_PASS  = 'RDZ2026?/';
+const FLT_TOK_K = 'flt_tok_v2';
+let fltToken = null;
 
-function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
-function fmtTime(iso){ const d=new Date(iso); return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
-
-function setType(t){ curType=t; document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on',p.dataset.type===t)); render(); }
-
-async function loadSites(){
-  try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom');
-    document.getElementById('f-site').innerHTML = '<option value="">Tous</option>' + (data||[]).map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join('');
-  }catch(e){}
+async function fltLogin(){
+  try{ const s = JSON.parse(localStorage.getItem(FLT_TOK_K)||'{}'); if(s.t && s.e && Date.now()/1000 < s.e-60){ fltToken=s.t; return; } }catch(_){}
+  const r = await fetch(`${FLT_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':FLT_KEY},body:JSON.stringify({email:FLT_EMAIL,password:FLT_PASS})});
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error_description||'Auth flotte échouée'); }
+  const d = await r.json();
+  fltToken = d.access_token;
+  localStorage.setItem(FLT_TOK_K, JSON.stringify({t:d.access_token, e:Math.floor(Date.now()/1000)+(d.expires_in||3600)}));
+}
+async function flt(path, opts={}){
+  const r = await fetch(`${FLT_URL}/rest/v1/${path}`,{...opts, headers:{'apikey':FLT_KEY,'Content-Type':'application/json',...(fltToken?{'Authorization':`Bearer ${fltToken}`}:{}),...(opts.headers||{})}});
+  if(!r.ok){ const t = await r.text(); throw new Error(t || `HTTP ${r.status}`); }
+  if(r.status===204) return null;
+  const txt = await r.text(); return txt ? JSON.parse(txt) : null;
 }
 
+/* ---------- Utilitaires ---------- */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
+function fmtTime(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+// Journée de service RDZ : 06:30 -> 06:29 le lendemain.
+function serviceDate(d){
+  d = d ? new Date(d) : new Date();
+  d = new Date(d.getTime() - (6*60 + 30) * 60000);
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), j = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${j}`;
+}
+function combineDT(dateStr, timeStr){
+  if(!dateStr) return null;
+  const t = (timeStr && /^\d{1,2}:\d{2}/.test(timeStr)) ? timeStr : '00:00';
+  const dt = new Date(`${dateStr}T${t.length===5?t:t.padStart(5,'0')}:00`);
+  return isNaN(dt) ? null : dt.toISOString();
+}
+function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'+(e?' err':''); setTimeout(()=>t.className='toast',2400); }
+
+/* ---------- Palette des types ---------- */
+const KINDS = {
+  journal:        { label:'Journal de bord',        icon:'📓', color:'#2a4b8d' },
+  alarme:         { label:'Alarme',                  icon:'🚨', color:'#C8102E' },
+  consigne:       { label:'Consigne',                 icon:'📌', color:'#8B1A1A' },
+  evenement:      { label:'Événement',                icon:'📅', color:'#6B1212' },
+  constat:        { label:'Constat',                  icon:'🧱', color:'#b8860b' },
+  constat_suivi:  { label:'Suivi de constat',         icon:'📝', color:'#d19a1a' },
+  validation:     { label:'Validation consignes',     icon:'✅', color:'#1b7a3d' },
+  materiel:       { label:'Matériel',                 icon:'📦', color:'#555' },
+  acces:          { label:'Clé / Badge',              icon:'🔑', color:'#7a4b1b' },
+  vehicule_mvt:   { label:'Véhicule — prise/retour',  icon:'🚗', color:'#2a4b8d' },
+  degat:          { label:'Véhicule — dégât',         icon:'💥', color:'#C8102E' },
+  mc_vehicule:    { label:'Véhicule — main courante',icon:'🛠️', color:'#6B1212' },
+  ouverture:      { label:'Ouverture résident',       icon:'🚪', color:'#1b7a3d' },
+  parking:        { label:'Surveillance parking',     icon:'🅿️', color:'#8B1A1A' },
+  comptage:       { label:'Comptage parking',         icon:'🔢', color:'#8B1A1A' },
+  biblio_filtrage:{ label:'Bibliothèque — filtrage',  icon:'📚', color:'#2a4b8d' },
+  biblio_comptage:{ label:'Bibliothèque — comptage',  icon:'📚', color:'#4a6fb0' },
+};
+
+/* ---------- Référentiels ---------- */
+let sites = [];              // {id,nom}
+let siteNameById = {};
+let fleetVehicles = [];      // {id,plate,brand,model}
+let vehById = {};
+
+async function loadSites(){
+  try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom'); sites = data||[];
+    siteNameById = {}; sites.forEach(s=>siteNameById[s.id]=s.nom);
+    const opt = '<option value="">Tous</option>' + sites.map(s=>`<option value="${esc(s.id)}">${esc(s.nom)}</option>`).join('');
+    document.getElementById('f-site').innerHTML = opt;
+  }catch(e){}
+}
+async function loadFleetVehicles(){
+  try{
+    await fltLogin();
+    const data = await flt('fleet_vehicles?select=id,plate,brand,model&active=eq.true');
+    fleetVehicles = data||[]; vehById = {}; fleetVehicles.forEach(v=>vehById[v.id]=v);
+  }catch(e){ /* base flotte peut être temporairement inaccessible : on continue sans elle */ }
+}
+function vehLabel(id){ const v = vehById[id]; return v ? (v.plate || (v.brand+' '+v.model)) : (id||'—'); }
+
+/* ============================================================
+   Chaque source : fetch() renvoie les lignes brutes.
+   expand(row) renvoie 1..n entrées {ts, sub, kind, raw}.
+   fields(row) renvoie la liste des champs éditables.
+   save(row, payload) écrit la modification.
+   ============================================================ */
+const SOURCES = [
+  { kind:'journal', table:'journal_entrees', base:'main',
+    async fetch(){ const {data}=await sb.from('journal_entrees').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'journal', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `${r.activite||'Entrée'} — ${r.site_nom||''}`; },
+    snippet(r){ return r.situation||r.actions||''; },
+    fields(){ return [
+      {k:'activite',l:'Activité',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
+      {k:'localisation_autre',l:'Précision',t:'text'},{k:'date_rapport',l:'Date du rapport',t:'date'},
+      {k:'heure_rapport',l:'Heure du rapport',t:'text'},{k:'situation',l:'Que se passe-t-il ?',t:'textarea'},
+      {k:'actions',l:'Qu\'a-t-il fait ?',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('journal_entrees').update(p).eq('id',r.id); if(error) throw error; },
+    photos(r){ return photosByEntry[r.id]||[]; } },
+
+  { kind:'alarme', table:'alarme_interventions', base:'main',
+    async fetch(){ const {data}=await sb.from('alarme_interventions').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'alarme', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `🚨 ${r.zone||'Alarme'} — ${r.site_nom||''}`; },
+    snippet(r){ return r.situation||r.actions||''; },
+    fields(){ return [
+      {k:'zone',l:'Zone',t:'text'},{k:'transmetteur_code',l:'Transmetteur',t:'text'},
+      {k:'heure_appel',l:'Heure appel',t:'text'},{k:'heure_arrivee',l:'Heure arrivée',t:'text'},
+      {k:'heure_fin',l:'Heure fin',t:'text'},{k:'resultat',l:'Résultat',t:'text'},
+      {k:'situation',l:'Constat sur place',t:'textarea'},{k:'actions',l:'Actions menées',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('alarme_interventions').update(p).eq('id',r.id); if(error) throw error; },
+    photos(r){ return photosByEntry[r.id]||[]; } },
+
+  { kind:'consigne', table:'consignes', base:'main',
+    async fetch(){ const {data}=await sb.from('consignes').select('*'); return data||[]; },
+    expand(r){
+      const out=[{ ts:r.created_at||r.date_debut, sub:'Ajout', kind:'consigne', raw:r }];
+      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'consigne', raw:r });
+      return out; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(){ return ''; },
+    title(r){ return `Consigne — ${siteNameById[r.site_id]||'—'}`; },
+    snippet(r){ return r.texte||''; },
+    fields(){ return [
+      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
+      {k:'date_debut',l:'Début validité',t:'date'},{k:'date_fin',l:'Fin validité',t:'date'},
+      {k:'texte',l:'Texte',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('consignes').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'evenement', table:'evenements', base:'main',
+    async fetch(){ const {data}=await sb.from('evenements').select('*'); return data||[]; },
+    expand(r){
+      const base = r.created_at || combineDT(r.date,r.heure_debut);
+      const out=[{ ts:base, sub:'Ajout', kind:'evenement', raw:r }];
+      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'evenement', raw:r });
+      return out; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agents||''; },
+    title(r){ return `${r.titre||'Événement'} — ${siteNameById[r.site_id]||''}`; },
+    snippet(r){ return r.remarques||r.consignes||r.lieu||''; },
+    fields(){ return [
+      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
+      {k:'titre',l:'Titre',t:'text'},{k:'date',l:'Date',t:'date'},
+      {k:'heure_debut',l:'Heure début',t:'text'},{k:'heure_fin',l:'Heure fin',t:'text'},
+      {k:'heure_service_debut',l:'Début service renforcé',t:'text'},{k:'heure_service_fin',l:'Fin service renforcé',t:'text'},
+      {k:'lieu',l:'Lieu',t:'text'},{k:'nb_agents',l:'Nb agents',t:'number'},{k:'agents',l:'Agents',t:'text'},
+      {k:'tenue',l:'Tenue',t:'text'},{k:'contact',l:'Contact',t:'text'},
+      {k:'consignes',l:'Consignes',t:'textarea'},{k:'remarques',l:'Remarques',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('evenements').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'constat', table:'constats', base:'main',
+    async fetch(){ const {data}=await sb.from('constats').select('*'); return data||[]; },
+    expand(r){
+      const base = r.created_at || combineDT(r.date_rapport,r.heure_rapport);
+      const out=[{ ts:base, sub:'Ajout', kind:'constat', raw:r }];
+      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'constat', raw:r });
+      return out; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agent||''; },
+    title(r){ return `Constat — ${r.categorie||''} — ${siteNameById[r.site_id]||''}`; },
+    snippet(r){ return r.description||''; },
+    fields(){ return [
+      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
+      {k:'categorie',l:'Catégorie',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
+      {k:'statut',l:'Statut',t:'text'},{k:'agent',l:'Agent',t:'text'},
+      {k:'date_rapport',l:'Date rapport',t:'date'},{k:'heure_rapport',l:'Heure rapport',t:'text'},
+      {k:'description',l:'Description',t:'textarea'},{k:'procedure',l:'Procédure',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('constats').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'constat_suivi', table:'constats_journal', base:'main',
+    async fetch(){ const {data}=await sb.from('constats_journal').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at||r.date_entree, sub:'', kind:'constat_suivi', raw:r }]; },
+    site(){ return ''; }, agent(r){ return r.auteur||''; },
+    title(r){ return `Suivi constat — ${r.type_entree||''}`; },
+    snippet(r){ return r.texte||''; },
+    fields(){ return [
+      {k:'type_entree',l:'Type',t:'text'},{k:'date_entree',l:'Date',t:'date'},
+      {k:'auteur',l:'Auteur',t:'text'},{k:'texte',l:'Texte',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('constats_journal').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'validation', table:'consignes_lectures', base:'main',
+    async fetch(){ const {data}=await sb.from('consignes_lectures').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.validated_at||r.created_at, sub:'', kind:'validation', raw:r }]; },
+    site(r){ return r.site_nom||siteNameById[r.site_id]||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Validation consignes — ${r.agent_nom||''} · ${r.site_nom||''}`; },
+    snippet(r){ return `${r.nb_consignes||0} consigne(s) · ${r.nb_evenements||0} événement(s) · ${r.nb_constats||0} constat(s)`; },
+    fields(){ return [
+      {k:'nb_consignes',l:'Nb consignes',t:'number'},{k:'nb_evenements',l:'Nb événements',t:'number'},
+      {k:'nb_constats',l:'Nb constats',t:'number'},
+      {k:'consignes_json',l:'Snapshot consignes (JSON brut)',t:'textarea',warn:true},
+      {k:'evenements_json',l:'Snapshot événements (JSON brut)',t:'textarea',warn:true},
+      {k:'constats_json',l:'Snapshot constats (JSON brut)',t:'textarea',warn:true} ]; },
+    async save(r,p){ const {error}=await sb.from('consignes_lectures').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'materiel', table:'stock_attributions', base:'main',
+    async fetch(){ const {data}=await sb.from('stock_attributions').select('*'); return data||[]; },
+    expand(r){
+      const out=[{ ts:r.date_sortie, sub:'Sortie', kind:'materiel', raw:r }];
+      if(r.date_retour) out.push({ ts:r.date_retour, sub:'Retour', kind:'materiel', raw:r });
+      return out; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Matériel — ${r.materiel_nom||''}`; },
+    snippet(r){ return `Qté ${r.quantite||''} · statut ${r.statut||''}${r.note?' · '+r.note:''}`; },
+    fields(){ return [
+      {k:'materiel_nom',l:'Matériel',t:'text'},{k:'quantite',l:'Quantité',t:'number'},
+      {k:'statut',l:'Statut',t:'text'},{k:'etat_retour',l:'État au retour',t:'text'},
+      {k:'date_sortie',l:'Date sortie',t:'date'},{k:'date_retour',l:'Date retour',t:'date'},
+      {k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('stock_attributions').update({...r,...p}).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'acces', table:'stock_acces', base:'main',
+    async fetch(){ const {data}=await sb.from('stock_acces').select('*'); return data||[]; },
+    expand(r){
+      const out=[{ ts:r.date_remise, sub:'Remise', kind:'acces', raw:r }];
+      if(r.date_retour_reel) out.push({ ts:r.date_retour_reel, sub:'Retour', kind:'acces', raw:r });
+      return out; },
+    site(r){ return r.site_nom||siteNameById[r.site_id]||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `${r.item_type==='badge'?'Badge':'Clé'} ${r.receptionnaire_type==='externe'?'(tiers)':'(interne)'} — ${r.item_nom||''}`; },
+    snippet(r){ return `${r.receptionnaire_nom||''}${r.receptionnaire_societe?' · '+r.receptionnaire_societe:''}${r.notes?' · '+r.notes:''}`; },
+    fields(){ return [
+      {k:'item_nom',l:'Objet',t:'text'},{k:'item_type',l:'Type (clé/badge)',t:'text'},
+      {k:'statut',l:'Statut',t:'text',warn:true},{k:'receptionnaire_nom',l:'Récepteur — nom',t:'text'},
+      {k:'receptionnaire_societe',l:'Récepteur — société',t:'text'},{k:'receptionnaire_telephone',l:'Récepteur — téléphone',t:'text'},
+      {k:'receptionnaire_type',l:'Récepteur — type (interne/externe)',t:'text'},
+      {k:'date_remise',l:'Date remise',t:'date'},{k:'date_retour_reel',l:'Date retour',t:'date'},
+      {k:'notes',l:'Notes',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('stock_acces').update({...r,...p}).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'vehicule_mvt', table:'fleet_movements', base:'fleet',
+    async fetch(){ return await flt('fleet_movements?select=*') || []; },
+    expand(r){ return [{ ts:r.datetime||r.created_at, sub:r.type==='prise'?'Prise':'Restitution', kind:'vehicule_mvt', raw:r }]; },
+    site(){ return ''; }, agent(r){ return r.agent_name||''; },
+    title(r){ return `Véhicule — ${r.type==='prise'?'prise':'restitution'} — ${vehLabel(r.vehicle_id)}`; },
+    snippet(r){ return `${r.cleanliness?'Propreté : '+r.cleanliness+' · ':''}${r.notes||''}`; },
+    fields(){ return [ {k:'cleanliness',l:'Propreté',t:'text'},{k:'notes',l:'Notes',t:'textarea'} ]; },
+    async save(r,p){ await flt(`fleet_movements?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
+
+  { kind:'degat', table:'fleet_damages', base:'fleet',
+    async fetch(){ return await flt('fleet_damages?select=*') || []; },
+    expand(r){
+      const out=[{ ts:r.created_at||r.date, sub:'Signalement', kind:'degat', raw:r }];
+      if(r.resolved && r.resolved_at) out.push({ ts:r.resolved_at, sub:'Résolution', kind:'degat', raw:r });
+      return out; },
+    site(){ return ''; }, agent(r){ return r.created_by||''; },
+    title(r){ return `Dégât — ${vehLabel(r.vehicle_id)} — ${r.type||''}`; },
+    snippet(r){ return `${r.severity?'Gravité : '+r.severity+' · ':''}${r.description||''}`; },
+    fields(){ return [
+      {k:'type',l:'Type de dégât',t:'text'},{k:'severity',l:'Gravité',t:'text'},
+      {k:'description',l:'Description',t:'textarea'},
+      {k:'resolved',l:'Résolu',t:'checkbox'},{k:'resolved_at',l:'Date résolution',t:'date'} ]; },
+    async save(r,p){ await flt(`fleet_damages?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
+
+  { kind:'mc_vehicule', table:'fleet_events', base:'fleet',
+    async fetch(){ return await flt('fleet_events?select=*') || []; },
+    expand(r){ return [{ ts:r.date, sub:'', kind:'mc_vehicule', raw:r }]; },
+    site(){ return ''; }, agent(r){ return r.created_by||''; },
+    title(r){ return `Main courante véhicule — ${vehLabel(r.vehicle_id)} — ${r.type||''}`; },
+    snippet(r){ return `${r.description||''}${r.km?' · '+r.km+' km':''}`; },
+    fields(){ return [
+      {k:'type',l:'Type',t:'text'},{k:'date',l:'Date',t:'date'},
+      {k:'description',l:'Description',t:'textarea'},{k:'km',l:'Kilométrage',t:'number'} ]; },
+    async save(r,p){ await flt(`fleet_events?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
+
+  { kind:'ouverture', table:'ouvertures', base:'main',
+    async fetch(){ const {data}=await sb.from('ouvertures').select('*'); return data||[]; },
+    expand(r){ return [{ ts:combineDT(r.date_ouverture,r.heure_ouverture)||r.date_ouverture, sub:'', kind:'ouverture', raw:r }]; },
+    site(r){ return r.site||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Ouverture — ${r.personne||''} — ${r.localisation||''}`; },
+    snippet(r){ return `${r.motif||''}${r.note?' · '+r.note:''}`; },
+    fields(){ return [
+      {k:'personne',l:'Personne',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
+      {k:'motif',l:'Motif',t:'text'},{k:'date_ouverture',l:'Date',t:'date'},{k:'heure_ouverture',l:'Heure',t:'text'},
+      {k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('ouvertures').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'parking', table:'vehicles', base:'main',
+    async fetch(){ const {data}=await sb.from('vehicles').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'parking', raw:r }]; },
+    site(r){ return r.site||''; }, agent(r){ return r.agent_name||''; },
+    title(r){ return `${r.statut||'Constat'} — ${r.plaque||'—'}`; },
+    snippet(r){ return `${r.motif||''}${r.remarque?' · '+r.remarque:''}`; },
+    fields(){ return [
+      {k:'statut',l:'Statut',t:'text'},{k:'motif',l:'Motif',t:'text'},
+      {k:'plaque',l:'Plaque',t:'text'},{k:'num_denonciation',l:'N° dénonciation',t:'text'},
+      {k:'num_macaron',l:'N° macaron',t:'text'},{k:'remarque',l:'Remarque',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('vehicles').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'comptage', table:'comptages', base:'main',
+    async fetch(){ const {data}=await sb.from('comptages').select('*'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'comptage', raw:r }]; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agent_name||''; },
+    title(r){ return `Comptage — zone ${r.zone_id||''} — ${siteNameById[r.site_id]||''}`; },
+    snippet(r){ return `${r.vehicules_presents||0}/${r.places_totales||'—'} véhicules`; },
+    fields(){ return [
+      {k:'zone_id',l:'Zone',t:'text'},{k:'vehicules_presents',l:'Véhicules présents',t:'number'},
+      {k:'places_totales',l:'Places totales',t:'number'} ]; },
+    async save(r,p){ const {error}=await sb.from('comptages').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'biblio_filtrage', table:'bibliotheque_filtrages', base:'main',
+    async fetch(){ const {data}=await sb.from('bibliotheque_filtrages').select('*'); return data||[]; },
+    expand(r){ return [{ ts:combineDT(r.date_rapport,r.heure_rapport)||r.created_at, sub:'', kind:'biblio_filtrage', raw:r }]; },
+    site(r){ return r.poste_garde||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Filtrage bibliothèque — ${r.poste_garde||''}`; },
+    snippet(r){ return `${r.rappels_reglement||0} rappel(s) · ${r.evictions_refus||0} éviction/refus${r.note?' · '+r.note:''}`; },
+    fields(){ return [
+      {k:'rappels_reglement',l:'Rappels règlement',t:'number'},{k:'evictions_refus',l:'Évictions / refus',t:'number'},
+      {k:'entrees',l:'Entrées par origine (JSON brut)',t:'textarea',warn:true},{k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('bibliotheque_filtrages').update(p).eq('id',r.id); if(error) throw error; } },
+
+  { kind:'biblio_comptage', table:'bibliotheque_comptages', base:'main',
+    async fetch(){ const {data}=await sb.from('bibliotheque_comptages').select('*'); return data||[]; },
+    expand(r){ return [{ ts:combineDT(r.date_rapport,r.heure_rapport)||r.created_at, sub:'', kind:'biblio_comptage', raw:r }]; },
+    site(r){ return r.poste_garde||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Comptage bibliothèque — ${r.poste_garde||''}`; },
+    snippet(r){ return `Affluence ${r.affluence||'—'}${r.ambiance?' · '+r.ambiance:''}${r.note?' · '+r.note:''}`; },
+    fields(){ return [
+      {k:'affluence',l:'Affluence',t:'text'},{k:'ambiance',l:'Ambiance',t:'text'},
+      {k:'rappels_reglement',l:'Rappels règlement',t:'number'},{k:'evictions',l:'Évictions',t:'number'},
+      {k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('bibliotheque_comptages').update(p).eq('id',r.id); if(error) throw error; } },
+];
+
+/* ---------- Photos rattachées au journal/alarme ---------- */
+let photosByEntry = {};
+
+/* ---------- État ---------- */
+let allEntries = [];   // {ts, kind, sub, raw, src}
+let activeTypes = new Set(Object.keys(KINDS));
+
+function renderTypePills(){
+  const box = document.getElementById('types');
+  box.innerHTML = Object.entries(KINDS).map(([k,def])=>
+    `<button class="pill ${activeTypes.has(k)?'on':''}" style="${activeTypes.has(k)?`background:${def.color};border-color:${def.color}`:''}" onclick="toggleType('${k}')">
+      <span class="dot" style="background:${activeTypes.has(k)?'#fff':def.color}"></span>${def.icon} ${def.label}
+    </button>`).join('');
+}
+function toggleType(k){ activeTypes.has(k) ? activeTypes.delete(k) : activeTypes.add(k); renderTypePills(); render(); }
+function resetTypes(){ activeTypes = new Set(Object.keys(KINDS)); renderTypePills(); render(); }
+
 function rangeISO(){
-  const du = document.getElementById('f-du').value || todayStr();
+  const du = document.getElementById('f-du').value || serviceDate();
   const au = document.getElementById('f-au').value || du;
   return { gte: new Date(du+'T00:00:00').toISOString(), lte: new Date(au+'T23:59:59.999').toISOString() };
 }
 
 async function refresh(){
   const list = document.getElementById('list');
-  list.innerHTML = '<div class="state-msg">Chargement…</div>';
+  list.innerHTML = '<div class="state-msg">Chargement (plusieurs sources)…</div>';
   const {gte,lte} = rangeISO();
-  const siteId = document.getElementById('f-site').value;
-  allItems = [];
+  allEntries = [];
   try{
-    // Journal
-    let jq = sb.from('journal_entrees').select('*').gte('created_at',gte).lte('created_at',lte);
-    if(siteId) jq = jq.eq('site_id',siteId);
-    const { data: jdata } = await jq;
-    (jdata||[]).forEach(r=>allItems.push({ kind:'journal', id:r.id, dt:r.created_at, site_nom:r.site_nom, agent_nom:r.agent_nom, raw:r }));
+    await Promise.all(SOURCES.map(async src=>{
+      try{
+        const rows = await src.fetch();
+        rows.forEach(r=>{
+          src.expand(r).forEach(e=>{
+            if(!e.ts) return;
+            const t = new Date(e.ts).getTime();
+            if(isNaN(t) || t < new Date(gte).getTime() || t > new Date(lte).getTime()) return;
+            allEntries.push({ ts:e.ts, kind:e.kind, sub:e.sub, raw:e.raw, src });
+          });
+        });
+      }catch(err){ console.warn('Source en échec :', src.table, err.message||err); }
+    }));
 
-    // Alarme
-    let aq = sb.from('alarme_interventions').select('*').gte('created_at',gte).lte('created_at',lte);
-    if(siteId) aq = aq.eq('site_id',siteId);
-    const { data: adata } = await aq;
-    (adata||[]).forEach(r=>allItems.push({ kind:'alarme', id:r.id, dt:r.created_at, site_nom:r.site_nom, agent_nom:r.agent_nom, raw:r }));
-
-    // Photos rattachées
-    const ids = allItems.map(i=>i.id);
+    // Photos journal/alarme
+    const ids = allEntries.filter(e=>e.kind==='journal'||e.kind==='alarme').map(e=>e.raw.id);
     photosByEntry = {};
     if(ids.length){
       const { data: pdata } = await sb.from('journal_photos').select('*').in('entree_id', ids);
       (pdata||[]).forEach(p=>{ (photosByEntry[p.entree_id]=photosByEntry[p.entree_id]||[]).push(p); });
     }
-    allItems.forEach(i=>i.photos = photosByEntry[i.id]||[]);
-    allItems.sort((a,b)=> new Date(b.dt)-new Date(a.dt));
 
-    // Agents présents
-    const agents = [...new Set(allItems.map(i=>i.agent_nom).filter(Boolean))].sort();
+    allEntries.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
+
+    // Agents présents (pour le filtre)
+    const agents = [...new Set(allEntries.map(e=>e.src.agent(e.raw)).filter(Boolean))].sort();
     const sel = document.getElementById('f-agent'); const cur = sel.value;
     sel.innerHTML = '<option value="">Tous</option>' + agents.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
     if(agents.includes(cur)) sel.value = cur;
 
     render();
-  }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; }
+  }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; console.error(e); }
 }
+
+/* Sources qui ont une vraie notion de site (site_id/site_nom résolu) */
+const SITE_AWARE = new Set(['journal','alarme','consigne','evenement','constat','validation','materiel','acces','comptage']);
 
 function render(){
   const list = document.getElementById('list');
   const agent = document.getElementById('f-agent').value;
-  let items = allItems.filter(i=> curType==='all' || i.kind===curType);
-  if(agent) items = items.filter(i=>i.agent_nom===agent);
+  const siteId = document.getElementById('f-site').value;
+  const siteName = siteId ? (siteNameById[siteId]||'') : '';
 
-  document.getElementById('summary').textContent = `${items.length} entrée(s)`;
+  let items = allEntries.filter(e=>activeTypes.has(e.kind));
+  if(agent) items = items.filter(e=>e.src.agent(e.raw)===agent);
+  if(siteName) items = items.filter(e=>{
+    if(!SITE_AWARE.has(e.kind)) return true; // sources sans notion de site : toujours affichées
+    return (e.src.site(e.raw)||'').toLowerCase() === siteName.toLowerCase();
+  });
+
+  document.getElementById('summary-txt').textContent = `${items.length} entrée(s)`;
   if(!items.length){ list.innerHTML = '<div class="state-msg">Aucune entrée pour ces filtres.</div>'; return; }
 
-  list.innerHTML = items.map(i=>{
-    const r=i.raw, nPh=i.photos.length;
-    let title, snip;
-    if(i.kind==='journal'){
-      title = esc(r.activite||'Entrée') + ' — ' + esc(r.site_nom||'');
-      snip = esc((r.situation||r.actions||'').slice(0,180)) || '<i>Sans description</i>';
-    }else{
-      title = '🚨 Alarme' + (r.zone?' · '+esc(r.zone):'') + ' — ' + esc(r.site_nom||'');
-      snip = esc((r.situation||r.actions||'').slice(0,180)) || '<i>Voir la marche à suivre</i>';
-    }
-    let resTag='';
-    if(i.kind==='alarme' && r.resultat){ const cls = r.resultat.startsWith('Levée')?'Levée':(r.resultat.startsWith('Interv')?'Interv':'RAS'); resTag=`<span class="res ${cls}">${esc(r.resultat)}</span>`; }
-    return `<div class="entry ${i.kind==='journal'?'j':'a'}" onclick="openDetail('${i.kind}','${esc(i.id)}')">
-      <div class="when"><div class="d">${fmtDate(i.dt)}</div><div class="h">${fmtTime(i.dt)}</div></div>
+  list.innerHTML = items.map((e,i)=>{
+    const def = KINDS[e.kind]; const r = e.raw;
+    let title='', snip='';
+    try{ title = e.src.title(r); snip = e.src.snippet(r); }catch(_){ title = def.label; }
+    const nPh = (e.src.photos ? e.src.photos(r) : []).length;
+    return `<div class="entry" style="border-left-color:${def.color}" onclick="openDetail(${i})" data-idx="${i}">
+      <div class="when"><div class="d">${fmtDateShort(e.ts)}</div><div class="h">${fmtTime(e.ts)}</div></div>
       <div class="mid">
-        <div class="title">${title}</div>
-        <div class="snip">${snip}</div>
-        <div class="meta2">👤 ${esc(i.agent_nom||'—')}</div>
+        <div class="title">${esc(title)}</div>
+        <div class="snip">${esc(snip)||'<i>Sans description</i>'}</div>
+        <div class="meta2">👤 ${esc(e.src.agent(r)||'—')}${SITE_AWARE.has(e.kind)&&e.src.site(r)?' · 📍 '+esc(e.src.site(r)):''}</div>
       </div>
       <div class="rgt">
-        <span class="tag ${i.kind==='journal'?'j':'a'}">${i.kind==='journal'?'Journal':'Alarme'}</span>
-        ${resTag}
+        <span class="tag" style="background:${def.color}">${def.icon} ${def.label}</span>
+        ${e.sub?`<span class="tag sub">${esc(e.sub)}</span>`:''}
         ${nPh?`<span class="tag ph">📷 ${nPh}</span>`:''}
       </div>
     </div>`;
   }).join('');
+  window.__renderedItems = items; // pour openDetail
 }
 
-/* ---------- détail ---------- */
+/* ---------- Détail + édition ---------- */
+let editing = null; // {entry, fields}
+
 function photoHtml(photos){
-  if(!photos.length) return '';
+  if(!photos || !photos.length) return '';
   return `<div class="msec"><div class="st">Photos (${photos.length})</div><div class="photos">` +
-    photos.map(p=>`<div class="photo">${p.url?`<a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>`:`<div class="pend">📷 En attente d'envoi (WiFi)</div>`}<div class="lg">${esc(p.legende||'')}</div></div>`).join('') +
+    photos.map(p=>`<div class="photo">${p.url?`<a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>`:`<div class="pend">📷 En attente d'envoi</div>`}<div class="lg">${esc(p.legende||'')}</div></div>`).join('') +
     `</div></div>`;
 }
-function openDetail(kind,id){
-  const item = allItems.find(i=>i.kind===kind && String(i.id)===String(id));
-  if(!item) return;
-  const r=item.raw; const m=document.getElementById('modal');
-  let html='';
-  if(kind==='journal'){
-    html = `<div class="mh j"><button class="x" onclick="closeModal()">✕</button>
-      <div class="k">Journal de bord</div><h3>${esc(r.activite||'Entrée')} — ${esc(r.site_nom||'')}</h3></div>
-      <div class="mb">
-        <div class="mgrid">
-          <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent_nom||'—')}</div></div>
-          <div class="mcell"><div class="k">Date / heure</div><div class="v">${esc((r.date_rapport||fmtDate(r.created_at))+' '+(r.heure_rapport||''))}</div></div>
-          <div class="mcell"><div class="k">Localisation</div><div class="v">${esc(r.localisation||'—')}</div></div>
-          <div class="mcell"><div class="k">Précision</div><div class="v">${esc(r.localisation_autre||'—')}</div></div>
-        </div>
-        ${r.situation?`<div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation)}</div></div>`:''}
-        ${r.actions?`<div class="msec"><div class="st">Qu'a-t-il fait ?</div><div class="txt">${esc(r.actions)}</div></div>`:''}
-        ${photoHtml(item.photos)}
-      </div>`;
-  }else{
-    let ck=[]; try{ ck = typeof r.checklist==='string'?JSON.parse(r.checklist||'[]'):(r.checklist||[]); }catch(e){ ck=[]; }
-    const ckHtml = ck.length ? `<div class="msec"><div class="st">Marche à suivre</div>` + ck.map(c=>{
-      if(c.type==='heure') return `<div class="ckline"><span class="ico">⏱</span><span>${esc(c.libelle)}</span><span class="val">${esc(c.valeur||'—')}</span></div>`;
-      if(c.type==='note')  return `<div class="ckline"><span class="ico">📝</span><span>${esc(c.libelle)}</span>${c.valeur?`<div class="note-v">${esc(c.valeur)}</div>`:''}</div>`;
-      return `<div class="ckline"><span class="ico">${c.fait?'✅':'⬜'}</span><span>${esc(c.libelle)}</span>${c.heure?`<span class="val">${esc(c.heure)}</span>`:''}</div>`;
-    }).join('') + `</div>` : '';
-    html = `<div class="mh a"><button class="x" onclick="closeModal()">✕</button>
-      <div class="k">Intervention alarme</div><h3>🚨 ${esc(r.zone||'Alarme')} — ${esc(r.site_nom||'')}</h3></div>
-      <div class="mb">
-        <div class="mgrid">
-          <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent_nom||'—')}</div></div>
-          <div class="mcell"><div class="k">Transmetteur</div><div class="v">${esc(r.transmetteur_code||'—')}</div></div>
-          <div class="mcell"><div class="k">Appel / Arrivée / Fin</div><div class="v">${esc((r.heure_appel||'—')+' · '+(r.heure_arrivee||'—')+' · '+(r.heure_fin||'—'))}</div></div>
-          <div class="mcell"><div class="k">Résultat</div><div class="v">${esc(r.resultat||'—')}</div></div>
-        </div>
-        ${ckHtml}
-        ${r.situation?`<div class="msec"><div class="st">Constat sur place</div><div class="txt">${esc(r.situation)}</div></div>`:''}
-        ${r.actions?`<div class="msec"><div class="st">Actions menées</div><div class="txt">${esc(r.actions)}</div></div>`:''}
-        ${photoHtml(item.photos)}
-      </div>`;
-  }
-  m.innerHTML = html;
+
+function openDetail(idx){
+  const items = window.__renderedItems; const e = items[idx]; if(!e) return;
+  const def = KINDS[e.kind]; const r = e.raw; const m = document.getElementById('modal');
+  let title=''; try{ title = e.src.title(r); }catch(_){ title = def.label; }
+  const nPh = (e.src.photos ? e.src.photos(r) : []);
+
+  m.innerHTML = `
+    <div class="mh" style="background:${def.color}"><button class="x" onclick="closeModal()">✕</button>
+      <div class="k">${def.icon} ${def.label}${e.sub?' · '+esc(e.sub):''}</div><h3>${esc(title)}</h3></div>
+    <div class="mb">
+      <div class="mgrid">
+        <div class="mcell"><div class="k">Agent</div><div class="v">${esc(e.src.agent(r)||'—')}</div></div>
+        <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(e.ts)} ${fmtTime(e.ts)}</div></div>
+      </div>
+      <div id="detail-view"></div>
+      ${photoHtml(nPh)}
+    </div>`;
+  renderDetailView(e);
   document.getElementById('overlay').classList.add('show');
 }
+function renderDetailView(e){
+  const box = document.getElementById('detail-view');
+  const r = e.raw; let snip=''; try{ snip = e.src.snippet(r); }catch(_){}
+  box.innerHTML = `
+    ${snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:''}
+    <div class="editbar"><button class="btn btn-sec" onclick="closeModal()">Fermer</button><button class="btn" onclick="startEdit(${window.__renderedItems.indexOf(e)})">✏️ Modifier</button></div>`;
+}
+function startEdit(idx){
+  const items = window.__renderedItems; const e = items[idx]; if(!e) return;
+  const r = e.raw; const fields = e.src.fields(r);
+  const box = document.getElementById('detail-view');
+  box.innerHTML = `
+    <div class="readonly-note">Les champs marqués ⚠ sont sensibles (anti-collision, snapshot JSON) — à modifier avec précaution.</div>
+    ${fields.map(f=>{
+      const val = r[f.k]==null?'':r[f.k];
+      if(f.t==='textarea') return `<div class="efield ${f.warn?'warn':''}"><label>${f.warn?'⚠ ':''}${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(typeof val==='object'?JSON.stringify(val):val)}</textarea></div>`;
+      if(f.t==='select') return `<div class="efield"><label>${esc(f.l)}</label><select id="ef-${f.k}">${f.opts.map(o=>`<option value="${esc(o.v)}" ${String(o.v)===String(val)?'selected':''}>${esc(o.l)}</option>`).join('')}</select></div>`;
+      if(f.t==='checkbox') return `<div class="efield check"><input type="checkbox" id="ef-${f.k}" ${val?'checked':''}><label>${esc(f.l)}</label></div>`;
+      return `<div class="efield ${f.warn?'warn':''}"><label>${f.warn?'⚠ ':''}${esc(f.l)}</label><input type="${f.t==='date'?'date':(f.t==='number'?'number':'text')}" id="ef-${f.k}" value="${esc(val)}"></div>`;
+    }).join('')}
+    <div class="esave"><button class="btn btn-sec" onclick="renderDetailView(window.__renderedItems[${idx}])">Annuler</button><button class="btn" onclick="saveEdit(${idx})">💾 Enregistrer</button></div>`;
+}
+async function saveEdit(idx){
+  const items = window.__renderedItems; const e = items[idx]; if(!e) return;
+  const r = e.raw; const fields = e.src.fields(r);
+  const payload = {};
+  fields.forEach(f=>{
+    const el = document.getElementById('ef-'+f.k); if(!el) return;
+    if(f.t==='checkbox'){ payload[f.k] = el.checked; }
+    else if(f.t==='number'){ payload[f.k] = el.value===''?null:Number(el.value); }
+    else { payload[f.k] = el.value; }
+  });
+  try{
+    await e.src.save(r, payload);
+    Object.assign(r, payload);
+    toast('Modifié ✓');
+    closeModal();
+    render();
+  }catch(err){ toast('Échec de l\'enregistrement : '+(err.message||err), true); }
+}
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
 
-/* init */
-document.getElementById('f-du').value = todayStr();
-document.getElementById('f-au').value = todayStr();
-loadSites();
-refresh();
+/* ---------- init ---------- */
+document.getElementById('f-du').value = serviceDate();
+document.getElementById('f-au').value = serviceDate();
+renderTypePills();
+loadSites().then(()=>{ loadFleetVehicles().then(refresh); refresh(); });
 </script>
 </body>
 </html>
