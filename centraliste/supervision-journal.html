@@ -94,6 +94,18 @@ main{flex:1;padding:18px}
 
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:11px 18px;border-radius:var(--radius-ui);font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:200}
 .toast.show{opacity:1}.toast.err{background:var(--danger)}
+
+/* Rapport client imprimable */
+.report-view{display:none}
+.report-view.open{display:block;max-width:820px;margin:20px auto;padding:0 16px}
+.report-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+@media print{
+  body > *:not(.report-view){display:none!important}
+  .report-view{display:block!important;margin:0;max-width:100%;padding:0}
+  .report-toolbar{display:none!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  @page{margin:12mm;size:A4}
+}
 </style>
 </head>
 <body>
@@ -117,9 +129,10 @@ main{flex:1;padding:18px}
         <div class="fg"><label>Agent</label><select id="f-agent"><option value="">Tous</option></select></div>
         <div class="fg"><label>&nbsp;</label><button class="btn" onclick="refresh()">🔄 Actualiser</button></div>
         <div class="fg"><label>&nbsp;</label><button class="btn btn-sec" onclick="resetTypes()">Cocher tout</button></div>
+        <div class="fg"><label>&nbsp;</label><button class="btn btn-sec" onclick="clearTypes()">Tout décocher</button></div>
       </div>
       <div class="types" id="types"></div>
-      <div class="hint">Le filtre « Site » ne s'applique qu'aux sources qui ont une notion de site (véhicules, badges tiers, bibliothèque : affichés quel que soit le site choisi).</div>
+      <div class="hint">Le filtre « Site » ne s'applique qu'aux sources qui ont une notion de site (véhicules, badges tiers, bibliothèque : affichés quel que soit le site choisi). Une « journée » va de 06h30 à 06h29 le lendemain (journée de service RDZ).</div>
     </div>
 
     <div class="summary"><span id="summary-txt"></span></div>
@@ -131,6 +144,15 @@ main{flex:1;padding:18px}
   <div class="modal" id="modal"></div>
 </div>
 <div class="toast" id="toast"></div>
+
+<div class="report-view" id="report-view">
+  <div class="report-toolbar">
+    <button class="btn" onclick="window.print()">🖨 Imprimer</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-sec" onclick="closeReport()">✕ Fermer l'aperçu</button>
+  </div>
+  <div id="report-content"></div>
+</div>
 
 <script>
 /* ============================================================
@@ -193,6 +215,183 @@ function combineDT(dateStr, timeStr){
   return isNaN(dt) ? null : dt.toISOString();
 }
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'+(e?' err':''); setTimeout(()=>t.className='toast',2400); }
+
+/* ============================================================
+   Rapports client imprimables — repris à l'identique des fichiers
+   de référence existants (charte visuelle, jamais réinventée) :
+   - ouverture résident  -> style "RDZ Reports" (historique-ouvertures.html)
+   - comptage bibliothèque -> style "Evènement //" (supervision-bibliotheque.html)
+   ============================================================ */
+const RPTO_LOGO_B64 = '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';
+function rpFmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); if(!d) return iso; return `${d}.${m}.${y}`; }
+function rpFmtHeure(h){ return h ? h.slice(0,5) : '—'; }
+
+function rpFieldO(lbl,val){
+  return `<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">${lbl}</label><div style="font-size:13px;color:#1a1a1a;padding:5px 0;border-bottom:1px solid #eee;min-height:28px;font-weight:500">${val}</div></div>`;
+}
+function rpPhotoBoxO(label,url){
+  const box = url
+    ? `<div style="border:1.5px solid #e0e0e0;border-radius:8px;background:#fafafa;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:180px"><img src="${url}" style="width:100%;height:100%;max-height:240px;object-fit:contain;display:block"></div>`
+    : `<div style="border:1.5px dashed #e0e0e0;border-radius:8px;background:#fafafa;color:#bbb;font-size:12px;text-align:center;padding:24px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;min-height:180px">📷<span>Photo non disponible</span></div>`;
+  return `<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</div>${box}</div>`;
+}
+// Style "RDZ Reports" — repris à l'identique de historique-ouvertures.html
+function buildRapportOuverture(o){
+  const dateTxt = rpFmtDate(o.date_ouverture), heureTxt = rpFmtHeure(o.heure_ouverture);
+  return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
+    <div style="background:#1a1a1a;padding:1.5rem 2rem">
+      <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
+        <div style="flex:1">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">Rapport d'ouverture</div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${esc(o.site)}</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);background:#f0f0f0">
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Date</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${dateTxt}</div></div>
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Heure</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${heureTxt}</div></div>
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(o.agent_nom||'—')}</div></div>
+      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Statut</label><div><span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f8f0;color:#1e6b1e;border:1.5px solid #1e6b1e">Enregistrée</span></div></div>
+    </div>
+    <div style="padding:1.5rem 2rem">
+      <div style="margin-bottom:2rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">1 — Détails de l'ouverture</div>
+        <div style="padding:1.2rem 1rem">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('Localisation',esc(o.localisation||'—'))}${rpFieldO('Identité de la personne',esc(o.personne||'—'))}</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px">${rpFieldO('Motif',esc(o.motif||'—'))}</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Note',esc(o.note||'—'))}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:0;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">2 — Preuve photographique</div>
+        <div style="padding:1.2rem 1rem"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Photo jointe',o.photo_url)}</div></div>
+      </div>
+    </div>
+    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
+        <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel — Usage officiel uniquement</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#666;font-weight:600;margin-bottom:4px">Réf. : ${(o.id||'').toString().slice(0,8).toUpperCase()}</div>
+        <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Style "Evènement //" — repris à l'identique de supervision-bibliotheque.html
+function rpFRow(lbl,val){ return `<div style="display:flex;padding:8px 0;border-bottom:1px solid #eee;font-size:12.5px"><div style="width:60%;color:#4a4a4a;padding-right:12px">${lbl}</div><div style="width:40%;font-weight:600;color:#1a1a1a">${val}</div></div>`; }
+function rpSTitle(t){ return `<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin:18px 0 8px">${t}</div>`; }
+function rpPhotoBlock(url){
+  if(!url) return '';
+  return `<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📷 Photo jointe</div><img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid #eee;display:block"></div>`;
+}
+function rpRetention(dateStr){ if(!dateStr) return '—'; const d=new Date(dateStr+'T00:00:00'); d.setFullYear(d.getFullYear()+5); return rpFmtDate(d.toISOString().slice(0,10)); }
+function rpShellIndividual(titre, poste, meta, bodyHtml, footerLabel){
+  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1)">
+    <div style="height:6px;background:#C8102E"></div>
+    <div style="background:#C8102E;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px">Ce rapport contient des données personnelles. Vous devez le supprimer au plus tard le ${meta.retention}</div>
+    <div style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-align:right;padding:6px 20px">Evènement //</div>
+    <div style="text-align:right;font-size:12px;color:#888;padding:14px 20px 0">${esc(poste)}</div>
+    <div style="text-align:center;padding:14px 20px 18px"><div style="font-size:17px;font-weight:700;color:#1a1a1a">${esc(titre)}</div></div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 18px">
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;width:180px;background:#fafafa">Catégorie</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Controle</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Priorité</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Moyenne</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Poste de garde</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(poste)}</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Déclaration par</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.agent)}</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Date de début</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.debut)}</td></tr>
+    </table>
+    <div style="padding:0 20px 20px">${bodyHtml}</div>
+    <div style="border-top:2px solid #eee;padding:10px 20px;display:flex;justify-content:space-between;font-size:10.5px;color:#9a9a9a">
+      <span>${esc(meta.debut)}</span><span>${esc(footerLabel)}</span><span>Page 1 / 1</span>
+    </div>
+  </div>`;
+}
+function buildBiblioComptageReport(c){
+  const meta = { agent:c.agent_nom, debut:`${rpFmtDate(c.date_rapport)} ${rpFmtHeure(c.heure_rapport)}`, retention:rpRetention(c.date_rapport) };
+  const body = rpSTitle('Date') + rpFRow('Date',rpFmtDate(c.date_rapport)) + rpFRow("L'heure",rpFmtHeure(c.heure_rapport))
+    + rpSTitle('Type') + rpFRow('Type','Patrouille')
+    + rpSTitle('Localisation') + rpFRow('Précisez la localisation (si incident/nécessaire)','—')
+    + rpSTitle('Rapport')
+    + rpFRow("Affluence (Nbre de personnes dans l'enceinte de la bibliothèque)", c.affluence??'—')
+    + rpFRow('Physionomie', esc(c.ambiance||'—'))
+    + rpFRow('Rappel(s) au règlement (nombre / relève identité / motif)', c.rappels_reglement??'—')
+    + rpFRow('Eviction(s) / Refus (nombre / relève identité / motif)', c.evictions??'—')
+    + rpFRow('Informations complémentaires (si nécessaire)', c.note ? esc(c.note) : '—')
+    + rpPhotoBlock(c.photo_url);
+  return rpShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque //');
+}
+
+// Style "RDZ Reports" — aucun rapport client parking n'existait déjà en
+// production ; construit sur le même gabarit que buildRapportOuverture
+// (choix validé) plutôt que le style "Evènement //" réservé à la bibliothèque.
+function buildParkingReport(v){
+  const dateTxt = v.created_at ? rpFmtDate(new Date(v.created_at).toISOString().slice(0,10)) : '—';
+  const heureTxt = v.created_at ? fmtTime(v.created_at) : '—';
+  const photos = [
+    {label:'Véhicule', url:v.photo_vehicule_url},
+    {label:'Dénonciation', url:v.photo_denonciation_url},
+    {label:'Pare-brise', url:v.photo_parebrise_url},
+    {label:'Macaron', url:v.photo_macaron_url}
+  ].filter(p=>p.url || true).slice(0,4);
+  return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
+    <div style="background:#1a1a1a;padding:1.5rem 2rem">
+      <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
+        <div style="flex:1">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">Rapport de surveillance parking</div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${esc(v.site||'—')}</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);background:#f0f0f0">
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Date</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${dateTxt}</div></div>
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Heure</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${heureTxt}</div></div>
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(v.agent_name||'—')}</div></div>
+      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Statut</label><div><span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#fdeceb;color:#8B1A1A;border:1.5px solid #8B1A1A">${esc(v.statut||'—')}</span></div></div>
+    </div>
+    <div style="padding:1.5rem 2rem">
+      <div style="margin-bottom:2rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">1 — Détails du contrôle</div>
+        <div style="padding:1.2rem 1rem">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('Plaque',esc(v.plaque||'—'))}${rpFieldO('Motif',esc(v.motif||'—'))}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('N° dénonciation',esc(v.num_denonciation||'—'))}${rpFieldO('N° macaron',esc(v.num_macaron||'—'))}</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Remarque',esc(v.remarque||'—'))}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:0;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">2 — Preuve photographique</div>
+        <div style="padding:1.2rem 1rem"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map(p=>rpPhotoBoxO(p.label,p.url)).join('')}</div></div>
+      </div>
+    </div>
+    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
+        <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel — Usage officiel uniquement</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#666;font-weight:600;margin-bottom:4px">Réf. : ${(v.id||'').toString().slice(0,8).toUpperCase()}</div>
+        <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+const REPORTABLE = { ouverture: buildRapportOuverture, biblio_comptage: buildBiblioComptageReport, parking: buildParkingReport };
+
+function openReport(idx){
+  const items = window.__renderedItems; const e = items[idx]; if(!e) return;
+  const fn = REPORTABLE[e.kind]; if(!fn) return;
+  document.getElementById('report-content').innerHTML = fn(e.raw);
+  closeModal();
+  document.getElementById('report-view').classList.add('open');
+  window.scrollTo(0,0);
+}
+function closeReport(){ document.getElementById('report-view').classList.remove('open'); }
 
 /* ---------- Palette des types ---------- */
 const KINDS = {
@@ -494,11 +693,17 @@ function renderTypePills(){
 }
 function toggleType(k){ activeTypes.has(k) ? activeTypes.delete(k) : activeTypes.add(k); renderTypePills(); render(); }
 function resetTypes(){ activeTypes = new Set(Object.keys(KINDS)); renderTypePills(); render(); }
+function clearTypes(){ activeTypes = new Set(); renderTypePills(); render(); }
 
+// Journée de service RDZ : 06:30 -> 06:29 le lendemain (jamais minuit -> minuit).
 function rangeISO(){
   const du = document.getElementById('f-du').value || serviceDate();
   const au = document.getElementById('f-au').value || du;
-  return { gte: new Date(du+'T00:00:00').toISOString(), lte: new Date(au+'T23:59:59.999').toISOString() };
+  const gte = new Date(du+'T06:30:00');
+  const lte = new Date(au+'T06:30:00');
+  lte.setDate(lte.getDate()+1);
+  lte.setMilliseconds(lte.getMilliseconds()-1);
+  return { gte: gte.toISOString(), lte: lte.toISOString() };
 }
 
 async function refresh(){
@@ -615,9 +820,11 @@ function openDetail(idx){
 function renderDetailView(e){
   const box = document.getElementById('detail-view');
   const r = e.raw; let snip=''; try{ snip = e.src.snippet(r); }catch(_){}
+  const idx = window.__renderedItems.indexOf(e);
+  const reportBtn = REPORTABLE[e.kind] ? `<button class="btn btn-sec" onclick="openReport(${idx})">🖨 Rapport client</button>` : '';
   box.innerHTML = `
     ${snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:''}
-    <div class="editbar"><button class="btn btn-sec" onclick="closeModal()">Fermer</button><button class="btn" onclick="startEdit(${window.__renderedItems.indexOf(e)})">✏️ Modifier</button></div>`;
+    <div class="editbar">${reportBtn}<button class="btn btn-sec" onclick="closeModal()">Fermer</button><button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button></div>`;
 }
 function startEdit(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
