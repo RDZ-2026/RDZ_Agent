@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-agent · v7 · 2026-08-09 -->
+<!-- RDZ · alarme-agent · v8 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -109,7 +109,7 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
 .note-block{background:#fff;border:1px solid var(--line-soft);border-left:4px solid #3b5b7a;border-radius:var(--radius-section);padding:13px;margin-bottom:9px}
 .note-lbl{font-size:14.5px;font-weight:bold;margin-bottom:10px}
 .note-input{position:relative}
-.note-input textarea{width:100%;padding:10px 48px 10px 10px;border:1px solid var(--line);border-radius:var(--radius-ui);font-family:var(--font);font-size:14px;line-height:1.4;resize:vertical;box-sizing:border-box}
+.note-input textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:var(--radius-ui);font-family:var(--font);font-size:14px;line-height:1.4;resize:vertical;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -174,14 +174,12 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
         <label>Que se passe-t-il&nbsp;? <span class="hint">Ce que vous constatez sur place.</span></label>
         <div class="dictable">
           <textarea id="f-situation" placeholder="Décrivez ou dictez…"></textarea>
-          <button type="button" class="mic" data-target="f-situation">🎤 Dicter</button>
         </div>
       </div>
       <div class="field">
         <label>Qu'avez-vous fait&nbsp;? <span class="hint">Vos actions, la remise en état, la levée de doute.</span></label>
         <div class="dictable">
           <textarea id="f-actions" placeholder="Décrivez ou dictez…"></textarea>
-          <button type="button" class="mic" data-target="f-actions">🎤 Dicter</button>
         </div>
       </div>
 
@@ -640,7 +638,6 @@ function renderChecklist(){
         <div class="note-lbl">${esc(c.libelle)}</div>
         <div class="note-input">
           <textarea id="note-${i}" rows="2" placeholder="Saisir ou dicter…" oninput="checklist[${i}].note=this.value">${esc(c.note||'')}</textarea>
-          <button type="button" class="mic" data-target="note-${i}">🎤</button>
         </div>
       </div>`;
     }
@@ -689,7 +686,6 @@ function renderPhotos(){
       <div class="pmeta">
         <div class="dictable">
           <input type="text" placeholder="Légende…" value="${esc(p.legende)}" oninput="photos[${i}].legende=this.value" id="leg-${i}">
-          <button type="button" class="mic" data-target="leg-${i}" style="bottom:4px">🎤</button>
         </div>
         <button type="button" class="rm" onclick="removePhoto(${i})">✕ Retirer</button>
       </div></div>`).join('');
