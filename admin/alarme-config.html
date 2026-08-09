@@ -1,10 +1,10 @@
-<!-- RDZ · alarme-config · v2 · 2026-08-08 -->
+<!-- RDZ · alarme-config · v2 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RDZ — Configuration des alarmes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Configuration alarme</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -17,61 +17,77 @@
   --font:Arial, Helvetica, sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg-soft);color:var(--ink)}
-.wrap{max-width:820px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
-header{background:var(--red);color:#fff;padding:12px 18px}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
 header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
 header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
 header .sub{font-size:12px;opacity:.9;margin-top:2px}
 header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
-main{flex:1;padding:18px}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 14px;color:var(--ink)}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:14px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:24px 10px}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.ok-msg{background:#eef6ef;border:1px solid #bfe3c6;color:var(--ok);border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
 
-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:11px 18px;border-radius:var(--radius-ui);font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
-.toast.show{opacity:1}
-.toast.err{background:var(--danger)}
+/* Accueil — gros boutons, pas de sidebar (charte admin/direction) */
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);
+  border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;color:inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.group-btn:active{border-color:var(--red)}
+.group-btn .ic{font-size:26px;width:36px;text-align:center;flex-shrink:0}
+.group-btn .txt .t{font-weight:bold;font-size:15px;color:var(--ink)}
+.group-btn .txt .d{font-size:12.5px;color:#666;margin-top:3px;line-height:1.4}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:20px}
 
-.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
-.h2{font-size:16px;font-weight:bold}
-.btn{border:none;border-radius:var(--radius-ui);padding:10px 15px;font-size:14px;font-weight:bold;cursor:pointer;font-family:var(--font)}
-.btn-red{background:var(--red);color:#fff}
-.btn-red:active{background:var(--red-dark)}
-.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
-.btn-danger{background:#fff;border:1px solid #e0a6a0;color:var(--danger)}
-.btn-sm{padding:7px 11px;font-size:13px}
+/* Pilules de sous-navigation (apparaissent une fois dans une rubrique) */
+.pills{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.pill{background:#fff;border:1px solid var(--line-soft);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:bold;cursor:pointer;color:#555}
+.pill.act{background:var(--red);border-color:var(--red);color:#fff}
 
-.card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-bottom:11px;cursor:pointer;display:flex;align-items:center;gap:12px}
-.card:active{border-color:var(--red)}
-.card .code{font-weight:bold;font-size:16px;background:var(--bg-meta);border-radius:var(--radius-ui);padding:6px 11px;letter-spacing:.5px}
-.card .info .s{font-weight:bold;font-size:14.5px}
-.card .info .z{font-size:12.5px;color:#777;margin-top:2px}
-.card .badge{margin-left:auto;font-size:11px;font-weight:bold;padding:3px 9px;border-radius:20px}
-.badge.on{background:#e9f4ec;color:var(--ok)}
+/* Listes */
+.list-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:13px 14px;margin-bottom:9px;display:flex;align-items:flex-start;gap:10px}
+.list-item .body{flex:1;min-width:0}
+.list-item .t1{font-weight:bold;font-size:14.5px;color:var(--ink)}
+.list-item .t2{font-size:12.5px;color:#666;margin-top:2px;line-height:1.5}
+.list-item .badge{display:inline-block;font-size:10.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.3px;
+  padding:2px 8px;border-radius:20px;margin-right:6px}
+.badge.etape{background:#eef2f7;color:#3b5b7a}
+.badge.question{background:#fff3d9;color:var(--warn)}
 .badge.off{background:#f2f2f2;color:#999}
+.list-item .actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.ibtn{background:none;border:1px solid var(--line);border-radius:var(--radius-ui);width:30px;height:30px;font-size:13px;cursor:pointer;color:var(--ink)}
+.ibtn:disabled{opacity:.3;cursor:default}
+.ibtn.danger{color:var(--danger);border-color:#eab8b8}
 
+.btn-add{width:100%;background:#fff;border:1.5px dashed var(--line);border-radius:var(--radius-section);padding:13px;
+  font-size:14px;font-weight:bold;color:var(--red);cursor:pointer;margin-bottom:16px}
+
+/* Formulaire (panneau) */
+.panel{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px;margin-bottom:18px}
+.panel-title{font-size:14px;font-weight:bold;margin-bottom:12px}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
-input[type=text],select,textarea{width:100%;font-family:var(--font);font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
-textarea{min-height:78px;resize:vertical;line-height:1.45}
-.row2{display:flex;gap:12px}.row2>*{flex:1}
-.form-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px;margin-bottom:16px}
-.toggle{display:flex;align-items:center;gap:9px;font-size:14px;cursor:pointer;user-select:none}
-.toggle input{width:auto}
+.field .hint{font-size:11.5px;color:#999;font-weight:normal;text-transform:none;letter-spacing:0;margin-top:3px}
+input[type=text],select,textarea{width:100%;font-family:var(--font);font-size:14.5px;color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px 11px}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+.row2{display:flex;gap:10px}.row2>*{flex:1}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:2px}
+.type-toggle{display:flex;gap:8px;margin-bottom:4px}
+.type-toggle button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.type-toggle button.sel{background:var(--red);border-color:var(--red);color:#fff}
+.opt-row{display:flex;gap:8px;margin-bottom:8px}
+.opt-row input{flex:1}
+.opt-row button{background:none;border:1px solid #eab8b8;color:var(--danger);border-radius:var(--radius-ui);padding:0 10px;cursor:pointer}
+.btn-mini{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:8px 12px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.form-actions{display:flex;gap:10px;margin-top:16px}
+.btn-primary{flex:1;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
+.btn-secondary{flex:1;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
 
-.sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--red);font-weight:bold;background:var(--bg-meta);padding:8px 12px;border-radius:var(--radius-ui);margin-bottom:12px}
-
-.ck-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:8px;margin-bottom:8px}
-.ck-row input[type=text]{border:1px solid var(--line-soft)}
-.ck-row .ord{display:flex;flex-direction:column;gap:2px}
-.ck-row .ord button{background:var(--bg-meta);border:1px solid var(--line-soft);border-radius:var(--radius-ui);width:30px;height:22px;cursor:pointer;font-size:12px;line-height:1;padding:0}
-.ck-row .ord button:disabled{opacity:.3;cursor:default}
-.ck-row .del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:4px 6px}
-.ck-type{width:auto!important;flex-shrink:0;font-size:12.5px;padding:8px 6px;background:var(--bg-soft)}
-.add-row{display:flex;gap:8px;margin-top:10px}
-@media(max-width:560px){.ck-row{flex-wrap:wrap}.ck-row input[type=text]{flex-basis:100%;order:5}.add-row{flex-wrap:wrap}#new-step{flex-basis:100%;order:5}}
-
-.state-msg{text-align:center;color:#999;font-size:14px;padding:26px 10px}
-.hint{font-size:12.5px;color:#999;margin-top:6px}
-.hidden{display:none!important}
+.branch-note{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:16px}
 </style>
 </head>
 <body>
@@ -80,277 +96,377 @@ textarea{min-height:78px;resize:vertical;line-height:1.45}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Configuration des alarmes</div>
+        <div class="sub">Configuration — Alarme</div>
       </div>
-      <a class="home" href="../index.html">← Accueil</a>
+      <a class="home" href="pilote.html">← Accueil</a>
     </div>
   </header>
 
   <main>
-    <!-- LISTE -->
-    <section id="screen-list">
-      <div class="bar">
-        <div class="h2">Transmetteurs</div>
-        <button class="btn btn-red" onclick="openNew()">＋ Ajouter un transmetteur</button>
-      </div>
-      <div id="list"><div class="state-msg">Chargement…</div></div>
+    <!-- ÉCRAN 0 : rubriques -->
+    <section id="s-home">
+      <div class="screen-title">Configuration alarme</div>
+
+      <button class="group-btn" onclick="goTrans()">
+        <span class="ic">📡</span>
+        <span class="txt">
+          <span class="t">Transmetteurs</span>
+          <span class="d">Sites, zones, emplacement des clés et consignes d'accès par transmetteur.</span>
+        </span>
+        <span class="chev">›</span>
+      </button>
+
+      <button class="group-btn" onclick="goMarche()">
+        <span class="ic">📋</span>
+        <span class="txt">
+          <span class="t">Marche à suivre</span>
+          <span class="d">Étapes et questions par transmetteur, avec chemins conditionnels (ex. en direct / pas en direct).</span>
+        </span>
+        <span class="chev">›</span>
+      </button>
     </section>
 
-    <!-- EDITION -->
-    <section id="screen-edit" class="hidden">
-      <div class="bar">
-        <button class="btn btn-ghost btn-sm" onclick="backToList()">← Liste</button>
-        <div class="h2" id="edit-title">Transmetteur</div>
-      </div>
+    <!-- ÉCRAN 1 : liste des transmetteurs -->
+    <section id="s-trans" class="hidden">
+      <button class="back-btn" onclick="goHome()">← Rubriques</button>
+      <div class="screen-title">📡 Transmetteurs</div>
+      <div id="trans-err"></div>
+      <button class="btn-add" onclick="openTransForm(null)">➕ Ajouter un transmetteur</button>
+      <div id="trans-list"><div class="state-msg">Chargement…</div></div>
+    </section>
 
-      <div class="form-card">
-        <div class="sec-title">Identité</div>
-        <div class="row2">
-          <div class="field">
-            <label>N° transmetteur (CERTAS)</label>
-            <input type="text" id="f-code" placeholder="Ex. 10023" inputmode="numeric">
-          </div>
-          <div class="field">
-            <label>Site</label>
-            <select id="f-site"><option value="">— Choisir —</option></select>
-          </div>
-        </div>
-        <div class="field">
-          <label>Zone (facultatif)</label>
-          <input type="text" id="f-zone" placeholder="Ex. Niveau -2, Bâtiment B, Entrée principale">
-        </div>
-        <div class="field">
-          <label>🔑 Emplacement des clés</label>
-          <textarea id="f-cles" placeholder="Ex. Trousseau n°4 — armoire loge, crochet A3"></textarea>
-        </div>
-        <div class="field">
-          <label>Consignes d'accès</label>
-          <textarea id="f-cons" placeholder="Ex. Accès porte nord. Code portail auprès du centraliste. Désarmer la centrale au tableau."></textarea>
-        </div>
-        <label class="toggle"><input type="checkbox" id="f-actif" checked> Transmetteur actif</label>
+    <!-- ÉCRAN 2 : choix du transmetteur pour la marche à suivre -->
+    <section id="s-marche-pick" class="hidden">
+      <button class="back-btn" onclick="goHome()">← Rubriques</button>
+      <div class="screen-title">📋 Marche à suivre — choisir un transmetteur</div>
+      <div id="marche-pick-err"></div>
+      <div id="marche-pick-list"><div class="state-msg">Chargement…</div></div>
+    </section>
 
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn btn-red" onclick="saveTransmetteur()">💾 Enregistrer</button>
-          <button class="btn btn-danger" id="btn-del" onclick="deleteTransmetteur()">🗑 Supprimer</button>
-        </div>
+    <!-- ÉCRAN 3 : marche à suivre d'un transmetteur -->
+    <section id="s-marche" class="hidden">
+      <button class="back-btn" onclick="goMarche()">← Autre transmetteur</button>
+      <div class="screen-title">📋 Marche à suivre — <span id="marche-trans-titre">—</span></div>
+      <div class="branch-note">
+        💡 Une <b>question</b> propose des boutons de réponse (ex. « En direct » / « Pas en direct »).
+        Une étape ou question suivante peut être réglée pour ne s'afficher <b>que si</b> une réponse précise a été donnée
+        à une question précédente — c'est ce qui crée les chemins différents dans <code>alarme-agent.html</code>.
       </div>
-
-      <!-- CHECKLIST -->
-      <div class="form-card">
-        <div class="sec-title">Marche à suivre (checklist)</div>
-        <div id="checklist-box"><div class="hint">Enregistrez d'abord le transmetteur pour ajouter des étapes.</div></div>
-      </div>
+      <div id="marche-err"></div>
+      <button class="btn-add" onclick="openItemForm(null)">➕ Ajouter une étape ou une question</button>
+      <div id="marche-list"><div class="state-msg">Chargement…</div></div>
     </section>
   </main>
 </div>
-<div class="toast" id="toast"></div>
 
 <script>
+/* ===================== Configuration alarme — logique ===================== */
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let sites = [];
-let editing = null;       // ligne transmetteur en cours (null = nouveau)
-let currentCode = null;   // code enregistré (checklist reliée à ce code)
-let checklist = [];
-
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(err?' err':''); setTimeout(()=>t.className='toast',2200); }
-function show(id){ ['screen-list','screen-edit'].forEach(s=>document.getElementById(s).classList.toggle('hidden', s!==id)); window.scrollTo(0,0); }
+function show(id){ ['s-home','s-trans','s-marche-pick','s-marche'].forEach(s=>{
+  document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
 
-/* ---------- sites ---------- */
-async function loadSites(){
-  try{
-    const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom');
-    sites = data||[];
-    const sel = document.getElementById('f-site');
-    sel.innerHTML = '<option value="">— Choisir —</option>' + sites.map(s=>`<option value="${s.id}">${esc(s.nom)}</option>`).join('');
-  }catch(e){ toast('Impossible de charger les sites', true); }
+function goHome(){ show('s-home'); }
+
+/* ============================== TRANSMETTEURS ============================== */
+let transList = [];
+
+async function goTrans(){
+  show('s-trans');
+  await loadTrans();
 }
-
-/* ---------- liste transmetteurs ---------- */
-async function loadList(){
-  const box = document.getElementById('list');
+async function loadTrans(){
+  const box = document.getElementById('trans-list');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
   try{
     const { data, error } = await sb.from('alarme_transmetteurs').select('*').order('code');
     if(error) throw error;
-    if(!data.length){ box.innerHTML = '<div class="state-msg">Aucun transmetteur. Cliquez « Ajouter ».</div>'; return; }
-    box.innerHTML = data.map(t=>`
-      <div class="card" onclick='openEdit(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
-        <div class="code">${esc(t.code)}</div>
-        <div class="info"><div class="s">${esc(t.site_nom||'Site non défini')}</div>
-          <div class="z">${esc(t.zone||'—')}</div></div>
-        <div class="badge ${t.actif?'on':'off'}">${t.actif?'Actif':'Inactif'}</div>
-      </div>`).join('');
-  }catch(e){ box.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; }
+    transList = data||[];
+    renderTransList();
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les transmetteurs (réseau ?).</div>'; }
 }
-
-/* ---------- édition ---------- */
-function openNew(){
-  editing = null; currentCode = null; checklist = [];
-  document.getElementById('edit-title').textContent = 'Nouveau transmetteur';
-  document.getElementById('f-code').value = '';
-  document.getElementById('f-code').removeAttribute('disabled');
-  document.getElementById('f-site').value = '';
-  document.getElementById('f-zone').value = '';
-  document.getElementById('f-cles').value = '';
-  document.getElementById('f-cons').value = '';
-  document.getElementById('f-actif').checked = true;
-  document.getElementById('btn-del').style.display = 'none';
-  document.getElementById('checklist-box').innerHTML = '<div class="hint">Enregistrez d\'abord le transmetteur pour ajouter des étapes.</div>';
-  show('screen-edit');
+function renderTransList(){
+  const box = document.getElementById('trans-list');
+  if(!transList.length){ box.innerHTML = '<div class="state-msg">Aucun transmetteur configuré.</div>'; return; }
+  box.innerHTML = transList.map(t=>`
+    <div class="list-item">
+      <div class="body">
+        <div class="t1">${!t.actif?'<span class="badge off">Inactif</span>':''}${esc(t.code)} — ${esc(t.site_nom||'—')}${t.zone?' · '+esc(t.zone):''}</div>
+        <div class="t2">🔑 ${esc(t.emplacement_cles||'Non renseigné')}</div>
+      </div>
+      <div class="actions">
+        <button class="ibtn" title="Modifier" onclick='openTransForm(${JSON.stringify(t).replace(/'/g,"&#39;")})'>✎</button>
+        <button class="ibtn danger" title="Supprimer" onclick="deleteTrans('${t.id}')">🗑</button>
+      </div>
+    </div>`).join('');
 }
-function openEdit(t){
-  editing = t; currentCode = t.code;
-  document.getElementById('edit-title').textContent = 'Transmetteur ' + t.code;
-  document.getElementById('f-code').value = t.code || '';
-  document.getElementById('f-site').value = t.site_id || '';
-  document.getElementById('f-zone').value = t.zone || '';
-  document.getElementById('f-cles').value = t.emplacement_cles || '';
-  document.getElementById('f-cons').value = t.consignes || '';
-  document.getElementById('f-actif').checked = t.actif !== false;
-  document.getElementById('btn-del').style.display = '';
-  loadChecklist(t.code);
-  show('screen-edit');
+function openTransForm(t){
+  const editing = !!t;
+  const html = `
+    <div class="panel">
+      <div class="panel-title">${editing?'Modifier le transmetteur':'Nouveau transmetteur'}</div>
+      <div class="row2">
+        <div class="field"><label>Code transmetteur *</label><input type="text" id="tf-code" value="${t?esc(t.code):''}"></div>
+        <div class="field"><label>Zone</label><input type="text" id="tf-zone" value="${t?esc(t.zone||''):''}"></div>
+      </div>
+      <div class="field"><label>Site</label><input type="text" id="tf-site" value="${t?esc(t.site_nom||''):''}"></div>
+      <div class="field"><label>Emplacement des clés</label><textarea id="tf-cles">${t?esc(t.emplacement_cles||''):''}</textarea></div>
+      <div class="field"><label>Consignes d'accès</label><textarea id="tf-cons">${t?esc(t.consignes||''):''}</textarea></div>
+      <div class="chk-row"><input type="checkbox" id="tf-actif" ${(!t || t.actif)?'checked':''}><label for="tf-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Actif</label></div>
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeTransForm()">Annuler</button>
+        <button class="btn-primary" onclick="saveTrans('${t?t.id:''}')">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  let holder = document.getElementById('trans-form-holder');
+  if(!holder){ holder = document.createElement('div'); holder.id='trans-form-holder';
+    document.getElementById('trans-list').insertAdjacentElement('beforebegin', holder); }
+  holder.innerHTML = html;
+  holder.scrollIntoView({behavior:'smooth', block:'start'});
 }
-function backToList(){ loadList(); show('screen-list'); }
-
-async function saveTransmetteur(){
-  const code = document.getElementById('f-code').value.trim();
-  const siteId = document.getElementById('f-site').value;
-  if(!code){ toast('Entrez un numéro de transmetteur', true); return; }
-  if(!siteId){ toast('Choisissez un site', true); return; }
-  const site = sites.find(s=>s.id===siteId);
-  const payload = {
-    code, site_id: siteId, site_nom: site?site.nom:null,
-    zone: document.getElementById('f-zone').value.trim() || null,
-    emplacement_cles: document.getElementById('f-cles').value.trim() || null,
-    consignes: document.getElementById('f-cons').value.trim() || null,
-    actif: document.getElementById('f-actif').checked
+function closeTransForm(){ const h=document.getElementById('trans-form-holder'); if(h) h.innerHTML=''; }
+async function saveTrans(id){
+  const err = document.getElementById('trans-err'); err.innerHTML='';
+  const code = document.getElementById('tf-code').value.trim();
+  if(!code){ err.innerHTML = '<div class="err">Le code transmetteur est obligatoire.</div>'; return; }
+  const row = {
+    code, zone: document.getElementById('tf-zone').value.trim()||null,
+    site_nom: document.getElementById('tf-site').value.trim()||null,
+    emplacement_cles: document.getElementById('tf-cles').value.trim()||null,
+    consignes: document.getElementById('tf-cons').value.trim()||null,
+    actif: document.getElementById('tf-actif').checked
   };
   try{
-    if(editing){
-      const oldCode = editing.code;
-      const { error } = await sb.from('alarme_transmetteurs').update(payload).eq('id', editing.id);
-      if(error) throw error;
-      // si le code a changé, répercuter sur la checklist reliée
-      if(oldCode !== code){
-        await sb.from('alarme_checklist_items').update({ transmetteur_code: code }).eq('transmetteur_code', oldCode);
-      }
-      editing = { ...editing, ...payload };
-    }else{
-      const { data, error } = await sb.from('alarme_transmetteurs').insert(payload).select().single();
-      if(error) throw error;
-      editing = data;
-      document.getElementById('btn-del').style.display = '';
-      document.getElementById('edit-title').textContent = 'Transmetteur ' + code;
-    }
-    currentCode = code;
-    toast('Transmetteur enregistré ✓');
-    loadChecklist(code);
-  }catch(e){
-    if((e.message||'').toLowerCase().includes('duplicate') || (e.code==='23505')) toast('Ce numéro existe déjà', true);
-    else toast('Échec de l\'enregistrement (réseau ?)', true);
-  }
+    if(id){ const { error } = await sb.from('alarme_transmetteurs').update(row).eq('id', id); if(error) throw error; }
+    else { const { error } = await sb.from('alarme_transmetteurs').insert({ id: uid(), ...row }); if(error) throw error; }
+    closeTransForm();
+    await loadTrans();
+  }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
 }
-
-async function deleteTransmetteur(){
-  if(!editing) return;
-  if(!confirm('Supprimer ce transmetteur et sa checklist ? Cette action est définitive.')) return;
+async function deleteTrans(id){
+  if(!confirm('Supprimer définitivement ce transmetteur et sa marche à suivre ?')) return;
   try{
-    await sb.from('alarme_checklist_items').delete().eq('transmetteur_code', editing.code);
-    const { error } = await sb.from('alarme_transmetteurs').delete().eq('id', editing.id);
+    await sb.from('alarme_checklist_items').delete().eq('transmetteur_code', (transList.find(t=>t.id===id)||{}).code||'__none__');
+    const { error } = await sb.from('alarme_transmetteurs').delete().eq('id', id);
     if(error) throw error;
-    toast('Transmetteur supprimé');
-    backToList();
-  }catch(e){ toast('Échec de la suppression', true); }
+    await loadTrans();
+  }catch(e){ document.getElementById('trans-err').innerHTML = '<div class="err">Erreur de suppression : '+esc(e.message)+'</div>'; }
 }
 
-/* ---------- checklist ---------- */
-async function loadChecklist(code){
-  const box = document.getElementById('checklist-box');
-  box.innerHTML = '<div class="hint">Chargement…</div>';
+/* ============================== MARCHE À SUIVRE ============================== */
+let currentTransCode = null;
+let items = [];
+
+async function goMarche(){
+  show('s-marche-pick');
+  const box = document.getElementById('marche-pick-list');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
   try{
-    const { data } = await sb.from('alarme_checklist_items').select('*').eq('transmetteur_code', code).order('ordre');
-    checklist = data||[];
-    renderChecklist();
-  }catch(e){ box.innerHTML = '<div class="hint">Erreur de chargement de la checklist.</div>'; }
+    const { data, error } = await sb.from('alarme_transmetteurs').select('*').order('code');
+    if(error) throw error;
+    transList = data||[];
+    if(!transList.length){ box.innerHTML = '<div class="state-msg">Aucun transmetteur — créez-en un d\'abord dans « Transmetteurs ».</div>'; return; }
+    box.innerHTML = transList.map(t=>`
+      <button class="group-btn" onclick="openMarche('${t.code}')">
+        <span class="ic">📡</span>
+        <span class="txt"><span class="t">${esc(t.code)} — ${esc(t.site_nom||'—')}</span><span class="d">${t.zone?esc(t.zone):'Sans zone'}</span></span>
+        <span class="chev">›</span>
+      </button>`).join('');
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les transmetteurs (réseau ?).</div>'; }
 }
-function renderChecklist(){
-  const box = document.getElementById('checklist-box');
-  let html = '';
-  if(!checklist.length){ html += '<div class="hint">Aucune étape. Ajoutez la première ci-dessous.</div>'; }
-  checklist.forEach((c,i)=>{
-    html += `<div class="ck-row">
-      <div class="ord">
-        <button onclick="moveItem(${i},-1)" ${i===0?'disabled':''}>▲</button>
-        <button onclick="moveItem(${i},1)" ${i===checklist.length-1?'disabled':''}>▼</button>
+
+async function openMarche(code){
+  currentTransCode = code;
+  document.getElementById('marche-trans-titre').textContent = code;
+  show('s-marche');
+  await loadItems();
+}
+async function loadItems(){
+  const box = document.getElementById('marche-list');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
+  try{
+    const { data, error } = await sb.from('alarme_checklist_items').select('*')
+      .eq('transmetteur_code', currentTransCode).order('ordre');
+    if(error) throw error;
+    items = data||[];
+    renderItems();
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger la marche à suivre (réseau ?).</div>'; }
+}
+function libelleParentQuestion(depId){
+  const p = items.find(i=>i.id===depId);
+  return p ? p.libelle : '(question supprimée)';
+}
+function renderItems(){
+  const box = document.getElementById('marche-list');
+  if(!items.length){ box.innerHTML = '<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
+  box.innerHTML = items.map((it,i)=>{
+    const badge = it.type==='question' ? '<span class="badge question">Question</span>' : '<span class="badge etape">Étape</span>';
+    const offBadge = !it.actif ? '<span class="badge off">Inactive</span>' : '';
+    let sub = '';
+    if(it.type==='question' && Array.isArray(it.options) && it.options.length) sub = 'Réponses : '+it.options.join(' / ');
+    if(it.depend_item_id) sub += (sub?' · ':'')+`Visible seulement si « ${esc(libelleParentQuestion(it.depend_item_id))} » = « ${esc(it.depend_valeur||'')} »`;
+    return `<div class="list-item">
+      <div class="body">
+        <div class="t1">${offBadge}${badge} ${esc(it.libelle)}</div>
+        ${sub?`<div class="t2">${sub}</div>`:''}
       </div>
-      <select class="ck-type" onchange="updateItemType(${c.id}, this.value)" title="Type d'étape">
-        ${typeOptions(c.type)}
-      </select>
-      <input type="text" value="${esc(c.libelle)}" onchange="updateItem(${c.id}, this.value)">
-      <button class="del" onclick="deleteItem(${c.id})" title="Supprimer">🗑</button>
+      <div class="actions">
+        <button class="ibtn" title="Monter" onclick="moveItem(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="ibtn" title="Descendre" onclick="moveItem(${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
+        <button class="ibtn" title="Modifier" onclick='openItemForm(${JSON.stringify(it).replace(/'/g,"&#39;")})'>✎</button>
+        <button class="ibtn danger" title="Supprimer" onclick="deleteItem(${it.id})">🗑</button>
+      </div>
     </div>`;
-  });
-  html += `<div class="add-row">
-    <select id="new-step-type" class="ck-type">${typeOptions('check')}</select>
-    <input type="text" id="new-step" placeholder="Nouvelle étape…" onkeydown="if(event.key==='Enter')addItem()">
-    <button class="btn btn-red btn-sm" onclick="addItem()">＋ Ajouter</button>
-  </div>
-  <div class="hint">✓ Vérification = case à cocher · ⏱ Horodatage = capture une heure · 📝 Note = champ texte (dictable). Les valeurs saisies alimentent le rapport.</div>`;
-  box.innerHTML = html;
-}
-const TYPES = [['check','✓ Vérification'],['heure','⏱ Horodatage'],['note','📝 Note']];
-function typeOptions(sel){ return TYPES.map(([v,l])=>`<option value="${v}" ${v===(sel||'check')?'selected':''}>${l}</option>`).join(''); }
-
-async function addItem(){
-  const inp = document.getElementById('new-step');
-  const libelle = inp.value.trim();
-  const type = document.getElementById('new-step-type').value || 'check';
-  if(!libelle) return;
-  if(!currentCode){ toast('Enregistrez d\'abord le transmetteur', true); return; }
-  const maxOrd = checklist.reduce((m,c)=>Math.max(m,c.ordre||0),0);
-  try{
-    const { data, error } = await sb.from('alarme_checklist_items')
-      .insert({ transmetteur_code: currentCode, libelle, type, ordre: maxOrd+10, actif:true }).select().single();
-    if(error) throw error;
-    checklist.push(data); renderChecklist();
-  }catch(e){ toast('Échec de l\'ajout', true); }
-}
-async function updateItemType(id, val){
-  try{ await sb.from('alarme_checklist_items').update({ type:val }).eq('id', id);
-    const it = checklist.find(c=>c.id===id); if(it) it.type=val; toast('Type modifié ✓');
-  }catch(e){ toast('Échec', true); }
-}
-async function updateItem(id, val){
-  const v = val.trim(); if(!v) return;
-  try{ await sb.from('alarme_checklist_items').update({ libelle:v }).eq('id', id);
-    const it = checklist.find(c=>c.id===id); if(it) it.libelle=v; toast('Étape modifiée ✓');
-  }catch(e){ toast('Échec de la modification', true); }
-}
-async function deleteItem(id){
-  if(!confirm('Supprimer cette étape ?')) return;
-  try{ await sb.from('alarme_checklist_items').delete().eq('id', id);
-    checklist = checklist.filter(c=>c.id!==id); renderChecklist();
-  }catch(e){ toast('Échec de la suppression', true); }
+  }).join('');
 }
 async function moveItem(i, dir){
-  const j = i+dir; if(j<0||j>=checklist.length) return;
-  const a = checklist[i], b = checklist[j];
-  const oa = a.ordre, ob = b.ordre;
+  const j = i+dir;
+  if(j<0 || j>=items.length) return;
+  const a = items[i], b = items[j];
+  const ordA = a.ordre, ordB = b.ordre;
   try{
-    await sb.from('alarme_checklist_items').update({ ordre: ob }).eq('id', a.id);
-    await sb.from('alarme_checklist_items').update({ ordre: oa }).eq('id', b.id);
-    a.ordre = ob; b.ordre = oa;
-    checklist.sort((x,y)=>(x.ordre||0)-(y.ordre||0));
-    renderChecklist();
-  }catch(e){ toast('Échec du réordonnancement', true); }
+    await sb.from('alarme_checklist_items').update({ ordre: ordB }).eq('id', a.id);
+    await sb.from('alarme_checklist_items').update({ ordre: ordA }).eq('id', b.id);
+    await loadItems();
+  }catch(e){ document.getElementById('marche-err').innerHTML = '<div class="err">Erreur de réordonnancement : '+esc(e.message)+'</div>'; }
 }
 
-loadSites();
-loadList();
+/* Questions disponibles comme parent = les questions déjà enregistrées pour ce
+   transmetteur, en excluant l'item qu'on est en train d'éditer (pas de dépendance
+   à soi-même). */
+function questionOptionsHTML(excludeId, selectedDepId){
+  const qs = items.filter(i=>i.type==='question' && i.id!==excludeId);
+  if(!qs.length) return '<option value="">— Aucune —</option>';
+  return '<option value="">— Toujours affiché —</option>' +
+    qs.map(q=>`<option value="${q.id}" ${q.id===selectedDepId?'selected':''}>${esc(q.libelle)}</option>`).join('');
+}
+function openItemForm(it){
+  const editing = !!it;
+  const type = it ? it.type : 'etape';
+  const opts = it && Array.isArray(it.options) ? it.options : ['',''];
+  const html = `
+    <div class="panel">
+      <div class="panel-title">${editing?'Modifier':'Nouvel'} item</div>
+      <div class="field">
+        <label>Type</label>
+        <div class="type-toggle">
+          <button type="button" id="if-type-etape" class="${type==='etape'?'sel':''}" onclick="setItemType('etape')">☑ Étape (case à cocher)</button>
+          <button type="button" id="if-type-question" class="${type==='question'?'sel':''}" onclick="setItemType('question')">🔀 Question (bifurcation)</button>
+        </div>
+      </div>
+      <div class="field"><label>Libellé *</label><input type="text" id="if-libelle" value="${it?esc(it.libelle):''}"></div>
+
+      <div id="if-options-wrap" class="field ${type==='question'?'':'hidden'}">
+        <label>Réponses possibles <span class="hint">Ex. « En direct » / « Pas en direct »</span></label>
+        <div id="if-options-list"></div>
+        <button type="button" class="btn-mini" onclick="addOptionRow()">➕ Ajouter une réponse</button>
+      </div>
+
+      <div class="field">
+        <label>Condition d'affichage <span class="hint">Cet item n'apparaît que si la question choisie a reçu la réponse indiquée.</span></label>
+        <select id="if-dep-item" onchange="renderDepValueOptions()">${questionOptionsHTML(it?it.id:null, it?it.depend_item_id:null)}</select>
+      </div>
+      <div class="field hidden" id="if-dep-valeur-wrap">
+        <label>Réponse attendue</label>
+        <select id="if-dep-valeur"></select>
+      </div>
+
+      <div class="chk-row"><input type="checkbox" id="if-actif" ${(!it || it.actif)?'checked':''}><label for="if-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Actif</label></div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeItemForm()">Annuler</button>
+        <button class="btn-primary" onclick="saveItem(${it&&it.id!=null?it.id:'null'})">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  let holder = document.getElementById('item-form-holder');
+  if(!holder){ holder = document.createElement('div'); holder.id='item-form-holder';
+    document.getElementById('marche-list').insertAdjacentElement('beforebegin', holder); }
+  holder.innerHTML = html;
+  window._itemOptions = (opts && opts.length) ? opts.slice() : ['',''];
+  renderOptionRows();
+  if(it && it.depend_item_id) renderDepValueOptions(it.depend_valeur);
+  holder.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function setItemType(t){
+  document.getElementById('if-type-etape').classList.toggle('sel', t==='etape');
+  document.getElementById('if-type-question').classList.toggle('sel', t==='question');
+  document.getElementById('if-options-wrap').classList.toggle('hidden', t!=='question');
+}
+function renderOptionRows(){
+  const box = document.getElementById('if-options-list');
+  box.innerHTML = window._itemOptions.map((o,i)=>`
+    <div class="opt-row">
+      <input type="text" value="${esc(o)}" oninput="window._itemOptions[${i}]=this.value; renderDepValueOptionsIfNeeded()">
+      <button type="button" onclick="removeOptionRow(${i})">✕</button>
+    </div>`).join('');
+}
+function addOptionRow(){ window._itemOptions.push(''); renderOptionRows(); }
+function removeOptionRow(i){ window._itemOptions.splice(i,1); if(!window._itemOptions.length) window._itemOptions=['']; renderOptionRows(); }
+function renderDepValueOptionsIfNeeded(){ /* les options d'une question tierce ne changent pas en direct ici — no-op volontaire */ }
+function renderDepValueOptions(selected){
+  const depSel = document.getElementById('if-dep-item');
+  const wrap = document.getElementById('if-dep-valeur-wrap');
+  const valSel = document.getElementById('if-dep-valeur');
+  const depId = depSel.value ? Number(depSel.value) : null;
+  if(!depId){ wrap.classList.add('hidden'); valSel.innerHTML=''; return; }
+  const parent = items.find(i=>i.id===depId);
+  const opts = (parent && Array.isArray(parent.options)) ? parent.options : [];
+  valSel.innerHTML = opts.map(o=>`<option value="${esc(o)}" ${o===selected?'selected':''}>${esc(o)}</option>`).join('');
+  wrap.classList.remove('hidden');
+}
+function closeItemForm(){ const h=document.getElementById('item-form-holder'); if(h) h.innerHTML=''; }
+async function saveItem(id){
+  const err = document.getElementById('marche-err'); err.innerHTML='';
+  const libelle = document.getElementById('if-libelle').value.trim();
+  if(!libelle){ err.innerHTML = '<div class="err">Le libellé est obligatoire.</div>'; return; }
+  const type = document.getElementById('if-type-question').classList.contains('sel') ? 'question' : 'etape';
+  const options = type==='question' ? window._itemOptions.map(o=>o.trim()).filter(Boolean) : null;
+  if(type==='question' && (!options || options.length<2)){
+    err.innerHTML = '<div class="err">Une question doit proposer au moins deux réponses.</div>'; return;
+  }
+  const depItemVal = document.getElementById('if-dep-item').value;
+  const depItemId = depItemVal ? Number(depItemVal) : null; // alarme_checklist_items.id est bigint, pas texte
+  const depValeur = depItemId ? (document.getElementById('if-dep-valeur').value || null) : null;
+  const actif = document.getElementById('if-actif').checked;
+
+  try{
+    if(id){
+      const row = { libelle, type, options, depend_item_id: depItemId, depend_valeur: depValeur, actif };
+      const { error } = await sb.from('alarme_checklist_items').update(row).eq('id', id);
+      if(error) throw error;
+    } else {
+      const maxOrdre = items.reduce((m,i)=>Math.max(m, i.ordre||0), 0);
+      const row = {
+        transmetteur_code: currentTransCode, libelle, type, options,
+        depend_item_id: depItemId, depend_valeur: depValeur, ordre: maxOrdre+10, actif
+      };
+      // alarme_checklist_items.id est un bigint généré par la base (identity) —
+      // on ne le fournit jamais côté client (contrairement à uid() pour
+      // alarme_transmetteurs, qui a un id texte). Cette page est un outil
+      // d'admin en ligne uniquement (pas RDZSync), donc .select() après
+      // l'insert est sans risque ici (voir piège technique n°6 : cette
+      // restriction ne concerne que la file hors-ligne des modules agents).
+      const { error } = await sb.from('alarme_checklist_items').insert(row).select().single();
+      if(error) throw error;
+    }
+    closeItemForm();
+    await loadItems();
+  }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
+}
+async function deleteItem(id){
+  const dependants = items.filter(i=>i.depend_item_id===id);
+  if(dependants.length && !confirm(dependants.length+' item(s) dépendent de cette question et perdront leur condition (ils redeviendront toujours affichés). Continuer ?')) return;
+  if(!dependants.length && !confirm('Supprimer cet item ?')) return;
+  try{
+    const { error } = await sb.from('alarme_checklist_items').delete().eq('id', id);
+    if(error) throw error;
+    await loadItems();
+  }catch(e){ document.getElementById('marche-err').innerHTML = '<div class="err">Erreur de suppression : '+esc(e.message)+'</div>'; }
+}
 </script>
 </body>
 </html>
