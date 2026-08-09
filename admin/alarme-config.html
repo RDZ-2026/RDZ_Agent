@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-config · v2 · 2026-08-09 -->
+<!-- RDZ · alarme-config · v3 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -56,6 +56,8 @@ main{flex:1;padding:16px}
   padding:2px 8px;border-radius:20px;margin-right:6px}
 .badge.etape{background:#eef2f7;color:#3b5b7a}
 .badge.question{background:#fff3d9;color:var(--warn)}
+.badge.note{background:#e9eef7;color:#3b5b7a}
+.badge.heure{background:#eaf5ec;color:#1b7a3d}
 .badge.off{background:#f2f2f2;color:#999}
 .list-item .actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
 .ibtn{background:none;border:1px solid var(--line);border-radius:var(--radius-ui);width:30px;height:30px;font-size:13px;cursor:pointer;color:var(--ink)}
@@ -76,8 +78,8 @@ input[type=text],select,textarea{width:100%;font-family:var(--font);font-size:14
 textarea{min-height:70px;resize:vertical;line-height:1.45}
 .row2{display:flex;gap:10px}.row2>*{flex:1}
 .chk-row{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:2px}
-.type-toggle{display:flex;gap:8px;margin-bottom:4px}
-.type-toggle button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.type-toggle{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.type-toggle button{flex:1 1 120px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
 .type-toggle button.sel{background:var(--red);border-color:var(--red);color:#fff}
 .opt-row{display:flex;gap:8px;margin-bottom:8px}
 .opt-row input{flex:1}
@@ -304,7 +306,8 @@ function renderItems(){
   const box = document.getElementById('marche-list');
   if(!items.length){ box.innerHTML = '<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
   box.innerHTML = items.map((it,i)=>{
-    const badge = it.type==='question' ? '<span class="badge question">Question</span>' : '<span class="badge etape">Étape</span>';
+    const LB={question:'Question',note:'Note',heure:'Horodatage',etape:'Étape'};
+    const badge = `<span class="badge ${it.type||'etape'}">${LB[it.type]||'Étape'}</span>`;
     const offBadge = !it.actif ? '<span class="badge off">Inactive</span>' : '';
     let sub = '';
     if(it.type==='question' && Array.isArray(it.options) && it.options.length) sub = 'Réponses : '+it.options.join(' / ');
@@ -354,8 +357,10 @@ function openItemForm(it){
       <div class="field">
         <label>Type</label>
         <div class="type-toggle">
-          <button type="button" id="if-type-etape" class="${type==='etape'?'sel':''}" onclick="setItemType('etape')">☑ Étape (case à cocher)</button>
-          <button type="button" id="if-type-question" class="${type==='question'?'sel':''}" onclick="setItemType('question')">🔀 Question (bifurcation)</button>
+          <button type="button" id="if-type-etape" class="${type==='etape'?'sel':''}" onclick="setItemType('etape')">☑ Étape</button>
+          <button type="button" id="if-type-question" class="${type==='question'?'sel':''}" onclick="setItemType('question')">🔀 Question</button>
+          <button type="button" id="if-type-note" class="${type==='note'?'sel':''}" onclick="setItemType('note')">📝 Note</button>
+          <button type="button" id="if-type-heure" class="${type==='heure'?'sel':''}" onclick="setItemType('heure')">🕐 Horodatage</button>
         </div>
       </div>
       <div class="field"><label>Libellé *</label><input type="text" id="if-libelle" value="${it?esc(it.libelle):''}"></div>
@@ -392,8 +397,9 @@ function openItemForm(it){
   holder.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function setItemType(t){
-  document.getElementById('if-type-etape').classList.toggle('sel', t==='etape');
-  document.getElementById('if-type-question').classList.toggle('sel', t==='question');
+  ['etape','question','note','heure'].forEach(x=>{
+    document.getElementById('if-type-'+x).classList.toggle('sel', t===x);
+  });
   document.getElementById('if-options-wrap').classList.toggle('hidden', t!=='question');
 }
 function renderOptionRows(){
@@ -423,7 +429,7 @@ async function saveItem(id){
   const err = document.getElementById('marche-err'); err.innerHTML='';
   const libelle = document.getElementById('if-libelle').value.trim();
   if(!libelle){ err.innerHTML = '<div class="err">Le libellé est obligatoire.</div>'; return; }
-  const type = document.getElementById('if-type-question').classList.contains('sel') ? 'question' : 'etape';
+  const type = ['etape','question','note','heure'].find(x=>document.getElementById('if-type-'+x).classList.contains('sel')) || 'etape';
   const options = type==='question' ? window._itemOptions.map(o=>o.trim()).filter(Boolean) : null;
   if(type==='question' && (!options || options.length<2)){
     err.innerHTML = '<div class="err">Une question doit proposer au moins deux réponses.</div>'; return;
