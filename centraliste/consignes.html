@@ -1,3 +1,4 @@
+<!-- RDZ · consignes · v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -225,7 +226,8 @@ let viewMode = 'all';
 let editId = null;
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
-function today() { return new Date().toISOString().split('T')[0]; }
+function serviceDate(d){ d = d ? new Date(d) : new Date(); d = new Date(d.getTime() - (6*60+30)*60000); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), j=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${j}`; } /* Journée de service RDZ : 06:30 -> 06:29 le lendemain */
+function today() { return serviceDate(); }
 function fmt(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; }
 function isActive(c, ref) {
   if (c.date_debut && c.date_debut > ref) return false;
