@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v2 · 2026-08-09 -->
+<!-- RDZ · supervision-journal · v4 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -41,6 +41,10 @@ main{flex:1;padding:18px}
 .hint{font-size:12px;color:#999;margin-top:8px}
 
 .summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.kpi-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.kpi-card .kv{font-size:26px;font-weight:bold;color:var(--red);line-height:1}
+.kpi-card .kl{font-size:11.5px;color:#777;text-transform:uppercase;letter-spacing:.3px;font-weight:bold}
 
 .entry{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--line);border-radius:var(--radius-section);
   padding:13px 15px;margin-bottom:10px;cursor:pointer;display:flex;gap:14px;align-items:flex-start}
@@ -134,6 +138,8 @@ main{flex:1;padding:18px}
       <div class="types" id="types"></div>
       <div class="hint">Le filtre « Site » ne s'applique qu'aux sources qui ont une notion de site (véhicules, badges tiers, bibliothèque : affichés quel que soit le site choisi). Une « journée » va de 06h30 à 06h29 le lendemain (journée de service RDZ).</div>
     </div>
+
+    <div class="kpi-bar" id="kpi-bar"></div>
 
     <div class="summary"><span id="summary-txt"></span></div>
     <div id="list"><div class="state-msg">Choisissez vos filtres et cliquez « Actualiser ».</div></div>
@@ -325,25 +331,20 @@ function buildBiblioComptageReport(c){
   return rpShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque //');
 }
 
-// Style "RDZ Reports" — aucun rapport client parking n'existait déjà en
-// production ; construit sur le même gabarit que buildRapportOuverture
-// (choix validé) plutôt que le style "Evènement //" réservé à la bibliothèque.
-function buildParkingReport(v){
-  const dateTxt = v.created_at ? rpFmtDate(new Date(v.created_at).toISOString().slice(0,10)) : '—';
-  const heureTxt = v.created_at ? fmtTime(v.created_at) : '—';
-  const photos = [
-    {label:'Véhicule', url:v.photo_vehicule_url},
-    {label:'Dénonciation', url:v.photo_denonciation_url},
-    {label:'Pare-brise', url:v.photo_parebrise_url},
-    {label:'Macaron', url:v.photo_macaron_url}
-  ].filter(p=>p.url || true).slice(0,4);
+// Style "RDZ Reports" — repris à l'identique des 3 fichiers de production
+// parkguard-rapport-denonciation.html / -autorise.html / -vide.html
+// (jamais réinventé — voir piège méthodologique du 2026-08-09 : un rapport
+// existait déjà pour chaque statut, il ne fallait pas en inventer un nouveau).
+function rpParkShell(labelTxt, statutBadgeHtml, bodyHtml, meta){
+  const dateTxt = meta.created_at ? rpFmtDate(new Date(meta.created_at).toISOString().slice(0,10)) : '—';
+  const heureTxt = meta.created_at ? fmtTime(meta.created_at) : '—';
   return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
     <div style="background:#1a1a1a;padding:1.5rem 2rem">
       <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
         <div style="flex:1">
-          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">Rapport de surveillance parking</div>
-          <div style="font-size:20px;font-weight:700;color:#fff">${esc(v.site||'—')}</div>
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">${labelTxt}</div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${esc(meta.site||'—')}</div>
         </div>
         <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
       </div>
@@ -351,34 +352,79 @@ function buildParkingReport(v){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);background:#f0f0f0">
       <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Date</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${dateTxt}</div></div>
       <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Heure</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${heureTxt}</div></div>
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(v.agent_name||'—')}</div></div>
-      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Statut</label><div><span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#fdeceb;color:#8B1A1A;border:1.5px solid #8B1A1A">${esc(v.statut||'—')}</span></div></div>
+      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(meta.agent_name||'—')}</div></div>
+      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Statut</label><div>${statutBadgeHtml}</div></div>
     </div>
-    <div style="padding:1.5rem 2rem">
-      <div style="margin-bottom:2rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">1 — Détails du contrôle</div>
-        <div style="padding:1.2rem 1rem">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('Plaque',esc(v.plaque||'—'))}${rpFieldO('Motif',esc(v.motif||'—'))}</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('N° dénonciation',esc(v.num_denonciation||'—'))}${rpFieldO('N° macaron',esc(v.num_macaron||'—'))}</div>
-          <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Remarque',esc(v.remarque||'—'))}</div>
-        </div>
-      </div>
-      <div style="margin-bottom:0;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">2 — Preuve photographique</div>
-        <div style="padding:1.2rem 1rem"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map(p=>rpPhotoBoxO(p.label,p.url)).join('')}</div></div>
-      </div>
-    </div>
+    <div style="padding:1.5rem 2rem">${bodyHtml}</div>
     <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
       <div style="display:flex;align-items:center;gap:.75rem">
         <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
         <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel — Usage officiel uniquement</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:11px;color:#666;font-weight:600;margin-bottom:4px">Réf. : ${(v.id||'').toString().slice(0,8).toUpperCase()}</div>
+        <div style="font-size:11px;color:#666;font-weight:600;margin-bottom:4px">Réf. : ${(meta.id||'').toString().slice(0,8).toUpperCase()}</div>
         <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève</div>
       </div>
     </div>
   </div>`;
+}
+function rpSec(numTitre, innerHtml){
+  return `<div style="margin-bottom:2rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+    <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">${esc(numTitre)}</div>
+    <div style="padding:1.2rem 1rem">${innerHtml}</div>
+  </div>`;
+}
+// Reprend parkguard-rapport-denonciation.html — statut "Infraction"
+function buildParkingDenonciation(v){
+  const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#fdf0f0;color:#C8102E;border:1.5px solid #C8102E">Infraction</span>`;
+  const body = rpSec('1 — Véhicule en infraction',
+      `<div style="margin-bottom:14px"><div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Plaque d'immatriculation</div><div style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:#C8102E;letter-spacing:.1em;padding:5px 0;border-bottom:1px solid #eee">${esc(v.plaque||'—')}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO("Motif d'infraction",esc(v.motif||'—'))}${rpFieldO('N° Dénonciation',`<span style="font-weight:700;color:#C8102E;font-size:16px">${esc(v.num_denonciation||'—')}</span>`)}</div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Remarques',esc(v.remarque||'—'))}</div>`)
+    + rpSec('2 — Preuves photographiques',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        ${rpPhotoBoxO('Véhicule (plaque visible)', v.photo_vehicule_url)}
+        ${rpPhotoBoxO('Dénonciation remplie', v.photo_denonciation_url)}
+        ${rpPhotoBoxO('Pare-brise (4 coins visibles)', v.photo_parebrise_url)}
+        ${rpPhotoBoxO('Vue générale', v.photo_macaron_url)}
+      </div>`);
+  return rpParkShell('Rapport de dénonciation', badge, body, v);
+}
+// Reprend parkguard-rapport-autorise.html — statut "Autorisé"
+function buildParkingAutorise(v){
+  const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f8f0;color:#1e6b1e;border:1.5px solid #1e6b1e">Autorisé</span>`;
+  const body = rpSec('1 — Véhicule autorisé',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        ${rpFieldO("Plaque d'immatriculation",`<span style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:#1e6b1e;letter-spacing:.1em">${esc(v.plaque||'—')}</span>`)}
+        ${rpFieldO('N° Macaron',`<span style="font-weight:700;color:#1e6b1e;font-size:22px">${esc(v.num_macaron||'—')}</span>`)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Remarques',esc(v.remarque||'—'))}</div>`)
+    + rpSec('2 — Preuves photographiques',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        ${rpPhotoBoxO('Véhicule (plaque visible)', v.photo_vehicule_url)}
+        ${rpPhotoBoxO('Macaron / Vignette', v.photo_macaron_url)}
+      </div>`);
+  return rpParkShell('Rapport véhicule autorisé', badge, body, v);
+}
+// Reprend parkguard-rapport-vide.html — statut "Vide" (parking vide)
+function buildParkingVide(v){
+  const badge = `<span style="display:inline-block;padding:.4rem 1.2rem;border-radius:20px;font-size:13px;font-weight:700;background:#f0f0f0;color:#555;border:1.5px solid #aaa">Vide</span>`;
+  let rem = (v.remarque && v.remarque!=='null') ? v.remarque : '';
+  rem = rem.replace(/^PARKING_VIDE ?[-—]? ?/i,'').trim();
+  const photos = [v.photo_vehicule_url, v.photo_denonciation_url, v.photo_parebrise_url, v.photo_macaron_url]
+    .filter(u=>u && u!=='null' && u!=='undefined');
+  const photosHtml = photos.length
+    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map((u,i)=>rpPhotoBoxO('Vue '+(i+1),u)).join('')}</div>`
+    : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Vue générale', null)}</div>`;
+  const body = rpSec('1 — Constat', rpFieldO('Remarques', esc(rem||'Aucun véhicule constaté sur le parking.')))
+    + rpSec('2 — Photos de présence sur site', photosHtml);
+  return rpParkShell('Rapport de ronde — Parking vide', badge, body, v);
+}
+function buildParkingReport(v){
+  const s = (v.statut||'').toLowerCase();
+  if(s.includes('infraction')) return buildParkingDenonciation(v);
+  if(s.includes('autoris')) return buildParkingAutorise(v);
+  return buildParkingVide(v);
 }
 
 const REPORTABLE = { ouverture: buildRapportOuverture, biblio_comptage: buildBiblioComptageReport, parking: buildParkingReport };
@@ -763,6 +809,7 @@ function render(){
   });
 
   document.getElementById('summary-txt').textContent = `${items.length} entrée(s)`;
+  renderKpis(items);
   if(!items.length){ list.innerHTML = '<div class="state-msg">Aucune entrée pour ces filtres.</div>'; return; }
 
   list.innerHTML = items.map((e,i)=>{
@@ -785,6 +832,23 @@ function render(){
     </div>`;
   }).join('');
   window.__renderedItems = items; // pour openDetail
+}
+
+/* Résumé synthétique en haut de page (sur le même jeu filtré que la liste). */
+function renderKpis(items){
+  const box = document.getElementById('kpi-bar');
+  const count = (pred) => items.filter(pred).length;
+  const cards = [
+    { l:'Entrées',                v: items.length },
+    { l:'Prises véhicule',        v: count(e=>e.kind==='vehicule_mvt' && e.sub==='Prise') },
+    { l:'Restitutions véhicule',  v: count(e=>e.kind==='vehicule_mvt' && e.sub==='Restitution') },
+    { l:'Rapports imprimables',   v: count(e=>REPORTABLE[e.kind]) },
+    { l:'Alarmes',                v: count(e=>e.kind==='alarme') },
+    { l:'Constats',               v: count(e=>e.kind==='constat' && e.sub==='Ajout') },
+    { l:'Événements',             v: count(e=>e.kind==='evenement' && e.sub==='Ajout') },
+    { l:'Validations consignes',  v: count(e=>e.kind==='validation') },
+  ];
+  box.innerHTML = cards.map(c=>`<div class="kpi-card"><div class="kv">${c.v}</div><div class="kl">${esc(c.l)}</div></div>`).join('');
 }
 
 /* ---------- Détail + édition ---------- */
