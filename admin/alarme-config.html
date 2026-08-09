@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-config · v3 · 2026-08-09 -->
+<!-- RDZ · alarme-config · v4 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -90,6 +90,13 @@ textarea{min-height:70px;resize:vertical;line-height:1.45}
 .btn-secondary{flex:1;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
 
 .branch-note{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:16px}
+.cond-mode{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12.5px;color:#555;flex-wrap:wrap}
+.cond-mode button{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:6px 10px;font-size:12px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.cond-mode button.sel{background:var(--red);border-color:var(--red);color:#fff}
+.cond-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.cond-row select{flex:1;min-width:0;padding:8px;border:1px solid var(--line);border-radius:var(--radius-ui);font-family:var(--font);font-size:13px;color:var(--ink)}
+.cond-eq{font-weight:bold;color:#888}
+.cond-x{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:6px 9px;cursor:pointer;color:#b02020;font-weight:bold}
 </style>
 </head>
 <body>
@@ -302,6 +309,49 @@ function libelleParentQuestion(depId){
   const p = items.find(i=>i.id===depId);
   return p ? p.libelle : '(question supprimée)';
 }
+function describeConditions(it){
+  const conds = (Array.isArray(it.depend_conditions) && it.depend_conditions.length)
+    ? it.depend_conditions
+    : (it.depend_item_id ? [{item_id:it.depend_item_id, valeur:it.depend_valeur}] : []);
+  if(!conds.length) return '';
+  const parts = conds.map(c=>`« ${esc(libelleParentQuestion(c.item_id))} » = « ${esc(c.valeur||'')} »`);
+  if(parts.length===1) return 'Visible si '+parts[0];
+  return 'Visible si '+parts.join(it.depend_mode==='ou' ? ' OU ' : ' ET ');
+}
+function questionCondOptionsHTML(selectedId){
+  const qs = items.filter(i=>i.type==='question' && i.id!==window._itemEditingId);
+  let h = `<option value="" ${!selectedId?'selected':''}>— Choisir une question —</option>`;
+  return h + qs.map(q=>`<option value="${q.id}" ${q.id===selectedId?'selected':''}>${esc(q.libelle)}</option>`).join('');
+}
+function answerOptionsHTML(qid, selected){
+  const q = items.find(i=>i.id===Number(qid));
+  const opts = (q && Array.isArray(q.options)) ? q.options : [];
+  let h = `<option value="" ${!selected?'selected':''}>— Réponse —</option>`;
+  return h + opts.map(o=>`<option value="${esc(o)}" ${o===selected?'selected':''}>${esc(o)}</option>`).join('');
+}
+function renderCondRows(){
+  const box = document.getElementById('if-cond-list'); if(!box) return;
+  const conds = window._itemConds || [];
+  box.innerHTML = conds.map((c,idx)=>`
+    <div class="cond-row">
+      <select onchange="setCondItem(${idx}, this.value)">${questionCondOptionsHTML(c.item_id||null)}</select>
+      <span class="cond-eq">=</span>
+      <select onchange="setCondVal(${idx}, this.value)">${answerOptionsHTML(c.item_id, c.valeur)}</select>
+      <button type="button" class="cond-x" onclick="removeCondRow(${idx})">✕</button>
+    </div>`).join('');
+  const mw = document.getElementById('if-cond-mode-wrap');
+  if(mw) mw.classList.toggle('hidden', conds.length<2);
+}
+function setCondMode(m){
+  window._itemCondMode = m;
+  const e=document.getElementById('if-mode-et'), o=document.getElementById('if-mode-ou');
+  if(e) e.classList.toggle('sel', m==='et');
+  if(o) o.classList.toggle('sel', m==='ou');
+}
+function setCondItem(idx, val){ window._itemConds[idx].item_id = val?Number(val):null; window._itemConds[idx].valeur = null; renderCondRows(); }
+function setCondVal(idx, val){ window._itemConds[idx].valeur = val||null; }
+function addCondRow(){ (window._itemConds = window._itemConds||[]).push({item_id:null, valeur:null}); renderCondRows(); }
+function removeCondRow(idx){ window._itemConds.splice(idx,1); renderCondRows(); }
 function renderItems(){
   const box = document.getElementById('marche-list');
   if(!items.length){ box.innerHTML = '<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
@@ -311,7 +361,7 @@ function renderItems(){
     const offBadge = !it.actif ? '<span class="badge off">Inactive</span>' : '';
     let sub = '';
     if(it.type==='question' && Array.isArray(it.options) && it.options.length) sub = 'Réponses : '+it.options.join(' / ');
-    if(it.depend_item_id) sub += (sub?' · ':'')+`Visible seulement si « ${esc(libelleParentQuestion(it.depend_item_id))} » = « ${esc(it.depend_valeur||'')} »`;
+    const condTxt = describeConditions(it); if(condTxt) sub += (sub?' · ':'')+condTxt;
     return `<div class="list-item">
       <div class="body">
         <div class="t1">${offBadge}${badge} ${esc(it.libelle)}</div>
@@ -372,12 +422,14 @@ function openItemForm(it){
       </div>
 
       <div class="field">
-        <label>Condition d'affichage <span class="hint">Cet item n'apparaît que si la question choisie a reçu la réponse indiquée.</span></label>
-        <select id="if-dep-item" onchange="renderDepValueOptions()">${questionOptionsHTML(it?it.id:null, it?it.depend_item_id:null)}</select>
-      </div>
-      <div class="field hidden" id="if-dep-valeur-wrap">
-        <label>Réponse attendue</label>
-        <select id="if-dep-valeur"></select>
+        <label>Condition d'affichage <span class="hint">Cet item n'apparaît que si les conditions ci-dessous sont remplies. Aucune condition = toujours affiché.</span></label>
+        <div class="cond-mode hidden" id="if-cond-mode-wrap">
+          <span>Afficher si :</span>
+          <button type="button" id="if-mode-et" onclick="setCondMode('et')">Toutes (ET)</button>
+          <button type="button" id="if-mode-ou" onclick="setCondMode('ou')">Au moins une (OU)</button>
+        </div>
+        <div id="if-cond-list"></div>
+        <button type="button" class="btn-mini" onclick="addCondRow()">➕ Ajouter une condition</button>
       </div>
 
       <div class="chk-row"><input type="checkbox" id="if-actif" ${(!it || it.actif)?'checked':''}><label for="if-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Actif</label></div>
@@ -393,7 +445,13 @@ function openItemForm(it){
   holder.innerHTML = html;
   window._itemOptions = (opts && opts.length) ? opts.slice() : ['',''];
   renderOptionRows();
-  if(it && it.depend_item_id) renderDepValueOptions(it.depend_valeur);
+  window._itemEditingId = it ? it.id : null;
+  window._itemConds = (it && Array.isArray(it.depend_conditions) && it.depend_conditions.length)
+    ? it.depend_conditions.map(c=>({item_id:c.item_id, valeur:c.valeur}))
+    : (it && it.depend_item_id ? [{item_id:it.depend_item_id, valeur:it.depend_valeur}] : []);
+  window._itemCondMode = (it && it.depend_mode) ? it.depend_mode : 'et';
+  setCondMode(window._itemCondMode);
+  renderCondRows();
   holder.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function setItemType(t){
@@ -434,21 +492,24 @@ async function saveItem(id){
   if(type==='question' && (!options || options.length<2)){
     err.innerHTML = '<div class="err">Une question doit proposer au moins deux réponses.</div>'; return;
   }
-  const depItemVal = document.getElementById('if-dep-item').value;
-  const depItemId = depItemVal ? Number(depItemVal) : null; // alarme_checklist_items.id est bigint, pas texte
-  const depValeur = depItemId ? (document.getElementById('if-dep-valeur').value || null) : null;
+  const conds = (window._itemConds||[]).filter(c=>c.item_id && c.valeur).map(c=>({item_id:Number(c.item_id), valeur:c.valeur}));
+  const depConditions = conds.length ? conds : null;
+  const depMode = window._itemCondMode || 'et';
+  const depItemId = conds.length ? conds[0].item_id : null;  // miroir 1re condition (compat)
+  const depValeur = conds.length ? conds[0].valeur : null;
   const actif = document.getElementById('if-actif').checked;
 
   try{
     if(id){
-      const row = { libelle, type, options, depend_item_id: depItemId, depend_valeur: depValeur, actif };
+      const row = { libelle, type, options, depend_item_id: depItemId, depend_valeur: depValeur, depend_conditions: depConditions, depend_mode: depMode, actif };
       const { error } = await sb.from('alarme_checklist_items').update(row).eq('id', id);
       if(error) throw error;
     } else {
       const maxOrdre = items.reduce((m,i)=>Math.max(m, i.ordre||0), 0);
       const row = {
         transmetteur_code: currentTransCode, libelle, type, options,
-        depend_item_id: depItemId, depend_valeur: depValeur, ordre: maxOrdre+10, actif
+        depend_item_id: depItemId, depend_valeur: depValeur,
+        depend_conditions: depConditions, depend_mode: depMode, ordre: maxOrdre+10, actif
       };
       // alarme_checklist_items.id est un bigint généré par la base (identity) —
       // on ne le fournit jamais côté client (contrairement à uid() pour
@@ -464,7 +525,7 @@ async function saveItem(id){
   }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
 }
 async function deleteItem(id){
-  const dependants = items.filter(i=>i.depend_item_id===id);
+  const dependants = items.filter(i=> i.depend_item_id===id || (Array.isArray(i.depend_conditions) && i.depend_conditions.some(c=>c.item_id===id)) );
   if(dependants.length && !confirm(dependants.length+' item(s) dépendent de cette question et perdront leur condition (ils redeviendront toujours affichés). Continuer ?')) return;
   if(!dependants.length && !confirm('Supprimer cet item ?')) return;
   try{
