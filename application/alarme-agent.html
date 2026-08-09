@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-agent · v2 · 2026-08-08 -->
+<!-- RDZ · alarme-agent · v2 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -65,18 +65,16 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
 .ck .lbl{font-size:14.5px;line-height:1.4;padding-top:2px}
 .ck.done .lbl{color:#777;text-decoration:line-through}
 .ck .tm{margin-left:auto;font-size:11.5px;color:#aaa;white-space:nowrap;padding-top:4px}
-.ck-h{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 13px;margin-bottom:9px}
-.ck-h.set{border-color:var(--ok);background:#f4faf5}
-.ck-h .lbl{font-size:14.5px;font-weight:bold;margin-bottom:8px}
-.ck-h .hrow{display:flex;gap:8px}
-.ck-h .hrow input{flex:1;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:var(--radius-ui)}
-.ck-h .hrow button{background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:0 16px;font-weight:bold;cursor:pointer}
-.ck-n{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 13px;margin-bottom:9px}
-.ck-n .lbl{font-size:14.5px;font-weight:bold;margin-bottom:8px}
-.ck-n textarea{width:100%;min-height:70px;font-family:var(--font);font-size:15px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px;resize:vertical}
 
-.res-btns{display:flex;gap:8px;margin-bottom:6px}
-.res-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px 6px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
+/* Item de type "question" (bifurcation) dans la marche à suivre */
+.q-block{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--warn);border-radius:var(--radius-section);padding:13px;margin-bottom:9px}
+.q-lbl{font-size:14.5px;font-weight:bold;margin-bottom:10px}
+.q-btns{display:flex;flex-wrap:wrap;gap:8px}
+.qbtn{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 14px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.qbtn.sel{background:var(--warn);border-color:var(--warn);color:#fff}
+
+.res-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.res-btns button{flex:1 1 calc(50% - 4px);min-width:140px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px 8px;font-size:12.5px;font-weight:bold;cursor:pointer;color:var(--ink);line-height:1.3}
 .res-btns button.sel{background:var(--red);border-color:var(--red);color:#fff}
 
 .dictable{position:relative}
@@ -118,7 +116,7 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
     <!-- Écran 1 : code transmetteur -->
     <section id="screen-code">
       <div class="screen-title">🚨 Alarme reçue</div>
-      <div class="code-intro">Entrez le <b>numéro de transmetteur</b> communiqué par CERTAS. Il charge le site, l'emplacement des clés et la marche à suivre.</div>
+      <div class="code-intro">Entrez le <b>numéro de transmetteur</b> communiqué par Sertas. Il charge le site, l'emplacement des clés et la marche à suivre.</div>
       <div id="code-err"></div>
       <div class="code-box">
         <input type="text" id="f-code" inputmode="numeric" autocomplete="off" placeholder="N° transmetteur">
@@ -151,14 +149,24 @@ textarea{min-height:90px;resize:vertical;line-height:1.45}
 
       <div id="op-err"></div>
 
+      <div class="section-h">Horodatage</div>
+      <div class="timebtns">
+        <button id="bt-arrivee" onclick="stampArrivee()">📍 Je suis arrivé</button>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Heure d'appel</label><input type="time" id="f-appel"></div>
+        <div class="field"><label>Heure d'arrivée</label><input type="time" id="f-arrivee"></div>
+      </div>
+
       <div class="section-h">Marche à suivre</div>
       <div id="checklist"><div class="state-msg">Chargement…</div></div>
 
       <div class="section-h">Résultat de l'intervention</div>
       <div class="res-btns" id="res-btns">
-        <button data-res="RAS" onclick="pickRes(this)">✅ RAS</button>
-        <button data-res="Levée de doute" onclick="pickRes(this)">🔎 Levée de doute</button>
-        <button data-res="Intervention" onclick="pickRes(this)">⚠️ Intervention</button>
+        <button data-res="Intervention terminée" onclick="pickRes(this)">✅ Intervention terminée</button>
+        <button data-res="Levée de doute terminée" onclick="pickRes(this)">🔎 Levée de doute terminée</button>
+        <button data-res="Intervention à prévoir" onclick="pickRes(this)">🗓️ Intervention à prévoir</button>
+        <button data-res="Quittance effectuée et asservissement remis en marche" onclick="pickRes(this)">🔁 Quittance effectuée et asservissement remis en marche</button>
       </div>
 
       <div class="field" style="margin-top:14px">
@@ -504,7 +512,7 @@ RDZSync.init({ client: sb });
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
 
 let trans = null;            // ligne alarme_transmetteurs
-let checklist = [];          // [{libelle, fait, heure}]
+let checklist = [];          // [{id, type, libelle, options, depend_item_id, depend_valeur, fait, heure, reponse}]
 let resultat = '';
 let photos = [];
 let opId = null;
@@ -538,12 +546,22 @@ async function validateCode(){
   }catch(e){ err.innerHTML='<div class="err">Réseau indisponible — impossible de charger le transmetteur. Réessayez dès que possible.</div>'; }
 }
 
+/* La marche à suivre peut mélanger deux types d'items (voir alarme-config.html) :
+   - 'etape'    : une case à cocher classique.
+   - 'question' : un choix à boutons (ex. "En direct" / "Pas en direct") dont la
+                  réponse conditionne l'affichage d'items suivants via
+                  depend_item_id / depend_valeur (voir itemVisible()). */
 async function loadChecklist(code){
   checklist = [];
   try{
     const { data } = await sb.from('alarme_checklist_items').select('*')
       .eq('transmetteur_code',code).eq('actif',true).order('ordre');
-    checklist = (data||[]).map(i=>({ libelle:i.libelle, type:i.type||'check', fait:false, heure:null, valeur:'' }));
+    checklist = (data||[]).map(i=>({
+      id:i.id, type:i.type||'etape', libelle:i.libelle,
+      options:Array.isArray(i.options)?i.options:[],
+      depend_item_id:i.depend_item_id||null, depend_valeur:i.depend_valeur||null,
+      fait:false, heure:null, reponse:null
+    }));
   }catch(e){/* checklist facultative */}
 }
 
@@ -556,6 +574,9 @@ function openOp(){
   document.getElementById('m-agent').textContent = AGENT_NOM;
   document.getElementById('b-keys').textContent = trans.emplacement_cles || 'Non renseigné';
   document.getElementById('b-cons').textContent = trans.consignes || 'Non renseigné';
+  document.getElementById('f-appel').value = nowHM();
+  document.getElementById('f-arrivee').value = '';
+  document.getElementById('bt-arrivee').classList.remove('set');
   document.getElementById('f-situation').value='';
   document.getElementById('f-actions').value='';
   document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel'));
@@ -565,26 +586,41 @@ function openOp(){
 }
 function backToCode(){ show('screen-code'); }
 
+function stampArrivee(){ document.getElementById('f-arrivee').value = nowHM(); document.getElementById('bt-arrivee').classList.add('set'); }
+
+/* Un item sans dépendance est toujours visible. Un item dépendant n'est
+   visible que si la question dont il dépend a reçu exactement la réponse
+   attendue (depend_valeur). */
+function itemVisible(c){
+  if(!c.depend_item_id) return true;
+  const parent = checklist.find(x=>x.id===c.depend_item_id);
+  return !!(parent && parent.reponse===c.depend_valeur);
+}
+
+/* Si on change la réponse à une question, tout ce qui dépendait d'elle (et
+   des items qui en dépendaient à leur tour) redevient vierge — pour ne pas
+   garder une coche ou une réponse invisible mais toujours "acquise" derrière
+   une branche qu'on a quittée. */
+function invalidateDescendants(itemId){
+  checklist.forEach(c=>{
+    if(c.depend_item_id===itemId){
+      c.fait=false; c.heure=null; c.reponse=null;
+      invalidateDescendants(c.id);
+    }
+  });
+}
+
 function renderChecklist(){
   const box = document.getElementById('checklist');
   if(!checklist.length){ box.innerHTML='<div class="state-msg">Aucune étape configurée pour ce transmetteur.</div>'; return; }
   box.innerHTML = checklist.map((c,i)=>{
-    if(c.type==='heure'){
-      return `<div class="ck-h ${c.valeur?'set':''}">
-        <div class="lbl">⏱ ${esc(c.libelle)}</div>
-        <div class="hrow">
-          <input type="time" value="${esc(c.valeur||'')}" onchange="setHeure(${i},this.value)">
-          <button type="button" onclick="setHeureNow(${i})">Maintenant</button>
-        </div>
-      </div>`;
-    }
-    if(c.type==='note'){
-      return `<div class="ck-n">
-        <div class="lbl">📝 ${esc(c.libelle)}</div>
-        <div class="dictable">
-          <textarea id="note-${i}" placeholder="Écrire ou dicter…" oninput="checklist[${i}].valeur=this.value">${esc(c.valeur||'')}</textarea>
-          <button type="button" class="mic" data-target="note-${i}">🎤 Dicter</button>
-        </div>
+    if(!itemVisible(c)) return '';
+    if(c.type==='question'){
+      return `<div class="q-block">
+        <div class="q-lbl">${esc(c.libelle)}</div>
+        <div class="q-btns">${c.options.map(o=>`
+          <button type="button" class="qbtn ${c.reponse===o?'sel':''}" onclick="pickQuestionAnswer(${i},${JSON.stringify(o)})">${esc(o)}</button>
+        `).join('')}</div>
       </div>`;
     }
     return `<div class="ck ${c.fait?'done':''}" onclick="toggleCk(${i})">
@@ -593,11 +629,13 @@ function renderChecklist(){
       ${c.heure?`<div class="tm">${esc(c.heure)}</div>`:''}
     </div>`;
   }).join('');
-  bindMics();
 }
 function toggleCk(i){ checklist[i].fait=!checklist[i].fait; checklist[i].heure = checklist[i].fait?nowHM():null; renderChecklist(); }
-function setHeure(i,val){ checklist[i].valeur=val; checklist[i].fait=!!val; renderChecklist(); }
-function setHeureNow(i){ checklist[i].valeur=nowHM(); checklist[i].fait=true; renderChecklist(); }
+function pickQuestionAnswer(i,val){
+  checklist[i].reponse = val; checklist[i].heure = nowHM();
+  invalidateDescendants(checklist[i].id);
+  renderChecklist();
+}
 
 function pickRes(btn){ resultat = btn.dataset.res;
   document.querySelectorAll('#res-btns button').forEach(b=>b.classList.remove('sel')); btn.classList.add('sel'); }
@@ -660,29 +698,35 @@ function closeOp(){
   const err=document.getElementById('op-err'); err.innerHTML='';
   const situation=document.getElementById('f-situation').value.trim();
   const actions=document.getElementById('f-actions').value.trim();
-  // Étapes "à faire" = vérifications non cochées + horodatages non renseignés (les notes restent libres).
-  const aFaire = checklist.filter(c=>(c.type==='check'||c.type==='heure') && !c.fait).length;
 
-  // Validation explicite : avertir si étapes manquantes ou résultat non choisi, mais laisser confirmer.
-  if(!closeOp._confirmed && (aFaire>0 || !resultat)){
+  // On ne réclame que les items effectivement visibles sur le chemin suivi
+  // (une étape masquée par une branche non prise ne doit pas bloquer la clôture).
+  const visibles = checklist.filter(itemVisible);
+  const nonCoches = visibles.filter(c=>c.type!=='question' && !c.fait).length;
+  const nonRepondues = visibles.filter(c=>c.type==='question' && !c.reponse).length;
+
+  // Validation explicite : avertir si étapes non cochées ou résultat non choisi, mais laisser confirmer.
+  if(!closeOp._confirmed && (nonCoches>0 || nonRepondues>0 || !resultat)){
     let msg='<div class="warn-box"><b>Avant de clôturer :</b><ul style="margin:6px 0 0 18px">';
-    if(aFaire>0) msg+=`<li>${aFaire} étape(s) de la marche à suivre non complétée(s)</li>`;
-    if(!resultat) msg+='<li>Aucun résultat sélectionné (RAS / Levée de doute / Intervention)</li>';
+    if(nonCoches>0) msg+=`<li>${nonCoches} étape(s) de la marche à suivre non cochée(s)</li>`;
+    if(nonRepondues>0) msg+=`<li>${nonRepondues} question(s) de la marche à suivre sans réponse</li>`;
+    if(!resultat) msg+='<li>Aucun résultat d\'intervention sélectionné</li>';
     msg+='</ul><div style="margin-top:8px">Ré-appuyez sur « Clôturer » pour confirmer quand même.</div></div>';
     err.innerHTML=msg; window.scrollTo(0,document.body.scrollHeight); closeOp._confirmed=true; return;
   }
 
-  // Horodatages : on récupère les heures saisies dans la checklist pour les colonnes dédiées
-  // (première "heure" = réception, dernière = arrivée), le détail complet restant dans le jsonb.
-  const heures = checklist.filter(c=>c.type==='heure' && c.valeur).map(c=>c.valeur);
+  // On enregistre aussi la visibilité de chaque item pour garder une trace
+  // du chemin réellement suivi (utile pour la supervision/relecture).
+  const checklistSnapshot = checklist.map(c=>({...c, visible:itemVisible(c)}));
+
   const row={
     id:opId, transmetteur_code:trans.code, site_id:trans.site_id||null, site_nom:trans.site_nom||null,
     zone:trans.zone||null, agent_nom:AGENT_NOM,
-    heure_appel: heures[0] || null,
-    heure_arrivee: heures.length>1 ? heures[heures.length-1] : null,
+    heure_appel:document.getElementById('f-appel').value||null,
+    heure_arrivee:document.getElementById('f-arrivee').value||null,
     heure_fin:nowHM(),
     resultat:resultat||null,
-    checklist:JSON.stringify(checklist),
+    checklist:JSON.stringify(checklistSnapshot),
     situation:situation||null, actions:actions||null,
     created_at:new Date().toISOString()
   };
