@@ -1,3 +1,4 @@
+<!-- RDZ · validation_consignes · v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -166,7 +167,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let validations = [];
 let sites = [];
 
-function today() { return new Date().toISOString().slice(0,10); }
+function serviceDate(d){ d = d ? new Date(d) : new Date(); d = new Date(d.getTime() - (6*60+30)*60000); const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), j=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${j}`; } /* Journée de service RDZ : 06:30 -> 06:29 le lendemain */
+function today() { return serviceDate(); }
 function escHtml(s) { return (s ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function fmtDate(d) { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}.${m}.${y}`; }
 function fmtTime(ts) { return new Date(ts).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'}); }
@@ -209,9 +211,10 @@ function populateFilters() {
 function periodStart(period) {
   if (period === 'all') return null;
   if (period === 'today') return today();
-  const d = new Date();
+  const d = new Date(Date.now() - (6*60+30)*60000);
   d.setDate(d.getDate() - parseInt(period, 10) + 1);
-  return d.toISOString().slice(0,10);
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), j=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${j}`;
 }
 
 // ─── STATS + ALERTE SITES EN ATTENTE ────────────────────────────────────────
