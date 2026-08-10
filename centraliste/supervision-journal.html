@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v4 · 2026-08-09 -->
+<!-- RDZ · supervision-journal · v5 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -27,24 +27,12 @@ header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255
 main{flex:1;padding:18px}
 
 .filters{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-bottom:14px}
-.frow{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
-.fg{display:flex;flex-direction:column;gap:5px}
-.fg label{font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold}
-.fg input,.fg select{font-family:var(--font);font-size:14px;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px;background:#fff}
 .btn{border:none;border-radius:var(--radius-ui);padding:9px 16px;font-size:14px;font-weight:bold;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff}
 .btn:active{background:var(--red-dark)}
 .btn-sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
-.types{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:12.5px;font-weight:bold;cursor:pointer;color:#555;display:flex;align-items:center;gap:5px}
-.pill.on{color:#fff;border-color:transparent}
-.pill .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.hint{font-size:12px;color:#999;margin-top:8px}
+.hint{font-size:12px;color:#999;margin:0}
 
 .summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.kpi-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
-.kpi-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-.kpi-card .kv{font-size:26px;font-weight:bold;color:var(--red);line-height:1}
-.kpi-card .kl{font-size:11.5px;color:#777;text-transform:uppercase;letter-spacing:.3px;font-weight:bold}
 
 .entry{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--line);border-radius:var(--radius-section);
   padding:13px 15px;margin-bottom:10px;cursor:pointer;display:flex;gap:14px;align-items:flex-start}
@@ -58,7 +46,6 @@ main{flex:1;padding:18px}
 .entry .meta2{font-size:11.5px;color:#999;margin-top:5px}
 .entry .rgt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
 .tag{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap;color:#fff}
-.tag.sub{background:var(--bg-meta);color:#777}
 .tag.ph{background:var(--bg-meta);color:#777}
 
 .state-msg{text-align:center;color:#999;font-size:14px;padding:40px 10px}
@@ -85,16 +72,12 @@ main{flex:1;padding:18px}
 .photo .lg{font-size:11.5px;color:#666;padding:6px 8px}
 
 /* édition */
-.editbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px}
+.editbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .efield{margin-bottom:11px}
 .efield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold;margin-bottom:5px}
-.efield.warn label{color:var(--warn)}
 .efield input,.efield select,.efield textarea{width:100%;font-family:var(--font);font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px}
 .efield textarea{min-height:70px;resize:vertical}
-.efield.check{display:flex;align-items:center;gap:8px;flex-direction:row}
-.efield.check label{margin:0}
 .esave{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-.readonly-note{font-size:11.5px;color:#999;margin-bottom:14px}
 
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:11px 18px;border-radius:var(--radius-ui);font-size:13.5px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:200}
 .toast.show{opacity:1}.toast.err{background:var(--danger)}
@@ -118,31 +101,22 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings (rondes &amp; comptages)</div>
       </div>
-      <a class="home" href="../index.html">← Accueil</a>
+      <a class="home" href="index.html">← Accueil</a>
     </div>
   </header>
 
   <main>
     <div class="filters">
-      <div class="frow">
-        <div class="fg"><label>Du</label><input type="date" id="f-du"></div>
-        <div class="fg"><label>Au</label><input type="date" id="f-au"></div>
-        <div class="fg"><label>Site</label><select id="f-site"><option value="">Tous</option></select></div>
-        <div class="fg"><label>Agent</label><select id="f-agent"><option value="">Tous</option></select></div>
-        <div class="fg"><label>&nbsp;</label><button class="btn" onclick="refresh()">🔄 Actualiser</button></div>
-        <div class="fg"><label>&nbsp;</label><button class="btn btn-sec" onclick="resetTypes()">Cocher tout</button></div>
-        <div class="fg"><label>&nbsp;</label><button class="btn btn-sec" onclick="clearTypes()">Tout décocher</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une, en commençant par les parkings (rondes + comptages). Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.</div>
+        <button class="btn" onclick="refresh()">🔄 Actualiser</button>
       </div>
-      <div class="types" id="types"></div>
-      <div class="hint">Le filtre « Site » ne s'applique qu'aux sources qui ont une notion de site (véhicules, badges tiers, bibliothèque : affichés quel que soit le site choisi). Une « journée » va de 06h30 à 06h29 le lendemain (journée de service RDZ).</div>
     </div>
 
-    <div class="kpi-bar" id="kpi-bar"></div>
-
     <div class="summary"><span id="summary-txt"></span></div>
-    <div id="list"><div class="state-msg">Choisissez vos filtres et cliquez « Actualiser ».</div></div>
+    <div id="list"><div class="state-msg">Chargement…</div></div>
   </main>
 </div>
 
@@ -162,76 +136,50 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v2)
-   Fusionne en un flux chronologique unique les écritures de :
-   journal de bord, alarmes, consignes, événements, constats
-   (+ suivi), validations de consignes, matériel, clés/badges
-   (internes + tiers), véhicules (mouvements/dégâts/main
-   courante), ouvertures résidents, ParkGuard (constats +
-   comptages), bibliothèque (filtrages + comptages).
-   Toute entrée est éditable ; l'écriture se fait directement
-   sur la table source (pas de file RDZSync ici : outil de
-   supervision desktop, écritures en ligne uniquement).
+   RDZ — Supervision journal de bord unifié (v5 — reconstruction)
+   On reconstruit ce module en connectant les sources une par une.
+   Étape 1 : PARKINGS uniquement — mélange en un seul flux
+   chronologique des rondes ParkGuard (table `vehicles`) et des
+   comptages (table `comptages`), avec accès direct pour modifier
+   ou supprimer chaque ligne, et ouvrir le rapport imprimable pour
+   les rondes. Toutes les autres sources (journal, alarmes,
+   consignes, événements, constats, véhicules flotte, ouvertures,
+   bibliothèque, etc.) sont volontairement abandonnées pour l'instant
+   — à reconnecter une par une dans les prochaines itérations.
+   Aucun filtre pour ce premier jet (site/date/agent) : liste brute,
+   triée du plus récent au plus ancien. Écritures directes sur les
+   tables sources (pas de file RDZSync ici : outil de supervision
+   desktop, en ligne uniquement).
    ============================================================ */
 
-/* ---------- Base principale ---------- */
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* ---------- Base Flotte / RouteOps (véhicules) ---------- */
-const FLT_URL  = 'https://trdhtlcenmjlcvzuplid.supabase.co';
-const FLT_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
-const FLT_EMAIL = 'surveillance@rdz-security-management.ch';
-const FLT_PASS  = 'RDZ2026?/';
-const FLT_TOK_K = 'flt_tok_v2';
-let fltToken = null;
-
-async function fltLogin(){
-  try{ const s = JSON.parse(localStorage.getItem(FLT_TOK_K)||'{}'); if(s.t && s.e && Date.now()/1000 < s.e-60){ fltToken=s.t; return; } }catch(_){}
-  const r = await fetch(`${FLT_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'Content-Type':'application/json','apikey':FLT_KEY},body:JSON.stringify({email:FLT_EMAIL,password:FLT_PASS})});
-  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error_description||'Auth flotte échouée'); }
-  const d = await r.json();
-  fltToken = d.access_token;
-  localStorage.setItem(FLT_TOK_K, JSON.stringify({t:d.access_token, e:Math.floor(Date.now()/1000)+(d.expires_in||3600)}));
-}
-async function flt(path, opts={}){
-  const r = await fetch(`${FLT_URL}/rest/v1/${path}`,{...opts, headers:{'apikey':FLT_KEY,'Content-Type':'application/json',...(fltToken?{'Authorization':`Bearer ${fltToken}`}:{}),...(opts.headers||{})}});
-  if(!r.ok){ const t = await r.text(); throw new Error(t || `HTTP ${r.status}`); }
-  if(r.status===204) return null;
-  const txt = await r.text(); return txt ? JSON.parse(txt) : null;
-}
 
 /* ---------- Utilitaires ---------- */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
 function fmtTime(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
-// Journée de service RDZ : 06:30 -> 06:29 le lendemain.
+// Journée de service RDZ : 06:30 -> 06:29 le lendemain. Pas encore utilisée pour filtrer
+// dans cette première étape (liste brute sans filtre), mais conservée car c'est la
+// convention métier à réutiliser dès qu'un filtre par date sera reconnecté ici.
 function serviceDate(d){
   d = d ? new Date(d) : new Date();
   d = new Date(d.getTime() - (6*60 + 30) * 60000);
   const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), j = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${j}`;
 }
-function combineDT(dateStr, timeStr){
-  if(!dateStr) return null;
-  const t = (timeStr && /^\d{1,2}:\d{2}/.test(timeStr)) ? timeStr : '00:00';
-  const dt = new Date(`${dateStr}T${t.length===5?t:t.padStart(5,'0')}:00`);
-  return isNaN(dt) ? null : dt.toISOString();
-}
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'+(e?' err':''); setTimeout(()=>t.className='toast',2400); }
 
 /* ============================================================
-   Rapports client imprimables — repris à l'identique des fichiers
-   de référence existants (charte visuelle, jamais réinventée) :
-   - ouverture résident  -> style "RDZ Reports" (historique-ouvertures.html)
-   - comptage bibliothèque -> style "Evènement //" (supervision-bibliotheque.html)
+   Rapport client imprimable — repris à l'identique des fichiers de
+   référence existants (charte visuelle "RDZ Reports", jamais
+   réinventée) : parkguard-rapport-denonciation.html / -autorise.html
+   / -vide.html.
    ============================================================ */
-const RPTO_LOGO_B64 = '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';
+const RPTO_LOGO_B64 = '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';
 function rpFmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); if(!d) return iso; return `${d}.${m}.${y}`; }
-function rpFmtHeure(h){ return h ? h.slice(0,5) : '—'; }
-
 function rpFieldO(lbl,val){
   return `<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">${lbl}</label><div style="font-size:13px;color:#1a1a1a;padding:5px 0;border-bottom:1px solid #eee;min-height:28px;font-weight:500">${val}</div></div>`;
 }
@@ -241,100 +189,6 @@ function rpPhotoBoxO(label,url){
     : `<div style="border:1.5px dashed #e0e0e0;border-radius:8px;background:#fafafa;color:#bbb;font-size:12px;text-align:center;padding:24px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;min-height:180px">📷<span>Photo non disponible</span></div>`;
   return `<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</div>${box}</div>`;
 }
-// Style "RDZ Reports" — repris à l'identique de historique-ouvertures.html
-function buildRapportOuverture(o){
-  const dateTxt = rpFmtDate(o.date_ouverture), heureTxt = rpFmtHeure(o.heure_ouverture);
-  return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
-    <div style="background:#1a1a1a;padding:1.5rem 2rem">
-      <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
-        <div style="flex:1">
-          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">Rapport d'ouverture</div>
-          <div style="font-size:20px;font-weight:700;color:#fff">${esc(o.site)}</div>
-        </div>
-        <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);background:#f0f0f0">
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Date</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${dateTxt}</div></div>
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Heure</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${heureTxt}</div></div>
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(o.agent_nom||'—')}</div></div>
-      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Statut</label><div><span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f8f0;color:#1e6b1e;border:1.5px solid #1e6b1e">Enregistrée</span></div></div>
-    </div>
-    <div style="padding:1.5rem 2rem">
-      <div style="margin-bottom:2rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">1 — Détails de l'ouverture</div>
-        <div style="padding:1.2rem 1rem">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${rpFieldO('Localisation',esc(o.localisation||'—'))}${rpFieldO('Identité de la personne',esc(o.personne||'—'))}</div>
-          <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px">${rpFieldO('Motif',esc(o.motif||'—'))}</div>
-          <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Note',esc(o.note||'—'))}</div>
-        </div>
-      </div>
-      <div style="margin-bottom:0;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">2 — Preuve photographique</div>
-        <div style="padding:1.2rem 1rem"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Photo jointe',o.photo_url)}</div></div>
-      </div>
-    </div>
-    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
-      <div style="display:flex;align-items:center;gap:.75rem">
-        <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
-        <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel — Usage officiel uniquement</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:11px;color:#666;font-weight:600;margin-bottom:4px">Réf. : ${(o.id||'').toString().slice(0,8).toUpperCase()}</div>
-        <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-// Style "Evènement //" — repris à l'identique de supervision-bibliotheque.html
-function rpFRow(lbl,val){ return `<div style="display:flex;padding:8px 0;border-bottom:1px solid #eee;font-size:12.5px"><div style="width:60%;color:#4a4a4a;padding-right:12px">${lbl}</div><div style="width:40%;font-weight:600;color:#1a1a1a">${val}</div></div>`; }
-function rpSTitle(t){ return `<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin:18px 0 8px">${t}</div>`; }
-function rpPhotoBlock(url){
-  if(!url) return '';
-  return `<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📷 Photo jointe</div><img src="${url}" style="max-width:100%;border-radius:8px;border:1px solid #eee;display:block"></div>`;
-}
-function rpRetention(dateStr){ if(!dateStr) return '—'; const d=new Date(dateStr+'T00:00:00'); d.setFullYear(d.getFullYear()+5); return rpFmtDate(d.toISOString().slice(0,10)); }
-function rpShellIndividual(titre, poste, meta, bodyHtml, footerLabel){
-  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1)">
-    <div style="height:6px;background:#C8102E"></div>
-    <div style="background:#C8102E;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px">Ce rapport contient des données personnelles. Vous devez le supprimer au plus tard le ${meta.retention}</div>
-    <div style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-align:right;padding:6px 20px">Evènement //</div>
-    <div style="text-align:right;font-size:12px;color:#888;padding:14px 20px 0">${esc(poste)}</div>
-    <div style="text-align:center;padding:14px 20px 18px"><div style="font-size:17px;font-weight:700;color:#1a1a1a">${esc(titre)}</div></div>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 18px">
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;width:180px;background:#fafafa">Catégorie</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Controle</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Priorité</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Moyenne</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Poste de garde</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(poste)}</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Déclaration par</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.agent)}</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Date de début</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.debut)}</td></tr>
-    </table>
-    <div style="padding:0 20px 20px">${bodyHtml}</div>
-    <div style="border-top:2px solid #eee;padding:10px 20px;display:flex;justify-content:space-between;font-size:10.5px;color:#9a9a9a">
-      <span>${esc(meta.debut)}</span><span>${esc(footerLabel)}</span><span>Page 1 / 1</span>
-    </div>
-  </div>`;
-}
-function buildBiblioComptageReport(c){
-  const meta = { agent:c.agent_nom, debut:`${rpFmtDate(c.date_rapport)} ${rpFmtHeure(c.heure_rapport)}`, retention:rpRetention(c.date_rapport) };
-  const body = rpSTitle('Date') + rpFRow('Date',rpFmtDate(c.date_rapport)) + rpFRow("L'heure",rpFmtHeure(c.heure_rapport))
-    + rpSTitle('Type') + rpFRow('Type','Patrouille')
-    + rpSTitle('Localisation') + rpFRow('Précisez la localisation (si incident/nécessaire)','—')
-    + rpSTitle('Rapport')
-    + rpFRow("Affluence (Nbre de personnes dans l'enceinte de la bibliothèque)", c.affluence??'—')
-    + rpFRow('Physionomie', esc(c.ambiance||'—'))
-    + rpFRow('Rappel(s) au règlement (nombre / relève identité / motif)', c.rappels_reglement??'—')
-    + rpFRow('Eviction(s) / Refus (nombre / relève identité / motif)', c.evictions??'—')
-    + rpFRow('Informations complémentaires (si nécessaire)', c.note ? esc(c.note) : '—')
-    + rpPhotoBlock(c.photo_url);
-  return rpShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque //');
-}
-
-// Style "RDZ Reports" — repris à l'identique des 3 fichiers de production
-// parkguard-rapport-denonciation.html / -autorise.html / -vide.html
-// (jamais réinventé — voir piège méthodologique du 2026-08-09 : un rapport
-// existait déjà pour chaque statut, il ne fallait pas en inventer un nouveau).
 function rpParkShell(labelTxt, statutBadgeHtml, bodyHtml, meta){
   const dateTxt = meta.created_at ? rpFmtDate(new Date(meta.created_at).toISOString().slice(0,10)) : '—';
   const heureTxt = meta.created_at ? fmtTime(meta.created_at) : '—';
@@ -374,7 +228,6 @@ function rpSec(numTitre, innerHtml){
     <div style="padding:1.2rem 1rem">${innerHtml}</div>
   </div>`;
 }
-// Reprend parkguard-rapport-denonciation.html — statut "Infraction"
 function buildParkingDenonciation(v){
   const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#fdf0f0;color:#C8102E;border:1.5px solid #C8102E">Infraction</span>`;
   const body = rpSec('1 — Véhicule en infraction',
@@ -390,7 +243,6 @@ function buildParkingDenonciation(v){
       </div>`);
   return rpParkShell('Rapport de dénonciation', badge, body, v);
 }
-// Reprend parkguard-rapport-autorise.html — statut "Autorisé"
 function buildParkingAutorise(v){
   const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f8f0;color:#1e6b1e;border:1.5px solid #1e6b1e">Autorisé</span>`;
   const body = rpSec('1 — Véhicule autorisé',
@@ -406,7 +258,6 @@ function buildParkingAutorise(v){
       </div>`);
   return rpParkShell('Rapport véhicule autorisé', badge, body, v);
 }
-// Reprend parkguard-rapport-vide.html — statut "Vide" (parking vide)
 function buildParkingVide(v){
   const badge = `<span style="display:inline-block;padding:.4rem 1.2rem;border-radius:20px;font-size:13px;font-weight:700;background:#f0f0f0;color:#555;border:1.5px solid #aaa">Vide</span>`;
   let rem = (v.remarque && v.remarque!=='null') ? v.remarque : '';
@@ -426,8 +277,7 @@ function buildParkingReport(v){
   if(s.includes('autoris')) return buildParkingAutorise(v);
   return buildParkingVide(v);
 }
-
-const REPORTABLE = { ouverture: buildRapportOuverture, biblio_comptage: buildBiblioComptageReport, parking: buildParkingReport };
+const REPORTABLE = { parking: buildParkingReport };
 
 function openReport(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
@@ -439,323 +289,80 @@ function openReport(idx){
 }
 function closeReport(){ document.getElementById('report-view').classList.remove('open'); }
 
-/* ---------- Palette des types ---------- */
+/* ---------- Palette des types (étape 1 : parkings uniquement) ---------- */
 const KINDS = {
-  journal:        { label:'Journal de bord',        icon:'📓', color:'#2a4b8d' },
-  alarme:         { label:'Alarme',                  icon:'🚨', color:'#C8102E' },
-  consigne:       { label:'Consigne',                 icon:'📌', color:'#8B1A1A' },
-  evenement:      { label:'Événement',                icon:'📅', color:'#6B1212' },
-  constat:        { label:'Constat',                  icon:'🧱', color:'#b8860b' },
-  constat_suivi:  { label:'Suivi de constat',         icon:'📝', color:'#d19a1a' },
-  validation:     { label:'Validation consignes',     icon:'✅', color:'#1b7a3d' },
-  materiel:       { label:'Matériel',                 icon:'📦', color:'#555' },
-  acces:          { label:'Clé / Badge',              icon:'🔑', color:'#7a4b1b' },
-  vehicule_mvt:   { label:'Véhicule — prise/retour',  icon:'🚗', color:'#2a4b8d' },
-  degat:          { label:'Véhicule — dégât',         icon:'💥', color:'#C8102E' },
-  mc_vehicule:    { label:'Véhicule — main courante',icon:'🛠️', color:'#6B1212' },
-  ouverture:      { label:'Ouverture résident',       icon:'🚪', color:'#1b7a3d' },
-  parking:        { label:'Surveillance parking',     icon:'🅿️', color:'#8B1A1A' },
-  comptage:       { label:'Comptage parking',         icon:'🔢', color:'#8B1A1A' },
-  biblio_filtrage:{ label:'Bibliothèque — filtrage',  icon:'📚', color:'#2a4b8d' },
-  biblio_comptage:{ label:'Bibliothèque — comptage',  icon:'📚', color:'#4a6fb0' },
+  parking:  { label:'Surveillance parking', icon:'🅿️', color:'#8B1A1A' },
+  comptage: { label:'Comptage parking',      icon:'🔢', color:'#1d4ed8' },
 };
 
 /* ---------- Référentiels ---------- */
-let sites = [];              // {id,nom}
+let sites = [];
 let siteNameById = {};
-let fleetVehicles = [];      // {id,plate,brand,model}
-let vehById = {};
-
 async function loadSites(){
-  try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom'); sites = data||[];
+  try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true); sites = data||[];
     siteNameById = {}; sites.forEach(s=>siteNameById[s.id]=s.nom);
-    const opt = '<option value="">Tous</option>' + sites.map(s=>`<option value="${esc(s.id)}">${esc(s.nom)}</option>`).join('');
-    document.getElementById('f-site').innerHTML = opt;
-  }catch(e){}
+  }catch(e){ console.warn('sites:', e.message||e); }
 }
-async function loadFleetVehicles(){
-  try{
-    await fltLogin();
-    const data = await flt('fleet_vehicles?select=id,plate,brand,model&active=eq.true');
-    fleetVehicles = data||[]; vehById = {}; fleetVehicles.forEach(v=>vehById[v.id]=v);
-  }catch(e){ /* base flotte peut être temporairement inaccessible : on continue sans elle */ }
-}
-function vehLabel(id){ const v = vehById[id]; return v ? (v.plate || (v.brand+' '+v.model)) : (id||'—'); }
 
 /* ============================================================
-   Chaque source : fetch() renvoie les lignes brutes.
-   expand(row) renvoie 1..n entrées {ts, sub, kind, raw}.
-   fields(row) renvoie la liste des champs éditables.
-   save(row, payload) écrit la modification.
+   Chaque source : fetch() renvoie les lignes brutes (bornées en
+   nombre — pas de filtre date pour ce premier jet). expand(row)
+   renvoie 1..n entrées {ts, sub, kind, raw}. fields(row) renvoie
+   les champs éditables. save(row, payload) écrit la modification.
+   del(row) supprime définitivement la ligne.
    ============================================================ */
 const SOURCES = [
-  { kind:'journal', table:'journal_entrees', base:'main',
-    async fetch(){ const {data}=await sb.from('journal_entrees').select('*'); return data||[]; },
-    expand(r){ return [{ ts:r.created_at, sub:'', kind:'journal', raw:r }]; },
-    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `${r.activite||'Entrée'} — ${r.site_nom||''}`; },
-    snippet(r){ return r.situation||r.actions||''; },
-    fields(){ return [
-      {k:'activite',l:'Activité',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
-      {k:'localisation_autre',l:'Précision',t:'text'},{k:'date_rapport',l:'Date du rapport',t:'date'},
-      {k:'heure_rapport',l:'Heure du rapport',t:'text'},{k:'situation',l:'Que se passe-t-il ?',t:'textarea'},
-      {k:'actions',l:'Qu\'a-t-il fait ?',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('journal_entrees').update(p).eq('id',r.id); if(error) throw error; },
-    photos(r){ return photosByEntry[r.id]||[]; } },
-
-  { kind:'alarme', table:'alarme_interventions', base:'main',
-    async fetch(){ const {data}=await sb.from('alarme_interventions').select('*'); return data||[]; },
-    expand(r){ return [{ ts:r.created_at, sub:'', kind:'alarme', raw:r }]; },
-    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `🚨 ${r.zone||'Alarme'} — ${r.site_nom||''}`; },
-    snippet(r){ return r.situation||r.actions||''; },
-    fields(){ return [
-      {k:'zone',l:'Zone',t:'text'},{k:'transmetteur_code',l:'Transmetteur',t:'text'},
-      {k:'heure_appel',l:'Heure appel',t:'text'},{k:'heure_arrivee',l:'Heure arrivée',t:'text'},
-      {k:'heure_fin',l:'Heure fin',t:'text'},{k:'resultat',l:'Résultat',t:'text'},
-      {k:'situation',l:'Constat sur place',t:'textarea'},{k:'actions',l:'Actions menées',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('alarme_interventions').update(p).eq('id',r.id); if(error) throw error; },
-    photos(r){ return photosByEntry[r.id]||[]; } },
-
-  { kind:'consigne', table:'consignes', base:'main',
-    async fetch(){ const {data}=await sb.from('consignes').select('*'); return data||[]; },
-    expand(r){
-      const out=[{ ts:r.created_at||r.date_debut, sub:'Ajout', kind:'consigne', raw:r }];
-      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'consigne', raw:r });
-      return out; },
-    site(r){ return siteNameById[r.site_id]||''; }, agent(){ return ''; },
-    title(r){ return `Consigne — ${siteNameById[r.site_id]||'—'}`; },
-    snippet(r){ return r.texte||''; },
-    fields(){ return [
-      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
-      {k:'date_debut',l:'Début validité',t:'date'},{k:'date_fin',l:'Fin validité',t:'date'},
-      {k:'texte',l:'Texte',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('consignes').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'evenement', table:'evenements', base:'main',
-    async fetch(){ const {data}=await sb.from('evenements').select('*'); return data||[]; },
-    expand(r){
-      const base = r.created_at || combineDT(r.date,r.heure_debut);
-      const out=[{ ts:base, sub:'Ajout', kind:'evenement', raw:r }];
-      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'evenement', raw:r });
-      return out; },
-    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agents||''; },
-    title(r){ return `${r.titre||'Événement'} — ${siteNameById[r.site_id]||''}`; },
-    snippet(r){ return r.remarques||r.consignes||r.lieu||''; },
-    fields(){ return [
-      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
-      {k:'titre',l:'Titre',t:'text'},{k:'date',l:'Date',t:'date'},
-      {k:'heure_debut',l:'Heure début',t:'text'},{k:'heure_fin',l:'Heure fin',t:'text'},
-      {k:'heure_service_debut',l:'Début service renforcé',t:'text'},{k:'heure_service_fin',l:'Fin service renforcé',t:'text'},
-      {k:'lieu',l:'Lieu',t:'text'},{k:'nb_agents',l:'Nb agents',t:'number'},{k:'agents',l:'Agents',t:'text'},
-      {k:'tenue',l:'Tenue',t:'text'},{k:'contact',l:'Contact',t:'text'},
-      {k:'consignes',l:'Consignes',t:'textarea'},{k:'remarques',l:'Remarques',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('evenements').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'constat', table:'constats', base:'main',
-    async fetch(){ const {data}=await sb.from('constats').select('*'); return data||[]; },
-    expand(r){
-      const base = r.created_at || combineDT(r.date_rapport,r.heure_rapport);
-      const out=[{ ts:base, sub:'Ajout', kind:'constat', raw:r }];
-      if(r.updated_at && r.created_at && new Date(r.updated_at)-new Date(r.created_at) > 60000) out.push({ ts:r.updated_at, sub:'Modification', kind:'constat', raw:r });
-      return out; },
-    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agent||''; },
-    title(r){ return `Constat — ${r.categorie||''} — ${siteNameById[r.site_id]||''}`; },
-    snippet(r){ return r.description||''; },
-    fields(){ return [
-      {k:'site_id',l:'Site',t:'select',opts:sites.map(s=>({v:s.id,l:s.nom}))},
-      {k:'categorie',l:'Catégorie',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
-      {k:'statut',l:'Statut',t:'text'},{k:'agent',l:'Agent',t:'text'},
-      {k:'date_rapport',l:'Date rapport',t:'date'},{k:'heure_rapport',l:'Heure rapport',t:'text'},
-      {k:'description',l:'Description',t:'textarea'},{k:'procedure',l:'Procédure',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('constats').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'constat_suivi', table:'constats_journal', base:'main',
-    async fetch(){ const {data}=await sb.from('constats_journal').select('*'); return data||[]; },
-    expand(r){ return [{ ts:r.created_at||r.date_entree, sub:'', kind:'constat_suivi', raw:r }]; },
-    site(){ return ''; }, agent(r){ return r.auteur||''; },
-    title(r){ return `Suivi constat — ${r.type_entree||''}`; },
-    snippet(r){ return r.texte||''; },
-    fields(){ return [
-      {k:'type_entree',l:'Type',t:'text'},{k:'date_entree',l:'Date',t:'date'},
-      {k:'auteur',l:'Auteur',t:'text'},{k:'texte',l:'Texte',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('constats_journal').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'validation', table:'consignes_lectures', base:'main',
-    async fetch(){ const {data}=await sb.from('consignes_lectures').select('*'); return data||[]; },
-    expand(r){ return [{ ts:r.validated_at||r.created_at, sub:'', kind:'validation', raw:r }]; },
-    site(r){ return r.site_nom||siteNameById[r.site_id]||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `Validation consignes — ${r.agent_nom||''} · ${r.site_nom||''}`; },
-    snippet(r){ return `${r.nb_consignes||0} consigne(s) · ${r.nb_evenements||0} événement(s) · ${r.nb_constats||0} constat(s)`; },
-    fields(){ return [
-      {k:'nb_consignes',l:'Nb consignes',t:'number'},{k:'nb_evenements',l:'Nb événements',t:'number'},
-      {k:'nb_constats',l:'Nb constats',t:'number'},
-      {k:'consignes_json',l:'Snapshot consignes (JSON brut)',t:'textarea',warn:true},
-      {k:'evenements_json',l:'Snapshot événements (JSON brut)',t:'textarea',warn:true},
-      {k:'constats_json',l:'Snapshot constats (JSON brut)',t:'textarea',warn:true} ]; },
-    async save(r,p){ const {error}=await sb.from('consignes_lectures').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'materiel', table:'stock_attributions', base:'main',
-    async fetch(){ const {data}=await sb.from('stock_attributions').select('*'); return data||[]; },
-    expand(r){
-      const out=[{ ts:r.date_sortie, sub:'Sortie', kind:'materiel', raw:r }];
-      if(r.date_retour) out.push({ ts:r.date_retour, sub:'Retour', kind:'materiel', raw:r });
-      return out; },
-    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `Matériel — ${r.materiel_nom||''}`; },
-    snippet(r){ return `Qté ${r.quantite||''} · statut ${r.statut||''}${r.note?' · '+r.note:''}`; },
-    fields(){ return [
-      {k:'materiel_nom',l:'Matériel',t:'text'},{k:'quantite',l:'Quantité',t:'number'},
-      {k:'statut',l:'Statut',t:'text'},{k:'etat_retour',l:'État au retour',t:'text'},
-      {k:'date_sortie',l:'Date sortie',t:'date'},{k:'date_retour',l:'Date retour',t:'date'},
-      {k:'note',l:'Note',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('stock_attributions').update({...r,...p}).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'acces', table:'stock_acces', base:'main',
-    async fetch(){ const {data}=await sb.from('stock_acces').select('*'); return data||[]; },
-    expand(r){
-      const out=[{ ts:r.date_remise, sub:'Remise', kind:'acces', raw:r }];
-      if(r.date_retour_reel) out.push({ ts:r.date_retour_reel, sub:'Retour', kind:'acces', raw:r });
-      return out; },
-    site(r){ return r.site_nom||siteNameById[r.site_id]||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `${r.item_type==='badge'?'Badge':'Clé'} ${r.receptionnaire_type==='externe'?'(tiers)':'(interne)'} — ${r.item_nom||''}`; },
-    snippet(r){ return `${r.receptionnaire_nom||''}${r.receptionnaire_societe?' · '+r.receptionnaire_societe:''}${r.notes?' · '+r.notes:''}`; },
-    fields(){ return [
-      {k:'item_nom',l:'Objet',t:'text'},{k:'item_type',l:'Type (clé/badge)',t:'text'},
-      {k:'statut',l:'Statut',t:'text',warn:true},{k:'receptionnaire_nom',l:'Récepteur — nom',t:'text'},
-      {k:'receptionnaire_societe',l:'Récepteur — société',t:'text'},{k:'receptionnaire_telephone',l:'Récepteur — téléphone',t:'text'},
-      {k:'receptionnaire_type',l:'Récepteur — type (interne/externe)',t:'text'},
-      {k:'date_remise',l:'Date remise',t:'date'},{k:'date_retour_reel',l:'Date retour',t:'date'},
-      {k:'notes',l:'Notes',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('stock_acces').update({...r,...p}).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'vehicule_mvt', table:'fleet_movements', base:'fleet',
-    async fetch(){ return await flt('fleet_movements?select=*') || []; },
-    expand(r){ return [{ ts:r.datetime||r.created_at, sub:r.type==='prise'?'Prise':'Restitution', kind:'vehicule_mvt', raw:r }]; },
-    site(){ return ''; }, agent(r){ return r.agent_name||''; },
-    title(r){ return `Véhicule — ${r.type==='prise'?'prise':'restitution'} — ${vehLabel(r.vehicle_id)}`; },
-    snippet(r){ return `${r.cleanliness?'Propreté : '+r.cleanliness+' · ':''}${r.notes||''}`; },
-    fields(){ return [ {k:'cleanliness',l:'Propreté',t:'text'},{k:'notes',l:'Notes',t:'textarea'} ]; },
-    async save(r,p){ await flt(`fleet_movements?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
-
-  { kind:'degat', table:'fleet_damages', base:'fleet',
-    async fetch(){ return await flt('fleet_damages?select=*') || []; },
-    expand(r){
-      const out=[{ ts:r.created_at||r.date, sub:'Signalement', kind:'degat', raw:r }];
-      if(r.resolved && r.resolved_at) out.push({ ts:r.resolved_at, sub:'Résolution', kind:'degat', raw:r });
-      return out; },
-    site(){ return ''; }, agent(r){ return r.created_by||''; },
-    title(r){ return `Dégât — ${vehLabel(r.vehicle_id)} — ${r.type||''}`; },
-    snippet(r){ return `${r.severity?'Gravité : '+r.severity+' · ':''}${r.description||''}`; },
-    fields(){ return [
-      {k:'type',l:'Type de dégât',t:'text'},{k:'severity',l:'Gravité',t:'text'},
-      {k:'description',l:'Description',t:'textarea'},
-      {k:'resolved',l:'Résolu',t:'checkbox'},{k:'resolved_at',l:'Date résolution',t:'date'} ]; },
-    async save(r,p){ await flt(`fleet_damages?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
-
-  { kind:'mc_vehicule', table:'fleet_events', base:'fleet',
-    async fetch(){ return await flt('fleet_events?select=*') || []; },
-    expand(r){ return [{ ts:r.date, sub:'', kind:'mc_vehicule', raw:r }]; },
-    site(){ return ''; }, agent(r){ return r.created_by||''; },
-    title(r){ return `Main courante véhicule — ${vehLabel(r.vehicle_id)} — ${r.type||''}`; },
-    snippet(r){ return `${r.description||''}${r.km?' · '+r.km+' km':''}`; },
-    fields(){ return [
-      {k:'type',l:'Type',t:'text'},{k:'date',l:'Date',t:'date'},
-      {k:'description',l:'Description',t:'textarea'},{k:'km',l:'Kilométrage',t:'number'} ]; },
-    async save(r,p){ await flt(`fleet_events?id=eq.${r.id}`,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(p)}); } },
-
-  { kind:'ouverture', table:'ouvertures', base:'main',
-    async fetch(){ const {data}=await sb.from('ouvertures').select('*'); return data||[]; },
-    expand(r){ return [{ ts:combineDT(r.date_ouverture,r.heure_ouverture)||r.date_ouverture, sub:'', kind:'ouverture', raw:r }]; },
-    site(r){ return r.site||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `Ouverture — ${r.personne||''} — ${r.localisation||''}`; },
-    snippet(r){ return `${r.motif||''}${r.note?' · '+r.note:''}`; },
-    fields(){ return [
-      {k:'personne',l:'Personne',t:'text'},{k:'localisation',l:'Localisation',t:'text'},
-      {k:'motif',l:'Motif',t:'text'},{k:'date_ouverture',l:'Date',t:'date'},{k:'heure_ouverture',l:'Heure',t:'text'},
-      {k:'note',l:'Note',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('ouvertures').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'parking', table:'vehicles', base:'main',
-    async fetch(){ const {data}=await sb.from('vehicles').select('*'); return data||[]; },
+  { kind:'parking', table:'vehicles',
+    async fetch(){ const {data}=await sb.from('vehicles').select('*').order('created_at',{ascending:false}).limit(500); return data||[]; },
     expand(r){ return [{ ts:r.created_at, sub:'', kind:'parking', raw:r }]; },
     site(r){ return r.site||''; }, agent(r){ return r.agent_name||''; },
-    title(r){ return `${r.statut||'Constat'} — ${r.plaque||'—'}`; },
-    snippet(r){ return `${r.motif||''}${r.remarque?' · '+r.remarque:''}`; },
+    title(r){
+      const st = (r.statut==='parking_vide'||r.motif==='PARKING_VIDE') ? '🅿️ Vide' : (r.statut==='infraction' ? 'Infraction' : 'Autorisé');
+      return `${st} — ${r.plaque||'—'} — ${r.site||''}`;
+    },
+    snippet(r){
+      if(r.statut==='infraction') return (r.motif||'—') + (r.num_denonciation ? ' · N° '+r.num_denonciation : '');
+      if(r.num_macaron) return '🏷️ '+r.num_macaron;
+      return r.remarque||'';
+    },
+    photos(r){ return [
+        r.photo_vehicule_url     ? {url:r.photo_vehicule_url,     legende:'Véhicule'}     : null,
+        r.photo_denonciation_url ? {url:r.photo_denonciation_url, legende:'Dénonciation'} : null,
+        r.photo_parebrise_url    ? {url:r.photo_parebrise_url,    legende:'Pare-brise'}   : null,
+        r.photo_macaron_url      ? {url:r.photo_macaron_url,      legende:'Macaron'}      : null
+      ].filter(Boolean); },
     fields(){ return [
       {k:'statut',l:'Statut',t:'text'},{k:'motif',l:'Motif',t:'text'},
       {k:'plaque',l:'Plaque',t:'text'},{k:'num_denonciation',l:'N° dénonciation',t:'text'},
       {k:'num_macaron',l:'N° macaron',t:'text'},{k:'remarque',l:'Remarque',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('vehicles').update(p).eq('id',r.id); if(error) throw error; } },
+    async save(r,p){ const {error}=await sb.from('vehicles').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('vehicles').delete().eq('id',r.id); if(error) throw error; } },
 
-  { kind:'comptage', table:'comptages', base:'main',
-    async fetch(){ const {data}=await sb.from('comptages').select('*'); return data||[]; },
+  { kind:'comptage', table:'comptages',
+    async fetch(){ const {data}=await sb.from('comptages').select('*,zones(nom,places_totales)').order('created_at',{ascending:false}).limit(500); return data||[]; },
     expand(r){ return [{ ts:r.created_at, sub:'', kind:'comptage', raw:r }]; },
     site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agent_name||''; },
-    title(r){ return `Comptage — zone ${r.zone_id||''} — ${siteNameById[r.site_id]||''}`; },
-    snippet(r){ return `${r.vehicules_presents||0}/${r.places_totales||'—'} véhicules`; },
+    title(r){
+      const zoneNom = r.zones ? r.zones.nom : (r.places_totales===80?'DLCC':r.places_totales===35?'CLX':'—');
+      return `Comptage — ${zoneNom} — ${siteNameById[r.site_id]||''}`;
+    },
+    snippet(r){
+      const pct = r.places_totales ? Math.round((r.vehicules_presents/r.places_totales)*100) : null;
+      return `${r.vehicules_presents||0} / ${r.places_totales||'—'} véhicules` + (pct!==null?` (${pct}%)`:'');
+    },
     fields(){ return [
-      {k:'zone_id',l:'Zone',t:'text'},{k:'vehicules_presents',l:'Véhicules présents',t:'number'},
+      {k:'vehicules_presents',l:'Véhicules présents',t:'number'},
       {k:'places_totales',l:'Places totales',t:'number'} ]; },
-    async save(r,p){ const {error}=await sb.from('comptages').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'biblio_filtrage', table:'bibliotheque_filtrages', base:'main',
-    async fetch(){ const {data}=await sb.from('bibliotheque_filtrages').select('*'); return data||[]; },
-    expand(r){ return [{ ts:combineDT(r.date_rapport,r.heure_rapport)||r.created_at, sub:'', kind:'biblio_filtrage', raw:r }]; },
-    site(r){ return r.poste_garde||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `Filtrage bibliothèque — ${r.poste_garde||''}`; },
-    snippet(r){ return `${r.rappels_reglement||0} rappel(s) · ${r.evictions_refus||0} éviction/refus${r.note?' · '+r.note:''}`; },
-    fields(){ return [
-      {k:'rappels_reglement',l:'Rappels règlement',t:'number'},{k:'evictions_refus',l:'Évictions / refus',t:'number'},
-      {k:'entrees',l:'Entrées par origine (JSON brut)',t:'textarea',warn:true},{k:'note',l:'Note',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('bibliotheque_filtrages').update(p).eq('id',r.id); if(error) throw error; } },
-
-  { kind:'biblio_comptage', table:'bibliotheque_comptages', base:'main',
-    async fetch(){ const {data}=await sb.from('bibliotheque_comptages').select('*'); return data||[]; },
-    expand(r){ return [{ ts:combineDT(r.date_rapport,r.heure_rapport)||r.created_at, sub:'', kind:'biblio_comptage', raw:r }]; },
-    site(r){ return r.poste_garde||''; }, agent(r){ return r.agent_nom||''; },
-    title(r){ return `Comptage bibliothèque — ${r.poste_garde||''}`; },
-    snippet(r){ return `Affluence ${r.affluence||'—'}${r.ambiance?' · '+r.ambiance:''}${r.note?' · '+r.note:''}`; },
-    fields(){ return [
-      {k:'affluence',l:'Affluence',t:'text'},{k:'ambiance',l:'Ambiance',t:'text'},
-      {k:'rappels_reglement',l:'Rappels règlement',t:'number'},{k:'evictions',l:'Évictions',t:'number'},
-      {k:'note',l:'Note',t:'textarea'} ]; },
-    async save(r,p){ const {error}=await sb.from('bibliotheque_comptages').update(p).eq('id',r.id); if(error) throw error; } },
+    async save(r,p){ const {error}=await sb.from('comptages').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('comptages').delete().eq('id',r.id); if(error) throw error; } },
 ];
-
-/* ---------- Photos rattachées au journal/alarme ---------- */
-let photosByEntry = {};
 
 /* ---------- État ---------- */
 let allEntries = [];   // {ts, kind, sub, raw, src}
-let activeTypes = new Set(Object.keys(KINDS));
-
-function renderTypePills(){
-  const box = document.getElementById('types');
-  box.innerHTML = Object.entries(KINDS).map(([k,def])=>
-    `<button class="pill ${activeTypes.has(k)?'on':''}" style="${activeTypes.has(k)?`background:${def.color};border-color:${def.color}`:''}" onclick="toggleType('${k}')">
-      <span class="dot" style="background:${activeTypes.has(k)?'#fff':def.color}"></span>${def.icon} ${def.label}
-    </button>`).join('');
-}
-function toggleType(k){ activeTypes.has(k) ? activeTypes.delete(k) : activeTypes.add(k); renderTypePills(); render(); }
-function resetTypes(){ activeTypes = new Set(Object.keys(KINDS)); renderTypePills(); render(); }
-function clearTypes(){ activeTypes = new Set(); renderTypePills(); render(); }
-
-// Journée de service RDZ : 06:30 -> 06:29 le lendemain (jamais minuit -> minuit).
-function rangeISO(){
-  const du = document.getElementById('f-du').value || serviceDate();
-  const au = document.getElementById('f-au').value || du;
-  const gte = new Date(du+'T06:30:00');
-  const lte = new Date(au+'T06:30:00');
-  lte.setDate(lte.getDate()+1);
-  lte.setMilliseconds(lte.getMilliseconds()-1);
-  return { gte: gte.toISOString(), lte: lte.toISOString() };
-}
 
 async function refresh(){
   const list = document.getElementById('list');
-  list.innerHTML = '<div class="state-msg">Chargement (plusieurs sources)…</div>';
-  const {gte,lte} = rangeISO();
+  list.innerHTML = '<div class="state-msg">Chargement…</div>';
   allEntries = [];
   try{
     await Promise.all(SOURCES.map(async src=>{
@@ -764,100 +371,49 @@ async function refresh(){
         rows.forEach(r=>{
           src.expand(r).forEach(e=>{
             if(!e.ts) return;
-            const t = new Date(e.ts).getTime();
-            if(isNaN(t) || t < new Date(gte).getTime() || t > new Date(lte).getTime()) return;
             allEntries.push({ ts:e.ts, kind:e.kind, sub:e.sub, raw:e.raw, src });
           });
         });
       }catch(err){ console.warn('Source en échec :', src.table, err.message||err); }
     }));
-
-    // Photos journal/alarme
-    const ids = allEntries.filter(e=>e.kind==='journal'||e.kind==='alarme').map(e=>e.raw.id);
-    photosByEntry = {};
-    if(ids.length){
-      const { data: pdata } = await sb.from('journal_photos').select('*').in('entree_id', ids);
-      (pdata||[]).forEach(p=>{ (photosByEntry[p.entree_id]=photosByEntry[p.entree_id]||[]).push(p); });
-    }
-
     allEntries.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
-
-    // Agents présents (pour le filtre)
-    const agents = [...new Set(allEntries.map(e=>e.src.agent(e.raw)).filter(Boolean))].sort();
-    const sel = document.getElementById('f-agent'); const cur = sel.value;
-    sel.innerHTML = '<option value="">Tous</option>' + agents.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
-    if(agents.includes(cur)) sel.value = cur;
-
     render();
   }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; console.error(e); }
 }
 
-/* Sources qui ont une vraie notion de site (site_id/site_nom résolu) */
-const SITE_AWARE = new Set(['journal','alarme','consigne','evenement','constat','validation','materiel','acces','comptage']);
-
 function render(){
   const list = document.getElementById('list');
-  const agent = document.getElementById('f-agent').value;
-  const siteId = document.getElementById('f-site').value;
-  const siteName = siteId ? (siteNameById[siteId]||'') : '';
-
-  let items = allEntries.filter(e=>activeTypes.has(e.kind));
-  if(agent) items = items.filter(e=>e.src.agent(e.raw)===agent);
-  if(siteName) items = items.filter(e=>{
-    if(!SITE_AWARE.has(e.kind)) return true; // sources sans notion de site : toujours affichées
-    return (e.src.site(e.raw)||'').toLowerCase() === siteName.toLowerCase();
-  });
+  const items = allEntries; // aucun filtre pour ce premier jet
 
   document.getElementById('summary-txt').textContent = `${items.length} entrée(s)`;
-  renderKpis(items);
-  if(!items.length){ list.innerHTML = '<div class="state-msg">Aucune entrée pour ces filtres.</div>'; return; }
+  if(!items.length){ list.innerHTML = '<div class="state-msg">Aucune entrée pour le moment.</div>'; return; }
 
   list.innerHTML = items.map((e,i)=>{
     const def = KINDS[e.kind]; const r = e.raw;
     let title='', snip='';
     try{ title = e.src.title(r); snip = e.src.snippet(r); }catch(_){ title = def.label; }
-    const nPh = (e.src.photos ? e.src.photos(r) : []).length;
+    const photos = e.src.photos ? e.src.photos(r) : [];
     return `<div class="entry" style="border-left-color:${def.color}" onclick="openDetail(${i})" data-idx="${i}">
       <div class="when"><div class="d">${fmtDateShort(e.ts)}</div><div class="h">${fmtTime(e.ts)}</div></div>
       <div class="mid">
         <div class="title">${esc(title)}</div>
         <div class="snip">${esc(snip)||'<i>Sans description</i>'}</div>
-        <div class="meta2">👤 ${esc(e.src.agent(r)||'—')}${SITE_AWARE.has(e.kind)&&e.src.site(r)?' · 📍 '+esc(e.src.site(r)):''}</div>
+        <div class="meta2">👤 ${esc(e.src.agent(r)||'—')}${e.src.site(r)?' · 📍 '+esc(e.src.site(r)):''}</div>
       </div>
       <div class="rgt">
         <span class="tag" style="background:${def.color}">${def.icon} ${def.label}</span>
-        ${e.sub?`<span class="tag sub">${esc(e.sub)}</span>`:''}
-        ${nPh?`<span class="tag ph">📷 ${nPh}</span>`:''}
+        ${photos.length?`<span class="tag ph">📷 ${photos.length}</span>`:''}
       </div>
     </div>`;
   }).join('');
-  window.__renderedItems = items; // pour openDetail
-}
-
-/* Résumé synthétique en haut de page (sur le même jeu filtré que la liste). */
-function renderKpis(items){
-  const box = document.getElementById('kpi-bar');
-  const count = (pred) => items.filter(pred).length;
-  const cards = [
-    { l:'Entrées',                v: items.length },
-    { l:'Prises véhicule',        v: count(e=>e.kind==='vehicule_mvt' && e.sub==='Prise') },
-    { l:'Restitutions véhicule',  v: count(e=>e.kind==='vehicule_mvt' && e.sub==='Restitution') },
-    { l:'Rapports imprimables',   v: count(e=>REPORTABLE[e.kind]) },
-    { l:'Alarmes',                v: count(e=>e.kind==='alarme') },
-    { l:'Constats',               v: count(e=>e.kind==='constat' && e.sub==='Ajout') },
-    { l:'Événements',             v: count(e=>e.kind==='evenement' && e.sub==='Ajout') },
-    { l:'Validations consignes',  v: count(e=>e.kind==='validation') },
-  ];
-  box.innerHTML = cards.map(c=>`<div class="kpi-card"><div class="kv">${c.v}</div><div class="kl">${esc(c.l)}</div></div>`).join('');
+  window.__renderedItems = items;
 }
 
 /* ---------- Détail + édition ---------- */
-let editing = null; // {entry, fields}
-
 function photoHtml(photos){
   if(!photos || !photos.length) return '';
   return `<div class="msec"><div class="st">Photos (${photos.length})</div><div class="photos">` +
-    photos.map(p=>`<div class="photo">${p.url?`<a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>`:`<div class="pend">📷 En attente d'envoi</div>`}<div class="lg">${esc(p.legende||'')}</div></div>`).join('') +
+    photos.map(p=>`<div class="photo"><a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a><div class="lg">${esc(p.legende||'')}</div></div>`).join('') +
     `</div></div>`;
 }
 
@@ -865,18 +421,18 @@ function openDetail(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
   const def = KINDS[e.kind]; const r = e.raw; const m = document.getElementById('modal');
   let title=''; try{ title = e.src.title(r); }catch(_){ title = def.label; }
-  const nPh = (e.src.photos ? e.src.photos(r) : []);
+  const photos = e.src.photos ? e.src.photos(r) : [];
 
   m.innerHTML = `
     <div class="mh" style="background:${def.color}"><button class="x" onclick="closeModal()">✕</button>
-      <div class="k">${def.icon} ${def.label}${e.sub?' · '+esc(e.sub):''}</div><h3>${esc(title)}</h3></div>
+      <div class="k">${def.icon} ${def.label}</div><h3>${esc(title)}</h3></div>
     <div class="mb">
       <div class="mgrid">
         <div class="mcell"><div class="k">Agent</div><div class="v">${esc(e.src.agent(r)||'—')}</div></div>
         <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(e.ts)} ${fmtTime(e.ts)}</div></div>
       </div>
       <div id="detail-view"></div>
-      ${photoHtml(nPh)}
+      ${photoHtml(photos)}
     </div>`;
   renderDetailView(e);
   document.getElementById('overlay').classList.add('show');
@@ -888,20 +444,22 @@ function renderDetailView(e){
   const reportBtn = REPORTABLE[e.kind] ? `<button class="btn btn-sec" onclick="openReport(${idx})">🖨 Rapport client</button>` : '';
   box.innerHTML = `
     ${snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:''}
-    <div class="editbar">${reportBtn}<button class="btn btn-sec" onclick="closeModal()">Fermer</button><button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button></div>`;
+    <div class="editbar">
+      ${reportBtn}
+      <button class="btn btn-sec" style="background:#fdf0f0;color:#8B1A1A;border-color:#f3c9c9" onclick="deleteEntry(${idx})">🗑️ Supprimer</button>
+      <button class="btn btn-sec" onclick="closeModal()">Fermer</button>
+      <button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button>
+    </div>`;
 }
 function startEdit(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
   const r = e.raw; const fields = e.src.fields(r);
   const box = document.getElementById('detail-view');
   box.innerHTML = `
-    <div class="readonly-note">Les champs marqués ⚠ sont sensibles (anti-collision, snapshot JSON) — à modifier avec précaution.</div>
     ${fields.map(f=>{
       const val = r[f.k]==null?'':r[f.k];
-      if(f.t==='textarea') return `<div class="efield ${f.warn?'warn':''}"><label>${f.warn?'⚠ ':''}${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(typeof val==='object'?JSON.stringify(val):val)}</textarea></div>`;
-      if(f.t==='select') return `<div class="efield"><label>${esc(f.l)}</label><select id="ef-${f.k}">${f.opts.map(o=>`<option value="${esc(o.v)}" ${String(o.v)===String(val)?'selected':''}>${esc(o.l)}</option>`).join('')}</select></div>`;
-      if(f.t==='checkbox') return `<div class="efield check"><input type="checkbox" id="ef-${f.k}" ${val?'checked':''}><label>${esc(f.l)}</label></div>`;
-      return `<div class="efield ${f.warn?'warn':''}"><label>${f.warn?'⚠ ':''}${esc(f.l)}</label><input type="${f.t==='date'?'date':(f.t==='number'?'number':'text')}" id="ef-${f.k}" value="${esc(val)}"></div>`;
+      if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
+      return `<div class="efield"><label>${esc(f.l)}</label><input type="${f.t==='number'?'number':'text'}" id="ef-${f.k}" value="${esc(val)}"></div>`;
     }).join('')}
     <div class="esave"><button class="btn btn-sec" onclick="renderDetailView(window.__renderedItems[${idx}])">Annuler</button><button class="btn" onclick="saveEdit(${idx})">💾 Enregistrer</button></div>`;
 }
@@ -911,9 +469,7 @@ async function saveEdit(idx){
   const payload = {};
   fields.forEach(f=>{
     const el = document.getElementById('ef-'+f.k); if(!el) return;
-    if(f.t==='checkbox'){ payload[f.k] = el.checked; }
-    else if(f.t==='number'){ payload[f.k] = el.value===''?null:Number(el.value); }
-    else { payload[f.k] = el.value; }
+    payload[f.k] = f.t==='number' ? (el.value===''?null:Number(el.value)) : el.value;
   });
   try{
     await e.src.save(r, payload);
@@ -923,14 +479,21 @@ async function saveEdit(idx){
     render();
   }catch(err){ toast('Échec de l\'enregistrement : '+(err.message||err), true); }
 }
+async function deleteEntry(idx){
+  const items = window.__renderedItems; const e = items[idx]; if(!e) return;
+  if(!confirm('Supprimer définitivement cette entrée ? Cette action est irréversible.')) return;
+  try{
+    await e.src.del(e.raw);
+    toast('🗑️ Supprimé');
+    closeModal();
+    await refresh();
+  }catch(err){ toast('Échec de la suppression : '+(err.message||err), true); }
+}
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
 
 /* ---------- init ---------- */
-document.getElementById('f-du').value = serviceDate();
-document.getElementById('f-au').value = serviceDate();
-renderTypePills();
-loadSites().then(()=>{ loadFleetVehicles().then(refresh); refresh(); });
+loadSites().then(refresh);
 </script>
 </body>
 </html>
