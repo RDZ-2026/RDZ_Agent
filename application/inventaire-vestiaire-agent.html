@@ -1,4 +1,4 @@
-<!-- RDZ · inventaire-vestiaire-agent · v2 · 2026-08-02 -->
+<!-- RDZ · inventaire-vestiaire-agent · v3 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -433,9 +433,14 @@ async function onCountChange(input){
 async function finishSession(){
   const compte = lignes.filter(l => l.quantite_comptee !== null && l.quantite_comptee !== undefined).length;
   if(!confirm(compte + ' ligne(s) comptée(s). Terminer et transmettre cet inventaire ?')) return;
+  // Piège technique n°9 : ne jamais envoyer un row d'upsert partiel (id + seuls champs modifiés)
+  // dès que la table a d'autres colonnes NOT NULL (ici agent_nom, created_at, statut...).
+  // On repart de la session complète déjà en cache localement et on n'y surcharge que
+  // les champs qui changent.
+  currentSession = { ...currentSession, statut:'termine', termine_at: new Date().toISOString() };
   RDZSync.save({
     module: 'inventaire-vestiaire', table: 'stock_inventaires', op:'upsert', onConflict:'id',
-    row: { id: currentSession.id, statut:'termine', termine_at: new Date().toISOString() }
+    row: currentSession
   });
   toast('✅ Inventaire pris en compte' + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
   showScreen('s-home');
