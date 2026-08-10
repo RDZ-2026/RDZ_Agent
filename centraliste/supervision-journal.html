@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v11 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v12 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -105,7 +105,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID</div>
       </div>
       <a class="home" href="../index.html">← Accueil</a>
     </div>
@@ -114,7 +114,7 @@ main{flex:1;padding:18px}
   <main>
     <div class="filters">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une — parkings (rondes + comptages), validations de consignes agents, consignes / événements / constats (avec distinction Ajout / Modification), et désormais les ouvertures résidences (accès/modification/suppression + rapport imprimable, comme dans historique-ouvertures.html). Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.<br><small style="color:#b8860b">⚠ Nécessite la migration SQL <code>migration-updated-at-supervision.sql</code> (colonne <code>updated_at</code> + trigger) sur les tables consignes / evenements / constats — sans elle, ces 3 sources restent silencieusement invisibles ici (erreur consignée en console).</small></div>
+        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une — parkings (rondes + comptages), validations de consignes agents, consignes / événements / constats (avec distinction Ajout / Modification), ouvertures résidences, et désormais la bibliothèque IHEID (comptages + filtrages : accès/modification/suppression + rapport imprimable, comme dans supervision-bibliotheque.html). Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.<br><small style="color:#b8860b">⚠ Nécessite la migration SQL <code>migration-updated-at-supervision.sql</code> (colonne <code>updated_at</code> + trigger) sur les tables consignes / evenements / constats — sans elle, ces 3 sources restent silencieusement invisibles ici (erreur consignée en console).</small></div>
         <button class="btn" onclick="refresh()">🔄 Actualiser</button>
       </div>
     </div>
@@ -142,7 +142,19 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v11 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v12 — reconstruction)
+   Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
+   `bibliotheque_filtrages`, identique à supervision-bibliotheque.html)
+   — deux kinds distincts (biblio_comptage / biblio_filtrage), édition
+   inline (y compris les entrées par origine du filtrage, via un type
+   de champ "origines" chargé depuis bibliotheque_config_origines),
+   suppression, et rapport imprimable individuel repris dans le style
+   "Evènement //" (RGPD + bandeau bleu) — VOLONTAIREMENT DIFFÉRENT de
+   la charte "RDZ Reports" des rapports parking/ouvertures : ne jamais
+   fusionner ces deux familles de rapports (voir instructions du
+   projet). Le rapport de synthèse visuel (onglet "Rapport de
+   synthèse" de supervision-bibliotheque.html) n'est pas repris ici —
+   seuls les rapports individuels par ligne le sont.
    Déposé dans centraliste/ (pas à la racine) : le lien Accueil pointe donc
    vers ../index.html, et les liens "Ouvrir dans le module de saisie" vers
    consignes.html / evenements.html / constats.html restent relatifs au
@@ -332,7 +344,65 @@ function buildOuvertureReport(r){
   const meta = { site:r.site, agent_name:r.agent_nom, id:r.id, created_at: `${r.date_ouverture}T${r.heure_ouverture||'00:00:00'}` };
   return rpParkShell("Rapport d'ouverture", badge, body, meta);
 }
-const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport };
+// ═══ Rapports individuels bibliothèque IHEID — style "Evènement //" ═══
+// Charte VISUELLE DISTINCTE de "RDZ Reports" (bandeau RGPD rouge + bandeau bleu "Evènement //"),
+// reprise à l'identique de supervision-bibliotheque.html. Ne jamais fusionner avec rpParkShell.
+function bibRetentionDate(dateStr){ const d=new Date(dateStr+'T00:00:00'); d.setFullYear(d.getFullYear()+5); return fmtDate(d.toISOString().slice(0,10)); }
+function bibFullDateTimeStr(dateStr, heureStr){ return fmtDate(dateStr) + ' ' + (heureStr||'').slice(0,5); }
+function bibPhotoBlock(url){
+  if(!url) return '';
+  return `<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📷 Photo jointe</div><img src="${esc(url)}" style="max-width:100%;border-radius:8px;border:1px solid #eee;display:block"></div>`;
+}
+function bibFRow(lbl,val){ return `<div style="display:flex;padding:8px 0;border-bottom:1px solid #eee;font-size:12.5px"><div style="width:60%;color:#4a4a4a;padding-right:12px">${lbl}</div><div style="width:40%;font-weight:600;color:#1a1a1a">${val}</div></div>`; }
+function bibSTitle(t){ return `<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin:18px 0 8px">${t}</div>`; }
+function bibShellIndividual(titre, poste, meta, bodyHtml, footerLabel){
+  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1)">
+    <div style="height:6px;background:#C8102E"></div>
+    <div style="background:#C8102E;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px">Ce rapport contient des données personnelles. Vous devez le supprimer au plus tard le ${meta.retention}</div>
+    <div style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-align:right;padding:6px 20px">Evènement //</div>
+    <div style="text-align:right;font-size:12px;color:#888;padding:14px 20px 0">${esc(poste)}</div>
+    <div style="text-align:center;padding:14px 20px 18px"><div style="font-size:17px;font-weight:700;color:#1a1a1a">${esc(titre)}</div></div>
+    <table style="width:100%;border-collapse:collapse;margin:0 0 18px">
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;width:180px;background:#fafafa">Catégorie</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Controle</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Priorité</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Moyenne</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Poste de garde</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(poste)}</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Déclaration par</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.agent)}</td></tr>
+      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Date de début</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.debut)}</td></tr>
+    </table>
+    <div style="padding:0 20px 20px">${bodyHtml}</div>
+    <div style="border-top:2px solid #eee;padding:10px 20px;display:flex;justify-content:space-between;font-size:10.5px;color:#9a9a9a">
+      <span>${esc(meta.debut)}</span><span>${esc(footerLabel)}</span><span>Page 1 / 1</span>
+    </div>
+  </div>`;
+}
+function buildBiblioComptageReport(c){
+  const meta = { agent:c.agent_nom, debut:bibFullDateTimeStr(c.date_rapport,c.heure_rapport), retention:bibRetentionDate(c.date_rapport) };
+  const body = bibSTitle('Date') + bibFRow('Date',fmtDate(c.date_rapport)) + bibFRow("L'heure",(c.heure_rapport||'').slice(0,5))
+    + bibSTitle('Type') + bibFRow('Type','Patrouille')
+    + bibSTitle('Rapport')
+    + bibFRow("Affluence (Nbre de personnes dans l'enceinte de la bibliothèque)", c.affluence)
+    + bibFRow('Physionomie', esc(c.ambiance||'—'))
+    + bibFRow('Rappel(s) au règlement', c.rappels_reglement||'—')
+    + bibFRow('Eviction(s) / Refus', c.evictions||'—')
+    + bibFRow('Informations complémentaires', c.note ? esc(c.note) : '—')
+    + bibPhotoBlock(c.photo_url);
+  return bibShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+}
+function buildBiblioFiltrageReport(f){
+  const meta = { agent:f.agent_nom, debut:bibFullDateTimeStr(f.date_rapport,f.heure_rapport), retention:bibRetentionDate(f.date_rapport) };
+  const entrees = f.entrees||{};
+  const entreesRows = Object.entries(entrees).map(([label,n]) => bibFRow('Entrées '+esc(label), n)).join('');
+  const body = bibSTitle('Date') + bibFRow('Date',fmtDate(f.date_rapport)) + bibFRow("L'heure",(f.heure_rapport||'').slice(0,5))
+    + bibSTitle('Type') + bibFRow('Type','Filtrage entrée')
+    + bibSTitle('Comptages Filtrage') + entreesRows
+    + bibFRow('Rappels au règlement', f.rappels_reglement||'—')
+    + bibFRow('Entrée refusée / Éviction', f.evictions_refus||'—')
+    + bibFRow('Informations complémentaires', f.note ? esc(f.note) : '—')
+    + bibPhotoBlock(f.photo_url);
+  return bibShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', f.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+}
+
+const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport };
 
 function openReport(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
@@ -354,6 +424,8 @@ const KINDS = {
   evenement:  { label:'Événement',             icon:'📅', color:'#b8860b' },
   constat:    { label:'Constat',               icon:'📋', color:'#c2410c' },
   ouverture:  { label:'Ouverture résidence',   icon:'🔑', color:'#0e7490' },
+  biblio_comptage: { label:'Bibliothèque — Comptage', icon:'📊', color:'#2563eb' },
+  biblio_filtrage: { label:'Bibliothèque — Filtrage', icon:'🚪', color:'#166534' },
 };
 
 // Distingue un AJOUT d'une MODIFICATION ultérieure en comparant created_at/updated_at
@@ -373,6 +445,15 @@ async function loadSites(){
   try{ const { data } = await sb.from('sites').select('id,nom').eq('actif',true); sites = data||[];
     siteNameById = {}; sites.forEach(s=>siteNameById[s.id]=s.nom);
   }catch(e){ console.warn('sites:', e.message||e); }
+}
+
+// Liste des origines de filtrage bibliothèque (bibliotheque_config_origines), nécessaire pour
+// construire dynamiquement les champs "Entrées par origine" dans l'édition d'un filtrage.
+let biblioOrigines = [];
+async function loadBiblioOrigines(){
+  try{ const { data } = await sb.from('bibliotheque_config_origines').select('*').eq('actif',true).order('ordre');
+    biblioOrigines = data||[];
+  }catch(e){ console.warn('bibliotheque_config_origines:', e.message||e); }
 }
 
 /* ============================================================
@@ -509,6 +590,51 @@ const SOURCES = [
       {k:'note',l:'Note',t:'textarea'} ]; },
     async save(r,p){ const {error}=await sb.from('ouvertures').update(p).eq('id',r.id); if(error) throw error; },
     async del(r){ const {error}=await sb.from('ouvertures').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'biblio_comptage', table:'bibliotheque_comptages',
+    async fetch(){ const {data}=await sb.from('bibliotheque_comptages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:`${r.date_rapport}T${r.heure_rapport||'00:00:00'}`, sub:'', kind:'biblio_comptage', raw:r }]; },
+    site(){ return 'Bibliothèque IHEID'; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Comptage bibliothèque — ${r.poste_garde||''}`; },
+    snippet(r){ return `Affluence ${r.affluence??'—'} · ${r.ambiance||'—'}`; },
+    photos(r){ return r.photo_url ? [{url:r.photo_url, legende:'Photo'}] : []; },
+    fields(){ return [
+      {k:'date_rapport',l:'Date',t:'text'},
+      {k:'heure_rapport',l:'Heure',t:'text'},
+      {k:'agent_nom',l:'Agent',t:'text'},
+      {k:'poste_garde',l:'Poste de garde',t:'text'},
+      {k:'affluence',l:'Affluence',t:'number'},
+      {k:'rappels_reglement',l:'Rappels au règlement',t:'number'},
+      {k:'evictions',l:'Évictions',t:'number'},
+      {k:'ambiance',l:'Ambiance',t:'text'},
+      {k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('bibliotheque_comptages').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('bibliotheque_comptages').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'biblio_filtrage', table:'bibliotheque_filtrages',
+    async fetch(){ const {data}=await sb.from('bibliotheque_filtrages').select('*').order('date_rapport',{ascending:false}).order('heure_rapport',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:`${r.date_rapport}T${r.heure_rapport||'00:00:00'}`, sub:'', kind:'biblio_filtrage', raw:r }]; },
+    site(){ return 'Bibliothèque IHEID'; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Filtrage bibliothèque — ${r.poste_garde||''}`; },
+    snippet(r){ const total=Object.values(r.entrees||{}).reduce((a,b)=>a+(parseInt(b)||0),0); return `Total entrées ${total}`; },
+    photos(r){ return r.photo_url ? [{url:r.photo_url, legende:'Photo'}] : []; },
+    detailHtml(r){
+      const entrees = r.entrees||{};
+      const rows = Object.entries(entrees).map(([lbl,n])=>`<div class="txt" style="margin-bottom:4px">${esc(lbl)} : <strong>${n}</strong></div>`).join('') || '<div class="txt"><i>Aucune entrée renseignée.</i></div>';
+      return `<div class="msec"><div class="st">Entrées par origine</div>${rows}</div>
+        <div class="msec"><div class="st">Rappels / Évictions</div><div class="txt">Rappels au règlement : ${r.rappels_reglement||0} · Entrées refusées / évictions : ${r.evictions_refus||0}</div></div>
+        ${r.note?`<div class="msec"><div class="st">Note</div><div class="txt">${esc(r.note)}</div></div>`:''}`; },
+    fields(){ return [
+      {k:'date_rapport',l:'Date',t:'text'},
+      {k:'heure_rapport',l:'Heure',t:'text'},
+      {k:'agent_nom',l:'Agent',t:'text'},
+      {k:'poste_garde',l:'Poste de garde',t:'text'},
+      {k:'entrees',l:'Entrées par origine',t:'origines'},
+      {k:'rappels_reglement',l:'Rappels au règlement',t:'number'},
+      {k:'evictions_refus',l:'Entrées refusées / évictions',t:'number'},
+      {k:'note',l:'Note',t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('bibliotheque_filtrages').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('bibliotheque_filtrages').delete().eq('id',r.id); if(error) throw error; } },
 ];
 
 /* ---------- État ---------- */
@@ -617,6 +743,12 @@ function startEdit(idx){
   const box = document.getElementById('detail-view');
   box.innerHTML = `
     ${fields.map(f=>{
+      if(f.t==='origines'){
+        const entrees = r[f.k]||{};
+        return `<div class="efield"><label>${esc(f.l)}</label>` +
+          biblioOrigines.map(o=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1;font-size:13px">${esc(o.label)}</span><input type="number" min="0" style="width:80px" id="ef-entree-${esc(o.label)}" value="${entrees[o.label]||0}"></div>`).join('') +
+          `</div>`;
+      }
       const val = r[f.k]==null?'':r[f.k];
       if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
       return `<div class="efield"><label>${esc(f.l)}</label><input type="${f.t==='number'?'number':'text'}" id="ef-${f.k}" value="${esc(val)}"></div>`;
@@ -628,6 +760,12 @@ async function saveEdit(idx){
   const r = e.raw; const fields = e.src.fields(r);
   const payload = {};
   fields.forEach(f=>{
+    if(f.t==='origines'){
+      const entrees = {};
+      biblioOrigines.forEach(o=>{ const el = document.getElementById('ef-entree-'+o.label); if(el) entrees[o.label] = parseInt(el.value)||0; });
+      payload[f.k] = entrees;
+      return;
+    }
     const el = document.getElementById('ef-'+f.k); if(!el) return;
     payload[f.k] = f.t==='number' ? (el.value===''?null:Number(el.value)) : el.value;
   });
@@ -653,7 +791,7 @@ function closeModal(){ document.getElementById('overlay').classList.remove('show
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
 
 /* ---------- init ---------- */
-loadSites().then(refresh);
+Promise.all([loadSites(), loadBiblioOrigines()]).then(refresh);
 </script>
 </body>
 </html>
