@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v7 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v8 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -105,7 +105,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings (rondes &amp; comptages)</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings (rondes &amp; comptages) · Validations consignes</div>
       </div>
       <a class="home" href="index.html">← Accueil</a>
     </div>
@@ -114,7 +114,7 @@ main{flex:1;padding:18px}
   <main>
     <div class="filters">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une, en commençant par les parkings (rondes + comptages). Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.</div>
+        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une — parkings (rondes + comptages) et validations de consignes agents pour l'instant. Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.</div>
         <button class="btn" onclick="refresh()">🔄 Actualiser</button>
       </div>
     </div>
@@ -142,16 +142,24 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v5 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v8 — reconstruction)
    On reconstruit ce module en connectant les sources une par une.
-   Étape 1 : PARKINGS uniquement — mélange en un seul flux
-   chronologique des rondes ParkGuard (table `vehicles`) et des
-   comptages (table `comptages`), avec accès direct pour modifier
-   ou supprimer chaque ligne, et ouvrir le rapport imprimable pour
-   les rondes. Toutes les autres sources (journal, alarmes,
-   consignes, événements, constats, véhicules flotte, ouvertures,
-   bibliothèque, etc.) sont volontairement abandonnées pour l'instant
-   — à reconnecter une par une dans les prochaines itérations.
+   Étape 1 : PARKINGS — mélange en un seul flux chronologique des
+   rondes ParkGuard (table `vehicles`) et des comptages (table
+   `comptages`), avec accès direct pour modifier ou supprimer chaque
+   ligne, et ouvrir le rapport imprimable pour les rondes.
+   Étape 2 : VALIDATIONS DE CONSIGNES (table `consignes_lectures`,
+   même donnée que `validation_consignes.html`) — entrée en lecture
+   seule (pas d'édition/suppression, comme dans le module source) ;
+   la ligne affiche le site + le nombre de consignes/événements/
+   constats, et le détail reprend les mêmes trois sections que la
+   modale de `validation_consignes.html` (texte des consignes lues,
+   titres des événements présentés, descriptions des constats
+   affichés à l'agent au moment de sa validation).
+   Toutes les autres sources (journal, alarmes, matériel, clés/badges,
+   véhicules flotte, ouvertures, bibliothèque, etc.) restent
+   volontairement abandonnées pour l'instant — à reconnecter une par
+   une dans les prochaines itérations.
    Aucun filtre pour ce premier jet (site/date/agent) : liste brute,
    triée du plus récent au plus ancien. Écritures directes sur les
    tables sources (pas de file RDZSync ici : outil de supervision
@@ -298,8 +306,9 @@ function closeReport(){ document.getElementById('report-view').classList.remove(
 
 /* ---------- Palette des types (étape 1 : parkings uniquement) ---------- */
 const KINDS = {
-  parking:  { label:'Surveillance parking', icon:'🅿️', color:'#8B1A1A' },
-  comptage: { label:'Comptage parking',      icon:'🔢', color:'#1d4ed8' },
+  parking:    { label:'Surveillance parking', icon:'🅿️', color:'#8B1A1A' },
+  comptage:   { label:'Comptage parking',      icon:'🔢', color:'#1d4ed8' },
+  validation: { label:'Validation consignes',  icon:'✅', color:'#1b7a3d' },
 };
 
 /* ---------- Référentiels ---------- */
@@ -362,6 +371,26 @@ const SOURCES = [
       {k:'places_totales',l:'Places totales',t:'number'} ]; },
     async save(r,p){ const {error}=await sb.from('comptages').update(p).eq('id',r.id); if(error) throw error; },
     async del(r){ const {error}=await sb.from('comptages').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'validation', table:'consignes_lectures',
+    // Entrée en lecture seule : pas de fields()/save()/del() — comme dans validation_consignes.html,
+    // qui ne propose ni édition ni suppression sur ces enregistrements (photo figée de ce que
+    // l'agent a vu au moment de sa validation).
+    async fetch(){ const {data}=await sb.from('consignes_lectures').select('*').order('validated_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.validated_at, sub:'', kind:'validation', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Validation consignes — ${r.site_nom||'—'}`; },
+    snippet(r){ return `📋 ${r.nb_consignes??0} consigne(s) · 📅 ${r.nb_evenements??0} événement(s) · ⚠ ${r.nb_constats??0} constat(s)`; },
+    detailHtml(r){
+      const cons = Array.isArray(r.consignes_json) ? r.consignes_json : [];
+      const evs  = Array.isArray(r.evenements_json) ? r.evenements_json : [];
+      const cts  = Array.isArray(r.constats_json)   ? r.constats_json   : [];
+      const sec = (titre, arr, render) => `<div class="msec"><div class="st">${titre} (${arr.length})</div>` +
+        (arr.length ? arr.map(x=>`<div class="txt" style="margin-bottom:6px">${render(x)}</div>`).join('')
+                    : `<div class="txt"><i>Aucun élément à ce moment.</i></div>`) + `</div>`;
+      return sec('📋 Consignes lues', cons, c=>esc(c.texte||''))
+           + sec('📅 Événements présentés', evs, e=>esc(e.titre||'')+(e.heure_debut?' — '+String(e.heure_debut).slice(0,5):''))
+           + sec('⚠ Constats affichés', cts, c=>esc(c.description||'')+(c.statut?' — '+esc(c.statut):'')); } },
 ];
 
 /* ---------- État ---------- */
@@ -449,13 +478,17 @@ function renderDetailView(e){
   const r = e.raw; let snip=''; try{ snip = e.src.snippet(r); }catch(_){}
   const idx = window.__renderedItems.indexOf(e);
   const reportBtn = REPORTABLE[e.kind] ? `<button class="btn btn-sec" onclick="openReport(${idx})">🖨 Rapport client</button>` : '';
+  const delBtn = e.src.del ? `<button class="btn btn-sec" style="background:#fdf0f0;color:#8B1A1A;border-color:#f3c9c9" onclick="deleteEntry(${idx})">🗑️ Supprimer</button>` : '';
+  const canEdit = e.src.fields && e.src.save && e.src.fields(r).length;
+  const editBtn = canEdit ? `<button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button>` : '';
+  const extra = e.src.detailHtml ? e.src.detailHtml(r) : '';
   box.innerHTML = `
-    ${snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:''}
+    ${extra || (snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:'')}
     <div class="editbar">
       ${reportBtn}
-      <button class="btn btn-sec" style="background:#fdf0f0;color:#8B1A1A;border-color:#f3c9c9" onclick="deleteEntry(${idx})">🗑️ Supprimer</button>
+      ${delBtn}
       <button class="btn btn-sec" onclick="closeModal()">Fermer</button>
-      <button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button>
+      ${editBtn}
     </div>`;
 }
 function startEdit(idx){
