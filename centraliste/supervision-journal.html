@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v14 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v15 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -105,7 +105,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID · Matériel · Badges externes</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID · Matériel · Badges externes · Véhicules</div>
       </div>
       <a class="home" href="../index.html">← Accueil</a>
     </div>
@@ -142,7 +142,7 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v14 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v15 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -189,6 +189,18 @@ main{flex:1;padding:18px}
    chez le tiers) — demande explicite de l'utilisateur du 2026-08-10.
    Le rapport affiche à la fois l'heure de prise (date_remise) et
    l'heure de retour (date_retour_reel) côte à côte.
+   Étape 7 : VÉHICULES (tables `fleet_movements` et `fleet_damages`, base
+   Flotte/RouteOps distincte — voir ensureFleetAuth/sbFleet plus haut,
+   authentification par compte de service, jeton en cache sous
+   'flt_tok_v2' réutilisé tel quel avec vehicule-agent.html/fleet-agent.html).
+   — kind `vehicule_mouvement` : prises/restitutions de véhicules, identique
+   à l'onglet "Mouvements" de fleet-agent.html (centraliste) — lecture seule
+   à la demande explicite de l'utilisateur : juste les entrées/sorties, la
+   photo (zoom via clic → nouvel onglet, comme les autres photos du journal)
+   et les notes. Pas d'édition, pas de suppression, pas de rapport.
+   — kind `degat_vehicule` : créations de dégâts véhicule (fleet_damages,
+   commune agent terrain / centraliste), demandées explicitement pour être
+   remontées dans le journal. Lecture seule également, avec photos zoomables.
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -229,6 +241,44 @@ main{flex:1;padding:18px}
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ---------- Base Flotte / RouteOps (fleet_movements, fleet_damages) ----------
+   Base Supabase distincte de la base principale (voir instructions du projet — cas
+   particulier base Flotte) : ces deux tables exigent une authentification par compte
+   de service (pas d'accès anonyme), à la différence de sites/missions/sheets/travel.
+   Le jeton est mis en cache dans localStorage sous 'flt_tok_v2' — clé réutilisée telle
+   quelle (déjà utilisée par vehicule-agent.html / fleet-agent.html) pour partager le
+   jeton entre modules sur le même appareil plutôt que de relancer une authentification
+   à chaque fois. Écrit ici en accès LECTURE SEULE (pas de POST/PATCH/DELETE) : la vue
+   unifiée ne fait que remonter les mouvements et dégâts déjà saisis dans fleet-agent.html. */
+const FLEET_SB = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const FLEET_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const FLEET_AUTH_EMAIL = 'surveillance@rdz-security-management.ch';
+const FLEET_AUTH_PASS = 'RDZ2026?/';
+const FLEET_TOK_KEY = 'flt_tok_v2';
+let fleetAuthToken = null;
+async function ensureFleetAuth(){
+  try{ const s = JSON.parse(localStorage.getItem(FLEET_TOK_KEY)||'{}'); if(s.t && s.e && Date.now()/1000 < s.e-60){ fleetAuthToken = s.t; return; } }catch(_){}
+  const r = await fetch(`${FLEET_SB}/auth/v1/token?grant_type=password`, { method:'POST', headers:{'Content-Type':'application/json','apikey':FLEET_KEY}, body:JSON.stringify({email:FLEET_AUTH_EMAIL,password:FLEET_AUTH_PASS}) });
+  if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.error_description||'Auth Flotte échouée'); }
+  const d = await r.json();
+  fleetAuthToken = d.access_token;
+  localStorage.setItem(FLEET_TOK_KEY, JSON.stringify({ t:d.access_token, e:Math.floor(Date.now()/1000)+(d.expires_in||3600) }));
+}
+async function sbFleet(path){
+  const r = await fetch(`${FLEET_SB}/rest/v1/${path}`, { headers:{'apikey':FLEET_KEY,'Content-Type':'application/json', ...(fleetAuthToken?{'Authorization':`Bearer ${fleetAuthToken}`}:{})} });
+  if(!r.ok){ const t = await r.text(); throw new Error(t||`HTTP ${r.status}`); }
+  const txt = await r.text(); return txt?JSON.parse(txt):null;
+}
+let fleetVehiclePlateById = {};
+async function loadFleetVehicles(){
+  try{
+    await ensureFleetAuth();
+    const data = await sbFleet('fleet_vehicles?select=id,plate,brand,model');
+    fleetVehiclePlateById = {};
+    (data||[]).forEach(v=>{ fleetVehiclePlateById[v.id] = `${v.plate||'—'}${v.brand?' — '+v.brand+(v.model?' '+v.model:''):''}`; });
+  }catch(e){ console.warn('fleet_vehicles:', e.message||e); }
+}
 
 /* ---------- Utilitaires ---------- */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -457,6 +507,8 @@ const KINDS = {
   biblio_filtrage: { label:'Bibliothèque — Filtrage', icon:'🚪', color:'#166534' },
   materiel:   { label:'Matériel — Prise / Retour', icon:'📦', color:'#4b5563' },
   badge_externe: { label:'Badge / clé externe',    icon:'🪪', color:'#7c3aed' },
+  vehicule_mouvement: { label:'Mouvement véhicule', icon:'🚗', color:'#0f766e' },
+  degat_vehicule:     { label:'Dégât véhicule',     icon:'💥', color:'#dc2626' },
 };
 
 // Distingue un AJOUT d'une MODIFICATION ultérieure en comparant created_at/updated_at
@@ -729,6 +781,51 @@ const SOURCES = [
     async save(r,p){ const {error}=await sb.from('stock_acces').update(p).eq('id',r.id); if(error) throw error; },
     async del(r){ const {error}=await sb.from('stock_acces').delete().eq('id',r.id); if(error) throw error; },
     canReport(r){ return r.statut==='rendu'; } },
+
+  { kind:'vehicule_mouvement', table:'fleet_movements',
+    // Base Flotte (voir ensureFleetAuth/sbFleet plus haut) — identique à l'onglet "Mouvements" de
+    // fleet-agent.html (centraliste). Lecture seule ici, à la demande explicite de l'utilisateur :
+    // juste les entrées/sorties, la photo (zoom via clic → nouvel onglet, comme les autres photos
+    // de ce journal) et les notes — pas d'édition ni de suppression, pas de rapport.
+    async fetch(){ await ensureFleetAuth(); const data = await sbFleet('fleet_movements?select=*&order=created_at.desc&limit=500'); return data||[]; },
+    expand(r){ return [{ ts:r.datetime||r.created_at, sub:'', kind:'vehicule_mouvement', raw:r }]; },
+    site(r){ return fleetVehiclePlateById[r.vehicle_id]||''; }, agent(r){ return r.agent_name||''; },
+    title(r){ return `${r.type==='prise'?'Prise':'Restitution'} véhicule — ${fleetVehiclePlateById[r.vehicle_id]||'—'}`; },
+    snippet(r){
+      const cleanLabel={propre:'✅ Propre',acceptable:'⚠️ État acceptable',sale:'🔴 Sale'};
+      let s = cleanLabel[r.cleanliness]||'';
+      if(r.notes) s += (s?' · ':'')+r.notes;
+      return s;
+    },
+    photos(r){ return r.photo_dashboard ? [{url:r.photo_dashboard, legende:'Tableau de bord'}] : []; },
+    detailHtml(r){
+      const cleanLabel={propre:'✅ Propre',acceptable:'⚠️ État acceptable',sale:'🔴 Sale'};
+      return `<div class="msec"><div class="st">${r.type==='prise'?'Prise':'Restitution'} du véhicule</div><div class="txt">${esc(fleetVehiclePlateById[r.vehicle_id]||'—')}<br>Le ${fmtDate(r.datetime||r.created_at)} ${fmtTime(r.datetime||r.created_at)} par ${esc(r.agent_name||'—')}</div></div>
+        ${r.cleanliness?`<div class="msec"><div class="st">État de propreté</div><div class="txt">${cleanLabel[r.cleanliness]||esc(r.cleanliness)}</div></div>`:''}
+        ${r.notes?`<div class="msec"><div class="st">Notes</div><div class="txt">${esc(r.notes)}</div></div>`:''}`; } },
+
+  { kind:'degat_vehicule', table:'fleet_damages',
+    // Base Flotte également. Historique des dégâts signalés (agent terrain via vehicule-agent.html
+    // ou centraliste via fleet-agent.html — table commune aux deux) : remontée demandée pour voir
+    // les créations de dégâts. Lecture seule ici, comme pour les mouvements ci-dessus.
+    async fetch(){ await ensureFleetAuth(); const data = await sbFleet('fleet_damages?select=*&order=created_at.desc&limit=500'); return data||[]; },
+    expand(r){ return [{ ts:r.created_at||r.date, sub:'', kind:'degat_vehicule', raw:r }]; },
+    site(r){ return fleetVehiclePlateById[r.vehicle_id]||''; }, agent(r){ return r.created_by||''; },
+    title(r){
+      const DMG_LABELS={rayure:'Rayure',enfoncement:'Enfoncement / Bosse',bris_vitre:'Bris de vitre',deterioration:'Détérioration',autre:'Autre'};
+      return `Dégât signalé — ${DMG_LABELS[r.type]||r.type||'—'} — ${fleetVehiclePlateById[r.vehicle_id]||'—'}`; },
+    snippet(r){ return `${r.severity?'Sévérité : '+r.severity+' · ':''}${r.description||''}`; },
+    photos(r){
+      let arr = r.photos;
+      if(typeof arr==='string'){
+        try{ arr = arr.startsWith('{') ? arr.slice(1,-1).split(',').map(s=>s.trim().replace(/^"|"$/g,'')) : JSON.parse(arr); }catch(_){ arr=[]; }
+      }
+      return (Array.isArray(arr)?arr:[]).filter(Boolean).map(url=>({url, legende:'Dégât'})); },
+    detailHtml(r){
+      const DMG_LABELS={rayure:'Rayure',enfoncement:'Enfoncement / Bosse',bris_vitre:'Bris de vitre',deterioration:'Détérioration',autre:'Autre'};
+      return `<div class="msec"><div class="st">Dégât</div><div class="txt">${esc(DMG_LABELS[r.type]||r.type||'—')} — sévérité ${esc(r.severity||'—')}<br>Constaté le ${fmtDate(r.date)} par ${esc(r.created_by||'—')}</div></div>
+        ${r.description?`<div class="msec"><div class="st">Description</div><div class="txt">${esc(r.description)}</div></div>`:''}
+        <div class="msec"><div class="st">Statut</div><div class="txt">${r.resolved?'✅ Résolu'+(r.resolved_at?' le '+fmtDate(r.resolved_at):''):'⏳ Actif — non résolu'}</div></div>`; } },
 ];
 
 /* ---------- État ---------- */
@@ -886,7 +983,7 @@ function closeModal(){ document.getElementById('overlay').classList.remove('show
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
 
 /* ---------- init ---------- */
-Promise.all([loadSites(), loadBiblioOrigines()]).then(refresh);
+Promise.all([loadSites(), loadBiblioOrigines(), loadFleetVehicles()]).then(refresh);
 </script>
 </body>
 </html>
