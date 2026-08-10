@@ -1,4 +1,4 @@
-<!-- RDZ · application · v1 · 2026-08-10 -->
+<!-- RDZ · application · v2 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -47,6 +47,8 @@ main{flex:1;padding:16px}
 .group-btn .chev{margin-left:auto;color:#bbb;font-size:22px;flex-shrink:0}
 
 .foot{text-align:center;color:#aaa;font-size:11.5px;padding:16px}
+.hidden{display:none!important}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -62,55 +64,67 @@ main{flex:1;padding:16px}
       Continuez à utiliser vos modules actuels normalement ; ici, ce sont les tout derniers modules, en cours de validation avant intégration au menu principal.
     </div>
 
-    <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
-    <div class="section-h">Vacation</div>
+    <!-- Vue principale -->
+    <div id="main-list">
+      <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
+      <div class="section-h">Vacation</div>
 
-    <a class="group-btn" href="prise-de-poste.html">
-      <span class="ic">☀️</span>
-      <span class="txt">
-        <span class="t">Prise de poste</span>
-        <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
-      </span>
-      <span class="chev">›</span>
-    </a>
+      <a class="group-btn" href="#" onclick="showPosteMenu();return false;">
+        <span class="ic">☀️</span>
+        <span class="txt">
+          <span class="t">Prise de poste</span>
+          <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
+        </span>
+        <span class="chev">›</span>
+      </a>
 
-    <a class="group-btn" href="feuille-route-agent.html">
-      <span class="ic">🗺️</span>
-      <span class="txt">
-        <span class="t">Feuille de route</span>
-        <span class="d">Missions du jour, inscription des heures réelles et notes.</span>
-      </span>
-      <span class="chev">›</span>
-    </a>
+      <a class="group-btn" href="feuille-route-agent.html">
+        <span class="ic">🗺️</span>
+        <span class="txt">
+          <span class="t">Feuille de route</span>
+          <span class="d">Missions du jour, inscription des heures réelles et notes.</span>
+        </span>
+        <span class="chev">›</span>
+      </a>
 
-    <a class="group-btn" href="fin-de-service.html">
-      <span class="ic">🌙</span>
-      <span class="txt">
-        <span class="t">Fin de poste</span>
-        <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
-      </span>
-      <span class="chev">›</span>
-    </a>
+      <a class="group-btn" href="fin-de-service.html">
+        <span class="ic">🌙</span>
+        <span class="txt">
+          <span class="t">Fin de poste</span>
+          <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
+        </span>
+        <span class="chev">›</span>
+      </a>
 
-    <!-- Outil terrain : liste pilotée par OUTIL_TERRAIN_ITEMS ci-dessous.
-         Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
-         pas besoin de dupliquer le HTML. -->
-    <div class="section-h spaced">Outil terrain</div>
-    <div id="outil-terrain-list"></div>
+      <!-- Outil terrain : liste pilotée par OUTIL_TERRAIN_ITEMS ci-dessous.
+           Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
+           pas besoin de dupliquer le HTML. -->
+      <div class="section-h spaced">Outil terrain</div>
+      <div id="outil-terrain-list"></div>
 
-    <!-- Dépannage -->
-    <div class="section-h spaced">Dépannage</div>
+      <!-- Dépannage -->
+      <div class="section-h spaced">Dépannage</div>
 
-    <a class="group-btn fix" href="../admin/reset-sync.html">
-      <span class="ic">🛠️</span>
-      <span class="txt">
-        <span class="t-row"><span class="t">Dépannage</span><span class="warn-badge">⚠️ Usage exceptionnel</span></span>
-        <span class="d">Réinitialiser la file d'envoi RDZSync.</span>
-      </span>
-      <span class="chev">›</span>
-    </a>
+      <a class="group-btn fix" href="../admin/reset-sync.html">
+        <span class="ic">🛠️</span>
+        <span class="txt">
+          <span class="t-row"><span class="t">Dépannage</span><span class="warn-badge">⚠️ Usage exceptionnel</span></span>
+          <span class="d">Réinitialiser la file d'envoi RDZSync.</span>
+        </span>
+        <span class="chev">›</span>
+      </a>
 
-    <div class="foot">RDZ · Outil terrain · v1</div>
+      <div class="foot">RDZ · Outil terrain · v2</div>
+    </div>
+
+    <!-- Sous-menu "Prise de poste" : mêmes 3 destinations que dans mobile.html
+         (Consignes/événements/constats, Matériel & clés, Prise de véhicule),
+         pilotées par POSTE_ITEMS ci-dessous. -->
+    <div id="poste-list" class="hidden">
+      <button class="back-btn" onclick="backToMain();return false;">‹ Retour</button>
+      <div class="section-h">Prise de poste</div>
+      <div id="poste-items-list"></div>
+    </div>
   </main>
 </div>
 
@@ -124,21 +138,49 @@ const OUTIL_TERRAIN_ITEMS = [
   { icon: '📓', name: 'Journal de bord', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' }
 ];
 
+// Sous-menu "Prise de poste" : mêmes 3 destinations et mêmes fichiers que
+// POSTE_ITEMS dans mobile.html (aucune duplication de module).
+const POSTE_ITEMS = [
+  { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
+  { icon: '📦', name: 'Matériel & clés', desc: "Sortie combinée, en cours, maintenance", href: 'materiel-agent.html' },
+  { icon: '🚗', name: 'Prise de véhicule', desc: "État, dégâts, assurance", href: 'vehicule-agent.html' }
+];
+
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function renderOutilTerrain(){
-  const box = document.getElementById('outil-terrain-list');
-  box.innerHTML = OUTIL_TERRAIN_ITEMS.map(item => `
-    <a class="group-btn tool" href="${esc(item.href)}">
+function cardHtml(item, extraClass){
+  return `<a class="group-btn ${extraClass||''}" href="${esc(item.href)}">
       <span class="ic">${item.icon}</span>
       <span class="txt">
         <span class="t">${esc(item.name)}</span>
         <span class="d">${esc(item.desc)}</span>
       </span>
       <span class="chev">›</span>
-    </a>`).join('');
+    </a>`;
+}
+
+function renderOutilTerrain(){
+  document.getElementById('outil-terrain-list').innerHTML =
+    OUTIL_TERRAIN_ITEMS.map(item => cardHtml(item, 'tool')).join('');
 }
 renderOutilTerrain();
+
+function renderPosteItems(){
+  document.getElementById('poste-items-list').innerHTML =
+    POSTE_ITEMS.map(item => cardHtml(item)).join('');
+}
+renderPosteItems();
+
+function showPosteMenu(){
+  document.getElementById('main-list').classList.add('hidden');
+  document.getElementById('poste-list').classList.remove('hidden');
+  window.scrollTo(0,0);
+}
+function backToMain(){
+  document.getElementById('poste-list').classList.add('hidden');
+  document.getElementById('main-list').classList.remove('hidden');
+  window.scrollTo(0,0);
+}
 </script>
 </body>
 </html>
