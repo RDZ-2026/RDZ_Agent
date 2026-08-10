@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v20 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v21 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -48,6 +48,18 @@ main{flex:1;padding:18px}
 .daynav input{flex:1;min-width:130px}
 .navbtn{padding:8px 11px;font-size:13px;line-height:1}
 #ffield-serviceday{min-width:230px}
+
+.timeline{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-section,8px);padding:16px 18px 12px;margin-bottom:14px}
+.timeline .tl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;font-size:12px;color:#777}
+.timeline .tl-head b{color:var(--ink);font-size:13px}
+.tl-track{position:relative;height:46px;margin:0 4px}
+.tl-line{position:absolute;top:20px;left:0;right:0;height:4px;background:var(--bg-meta,#f0f0f0);border-radius:2px}
+.tl-hour{position:absolute;top:0;font-size:10px;color:#999;transform:translateX(-50%);white-space:nowrap}
+.tl-hour .tick{width:1px;height:8px;background:var(--line);margin:0 auto 2px}
+.tl-now{position:absolute;top:12px;width:2px;height:20px;background:var(--report-red,#C8102E);border-radius:1px}
+.tl-dot{position:absolute;top:14px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15);cursor:pointer;transform:translateX(-50%);transition:transform .12s}
+.tl-dot:hover{transform:translateX(-50%) scale(1.35);z-index:5}
+.tl-empty{font-size:12px;color:#999;text-align:center;padding:8px 0}
 
 .summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 
@@ -177,6 +189,7 @@ main{flex:1;padding:18px}
     </div>
 
     <div class="summary"><span id="summary-txt"></span></div>
+    <div id="timeline-wrap"></div>
     <div id="list"><div class="state-msg">Chargement…</div></div>
   </main>
 </div>
@@ -199,7 +212,14 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v20 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v21)
+   v21 : frise chronologique horizontale dans la vue Journée de service
+   (span 06h30->06h29 via serviceDayBounds), un point par action de la
+   liste filtrée courante, positionné selon l'heure réelle, coloré par
+   kind (KINDS[...].color), tooltip (heure · catégorie · titre), clic ->
+   openDetail(idx) avec le même index que la liste dessous. Repère
+   "maintenant" si la journée affichée est la journée en cours. Masquée
+   en Vue complète (pas de sens sur une plage de plusieurs jours).
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -1117,6 +1137,14 @@ function render(){
   }
 
   document.getElementById('summary-txt').innerHTML = `${items.length} entrée(s)${filterActive?` sur ${allEntries.length}<span class="factive"> · filtré</span>`:''}${esc(dayLabel)}`;
+
+  if(viewMode==='service'){
+    const day = document.getElementById('flt-serviceday').value || serviceDate();
+    renderTimeline(items, day);
+  }else{
+    document.getElementById('timeline-wrap').innerHTML = '';
+  }
+
   if(!items.length){ list.innerHTML = `<div class="state-msg">${viewMode==='service'?'Aucune entrée pour cette journée de service.':(filterActive?'Aucune entrée ne correspond à ces filtres.':'Aucune entrée pour le moment.')}</div>`; return; }
 
   list.innerHTML = items.map((e,i)=>{
@@ -1138,6 +1166,48 @@ function render(){
     </div>`;
   }).join('');
   window.__renderedItems = items;
+}
+
+/* ---------- Frise chronologique (vue Journée de service) ---------- */
+function renderTimeline(items, day){
+  const wrap = document.getElementById('timeline-wrap');
+  if(viewMode!=='service'){ wrap.innerHTML=''; return; }
+  const { start, end } = serviceDayBounds(day);
+  const span = end.getTime() - start.getTime();
+  const pts = items.map((e,i)=>{
+    const d = new Date(e.ts); if(isNaN(d)) return null;
+    const pct = ((d.getTime()-start.getTime())/span)*100;
+    if(pct<0 || pct>100) return null;
+    return { e, i, pct };
+  }).filter(Boolean);
+
+  if(!pts.length){
+    wrap.innerHTML = `<div class="timeline"><div class="tl-head"><b>🕐 Frise de la journée</b></div><div class="tl-empty">Aucune action à situer sur cette journée de service.</div></div>`;
+    return;
+  }
+
+  const hourMarks = [0,25,50,75,100].map(pct=>{
+    const t = new Date(start.getTime() + span*(pct/100));
+    return `<div class="tl-hour" style="left:${pct}%"><div class="tick"></div>${fmtTime(t)}</div>`;
+  }).join('');
+
+  let nowMark = '';
+  const now = new Date();
+  if(now>=start && now<end){
+    const pct = ((now.getTime()-start.getTime())/span)*100;
+    nowMark = `<div class="tl-now" style="left:${pct}%" title="Maintenant"></div>`;
+  }
+
+  const dots = pts.map(p=>{
+    const def = KINDS[p.e.kind]; let title=''; try{ title = p.e.src.title(p.e.raw); }catch(_){ title = def.label; }
+    const tip = `${fmtTime(p.e.ts)} · ${def.label} · ${title}`.replace(/"/g,"'");
+    return `<div class="tl-dot" style="left:${p.pct}%;background:${def.color}" title="${esc(tip)}" onclick="event.stopPropagation();openDetail(${p.i})"></div>`;
+  }).join('');
+
+  wrap.innerHTML = `<div class="timeline">
+    <div class="tl-head"><b>🕐 Frise de la journée</b><span>${pts.length} action(s) situées · clic sur un point pour ouvrir le détail</span></div>
+    <div class="tl-track">${hourMarks}<div class="tl-line"></div>${nowMark}${dots}</div>
+  </div>`;
 }
 
 /* ---------- Détail + édition ---------- */
