@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v12 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v13 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -144,17 +144,21 @@ main{flex:1;padding:18px}
 /* ============================================================
    RDZ — Supervision journal de bord unifié (v12 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
-   `bibliotheque_filtrages`, identique à supervision-bibliotheque.html)
-   — deux kinds distincts (biblio_comptage / biblio_filtrage), édition
-   inline (y compris les entrées par origine du filtrage, via un type
-   de champ "origines" chargé depuis bibliotheque_config_origines),
-   suppression, et rapport imprimable individuel repris dans le style
-   "Evènement //" (RGPD + bandeau bleu) — VOLONTAIREMENT DIFFÉRENT de
-   la charte "RDZ Reports" des rapports parking/ouvertures : ne jamais
-   fusionner ces deux familles de rapports (voir instructions du
-   projet). Le rapport de synthèse visuel (onglet "Rapport de
-   synthèse" de supervision-bibliotheque.html) n'est pas repris ici —
-   seuls les rapports individuels par ligne le sont.
+   `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
+   pour les données) — deux kinds distincts (biblio_comptage /
+   biblio_filtrage), édition inline (y compris les entrées par origine
+   du filtrage, via un type de champ "origines" chargé depuis
+   bibliotheque_config_origines), suppression, et rapport imprimable
+   individuel repris DÉLIBÉRÉMENT dans la charte "RDZ Reports" (même
+   habillage que les rapports parking/ouvertures : en-tête noir + liseré
+   rouge 4px, médaillon logo RPTO_LOGO_B64, bandeau méta gris, sections
+   titrées en rouge sur fond gris) plutôt que dans le style "Evènement //"
+   (RGPD + bandeau bleu) de supervision-bibliotheque.html — demande
+   explicite de l'utilisateur du 2026-08-10 pour harmoniser visuellement
+   les rapports individuels bibliothèque avec ceux du parking/ouvertures ;
+   seuls les champs diffèrent. Le rapport de synthèse visuel (onglet
+   "Rapport de synthèse" de supervision-bibliotheque.html) n'est pas
+   repris ici — seuls les rapports individuels par ligne le sont.
    Déposé dans centraliste/ (pas à la racine) : le lien Accueil pointe donc
    vers ../index.html, et les liens "Ouvrir dans le module de saisie" vers
    consignes.html / evenements.html / constats.html restent relatifs au
@@ -344,62 +348,44 @@ function buildOuvertureReport(r){
   const meta = { site:r.site, agent_name:r.agent_nom, id:r.id, created_at: `${r.date_ouverture}T${r.heure_ouverture||'00:00:00'}` };
   return rpParkShell("Rapport d'ouverture", badge, body, meta);
 }
-// ═══ Rapports individuels bibliothèque IHEID — style "Evènement //" ═══
-// Charte VISUELLE DISTINCTE de "RDZ Reports" (bandeau RGPD rouge + bandeau bleu "Evènement //"),
-// reprise à l'identique de supervision-bibliotheque.html. Ne jamais fusionner avec rpParkShell.
-function bibRetentionDate(dateStr){ const d=new Date(dateStr+'T00:00:00'); d.setFullYear(d.getFullYear()+5); return fmtDate(d.toISOString().slice(0,10)); }
-function bibFullDateTimeStr(dateStr, heureStr){ return fmtDate(dateStr) + ' ' + (heureStr||'').slice(0,5); }
-function bibPhotoBlock(url){
-  if(!url) return '';
-  return `<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:#4a4a4a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📷 Photo jointe</div><img src="${esc(url)}" style="max-width:100%;border-radius:8px;border:1px solid #eee;display:block"></div>`;
-}
-function bibFRow(lbl,val){ return `<div style="display:flex;padding:8px 0;border-bottom:1px solid #eee;font-size:12.5px"><div style="width:60%;color:#4a4a4a;padding-right:12px">${lbl}</div><div style="width:40%;font-weight:600;color:#1a1a1a">${val}</div></div>`; }
-function bibSTitle(t){ return `<div style="font-size:15px;font-weight:700;color:#1a1a1a;margin:18px 0 8px">${t}</div>`; }
-function bibShellIndividual(titre, poste, meta, bodyHtml, footerLabel){
-  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,.1)">
-    <div style="height:6px;background:#C8102E"></div>
-    <div style="background:#C8102E;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:6px">Ce rapport contient des données personnelles. Vous devez le supprimer au plus tard le ${meta.retention}</div>
-    <div style="background:#2563eb;color:#fff;font-size:11px;font-weight:700;text-align:right;padding:6px 20px">Evènement //</div>
-    <div style="text-align:right;font-size:12px;color:#888;padding:14px 20px 0">${esc(poste)}</div>
-    <div style="text-align:center;padding:14px 20px 18px"><div style="font-size:17px;font-weight:700;color:#1a1a1a">${esc(titre)}</div></div>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 18px">
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;width:180px;background:#fafafa">Catégorie</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Controle</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Priorité</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">Moyenne</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Poste de garde</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(poste)}</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Déclaration par</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.agent)}</td></tr>
-      <tr><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee;font-weight:700;background:#fafafa">Date de début</td><td style="padding:8px 20px;font-size:12.5px;border-bottom:1px solid #eee">${esc(meta.debut)}</td></tr>
-    </table>
-    <div style="padding:0 20px 20px">${bodyHtml}</div>
-    <div style="border-top:2px solid #eee;padding:10px 20px;display:flex;justify-content:space-between;font-size:10.5px;color:#9a9a9a">
-      <span>${esc(meta.debut)}</span><span>${esc(footerLabel)}</span><span>Page 1 / 1</span>
-    </div>
-  </div>`;
-}
+// ═══ Rapports individuels bibliothèque IHEID — style "RDZ Reports" ═══
+// À la demande explicite de l'utilisateur (2026-08-10) : même charte, même trame et même logo
+// que les rapports parking/ouvertures (rpParkShell/rpSec/rpFieldO/rpPhotoBoxO), avec des champs
+// propres à la bibliothèque. Remplace l'essai précédent en style "Evènement //".
 function buildBiblioComptageReport(c){
-  const meta = { agent:c.agent_nom, debut:bibFullDateTimeStr(c.date_rapport,c.heure_rapport), retention:bibRetentionDate(c.date_rapport) };
-  const body = bibSTitle('Date') + bibFRow('Date',fmtDate(c.date_rapport)) + bibFRow("L'heure",(c.heure_rapport||'').slice(0,5))
-    + bibSTitle('Type') + bibFRow('Type','Patrouille')
-    + bibSTitle('Rapport')
-    + bibFRow("Affluence (Nbre de personnes dans l'enceinte de la bibliothèque)", c.affluence)
-    + bibFRow('Physionomie', esc(c.ambiance||'—'))
-    + bibFRow('Rappel(s) au règlement', c.rappels_reglement||'—')
-    + bibFRow('Eviction(s) / Refus', c.evictions||'—')
-    + bibFRow('Informations complémentaires', c.note ? esc(c.note) : '—')
-    + bibPhotoBlock(c.photo_url);
-  return bibShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', c.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+  const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#eff6ff;color:#2563eb;border:1.5px solid #2563eb">Comptage</span>`;
+  const body = rpSec('1 — Relevé de comptage',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        ${rpFieldO('Poste de garde', esc(c.poste_garde||'—'))}
+        ${rpFieldO('Affluence', `<span style="font-weight:700;font-size:22px;color:#2563eb">${c.affluence??'—'}</span>`)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        ${rpFieldO('Physionomie / Ambiance', esc(c.ambiance||'—'))}
+        ${rpFieldO('Rappels au règlement', c.rappels_reglement??0)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px">${rpFieldO('Évictions / Refus', c.evictions??0)}</div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Note', esc(c.note||'—'))}</div>`)
+    + rpSec('2 — Preuve photographique',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Photo jointe', c.photo_url)}</div>`);
+  const meta = { site:'Bibliothèque IHEID', agent_name:c.agent_nom, id:c.id, created_at:`${c.date_rapport}T${c.heure_rapport||'00:00:00'}` };
+  return rpParkShell('Rapport de comptage — Bibliothèque', badge, body, meta);
 }
 function buildBiblioFiltrageReport(f){
-  const meta = { agent:f.agent_nom, debut:bibFullDateTimeStr(f.date_rapport,f.heure_rapport), retention:bibRetentionDate(f.date_rapport) };
+  const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f7f0;color:#166534;border:1.5px solid #166534">Filtrage</span>`;
   const entrees = f.entrees||{};
-  const entreesRows = Object.entries(entrees).map(([label,n]) => bibFRow('Entrées '+esc(label), n)).join('');
-  const body = bibSTitle('Date') + bibFRow('Date',fmtDate(f.date_rapport)) + bibFRow("L'heure",(f.heure_rapport||'').slice(0,5))
-    + bibSTitle('Type') + bibFRow('Type','Filtrage entrée')
-    + bibSTitle('Comptages Filtrage') + entreesRows
-    + bibFRow('Rappels au règlement', f.rappels_reglement||'—')
-    + bibFRow('Entrée refusée / Éviction', f.evictions_refus||'—')
-    + bibFRow('Informations complémentaires', f.note ? esc(f.note) : '—')
-    + bibPhotoBlock(f.photo_url);
-  return bibShellIndividual('RAPPORT DE RONDE JOURNÉE BIBLIOTHÈQUE IHEID', f.poste_garde, meta, body, 'Rapport de Ronde journée Bibliothèque IHEID //');
+  const entreesHtml = Object.entries(entrees).map(([lbl,n])=>rpFieldO(esc(lbl), `<span style="font-weight:700">${n}</span>`)).join('') || rpFieldO('Entrées', 'Aucune donnée');
+  const body = rpSec('1 — Filtrage des entrées',
+      `<div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:10px">${rpFieldO('Poste de garde', esc(f.poste_garde||'—'))}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${entreesHtml}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        ${rpFieldO('Rappels au règlement', f.rappels_reglement??0)}
+        ${rpFieldO('Entrées refusées / évictions', f.evictions_refus??0)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Note', esc(f.note||'—'))}</div>`)
+    + rpSec('2 — Preuve photographique',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Photo jointe', f.photo_url)}</div>`);
+  const meta = { site:'Bibliothèque IHEID', agent_name:f.agent_nom, id:f.id, created_at:`${f.date_rapport}T${f.heure_rapport||'00:00:00'}` };
+  return rpParkShell('Rapport de filtrage — Bibliothèque', badge, body, meta);
 }
 
 const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport };
