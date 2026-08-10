@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v19 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v20 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -140,7 +140,7 @@ main{flex:1;padding:18px}
           <label>Journée de service</label>
           <div class="daynav">
             <button class="btn btn-sec navbtn" onclick="shiftServiceDay(-1)" title="Journée précédente">◀</button>
-            <input type="date" id="flt-serviceday" onchange="applyFilters()">
+            <input type="date" id="flt-serviceday" onchange="onServiceDayChange()">
             <button class="btn btn-sec navbtn" onclick="shiftServiceDay(1)" title="Journée suivante">▶</button>
           </div>
         </div>
@@ -199,7 +199,7 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v19 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v20 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -288,6 +288,15 @@ main{flex:1;padding:18px}
    comportement, plage de dates libre). getFilteredEntries() applique les
    mêmes filtres communs (kind/agent/site) puis, selon viewMode, soit borne
    à la journée de service sélectionnée soit applique Du/Au.
+   Étape 11 (v20) : FILTRES "ACTIFS" (demande explicite du 2026-08-10) — les
+   listes déroulantes Catégorie/Agent/Site ne proposent plus que les valeurs
+   réellement présentes dans le périmètre affiché (getScopeEntries) : la
+   journée de service sélectionnée en vue "Journée de service", ou toutes
+   les données en "Vue complète". Recalculé (populateFilterOptions) à chaque
+   changement de jour (◀ / ▶ ou saisie directe → onServiceDayChange) et à
+   chaque changement d'onglet (switchView) — pas seulement au refresh(). Ce
+   n'est PAS un filtrage à facettes en cascade : changer Agent/Site/Catégorie
+   ne recalcule pas les autres listes, seul le jour affiché les fait varier.
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -937,22 +946,42 @@ async function refresh(){
 function normalize(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
 function normalizeName(s){ return normalize(s).split(/\s+/).filter(Boolean).sort().join(' '); }
 
+// Filtres "actifs" (demande explicite du 2026-08-10) : les options proposées dans
+// Catégorie/Agent/Site ne sont pas une liste figée de toutes les valeurs possibles —
+// elles sont reconstruites à partir du PÉRIMÈTRE actuellement affiché (getScopeEntries) :
+// la journée de service sélectionnée en vue "Journée de service", ou l'ensemble des
+// données en vue "Vue complète". On ne propose donc jamais un site/agent/catégorie qui
+// ne ramènerait aucun résultat. Ce périmètre n'est PAS recroisé avec la sélection
+// courante de Catégorie/Agent/Site elle-même (pas de filtres à facettes en cascade) :
+// changer l'agent sélectionné ne réduit pas la liste des sites, par exemple — seul le
+// jour affiché (ou son absence, en Vue complète) fait varier ces listes.
+function getScopeEntries(){
+  if(viewMode==='service'){
+    const day = document.getElementById('flt-serviceday').value || serviceDate();
+    const { start, end } = serviceDayBounds(day);
+    return allEntries.filter(e=>{ const d=new Date(e.ts); return !isNaN(d) && d>=start && d<end; });
+  }
+  return allEntries;
+}
+
 function populateFilterOptions(){
+  const scope = getScopeEntries();
+
   const kindSel = document.getElementById('flt-kind');
   const curKind = kindSel.value;
-  const kindsPresent = [...new Set(allEntries.map(e=>e.kind))];
+  const kindsPresent = [...new Set(scope.map(e=>e.kind))];
   kindSel.innerHTML = '<option value="">Toutes</option>' +
     kindsPresent
       .sort((a,b)=>(KINDS[a]?.label||a).localeCompare(KINDS[b]?.label||b,'fr'))
       .map(k=>`<option value="${esc(k)}">${esc(KINDS[k]?.icon||'')} ${esc(KINDS[k]?.label||k)}</option>`).join('');
-  if(kindsPresent.includes(curKind)) kindSel.value = curKind;
+  kindSel.value = kindsPresent.includes(curKind) ? curKind : '';
 
   // Agent : regroupement par clé canonique (voir normalizeName ci-dessus), affichage
   // de la variante la plus fréquente pour chaque groupe.
   const agentSel = document.getElementById('flt-agent');
   const curAgent = agentSel.value;
   const agentGroups = {}; // clé canonique -> { variants: {texte: count} }
-  allEntries.forEach(e=>{
+  scope.forEach(e=>{
     let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){}
     a = a.trim(); if(!a) return;
     const key = normalizeName(a);
@@ -965,14 +994,14 @@ function populateFilterOptions(){
   }).sort((a,b)=>a.label.localeCompare(b.label,'fr'));
   agentSel.innerHTML = '<option value="">Tous les agents</option>' +
     agentOptions.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}</option>`).join('');
-  if(agentOptions.some(o=>o.key===curAgent)) agentSel.value = curAgent;
+  agentSel.value = agentOptions.some(o=>o.key===curAgent) ? curAgent : '';
 
   const siteSel = document.getElementById('flt-site');
   const curSite = siteSel.value;
-  const sitesPresent = [...new Set(allEntries.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const sitesPresent = [...new Set(scope.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
   siteSel.innerHTML = '<option value="">Tous les sites</option>' +
     sitesPresent.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
-  if(sitesPresent.includes(curSite)) siteSel.value = curSite;
+  siteSel.value = sitesPresent.includes(curSite) ? curSite : '';
 }
 
 /* ---------- Vue "Journée de service" ----------
@@ -1000,6 +1029,7 @@ function switchView(mode){
   document.getElementById('ffield-serviceday').style.display = mode==='service' ? '' : 'none';
   document.getElementById('ffield-from').style.display = mode==='full' ? '' : 'none';
   document.getElementById('ffield-to').style.display = mode==='full' ? '' : 'none';
+  populateFilterOptions(); // le périmètre (journée vs tout) change avec la vue
   render();
 }
 
@@ -1008,6 +1038,14 @@ function shiftServiceDay(delta){
   const cur = el.value ? new Date(el.value+'T00:00:00') : new Date();
   cur.setDate(cur.getDate()+delta);
   el.value = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+  onServiceDayChange();
+}
+
+// Rebranché sur l'onchange du sélecteur de date ET sur les flèches ◀ / ▶ : changer
+// de journée change le périmètre des filtres actifs (populateFilterOptions), pas
+// seulement la liste affichée.
+function onServiceDayChange(){
+  populateFilterOptions();
   render();
 }
 
@@ -1052,6 +1090,7 @@ function resetFilters(){
   document.getElementById('flt-site').value = '';
   if(viewMode==='service') document.getElementById('flt-serviceday').value = serviceDate();
   else { document.getElementById('flt-from').value = ''; document.getElementById('flt-to').value = ''; }
+  populateFilterOptions(); // le jour peut avoir changé (vue service) -> périmètre à recalculer
   render();
 }
 
