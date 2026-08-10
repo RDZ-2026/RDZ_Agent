@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v17 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v18 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -137,10 +137,16 @@ main{flex:1;padding:18px}
           <label>Au</label>
           <input type="date" id="flt-to" onchange="applyFilters()">
         </div>
-        <div class="ffield grow">
+        <div class="ffield">
           <label>Agent</label>
           <select id="flt-agent" onchange="applyFilters()">
             <option value="">Tous les agents</option>
+          </select>
+        </div>
+        <div class="ffield grow">
+          <label>Site</label>
+          <select id="flt-site" onchange="applyFilters()">
+            <option value="">Tous les sites</option>
           </select>
         </div>
         <button class="btn btn-sec reset" onclick="resetFilters()">✕ Réinitialiser</button>
@@ -172,7 +178,7 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v17 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v18 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -244,8 +250,13 @@ main{flex:1;padding:18px}
    figée en dur), pour éviter des options qui ne renvoient jamais aucun
    résultat. La plage de dates compare la date CALENDAIRE de e.ts (pas la
    journée de service RDZ 06:30→06:29 — à revoir plus tard si besoin).
-   getFilteredEntries() applique les 3 filtres ; render() les combine et
+   getFilteredEntries() applique les filtres ; render() les combine et
    affiche "N entrée(s) sur TOTAL · filtré" quand au moins un filtre est actif.
+   Étape 9 (v18) : filtre SITE ajouté (mêmes principes que les autres), et le
+   filtre Agent regroupe désormais les variantes d'un même nom (ordre des mots,
+   casse, accents) via une clé canonique — voir normalizeName() dans le bloc
+   "Filtres" du script, demande explicite de l'utilisateur du 2026-08-10
+   (ex. "Anthony Lindt" et "Lindt Anthony" ne comptent plus comme deux agents).
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -871,12 +882,30 @@ async function refresh(){
   }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; console.error(e); }
 }
 
-/* ---------- Filtres : catégorie, plage de dates, agent ----------
-   Les trois filtres se combinent (ET logique). La catégorie et l'agent sont des
+/* ---------- Filtres : catégorie, plage de dates, agent, site ----------
+   Les quatre filtres se combinent (ET logique). Catégorie / Agent / Site sont des
    listes déroulantes reconstruites à chaque refresh() à partir des données réellement
    présentes (populateFilterOptions) ; la plage de dates compare la date calendaire de
    e.ts (pas la journée de service RDZ 06:30→06:29 — cohérent avec le reste de la page,
-   qui n'utilise pas encore serviceDate() pour ce tri). */
+   qui n'utilise pas encore serviceDate() pour ce tri).
+
+   Regroupement agent « intelligent » (demande explicite du 2026-08-10) : la saisie
+   terrain du nom d'agent est du texte libre selon les modules (ex. "Anthony Lindt" vs
+   "Lindt Anthony" — même personne, ordre des mots inversé), ce qui faisait apparaître
+   deux entrées distinctes dans le filtre. On regroupe donc les agents par une CLÉ
+   CANONIQUE — normalizeName() ci-dessous, reprise telle quelle de la convention déjà
+   utilisée dans badge-externe.html / materiel-agent.html (minuscules, accents retirés,
+   mots triés alphabétiquement) — qui traite "Anthony Lindt" et "Lindt Anthony" comme UN
+   seul agent. Ceci corrige l'ordre des mots ou la casse, mais PAS les fautes de frappe
+   franches (ex. "Anthony Lindt" vs "Antony Lindt" resteront deux entrées séparées, car
+   les rapprocher automatiquement risquerait de fusionner deux agents réellement
+   différents — un vrai doublon orthographique doit être corrigé à la source, dans le
+   module de saisie, plutôt que masqué ici). Le libellé affiché dans le menu est la
+   variante la plus fréquemment rencontrée pour cette clé (ex-æquo : la première par
+   ordre alphabétique), pour rester lisible plutôt que d'afficher la forme triée. */
+function normalize(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function normalizeName(s){ return normalize(s).split(/\s+/).filter(Boolean).sort().join(' '); }
+
 function populateFilterOptions(){
   const kindSel = document.getElementById('flt-kind');
   const curKind = kindSel.value;
@@ -887,22 +916,44 @@ function populateFilterOptions(){
       .map(k=>`<option value="${esc(k)}">${esc(KINDS[k]?.icon||'')} ${esc(KINDS[k]?.label||k)}</option>`).join('');
   if(kindsPresent.includes(curKind)) kindSel.value = curKind;
 
+  // Agent : regroupement par clé canonique (voir normalizeName ci-dessus), affichage
+  // de la variante la plus fréquente pour chaque groupe.
   const agentSel = document.getElementById('flt-agent');
   const curAgent = agentSel.value;
-  const agentsPresent = [...new Set(allEntries.map(e=>{ try{ return e.src.agent(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const agentGroups = {}; // clé canonique -> { variants: {texte: count} }
+  allEntries.forEach(e=>{
+    let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){}
+    a = a.trim(); if(!a) return;
+    const key = normalizeName(a);
+    if(!agentGroups[key]) agentGroups[key] = {};
+    agentGroups[key][a] = (agentGroups[key][a]||0) + 1;
+  });
+  const agentOptions = Object.entries(agentGroups).map(([key, variants])=>{
+    const label = Object.entries(variants).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0],'fr'))[0][0];
+    return { key, label };
+  }).sort((a,b)=>a.label.localeCompare(b.label,'fr'));
   agentSel.innerHTML = '<option value="">Tous les agents</option>' +
-    agentsPresent.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
-  if(agentsPresent.includes(curAgent)) agentSel.value = curAgent;
+    agentOptions.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}</option>`).join('');
+  if(agentOptions.some(o=>o.key===curAgent)) agentSel.value = curAgent;
+
+  const siteSel = document.getElementById('flt-site');
+  const curSite = siteSel.value;
+  const sitesPresent = [...new Set(allEntries.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  siteSel.innerHTML = '<option value="">Tous les sites</option>' +
+    sitesPresent.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  if(sitesPresent.includes(curSite)) siteSel.value = curSite;
 }
 
 function getFilteredEntries(){
   const kind = document.getElementById('flt-kind').value;
   const from = document.getElementById('flt-from').value; // AAAA-MM-JJ ou ''
   const to = document.getElementById('flt-to').value;
-  const agent = document.getElementById('flt-agent').value;
+  const agentKey = document.getElementById('flt-agent').value; // clé canonique normalizeName()
+  const site = document.getElementById('flt-site').value;
   return allEntries.filter(e=>{
     if(kind && e.kind!==kind) return false;
-    if(agent){ let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){} if(a!==agent) return false; }
+    if(agentKey){ let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){} if(normalizeName(a)!==agentKey) return false; }
+    if(site){ let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} if(s!==site) return false; }
     if(from || to){
       const d = new Date(e.ts); if(isNaN(d)) return false;
       const dayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -920,13 +971,14 @@ function resetFilters(){
   document.getElementById('flt-from').value = '';
   document.getElementById('flt-to').value = '';
   document.getElementById('flt-agent').value = '';
+  document.getElementById('flt-site').value = '';
   render();
 }
 
 function render(){
   const list = document.getElementById('list');
   const items = getFilteredEntries();
-  const filterActive = document.getElementById('flt-kind').value || document.getElementById('flt-from').value || document.getElementById('flt-to').value || document.getElementById('flt-agent').value;
+  const filterActive = document.getElementById('flt-kind').value || document.getElementById('flt-from').value || document.getElementById('flt-to').value || document.getElementById('flt-agent').value || document.getElementById('flt-site').value;
 
   document.getElementById('summary-txt').innerHTML = `${items.length} entrée(s)${filterActive?` sur ${allEntries.length}<span class="factive"> · filtré</span>`:''}`;
   if(!items.length){ list.innerHTML = `<div class="state-msg">${filterActive?'Aucune entrée ne correspond à ces filtres.':'Aucune entrée pour le moment.'}</div>`; return; }
