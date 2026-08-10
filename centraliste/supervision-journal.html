@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v13 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v14 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -105,7 +105,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID · Matériel · Badges externes</div>
       </div>
       <a class="home" href="../index.html">← Accueil</a>
     </div>
@@ -142,7 +142,7 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v12 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v14 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -172,6 +172,23 @@ main{flex:1;padding:18px}
    de la photo depuis cette vue unifiée (upload caméra/galerie non repris
    ici) : seule la photo déjà enregistrée s'affiche, dans le détail et
    dans le rapport.
+   Étape 6 : MATÉRIEL & BADGES EXTERNES (tables `stock_attributions` et
+   `stock_acces`, identique à materiel-agent.html / badge-externe.html).
+   — kind `materiel` : historique des sorties/retours de matériel, une
+   ligne par sortie (tri sur date_sortie), le retour éventuel étant
+   affiché dans le détail plutôt que comme entrée séparée. Édition
+   inline et suppression, mais PAS de rapport imprimable (non demandé).
+   — kind `badge_externe` : historique des remises/retours de clés et
+   badges à des tiers externes (stock_acces filtré sur
+   receptionnaire_type='externe' — table partagée avec les sorties agent
+   de materiel-agent.html, qui ne sont pas reprises ici). Édition inline
+   et suppression. Rapport imprimable (charte "RDZ Reports", même style
+   que parking/ouvertures/bibliothèque) généré UNIQUEMENT sur le retour
+   du badge/clé (source.canReport(r) → r.statut==='rendu' ; le bouton
+   "🖨 Rapport client" n'apparaît donc pas tant que le badge est encore
+   chez le tiers) — demande explicite de l'utilisateur du 2026-08-10.
+   Le rapport affiche à la fois l'heure de prise (date_remise) et
+   l'heure de retour (date_retour_reel) côte à côte.
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -388,7 +405,33 @@ function buildBiblioFiltrageReport(f){
   return rpParkShell('Rapport de filtrage — Bibliothèque', badge, body, meta);
 }
 
-const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport };
+// ═══ Rapport individuel badge/clé externe — style "RDZ Reports" ═══
+// Généré UNIQUEMENT sur le retour (voir canReport dans la source badge_externe ci-dessus) : montre
+// l'heure de prise ET l'heure de retour côte à côte, à la demande explicite de l'utilisateur.
+function buildBadgeExterneReport(r){
+  const badgeHtml = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f3f0fb;color:#7c3aed;border:1.5px solid #7c3aed">${r.item_type==='badge'?'Badge':'Clé'} rendu(e)</span>`;
+  const body = rpSec('1 — Réceptionnaire externe',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        ${rpFieldO('Nom', esc(r.receptionnaire_nom||'—'))}
+        ${rpFieldO('Société', esc(r.receptionnaire_societe||'—'))}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Téléphone', esc(r.receptionnaire_telephone||'—'))}</div>`)
+    + rpSec('2 — Clé / Badge concerné(e)',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${rpFieldO('Désignation', esc(r.item_nom||'—'))}
+        ${rpFieldO('Site', esc(r.site_nom||'—'))}
+      </div>`)
+    + rpSec('3 — Horaires de prise et de retour',
+      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+        ${rpFieldO('Heure de prise', `${fmtDate(r.date_remise)} — ${fmtTime(r.date_remise)||'—'}`)}
+        ${rpFieldO('Heure de retour', `${fmtDate(r.date_retour_reel)} — ${fmtTime(r.date_retour_reel)||'—'}`)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:12px">${rpFieldO('Note', esc(r.notes||'—'))}</div>`);
+  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:r.date_retour_reel||r.date_remise };
+  return rpParkShell('Rapport de retour — Badge / Clé externe', badgeHtml, body, meta);
+}
+
+const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport, badge_externe: buildBadgeExterneReport };
 
 function openReport(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
@@ -412,6 +455,8 @@ const KINDS = {
   ouverture:  { label:'Ouverture résidence',   icon:'🔑', color:'#0e7490' },
   biblio_comptage: { label:'Bibliothèque — Comptage', icon:'📊', color:'#2563eb' },
   biblio_filtrage: { label:'Bibliothèque — Filtrage', icon:'🚪', color:'#166534' },
+  materiel:   { label:'Matériel — Prise / Retour', icon:'📦', color:'#4b5563' },
+  badge_externe: { label:'Badge / clé externe',    icon:'🪪', color:'#7c3aed' },
 };
 
 // Distingue un AJOUT d'une MODIFICATION ultérieure en comparant created_at/updated_at
@@ -621,6 +666,69 @@ const SOURCES = [
       {k:'note',l:'Note',t:'textarea'} ]; },
     async save(r,p){ const {error}=await sb.from('bibliotheque_filtrages').update(p).eq('id',r.id); if(error) throw error; },
     async del(r){ const {error}=await sb.from('bibliotheque_filtrages').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'materiel', table:'stock_attributions',
+    // Historique des prises et restitutions de matériel (materiel-agent.html). Une ligne = une
+    // sortie ; si elle a été rendue (statut='rendu'), le retour est affiché dans le détail plutôt
+    // que comme une entrée séparée dans le journal — le tri chronologique se fait sur date_sortie.
+    // Pas de rapport imprimable demandé pour ce flux (à la différence des badges externes ci-dessous).
+    async fetch(){ const {data}=await sb.from('stock_attributions').select('*').order('date_sortie',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.date_sortie, sub:'', kind:'materiel', raw:r }]; },
+    site(){ return ''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `${r.statut==='rendu'?'Matériel rendu':'Sortie matériel'} — ${r.materiel_nom||'—'}${r.quantite>1?' ×'+r.quantite:''}`; },
+    snippet(r){
+      let s = `Quantité : ${r.quantite??1}`;
+      if(r.note) s += ' · '+r.note;
+      s += r.statut==='rendu' ? ` · Rendu le ${fmtDate(r.date_retour)} ${fmtTime(r.date_retour)}${r.etat_retour?' — '+r.etat_retour:''}` : ' · ⏳ Toujours sorti';
+      return s;
+    },
+    detailHtml(r){
+      return `<div class="msec"><div class="st">Sortie</div><div class="txt">${esc(r.materiel_nom||'—')} — quantité ${r.quantite??1}<br>Le ${fmtDate(r.date_sortie)} ${fmtTime(r.date_sortie)} par ${esc(r.agent_nom||'—')}</div></div>
+        ${r.note?`<div class="msec"><div class="st">Note</div><div class="txt">${esc(r.note)}</div></div>`:''}
+        <div class="msec"><div class="st">Statut</div><div class="txt">${r.statut==='rendu'
+          ? `✅ Rendu le ${fmtDate(r.date_retour)} ${fmtTime(r.date_retour)}${r.etat_retour?' — état au retour : '+esc(r.etat_retour):''}`
+          : '⏳ Toujours sorti — non rendu'}</div></div>`; },
+    fields(){ return [
+      {k:'materiel_nom',l:'Matériel',t:'text'},
+      {k:'quantite',l:'Quantité',t:'number'},
+      {k:'note',l:'Note',t:'textarea'},
+      {k:'statut',l:'Statut (actif/rendu)',t:'text'},
+      {k:'etat_retour',l:'État au retour',t:'text'} ]; },
+    async save(r,p){ const {error}=await sb.from('stock_attributions').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('stock_attributions').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'badge_externe', table:'stock_acces',
+    // Historique des remises et retours de clés/badges à des tiers externes (badge-externe.html).
+    // Filtré sur receptionnaire_type='externe' pour ne pas dupliquer les sorties agent déjà
+    // couvertes par materiel-agent.html (table stock_acces partagée entre les deux flux).
+    // Rapport imprimable demandé UNIQUEMENT sur le retour (canReport ci-dessous) — pas sur la
+    // remise seule — avec heure de prise ET heure de retour visibles sur le rapport.
+    async fetch(){ const {data}=await sb.from('stock_acces').select('*').eq('receptionnaire_type','externe').order('date_remise',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.date_remise, sub:'', kind:'badge_externe', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `${r.statut==='rendu'?'Badge/clé rendu(e)':'Badge/clé remis(e)'} — ${r.item_nom||'—'} — ${r.receptionnaire_nom||'—'}`; },
+    snippet(r){
+      let s = `${r.item_type==='badge'?'🪪 Badge':'🔑 Clé'} → ${r.receptionnaire_nom||'—'}${r.receptionnaire_societe?' ('+r.receptionnaire_societe+')':''}`;
+      s += r.statut==='rendu' ? ` · Rendu le ${fmtDate(r.date_retour_reel)} ${fmtTime(r.date_retour_reel)}` : ' · ⏳ Toujours chez le tiers';
+      return s;
+    },
+    detailHtml(r){
+      return `<div class="msec"><div class="st">Remise</div><div class="txt">${esc(r.item_nom||'—')} (${esc(r.item_type||'—')})${r.site_nom?' — '+esc(r.site_nom):''}<br>Remis le ${fmtDate(r.date_remise)} ${fmtTime(r.date_remise)} par ${esc(r.agent_nom||'—')}</div></div>
+        <div class="msec"><div class="st">Réceptionnaire externe</div><div class="txt">${esc(r.receptionnaire_nom||'—')}${r.receptionnaire_societe?' — '+esc(r.receptionnaire_societe):''}${r.receptionnaire_telephone?' — ☎ '+esc(r.receptionnaire_telephone):''}</div></div>
+        ${r.notes?`<div class="msec"><div class="st">Note</div><div class="txt">${esc(r.notes)}</div></div>`:''}
+        <div class="msec"><div class="st">Statut</div><div class="txt">${r.statut==='rendu'
+          ? `✅ Rendu le ${fmtDate(r.date_retour_reel)} ${fmtTime(r.date_retour_reel)} — rapport disponible ci-dessous`
+          : '⏳ Toujours chez le tiers externe — non rendu (rapport disponible uniquement après le retour)'}</div></div>`; },
+    fields(){ return [
+      {k:'item_nom',l:'Clé / Badge',t:'text'},
+      {k:'receptionnaire_nom',l:'Réceptionnaire',t:'text'},
+      {k:'receptionnaire_societe',l:'Société',t:'text'},
+      {k:'receptionnaire_telephone',l:'Téléphone',t:'text'},
+      {k:'notes',l:'Note',t:'textarea'},
+      {k:'statut',l:'Statut (actif/rendu)',t:'text'} ]; },
+    async save(r,p){ const {error}=await sb.from('stock_acces').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ const {error}=await sb.from('stock_acces').delete().eq('id',r.id); if(error) throw error; },
+    canReport(r){ return r.statut==='rendu'; } },
 ];
 
 /* ---------- État ---------- */
@@ -707,7 +815,8 @@ function renderDetailView(e){
   const box = document.getElementById('detail-view');
   const r = e.raw; let snip=''; try{ snip = e.src.snippet(r); }catch(_){}
   const idx = window.__renderedItems.indexOf(e);
-  const reportBtn = REPORTABLE[e.kind] ? `<button class="btn btn-sec" onclick="openReport(${idx})">🖨 Rapport client</button>` : '';
+  const canReport = REPORTABLE[e.kind] && (!e.src.canReport || e.src.canReport(r));
+  const reportBtn = canReport ? `<button class="btn btn-sec" onclick="openReport(${idx})">🖨 Rapport client</button>` : '';
   const delBtn = e.src.del ? `<button class="btn btn-sec" style="background:#fdf0f0;color:#8B1A1A;border-color:#f3c9c9" onclick="deleteEntry(${idx})">🗑️ Supprimer</button>` : '';
   const canEdit = e.src.fields && e.src.save && e.src.fields(r).length;
   const editBtn = canEdit ? `<button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button>` : '';
