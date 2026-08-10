@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v8 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v10 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -105,16 +105,16 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings (rondes &amp; comptages) · Validations consignes</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats</div>
       </div>
-      <a class="home" href="index.html">← Accueil</a>
+      <a class="home" href="../index.html">← Accueil</a>
     </div>
   </header>
 
   <main>
     <div class="filters">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une — parkings (rondes + comptages) et validations de consignes agents pour l'instant. Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.</div>
+        <div class="hint">Reconstruction en cours : on reconnecte les sources une par une — parkings (rondes + comptages), validations de consignes agents, et désormais consignes / événements / constats (avec distinction Ajout / Modification). Liste brute, sans filtre pour l'instant. Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.<br><small style="color:#b8860b">⚠ Nécessite la migration SQL <code>migration-updated-at-supervision.sql</code> (colonne <code>updated_at</code> + trigger) sur les tables consignes / evenements / constats — sans elle, ces 3 sources restent silencieusement invisibles ici (erreur consignée en console).</small></div>
         <button class="btn" onclick="refresh()">🔄 Actualiser</button>
       </div>
     </div>
@@ -142,7 +142,11 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v8 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v10 — reconstruction)
+   Déposé dans centraliste/ (pas à la racine) : le lien Accueil pointe donc
+   vers ../index.html, et les liens "Ouvrir dans le module de saisie" vers
+   consignes.html / evenements.html / constats.html restent relatifs au
+   même dossier (pas de préfixe centraliste/).
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -156,6 +160,20 @@ main{flex:1;padding:18px}
    modale de `validation_consignes.html` (texte des consignes lues,
    titres des événements présentés, descriptions des constats
    affichés à l'agent au moment de sa validation).
+   Étape 3 : CONSIGNES / ÉVÉNEMENTS / CONSTATS (tables `consignes`,
+   `evenements`, `constats`, centraliste/) — chaque ligne apparaît une
+   seule fois, datée par `updated_at` (et non plus `created_at`), pour
+   remonter aussi bien les créations que les modifications ultérieures.
+   Un badge distingue « ➕ Ajout » (updated_at ≈ created_at) de
+   « ✏️ Modification » (écart > 5 s) — voir ajoutOuModif(). Ces trois
+   sources EXIGENT la migration SQL `migration-updated-at-supervision.sql`
+   (colonne `updated_at` + trigger sur les 3 tables) : sans elle, la
+   requête échoue silencieusement (catch par source dans refresh()) et
+   ces entrées n'apparaissent simplement pas. Pas d'édition inline pour
+   ces 3 sources : le détail propose un lien direct « Ouvrir dans le
+   module de saisie » vers centraliste/consignes.html /
+   evenements.html / constats.html plutôt que de dupliquer leurs
+   formulaires ici.
    Toutes les autres sources (journal, alarmes, matériel, clés/badges,
    véhicules flotte, ouvertures, bibliothèque, etc.) restent
    volontairement abandonnées pour l'instant — à reconnecter une par
@@ -309,7 +327,20 @@ const KINDS = {
   parking:    { label:'Surveillance parking', icon:'🅿️', color:'#8B1A1A' },
   comptage:   { label:'Comptage parking',      icon:'🔢', color:'#1d4ed8' },
   validation: { label:'Validation consignes',  icon:'✅', color:'#1b7a3d' },
+  consigne:   { label:'Consigne',              icon:'📌', color:'#6b4fa0' },
+  evenement:  { label:'Événement',             icon:'📅', color:'#b8860b' },
+  constat:    { label:'Constat',               icon:'📋', color:'#c2410c' },
 };
+
+// Distingue un AJOUT d'une MODIFICATION ultérieure en comparant created_at/updated_at
+// (colonnes ajoutées par claude/migration-updated-at-supervision.sql). Tolérance de 5s
+// pour ne pas confondre une modification réelle avec un léger décalage d'horodatage serveur.
+function ajoutOuModif(r){
+  if(!r.updated_at || !r.created_at) return { isModif:false, label:'➕ Ajout' };
+  const c = new Date(r.created_at).getTime(), u = new Date(r.updated_at).getTime();
+  const isModif = (u - c) > 5000;
+  return { isModif, label: isModif ? '✏️ Modification' : '➕ Ajout' };
+}
 
 /* ---------- Référentiels ---------- */
 let sites = [];
@@ -391,6 +422,49 @@ const SOURCES = [
       return sec('📋 Consignes lues', cons, c=>esc(c.texte||''))
            + sec('📅 Événements présentés', evs, e=>esc(e.titre||'')+(e.heure_debut?' — '+String(e.heure_debut).slice(0,5):''))
            + sec('⚠ Constats affichés', cts, c=>esc(c.description||'')+(c.statut?' — '+esc(c.statut):'')); } },
+
+  { kind:'consigne', table:'consignes',
+    // Nécessite migration-updated-at-supervision.sql (colonne updated_at + trigger).
+    // Pas d'édition ici : lien direct vers le module de saisie (centraliste/consignes.html).
+    async fetch(){ const {data}=await sb.from('consignes').select('*').order('updated_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.updated_at||r.created_at, sub:'', kind:'consigne', raw:r }]; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(){ return ''; },
+    title(r){ return `${ajoutOuModif(r).label} — Consigne — ${siteNameById[r.site_id]||'—'}`; },
+    snippet(r){ return r.texte||''; },
+    detailHtml(r){
+      const {label,isModif} = ajoutOuModif(r);
+      return `<div class="msec"><div class="st">${label}</div><div class="txt">${esc(r.texte||'')}</div></div>
+        <div class="msec"><div class="st">Période</div><div class="txt">Dès le ${fmtDate(r.date_debut)}${r.date_fin?' jusqu\'au '+fmtDate(r.date_fin):' (permanente)'}</div></div>
+        <div class="msec"><div class="st">Historique</div><div class="txt">Créée le ${fmtDate(r.created_at)} ${fmtTime(r.created_at)}${isModif?' · modifiée le '+fmtDate(r.updated_at)+' '+fmtTime(r.updated_at):''}</div></div>`; },
+    moduleLink(){ return 'consignes.html'; } },
+
+  { kind:'evenement', table:'evenements',
+    async fetch(){ const {data}=await sb.from('evenements').select('*').order('updated_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.updated_at||r.created_at, sub:'', kind:'evenement', raw:r }]; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agents||''; },
+    title(r){ return `${ajoutOuModif(r).label} — ${r.titre||'Événement'}`; },
+    snippet(r){ return `${r.date?fmtDate(r.date):''}${r.heure_debut?' '+String(r.heure_debut).slice(0,5):''}${r.lieu?' · '+r.lieu:''}`; },
+    detailHtml(r){
+      const {label,isModif} = ajoutOuModif(r);
+      return `<div class="msec"><div class="st">${label}</div><div class="txt">${esc(r.titre||'')}${r.lieu?' — '+esc(r.lieu):''}</div></div>
+        <div class="msec"><div class="st">Horaire</div><div class="txt">${fmtDate(r.date)} · ${r.heure_debut?String(r.heure_debut).slice(0,5):'—'}${r.heure_fin?' → '+String(r.heure_fin).slice(0,5):''}</div></div>
+        ${r.consignes?`<div class="msec"><div class="st">Consignes sécurité</div><div class="txt">${esc(r.consignes)}</div></div>`:''}
+        <div class="msec"><div class="st">Historique</div><div class="txt">Créé le ${fmtDate(r.created_at)} ${fmtTime(r.created_at)}${isModif?' · modifié le '+fmtDate(r.updated_at)+' '+fmtTime(r.updated_at):''}</div></div>`; },
+    moduleLink(){ return 'evenements.html'; } },
+
+  { kind:'constat', table:'constats',
+    async fetch(){ const {data}=await sb.from('constats').select('*').order('updated_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.updated_at||r.created_at, sub:'', kind:'constat', raw:r }]; },
+    site(r){ return siteNameById[r.site_id]||''; }, agent(r){ return r.agent||''; },
+    title(r){ return `${ajoutOuModif(r).label} — Constat — ${siteNameById[r.site_id]||'—'}`; },
+    snippet(r){ return `${r.description||''}${r.statut?' — '+r.statut:''}`; },
+    detailHtml(r){
+      const {label,isModif} = ajoutOuModif(r);
+      return `<div class="msec"><div class="st">${label}</div><div class="txt">${esc(r.description||'')}</div></div>
+        ${r.procedure?`<div class="msec"><div class="st">Procédure</div><div class="txt">${esc(r.procedure)}</div></div>`:''}
+        <div class="msec"><div class="st">Statut</div><div class="txt">${esc(r.statut||'—')}${r.localisation?' · '+esc(r.localisation):''}</div></div>
+        <div class="msec"><div class="st">Historique</div><div class="txt">Créé le ${fmtDate(r.created_at)} ${fmtTime(r.created_at)}${isModif?' · modifié le '+fmtDate(r.updated_at)+' '+fmtTime(r.updated_at):''}</div></div>`; },
+    moduleLink(){ return 'constats.html'; } },
 ];
 
 /* ---------- État ---------- */
@@ -481,11 +555,13 @@ function renderDetailView(e){
   const delBtn = e.src.del ? `<button class="btn btn-sec" style="background:#fdf0f0;color:#8B1A1A;border-color:#f3c9c9" onclick="deleteEntry(${idx})">🗑️ Supprimer</button>` : '';
   const canEdit = e.src.fields && e.src.save && e.src.fields(r).length;
   const editBtn = canEdit ? `<button class="btn" onclick="startEdit(${idx})">✏️ Modifier</button>` : '';
+  const moduleBtn = e.src.moduleLink ? `<a class="btn btn-sec" style="text-decoration:none;display:inline-block" href="${esc(e.src.moduleLink())}" target="_blank">↗️ Ouvrir dans le module de saisie</a>` : '';
   const extra = e.src.detailHtml ? e.src.detailHtml(r) : '';
   box.innerHTML = `
     ${extra || (snip?`<div class="msec"><div class="st">Résumé</div><div class="txt">${esc(snip)}</div></div>`:'')}
     <div class="editbar">
       ${reportBtn}
+      ${moduleBtn}
       ${delBtn}
       <button class="btn btn-sec" onclick="closeModal()">Fermer</button>
       ${editBtn}
