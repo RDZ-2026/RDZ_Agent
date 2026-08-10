@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v18 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v19 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -40,6 +40,14 @@ main{flex:1;padding:18px}
 .ffield select:focus,.ffield input:focus{outline:none;border-color:var(--red)}
 .filterbar .reset{align-self:flex-end}
 .factive{font-size:11.5px;color:var(--red);font-weight:bold;margin-top:2px}
+
+.view-tabs{display:flex;gap:8px;margin-bottom:12px}
+.vtab{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:20px;padding:8px 16px;font-size:13px;font-weight:bold;font-family:var(--font);cursor:pointer}
+.vtab.active{background:var(--red);border-color:var(--red-dark);color:#fff}
+.daynav{display:flex;gap:6px;align-items:center}
+.daynav input{flex:1;min-width:130px}
+.navbtn{padding:8px 11px;font-size:13px;line-height:1}
+#ffield-serviceday{min-width:230px}
 
 .summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 
@@ -121,21 +129,34 @@ main{flex:1;padding:18px}
   </header>
 
   <main>
+    <div class="view-tabs">
+      <button class="vtab active" id="vtab-service" onclick="switchView('service')">📅 Journée de service</button>
+      <button class="vtab" id="vtab-full" onclick="switchView('full')">📋 Vue complète</button>
+    </div>
+
     <div class="filters">
       <div class="filterbar">
+        <div class="ffield" id="ffield-serviceday">
+          <label>Journée de service</label>
+          <div class="daynav">
+            <button class="btn btn-sec navbtn" onclick="shiftServiceDay(-1)" title="Journée précédente">◀</button>
+            <input type="date" id="flt-serviceday" onchange="applyFilters()">
+            <button class="btn btn-sec navbtn" onclick="shiftServiceDay(1)" title="Journée suivante">▶</button>
+          </div>
+        </div>
+        <div class="ffield" id="ffield-from" style="display:none">
+          <label>Du</label>
+          <input type="date" id="flt-from" onchange="applyFilters()">
+        </div>
+        <div class="ffield" id="ffield-to" style="display:none">
+          <label>Au</label>
+          <input type="date" id="flt-to" onchange="applyFilters()">
+        </div>
         <div class="ffield">
           <label>Catégorie</label>
           <select id="flt-kind" onchange="applyFilters()">
             <option value="">Toutes</option>
           </select>
-        </div>
-        <div class="ffield">
-          <label>Du</label>
-          <input type="date" id="flt-from" onchange="applyFilters()">
-        </div>
-        <div class="ffield">
-          <label>Au</label>
-          <input type="date" id="flt-to" onchange="applyFilters()">
         </div>
         <div class="ffield">
           <label>Agent</label>
@@ -178,7 +199,7 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v18 — reconstruction)
+   RDZ — Supervision journal de bord unifié (v19 — reconstruction)
    Étape 5 : BIBLIOTHÈQUE IHEID (tables `bibliotheque_comptages` et
    `bibliotheque_filtrages`, identique à supervision-bibliotheque.html
    pour les données) — deux kinds distincts (biblio_comptage /
@@ -257,6 +278,16 @@ main{flex:1;padding:18px}
    casse, accents) via une clé canonique — voir normalizeName() dans le bloc
    "Filtres" du script, demande explicite de l'utilisateur du 2026-08-10
    (ex. "Anthony Lindt" et "Lindt Anthony" ne comptent plus comme deux agents).
+   Étape 10 (v19) : VUE "JOURNÉE DE SERVICE" — copie de la vue chronologique
+   dans le même fichier (demande explicite du 2026-08-10), avec les mêmes
+   filtres Catégorie/Agent/Site, mais le Du/Au est remplacé par un sélecteur
+   d'UNE journée de service RDZ (06:30→06:29, via serviceDate()/
+   serviceDayBounds()) avec navigation ◀ / ▶. Deux onglets en haut de page
+   (switchView) : "Journée de service" (actif PAR DÉFAUT au chargement, sur
+   la journée en cours — initFilters()) et "Vue complète" (l'ancien
+   comportement, plage de dates libre). getFilteredEntries() applique les
+   mêmes filtres communs (kind/agent/site) puis, selon viewMode, soit borne
+   à la journée de service sélectionnée soit applique Du/Au.
    On reconstruit ce module en connectant les sources une par une.
    Étape 1 : PARKINGS — mélange en un seul flux chronologique des
    rondes ParkGuard (table `vehicles`) et des comptages (table
@@ -944,16 +975,65 @@ function populateFilterOptions(){
   if(sitesPresent.includes(curSite)) siteSel.value = curSite;
 }
 
+/* ---------- Vue "Journée de service" ----------
+   Copie de la vue chronologique, dans le même fichier (demande explicite du
+   2026-08-10) : mêmes filtres Catégorie/Agent/Site, mais le filtre Du/Au est
+   remplacé par un sélecteur d'UNE journée de service RDZ (06:30 → 06:29 le
+   lendemain, voir serviceDate() plus haut) avec navigation ◀ Précédente /
+   Suivante ▶. Vue active PAR DÉFAUT au chargement de la page, sur la journée
+   de service en cours (initFilters() ci-dessous). L'onglet "Vue complète"
+   reste disponible pour retrouver l'ancien comportement (plage de dates libre,
+   sans limite à une seule journée). */
+let viewMode = 'service'; // 'service' | 'full'
+
+function serviceDayBounds(dayStr){
+  const [y,m,d] = dayStr.split('-').map(Number);
+  const start = new Date(y, m-1, d, 6, 30, 0, 0);
+  const end = new Date(start.getTime() + 24*3600*1000);
+  return { start, end };
+}
+
+function switchView(mode){
+  viewMode = mode;
+  document.getElementById('vtab-service').classList.toggle('active', mode==='service');
+  document.getElementById('vtab-full').classList.toggle('active', mode==='full');
+  document.getElementById('ffield-serviceday').style.display = mode==='service' ? '' : 'none';
+  document.getElementById('ffield-from').style.display = mode==='full' ? '' : 'none';
+  document.getElementById('ffield-to').style.display = mode==='full' ? '' : 'none';
+  render();
+}
+
+function shiftServiceDay(delta){
+  const el = document.getElementById('flt-serviceday');
+  const cur = el.value ? new Date(el.value+'T00:00:00') : new Date();
+  cur.setDate(cur.getDate()+delta);
+  el.value = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+  render();
+}
+
 function getFilteredEntries(){
   const kind = document.getElementById('flt-kind').value;
-  const from = document.getElementById('flt-from').value; // AAAA-MM-JJ ou ''
-  const to = document.getElementById('flt-to').value;
   const agentKey = document.getElementById('flt-agent').value; // clé canonique normalizeName()
   const site = document.getElementById('flt-site').value;
-  return allEntries.filter(e=>{
+  const common = e=>{
     if(kind && e.kind!==kind) return false;
     if(agentKey){ let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){} if(normalizeName(a)!==agentKey) return false; }
     if(site){ let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} if(s!==site) return false; }
+    return true;
+  };
+  if(viewMode==='service'){
+    const day = document.getElementById('flt-serviceday').value || serviceDate();
+    const { start, end } = serviceDayBounds(day);
+    return allEntries.filter(e=>{
+      if(!common(e)) return false;
+      const d = new Date(e.ts); if(isNaN(d)) return false;
+      return d>=start && d<end;
+    });
+  }
+  const from = document.getElementById('flt-from').value; // AAAA-MM-JJ ou ''
+  const to = document.getElementById('flt-to').value;
+  return allEntries.filter(e=>{
+    if(!common(e)) return false;
     if(from || to){
       const d = new Date(e.ts); if(isNaN(d)) return false;
       const dayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -968,20 +1048,37 @@ function applyFilters(){ render(); }
 
 function resetFilters(){
   document.getElementById('flt-kind').value = '';
-  document.getElementById('flt-from').value = '';
-  document.getElementById('flt-to').value = '';
   document.getElementById('flt-agent').value = '';
   document.getElementById('flt-site').value = '';
+  if(viewMode==='service') document.getElementById('flt-serviceday').value = serviceDate();
+  else { document.getElementById('flt-from').value = ''; document.getElementById('flt-to').value = ''; }
   render();
+}
+
+function initFilters(){
+  document.getElementById('flt-serviceday').value = serviceDate();
+  switchView('service');
 }
 
 function render(){
   const list = document.getElementById('list');
   const items = getFilteredEntries();
-  const filterActive = document.getElementById('flt-kind').value || document.getElementById('flt-from').value || document.getElementById('flt-to').value || document.getElementById('flt-agent').value || document.getElementById('flt-site').value;
+  // La sélection de journée de service n'est pas comptée comme un "filtre" au sens du
+  // badge ci-dessous (c'est la nature même de cette vue) — seuls Catégorie/Agent/Site
+  // (et Du/Au en Vue complète) déclenchent le badge "· filtré".
+  const filterActive = document.getElementById('flt-kind').value || document.getElementById('flt-agent').value || document.getElementById('flt-site').value
+    || (viewMode==='full' && (document.getElementById('flt-from').value || document.getElementById('flt-to').value));
 
-  document.getElementById('summary-txt').innerHTML = `${items.length} entrée(s)${filterActive?` sur ${allEntries.length}<span class="factive"> · filtré</span>`:''}`;
-  if(!items.length){ list.innerHTML = `<div class="state-msg">${filterActive?'Aucune entrée ne correspond à ces filtres.':'Aucune entrée pour le moment.'}</div>`; return; }
+  let dayLabel = '';
+  if(viewMode==='service'){
+    const day = document.getElementById('flt-serviceday').value || serviceDate();
+    const { end } = serviceDayBounds(day);
+    const endJ = new Date(end.getTime()-60000); // 06:29 (affichage), pas 06:30 exclusif
+    dayLabel = ` — journée de service du ${fmtDate(day+'T00:00:00')} 06h30 au ${fmtDate(endJ)} ${fmtTime(endJ)}`;
+  }
+
+  document.getElementById('summary-txt').innerHTML = `${items.length} entrée(s)${filterActive?` sur ${allEntries.length}<span class="factive"> · filtré</span>`:''}${esc(dayLabel)}`;
+  if(!items.length){ list.innerHTML = `<div class="state-msg">${viewMode==='service'?'Aucune entrée pour cette journée de service.':(filterActive?'Aucune entrée ne correspond à ces filtres.':'Aucune entrée pour le moment.')}</div>`; return; }
 
   list.innerHTML = items.map((e,i)=>{
     const def = KINDS[e.kind]; const r = e.raw;
@@ -1107,6 +1204,7 @@ function closeModal(){ document.getElementById('overlay').classList.remove('show
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
 
 /* ---------- init ---------- */
+initFilters();
 Promise.all([loadSites(), loadBiblioOrigines(), loadFleetVehicles()]).then(refresh);
 </script>
 </body>
