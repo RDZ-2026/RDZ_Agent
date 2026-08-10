@@ -1,0 +1,144 @@
+<!-- RDZ · application · v1 · 2026-08-10 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Outil terrain</title>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+main{flex:1;padding:16px}
+
+.pilot-banner{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);
+  padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:20px}
+.pilot-banner b{color:var(--warn)}
+
+.section-h{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin:0 0 10px}
+.section-h.spaced{margin-top:22px}
+
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);
+  border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;text-decoration:none;color:inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);transition:border-color .1s}
+.group-btn:active{border-color:var(--red)}
+.group-btn.tool{border-left:4px solid var(--report-red)}
+.group-btn.fix{border-left:4px solid var(--warn)}
+.group-btn .ic{font-size:27px;width:38px;text-align:center;flex-shrink:0}
+.group-btn .txt{min-width:0;flex:1}
+.group-btn .txt .t{font-weight:bold;font-size:15.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-btn .txt .t-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.warn-badge{background:#fde8e8;color:#b02020;border:1px solid #eaa8a8;border-radius:20px;font-size:10.5px;font-weight:bold;
+  padding:3px 10px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.group-btn .txt .d{font-size:12.5px;color:#666;margin-top:3px;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:22px;flex-shrink:0}
+
+.foot{text-align:center;color:#aaa;font-size:11.5px;padding:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+    <div class="sub">Application terrain pour les agents</div>
+  </header>
+
+  <main>
+    <div class="pilot-banner">
+      🧪 <b>Outil terrain.</b> Ces outils tournent <b>en parallèle</b> de vos applications habituelles (menu principal RDZ Agent).
+      Continuez à utiliser vos modules actuels normalement ; ici, ce sont les tout derniers modules, en cours de validation avant intégration au menu principal.
+    </div>
+
+    <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
+    <div class="section-h">Vacation</div>
+
+    <a class="group-btn" href="prise-de-poste.html">
+      <span class="ic">☀️</span>
+      <span class="txt">
+        <span class="t">Prise de poste</span>
+        <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <a class="group-btn" href="feuille-route-agent.html">
+      <span class="ic">🗺️</span>
+      <span class="txt">
+        <span class="t">Feuille de route</span>
+        <span class="d">Missions du jour, inscription des heures réelles et notes.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <a class="group-btn" href="fin-de-service.html">
+      <span class="ic">🌙</span>
+      <span class="txt">
+        <span class="t">Fin de poste</span>
+        <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <!-- Outil terrain : liste pilotée par OUTIL_TERRAIN_ITEMS ci-dessous.
+         Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
+         pas besoin de dupliquer le HTML. -->
+    <div class="section-h spaced">Outil terrain</div>
+    <div id="outil-terrain-list"></div>
+
+    <!-- Dépannage -->
+    <div class="section-h spaced">Dépannage</div>
+
+    <a class="group-btn fix" href="../admin/reset-sync.html">
+      <span class="ic">🛠️</span>
+      <span class="txt">
+        <span class="t-row"><span class="t">Dépannage</span><span class="warn-badge">⚠️ Usage exceptionnel</span></span>
+        <span class="d">Réinitialiser la file d'envoi RDZSync.</span>
+      </span>
+      <span class="chev">›</span>
+    </a>
+
+    <div class="foot">RDZ · Outil terrain · v1</div>
+  </main>
+</div>
+
+<script>
+// Section "Outil terrain" : mêmes fichiers physiques que ceux visés à terme depuis le
+// menu principal (mobile.html) — rien n'est dupliqué, on ne fait que les rendre
+// accessibles ici en avant-première pendant leur période de validation.
+// Pour ajouter un module ici plus tard : ajouter une entrée à ce tableau.
+const OUTIL_TERRAIN_ITEMS = [
+  { icon: '🚨', name: 'Alarme', desc: "Intervenir sur une alarme. Que faire et comment le faire ?", href: 'alarme-agent.html' },
+  { icon: '📓', name: 'Journal de bord', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' }
+];
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderOutilTerrain(){
+  const box = document.getElementById('outil-terrain-list');
+  box.innerHTML = OUTIL_TERRAIN_ITEMS.map(item => `
+    <a class="group-btn tool" href="${esc(item.href)}">
+      <span class="ic">${item.icon}</span>
+      <span class="txt">
+        <span class="t">${esc(item.name)}</span>
+        <span class="d">${esc(item.desc)}</span>
+      </span>
+      <span class="chev">›</span>
+    </a>`).join('');
+}
+renderOutilTerrain();
+</script>
+</body>
+</html>
