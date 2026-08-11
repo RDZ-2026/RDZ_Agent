@@ -1,10 +1,11 @@
-<!-- RDZ · application · v2 · 2026-08-10 -->
+<!-- RDZ · application · v3 · 2026-08-10 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>RDZ — Outil terrain</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
@@ -19,9 +20,48 @@
 body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
 .wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
 header{background:var(--red);color:#fff;padding:12px 16px}
+header .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
 header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header .change-agent{background:none;border:none;color:rgba(255,255,255,.85);font-size:11.5px;text-decoration:underline;cursor:pointer;white-space:nowrap;padding:2px 0}
 main{flex:1;padding:16px}
+
+/* ── Écrans (identification / PIN / menu) ── */
+.screen{display:none}
+.screen.on{display:block}
+
+#screen-loading.screen.on{display:flex}
+#screen-loading{min-height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:var(--red)}
+.splash-title{font-size:20px;font-weight:700;color:#fff;letter-spacing:.08em;text-transform:uppercase}
+.splash-sub{font-size:12px;color:rgba(255,255,255,.7)}
+.spinner{width:30px;height:30px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.ident-content{padding:24px 20px;display:flex;flex-direction:column;gap:10px}
+.ident-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.ident-sub{font-size:12.5px;color:#555;margin-bottom:12px;line-height:1.5}
+.agent-pick-btn{background:#fff;border:1px solid var(--line-soft);border-left:4px solid var(--red);border-radius:var(--radius-ui);
+  padding:16px 18px;font-size:15px;font-weight:600;color:var(--ink);text-align:left;cursor:pointer;display:flex;
+  align-items:center;justify-content:space-between;width:100%}
+.agent-pick-btn:active{background:#f5e8e8}
+.notice-banner{background:#fef9c3;border:1px solid #fde68a;color:#854d0e;font-size:12px;padding:10px 14px;border-radius:var(--radius-ui);margin-bottom:14px;line-height:1.5}
+
+.pin-content{padding:30px 24px;display:flex;flex-direction:column;align-items:center;gap:20px}
+.pin-agent-name{font-size:16px;font-weight:700}
+.pin-msg{font-size:12.5px;color:#555;text-align:center;line-height:1.5}
+.pin-msg.warn{color:#854d0e;background:#fef9c3;border:1px solid #fde68a;padding:10px 14px;border-radius:var(--radius-ui)}
+.pin-msg.err{color:#dc2626}
+.pin-dots{display:flex;gap:14px;margin:10px 0}
+.pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--red);background:transparent;transition:background .1s}
+.pin-dot.filled{background:var(--red)}
+.pin-dots.shake{animation:shake .35s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,74px);gap:14px}
+.key{width:74px;height:74px;border-radius:50%;border:1px solid var(--line-soft);background:#fff;font-size:24px;font-weight:600;
+  color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.key:active{background:#f5e8e8}
+.key.fn{border:none;background:none;font-size:13px;color:#555;font-weight:700}
+.link-btn{background:none;border:none;color:#555;font-size:12px;text-decoration:underline;cursor:pointer;margin-top:6px}
 
 .pilot-banner{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);
   padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:20px}
@@ -52,81 +92,337 @@ main{flex:1;padding:16px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-    <div class="sub">Application terrain pour les agents</div>
-  </header>
 
-  <main>
-    <div class="pilot-banner">
-      🧪 <b>Outil terrain.</b> Ces outils tournent <b>en parallèle</b> de vos applications habituelles (menu principal RDZ Agent).
-      Continuez à utiliser vos modules actuels normalement ; ici, ce sont les tout derniers modules, en cours de validation avant intégration au menu principal.
-    </div>
-
-    <!-- Vue principale -->
-    <div id="main-list">
-      <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
-      <div class="section-h">Vacation</div>
-
-      <a class="group-btn" href="#" onclick="showPosteMenu();return false;">
-        <span class="ic">☀️</span>
-        <span class="txt">
-          <span class="t">Prise de poste</span>
-          <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
-        </span>
-        <span class="chev">›</span>
-      </a>
-
-      <a class="group-btn" href="feuille-route-agent.html">
-        <span class="ic">🗺️</span>
-        <span class="txt">
-          <span class="t">Feuille de route</span>
-          <span class="d">Missions du jour, inscription des heures réelles et notes.</span>
-        </span>
-        <span class="chev">›</span>
-      </a>
-
-      <a class="group-btn" href="fin-de-service.html">
-        <span class="ic">🌙</span>
-        <span class="txt">
-          <span class="t">Fin de poste</span>
-          <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
-        </span>
-        <span class="chev">›</span>
-      </a>
-
-      <!-- Outil terrain : liste pilotée par OUTIL_TERRAIN_ITEMS ci-dessous.
-           Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
-           pas besoin de dupliquer le HTML. -->
-      <div class="section-h spaced">Outil terrain</div>
-      <div id="outil-terrain-list"></div>
-
-      <!-- Dépannage -->
-      <div class="section-h spaced">Dépannage</div>
-
-      <a class="group-btn fix" href="../admin/reset-sync.html">
-        <span class="ic">🛠️</span>
-        <span class="txt">
-          <span class="t-row"><span class="t">Dépannage</span><span class="warn-badge">⚠️ Usage exceptionnel</span></span>
-          <span class="d">Réinitialiser la file d'envoi RDZSync.</span>
-        </span>
-        <span class="chev">›</span>
-      </a>
-
-      <div class="foot">RDZ · Outil terrain · v2</div>
-    </div>
-
-    <!-- Sous-menu "Prise de poste" : mêmes 3 destinations que dans mobile.html
-         (Consignes/événements/constats, Matériel & clés, Prise de véhicule),
-         pilotées par POSTE_ITEMS ci-dessous. -->
-    <div id="poste-list" class="hidden">
-      <button class="back-btn" onclick="backToMain();return false;">‹ Retour</button>
-      <div class="section-h">Prise de poste</div>
-      <div id="poste-items-list"></div>
-    </div>
-  </main>
+<!-- SPLASH -->
+<div class="screen on" id="screen-loading">
+  <div class="splash-title">RDZ — Outil terrain</div>
+  <div class="spinner"></div>
+  <div class="splash-sub">Connexion en cours…</div>
 </div>
+
+<!-- IDENTIFICATION -->
+<div class="screen" id="screen-ident">
+  <div class="wrap">
+    <header>
+      <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+      <div class="sub">Identification</div>
+    </header>
+    <div class="ident-content">
+      <div class="ident-title">Qui êtes-vous ?</div>
+      <div class="ident-sub">Sélectionnez votre nom dans la liste. Cette sélection ne sera demandée qu'une seule fois sur cet appareil.</div>
+      <div id="ident-notice"></div>
+      <div id="agent-pick-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PIN (vérification) -->
+<div class="screen" id="screen-pin">
+  <div class="wrap">
+    <header>
+      <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+      <div class="sub">Code d'accès</div>
+    </header>
+    <div class="pin-content">
+      <div class="pin-agent-name" id="pin-agent-name"></div>
+      <div class="pin-msg" id="pin-msg">Entrez votre code PIN</div>
+      <div class="pin-dots" id="pin-dots">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="keypad" id="pin-keypad"></div>
+      <button class="link-btn" onclick="backToIdent()">Ce n'est pas moi — changer d'agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN (création, premier usage) -->
+<div class="screen" id="screen-create-pin">
+  <div class="wrap">
+    <header>
+      <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+      <div class="sub">Créer votre code d'accès</div>
+    </header>
+    <div class="pin-content">
+      <div class="pin-agent-name" id="create-pin-agent-name"></div>
+      <div class="pin-msg" id="create-pin-msg">Choisissez un code PIN à 4 chiffres</div>
+      <div class="pin-dots" id="create-pin-dots">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="keypad" id="create-pin-keypad"></div>
+      <button class="link-btn" onclick="backToIdent()">Ce n'est pas moi — changer d'agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- MENU -->
+<div class="screen" id="screen-menu">
+  <div class="wrap">
+    <header>
+      <div class="top">
+        <div>
+          <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+          <div class="sub" id="menu-greeting">Application terrain pour les agents</div>
+        </div>
+        <button class="change-agent" onclick="logout()">Changer d'agent</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="pilot-banner">
+        🧪 <b>Outil terrain.</b> Ces outils tournent <b>en parallèle</b> de vos applications habituelles (menu principal RDZ Agent).
+        Continuez à utiliser vos modules actuels normalement ; ici, ce sont les tout derniers modules, en cours de validation avant intégration au menu principal.
+      </div>
+
+      <!-- Vue principale -->
+      <div id="main-list">
+        <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
+        <div class="section-h">Vacation</div>
+
+        <a class="group-btn" href="#" onclick="showPosteMenu();return false;">
+          <span class="ic">☀️</span>
+          <span class="txt">
+            <span class="t">Prise de poste</span>
+            <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
+          </span>
+          <span class="chev">›</span>
+        </a>
+
+        <a class="group-btn" href="feuille-route-agent.html">
+          <span class="ic">🗺️</span>
+          <span class="txt">
+            <span class="t">Feuille de route</span>
+            <span class="d">Missions du jour, inscription des heures réelles et notes.</span>
+          </span>
+          <span class="chev">›</span>
+        </a>
+
+        <a class="group-btn" href="fin-de-service.html">
+          <span class="ic">🌙</span>
+          <span class="txt">
+            <span class="t">Fin de poste</span>
+            <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
+          </span>
+          <span class="chev">›</span>
+        </a>
+
+        <!-- Outil terrain : liste pilotée par OUTIL_TERRAIN_ITEMS ci-dessous.
+             Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
+             pas besoin de dupliquer le HTML. -->
+        <div class="section-h spaced">Outil terrain</div>
+        <div id="outil-terrain-list"></div>
+
+        <!-- Dépannage -->
+        <div class="section-h spaced">Dépannage</div>
+
+        <a class="group-btn fix" href="../admin/reset-sync.html">
+          <span class="ic">🛠️</span>
+          <span class="txt">
+            <span class="t-row"><span class="t">Dépannage</span><span class="warn-badge">⚠️ Usage exceptionnel</span></span>
+            <span class="d">Réinitialiser la file d'envoi RDZSync.</span>
+          </span>
+          <span class="chev">›</span>
+        </a>
+
+        <div class="foot">RDZ · Outil terrain · v3</div>
+      </div>
+
+      <!-- Sous-menu "Prise de poste" : mêmes 3 destinations que dans mobile.html
+           (Consignes/événements/constats, Matériel & clés, Prise de véhicule),
+           pilotées par POSTE_ITEMS ci-dessous. -->
+      <div id="poste-list" class="hidden">
+        <button class="back-btn" onclick="backToMain();return false;">‹ Retour</button>
+        <div class="section-h">Prise de poste</div>
+        <div id="poste-items-list"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   Identification agent (nom + PIN) — même logique que application/mobile.html.
+   Objectif : demander l'identité de l'agent AVANT d'entrer dans le menu (et
+   non plus après, une fois dans un module, où le champ agent se retrouvait
+   vide). Le nom identifié est mis en cache dans localStorage sous les mêmes
+   clés que mobile.html (rdz_agent_id / rdz_agent_nom / rdz_agent_pin_hash) :
+   c'est le même stockage navigateur que celui déjà lu par tous les modules
+   agent (prise-de-poste.html, materiel-agent.html, etc. via rdz_agent_nom).
+   "Changer d'agent" (déconnexion) vide ce cache pour forcer une nouvelle
+   identification au prochain agent qui utilise le téléphone.
+   ============================================================================ */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function fullName(a) {
+  return [a.nom, a.prenom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
+}
+
+async function hashPin(pin) {
+  const enc = new TextEncoder().encode('RDZ-PIN-2026-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const LS_ID = 'rdz_agent_id';
+const LS_NOM = 'rdz_agent_nom';
+const LS_HASH = 'rdz_agent_pin_hash';
+
+function getLocalSession() {
+  return { id: localStorage.getItem(LS_ID), nom: localStorage.getItem(LS_NOM), hash: localStorage.getItem(LS_HASH) };
+}
+function setLocalSession(id, nom, hash) {
+  localStorage.setItem(LS_ID, id); localStorage.setItem(LS_NOM, nom); localStorage.setItem(LS_HASH, hash || '');
+}
+function clearLocalSession() {
+  localStorage.removeItem(LS_ID); localStorage.removeItem(LS_NOM); localStorage.removeItem(LS_HASH);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+}
+
+async function showIdentScreen(notice) {
+  document.getElementById('ident-notice').innerHTML = notice ? `<div class="notice-banner">${notice}</div>` : '';
+  const list = document.getElementById('agent-pick-list');
+  list.innerHTML = '<div style="text-align:center;color:#9a9a9a;font-size:13px;padding:20px 0">Chargement des agents…</div>';
+  showScreen('screen-ident');
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('actif', true).order('nom');
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:#9a9a9a;font-size:13px;padding:20px 0">Aucun agent actif. Contactez votre responsable.</div>';
+      return;
+    }
+    list.innerHTML = data.map(a => `<button class="agent-pick-btn" onclick="selectAgent('${a.id}')">${fullName(a)} <span>›</span></button>`).join('');
+  } catch (err) {
+    list.innerHTML = `<div style="text-align:center;color:#dc2626;font-size:13px;padding:20px 0">Erreur de connexion.<br>${err.message}</div>`;
+  }
+}
+
+function backToIdent() { clearLocalSession(); showIdentScreen(); }
+
+async function selectAgent(id) {
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('id', id).single();
+    if (error) throw error;
+    if (data.pin_hash) openPinScreen(data, null); else openCreatePinScreen(data);
+  } catch (err) { alert('Erreur : ' + err.message); }
+}
+
+let pinBuffer = '';
+let pinCurrentAgent = null;
+
+function buildKeypad(containerId, onDigit) {
+  const el = document.getElementById(containerId);
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  el.innerHTML = keys.map(k => {
+    if (k === '') return '<div></div>';
+    if (k === '⌫') return `<div class="key fn" onclick="${onDigit}(null)">Effacer</div>`;
+    return `<div class="key" onclick="${onDigit}('${k}')">${k}</div>`;
+  }).join('');
+}
+
+function updateDots(prefix, len) {
+  document.querySelectorAll('#' + prefix + '-dots .pin-dot').forEach((d, i) => d.classList.toggle('filled', i < len));
+}
+
+function openPinScreen(agent, message) {
+  pinCurrentAgent = agent; pinBuffer = '';
+  document.getElementById('pin-agent-name').textContent = fullName(agent);
+  document.getElementById('pin-msg').className = 'pin-msg' + (message ? ' warn' : '');
+  document.getElementById('pin-msg').textContent = message || 'Entrez votre code PIN';
+  updateDots('pin', 0);
+  buildKeypad('pin-keypad', 'onPinDigit');
+  showScreen('screen-pin');
+}
+
+async function onPinDigit(d) {
+  if (d === null) { pinBuffer = pinBuffer.slice(0, -1); updateDots('pin', pinBuffer.length); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d; updateDots('pin', pinBuffer.length);
+  if (pinBuffer.length === 4) {
+    const hash = await hashPin(pinBuffer);
+    if (hash === pinCurrentAgent.pin_hash) {
+      setLocalSession(pinCurrentAgent.id, fullName(pinCurrentAgent), hash);
+      enterMenu(fullName(pinCurrentAgent));
+    } else {
+      const dotsEl = document.getElementById('pin-dots');
+      dotsEl.classList.add('shake');
+      document.getElementById('pin-msg').className = 'pin-msg err';
+      document.getElementById('pin-msg').textContent = 'Code incorrect, réessayez';
+      setTimeout(() => { dotsEl.classList.remove('shake'); pinBuffer = ''; updateDots('pin', 0); }, 400);
+    }
+  }
+}
+
+let createPinStep = 1, createPinFirst = '', createPinAgent = null;
+
+function openCreatePinScreen(agent) {
+  createPinAgent = agent; createPinStep = 1; createPinFirst = ''; pinBuffer = '';
+  document.getElementById('create-pin-agent-name').textContent = fullName(agent);
+  document.getElementById('create-pin-msg').textContent = 'Choisissez un code PIN à 4 chiffres';
+  document.getElementById('create-pin-msg').className = 'pin-msg';
+  updateDots('create-pin', 0);
+  buildKeypad('create-pin-keypad', 'onCreatePinDigit');
+  showScreen('screen-create-pin');
+}
+
+async function onCreatePinDigit(d) {
+  if (d === null) { pinBuffer = pinBuffer.slice(0, -1); updateDots('create-pin', pinBuffer.length); return; }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d; updateDots('create-pin', pinBuffer.length);
+  if (pinBuffer.length === 4) {
+    if (createPinStep === 1) {
+      createPinFirst = pinBuffer; createPinStep = 2; pinBuffer = '';
+      document.getElementById('create-pin-msg').textContent = 'Confirmez votre code PIN';
+      updateDots('create-pin', 0);
+    } else {
+      if (pinBuffer === createPinFirst) {
+        const hash = await hashPin(pinBuffer);
+        const { error } = await sb.from('agents').update({ pin_hash: hash, updated_at: new Date().toISOString() }).eq('id', createPinAgent.id);
+        if (error) { alert('Erreur : ' + error.message); return; }
+        setLocalSession(createPinAgent.id, fullName(createPinAgent), hash);
+        enterMenu(fullName(createPinAgent));
+      } else {
+        const dotsEl = document.getElementById('create-pin-dots');
+        dotsEl.classList.add('shake');
+        document.getElementById('create-pin-msg').className = 'pin-msg err';
+        document.getElementById('create-pin-msg').textContent = 'Les codes ne correspondent pas, recommencez';
+        setTimeout(() => {
+          dotsEl.classList.remove('shake'); createPinStep = 1; createPinFirst = ''; pinBuffer = '';
+          document.getElementById('create-pin-msg').className = 'pin-msg';
+          document.getElementById('create-pin-msg').textContent = 'Choisissez un code PIN à 4 chiffres';
+          updateDots('create-pin', 0);
+        }, 900);
+      }
+    }
+  }
+}
+
+function logout() { clearLocalSession(); showIdentScreen(); }
+
+function enterMenu(nom) {
+  document.getElementById('menu-greeting').textContent = 'Bonjour, ' + nom;
+  showScreen('screen-menu');
+}
+
+async function init() {
+  const session = getLocalSession();
+  if (!session.id) return showIdentScreen();
+  try {
+    const { data, error } = await sb.from('agents').select('*').eq('id', session.id).single();
+    if (error || !data) { clearLocalSession(); return showIdentScreen(); }
+    if (data.actif === false) { clearLocalSession(); return showIdentScreen("Votre accès a été désactivé. Contactez votre responsable."); }
+    if (!data.pin_hash) return openCreatePinScreen(data);
+    if (data.pin_hash === session.hash) return enterMenu(fullName(data));
+    return openPinScreen(data, "Votre code d'accès a été modifié. Merci de le ressaisir.");
+  } catch (err) { showIdentScreen('Connexion impossible pour le moment. Réessayez.'); }
+}
+
+init();
+</script>
 
 <script>
 // Section "Outil terrain" : mêmes fichiers physiques que ceux visés à terme depuis le
