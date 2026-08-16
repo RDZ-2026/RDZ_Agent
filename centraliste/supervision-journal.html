@@ -49,6 +49,30 @@ main{flex:1;padding:18px}
 .navbtn{padding:8px 11px;font-size:13px;line-height:1}
 #ffield-serviceday{min-width:230px}
 
+/* Rapport direction */
+.dir-mode-tabs{display:flex;gap:6px}
+.dmtab{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:var(--radius-ui);padding:8px 12px;font-size:12.5px;font-weight:bold;font-family:var(--font);cursor:pointer;white-space:nowrap}
+.dmtab.active{background:#1a1a1a;border-color:#1a1a1a;color:#fff}
+.dir-presets{display:flex;gap:6px}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.stat-tile{flex:1;min-width:140px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px 16px}
+.stat-tile .n{font-size:26px;font-weight:bold;color:var(--ink);line-height:1.1}
+.stat-tile .l{font-size:11.5px;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
+.dir-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px 18px;margin-bottom:16px}
+.dir-card h4{font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:#666;margin-bottom:12px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+.bar-row .lbl{min-width:220px;max-width:220px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;background:var(--bg-meta);border-radius:4px;height:16px;overflow:hidden}
+.bar-fill{height:16px;border-radius:4px 0 0 4px;min-width:2px}
+.bar-row .cnt{min-width:34px;text-align:right;font-weight:bold;color:var(--ink)}
+.attn-item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line-soft);border-left:4px solid var(--line);border-radius:6px;margin-bottom:8px;cursor:pointer;background:#fff}
+.attn-item:hover{border-color:var(--line)}
+.attn-item .when{min-width:80px;flex-shrink:0;font-size:12px;color:#888}
+.attn-item .mid{flex:1;min-width:0}
+.attn-item .mid .t{font-weight:bold;font-size:13.5px}
+.attn-item .mid .s{font-size:12.5px;color:#666;margin-top:2px}
+.attn-badge{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap;color:#fff;flex-shrink:0}
+
 .timeline{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-section,8px);padding:16px 18px 12px;margin-bottom:14px}
 .timeline .tl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;font-size:12px;color:#777}
 .timeline .tl-head b{color:var(--ink);font-size:13px}
@@ -144,9 +168,10 @@ main{flex:1;padding:18px}
     <div class="view-tabs">
       <button class="vtab active" id="vtab-service" onclick="switchView('service')">📅 Journée de service</button>
       <button class="vtab" id="vtab-full" onclick="switchView('full')">📋 Vue complète</button>
+      <button class="vtab" id="vtab-direction" onclick="switchView('direction')">📊 Rapport direction</button>
     </div>
 
-    <div class="filters">
+    <div class="filters" id="list-filters">
       <div class="filterbar">
         <div class="ffield" id="ffield-serviceday">
           <label>Journée de service</label>
@@ -188,9 +213,60 @@ main{flex:1;padding:18px}
       <div class="hint">Rappel : une journée de service RDZ va de 06h30 à 06h29 le lendemain.<br><small style="color:#b8860b">⚠ Nécessite la migration SQL <code>migration-updated-at-supervision.sql</code> (colonne <code>updated_at</code> + trigger) sur les tables consignes / evenements / constats — sans elle, ces 3 sources restent silencieusement invisibles ici (erreur consignée en console).</small></div>
     </div>
 
-    <div class="summary"><span id="summary-txt"></span></div>
+    <div class="summary" id="summary-bar"><span id="summary-txt"></span></div>
     <div id="timeline-wrap"></div>
     <div id="list"><div class="state-msg">Chargement…</div></div>
+
+    <!-- Rapport direction : synthèse lisible pour la direction (KPIs + points d'attention),
+         période "journée" ou "personnalisée" au choix, imprimable en style RDZ Reports.
+         Complètement indépendant des filtres Catégorie/Agent/Site des deux autres onglets
+         (sa propre sélection de site, voir #dir-site) — seul allEntries est partagé. -->
+    <div id="direction-panel" class="hidden">
+      <div class="filters">
+        <div class="filterbar">
+          <div class="ffield">
+            <label>Période</label>
+            <div class="dir-mode-tabs">
+              <button class="dmtab active" id="dmtab-day" onclick="switchDirMode('day')">Journée de service</button>
+              <button class="dmtab" id="dmtab-range" onclick="switchDirMode('range')">Période personnalisée</button>
+            </div>
+          </div>
+          <div class="ffield" id="dir-ffield-day">
+            <label>Journée de service</label>
+            <div class="daynav">
+              <button class="btn btn-sec navbtn" onclick="shiftDirDay(-1)" title="Journée précédente">◀</button>
+              <input type="date" id="dir-serviceday" onchange="renderDirectionReport()">
+              <button class="btn btn-sec navbtn" onclick="shiftDirDay(1)" title="Journée suivante">▶</button>
+            </div>
+          </div>
+          <div class="ffield" id="dir-ffield-range" style="display:none">
+            <label>Plage</label>
+            <div class="dir-presets">
+              <button class="btn btn-sec btn-sm" onclick="applyDirPreset('today')">Aujourd'hui</button>
+              <button class="btn btn-sec btn-sm" onclick="applyDirPreset('week')">Cette semaine</button>
+              <button class="btn btn-sec btn-sm" onclick="applyDirPreset('month')">Ce mois</button>
+            </div>
+          </div>
+          <div class="ffield" id="dir-ffield-from" style="display:none">
+            <label>Du</label>
+            <input type="date" id="dir-from" onchange="renderDirectionReport()">
+          </div>
+          <div class="ffield" id="dir-ffield-to" style="display:none">
+            <label>Au</label>
+            <input type="date" id="dir-to" onchange="renderDirectionReport()">
+          </div>
+          <div class="ffield grow">
+            <label>Site</label>
+            <select id="dir-site" onchange="renderDirectionReport()">
+              <option value="">Tous les sites</option>
+            </select>
+          </div>
+          <button class="btn btn-sec" onclick="printDirectionReport()">🖨 Version imprimable</button>
+        </div>
+        <div class="hint">Chiffres clés + points d'attention (rapports standard et interventions alarme non clôturés) sur la période choisie, tous sites confondus par défaut.</div>
+      </div>
+      <div id="direction-content"><div class="state-msg">Chargement…</div></div>
+    </div>
   </main>
 </div>
 
@@ -1170,6 +1246,10 @@ async function refresh(){
     allEntries.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
     populateFilterOptions();
     render();
+    // Le tableau de bord "Rapport direction" ne se recharge pas tout seul : s'il est
+    // affiché au moment d'un refresh() (ex. après suppression d'un point d'attention),
+    // on le redessine aussi avec les données fraîches.
+    if(!document.getElementById('direction-panel').classList.contains('hidden')) renderDirectionReport();
   }catch(e){ list.innerHTML = '<div class="state-msg">Erreur de chargement (réseau ?).</div>'; console.error(e); }
 }
 
@@ -1274,9 +1354,27 @@ function serviceDayBounds(dayStr){
 }
 
 function switchView(mode){
-  viewMode = mode;
+  const isDirection = mode==='direction';
   document.getElementById('vtab-service').classList.toggle('active', mode==='service');
   document.getElementById('vtab-full').classList.toggle('active', mode==='full');
+  document.getElementById('vtab-direction').classList.toggle('active', isDirection);
+
+  // Bascule entre le bloc "liste" (filtres/frise/liste, onglets service/full) et le
+  // bloc "Rapport direction" (tableau de bord) — les deux blocs ne partagent que
+  // allEntries, pas leurs filtres respectifs.
+  document.getElementById('list-filters').style.display = isDirection ? 'none' : '';
+  document.getElementById('summary-bar').style.display = isDirection ? 'none' : '';
+  document.getElementById('timeline-wrap').style.display = isDirection ? 'none' : '';
+  document.getElementById('list').style.display = isDirection ? 'none' : '';
+  document.getElementById('direction-panel').classList.toggle('hidden', !isDirection);
+  if(isDirection){
+    if(!document.getElementById('dir-serviceday').value) document.getElementById('dir-serviceday').value = serviceDate();
+    populateDirSiteOptions();
+    renderDirectionReport();
+    return;
+  }
+
+  viewMode = mode;
   document.getElementById('ffield-serviceday').style.display = mode==='service' ? '' : 'none';
   document.getElementById('ffield-from').style.display = mode==='full' ? '' : 'none';
   document.getElementById('ffield-to').style.display = mode==='full' ? '' : 'none';
@@ -1542,6 +1640,310 @@ async function deleteEntry(idx){
 }
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') closeModal(); });
+
+/* ============================================================
+   RAPPORT DIRECTION — tableau de bord de synthèse (demande explicite de
+   l'utilisateur du 2026-08-16) : "un onglet où on peut avoir un rapport
+   automatique plus lisible pour la direction". Complètement indépendant
+   des filtres Catégorie/Agent/Site des onglets Journée de service / Vue
+   complète (sa propre période — journée de service OU plage libre avec
+   raccourcis Aujourd'hui/Semaine/Mois — et son propre filtre Site) : ne
+   lit que allEntries, déjà chargé par refresh(). Contenu, en un seul
+   écran comme demandé :
+   — chiffres clés (stat tiles) ;
+   — points d'attention : rapports standard + interventions alarme dont
+     statut_cloture est encore 'action'/'probleme' ou non renseigné —
+     ce sur quoi la direction doit effectivement se pencher, pas une
+     liste brute de tout ce qui s'est passé ;
+   — répartitions (barres horizontales simples en CSS, pas de librairie
+     de graphiques externe — cohérent avec le reste du projet, un seul
+     fichier autonome) : statut de clôture, nature d'activité, catégorie
+     (toutes sources), site.
+   Couleurs : statut de clôture reprend CLOTURE_OPTIONS (déjà utilisées
+   partout ailleurs dans ce fichier) ; catégorie reprend KINDS[...].color
+   (déjà fixées) ; nature d'activité utilise une palette fixe dédiée
+   (NATURE_COLORS ci-dessous, une couleur par catégorie de la taxonomie
+   RDZ) — jamais de couleur générée à la volée, toujours un ordre fixe,
+   et chaque barre reste étiquetée en texte (jamais la couleur seule).
+   Imprimable (printDirectionReport) dans le même habillage "RDZ Reports"
+   que les autres rapports (rpSynthesisShell, plus simple que rpRdzShell :
+   pas de bandeau par entité, juste période + site en sous-titre). */
+let dirMode = 'day'; // 'day' | 'range'
+const NATURE_COLORS = {
+  'Accès': '#0e7490', 'Admin / conciergerie': '#7c3aed', 'Incivilité': '#c2410c',
+  'Secourisme': '#1b7a3d', 'Sécurité': '#8B1A1A', 'Technique': '#4b5563',
+  'Alarmes': '#dc2626', 'Non classé': '#999999'
+};
+
+function switchDirMode(mode){
+  dirMode = mode;
+  document.getElementById('dmtab-day').classList.toggle('active', mode==='day');
+  document.getElementById('dmtab-range').classList.toggle('active', mode==='range');
+  document.getElementById('dir-ffield-day').style.display = mode==='day' ? '' : 'none';
+  document.getElementById('dir-ffield-range').style.display = mode==='range' ? '' : 'none';
+  document.getElementById('dir-ffield-from').style.display = mode==='range' ? '' : 'none';
+  document.getElementById('dir-ffield-to').style.display = mode==='range' ? '' : 'none';
+  renderDirectionReport();
+}
+function shiftDirDay(delta){
+  const el = document.getElementById('dir-serviceday');
+  const cur = el.value ? new Date(el.value+'T00:00:00') : new Date();
+  cur.setDate(cur.getDate()+delta);
+  el.value = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+  renderDirectionReport();
+}
+// Raccourcis pour le mode "Période personnalisée" : remplissent Du/Au, l'utilisateur
+// peut ensuite ajuster les dates à la main si besoin.
+function applyDirPreset(preset){
+  const now = new Date();
+  let from = now, to = now;
+  if(preset==='week'){
+    const dow = (now.getDay()+6)%7; // lundi = 0
+    from = new Date(now); from.setDate(now.getDate()-dow);
+  }else if(preset==='month'){
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const fmt = d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('dir-from').value = fmt(from);
+  document.getElementById('dir-to').value = fmt(to);
+  renderDirectionReport();
+}
+function populateDirSiteOptions(){
+  const sel = document.getElementById('dir-site');
+  const cur = sel.value;
+  const sitesPresent = [...new Set(allEntries.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  sel.innerHTML = '<option value="">Tous les sites</option>' + sitesPresent.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  sel.value = sitesPresent.includes(cur) ? cur : '';
+}
+function getDirectionEntries(){
+  const site = document.getElementById('dir-site').value;
+  const bySite = e=>{ if(!site) return true; let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} return s===site; };
+  if(dirMode==='day'){
+    const day = document.getElementById('dir-serviceday').value || serviceDate();
+    const { start, end } = serviceDayBounds(day);
+    return allEntries.filter(e=>{ if(!bySite(e)) return false; const d=new Date(e.ts); return !isNaN(d) && d>=start && d<end; });
+  }
+  const from = document.getElementById('dir-from').value;
+  const to = document.getElementById('dir-to').value;
+  return allEntries.filter(e=>{
+    if(!bySite(e)) return false;
+    if(from || to){
+      const d = new Date(e.ts); if(isNaN(d)) return false;
+      const dayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      if(from && dayStr < from) return false;
+      if(to && dayStr > to) return false;
+    }
+    return true;
+  });
+}
+function dirPeriodLabel(){
+  if(dirMode==='day'){
+    const day = document.getElementById('dir-serviceday').value || serviceDate();
+    const { end } = serviceDayBounds(day);
+    const endJ = new Date(end.getTime()-60000);
+    return `Journée de service du ${fmtDate(day+'T00:00:00')} 06h30 au ${fmtDate(endJ)} ${fmtTime(endJ)}`;
+  }
+  const from = document.getElementById('dir-from').value, to = document.getElementById('dir-to').value;
+  if(!from && !to) return 'Toute la période disponible';
+  if(from && to) return from===to ? `Le ${fmtDate(from+'T00:00:00')}` : `Du ${fmtDate(from+'T00:00:00')} au ${fmtDate(to+'T00:00:00')}`;
+  return from ? `Depuis le ${fmtDate(from+'T00:00:00')}` : `Jusqu'au ${fmtDate(to+'T00:00:00')}`;
+}
+
+function computeDirectionStats(entries){
+  const byKind = {};
+  entries.forEach(e=>{ byKind[e.kind] = (byKind[e.kind]||0)+1; });
+
+  const bySite = {};
+  entries.forEach(e=>{ let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} s = s||'Site non précisé'; bySite[s] = (bySite[s]||0)+1; });
+
+  // "Points d'attention" : uniquement les deux sources qui portent une classification
+  // (rapport standard + intervention alarme) — les autres kinds (consignes, ouvertures,
+  // parkings…) n'ont pas de statut_cloture et ne relèvent pas de ce suivi.
+  const activity = entries.filter(e=>e.kind==='rapport_standard' || e.kind==='alarme');
+  const byNature = {};
+  activity.forEach(e=>{ const n = e.raw.nature_activite || 'Non classé'; byNature[n] = (byNature[n]||0)+1; });
+
+  const byCloture = {regle:0, action:0, info:0, probleme:0, non_classe:0};
+  activity.forEach(e=>{ const k = e.raw.statut_cloture; byCloture[k && byCloture.hasOwnProperty(k) ? k : 'non_classe']++; });
+
+  // Temps de réponse alarme : écart entre l'heure de l'alarme (created_at) et l'heure
+  // d'arrivée sur site (heure_arrivee, "HH:MM"). Écarte les valeurs négatives (passage
+  // de minuit non géré ici) et les écarts > 8h (quasi certainement une erreur de saisie
+  // d'heure plutôt qu'une intervention réelle de cette durée).
+  const alarmesAvecArrivee = entries.filter(e=>e.kind==='alarme' && e.raw.heure_arrivee);
+  let totalMin = 0, nMin = 0;
+  alarmesAvecArrivee.forEach(e=>{
+    const alarmeD = new Date(e.ts); if(isNaN(alarmeD)) return;
+    const parts = String(e.raw.heure_arrivee).split(':').map(Number);
+    const hh = parts[0], mm = parts[1];
+    if(isNaN(hh) || isNaN(mm)) return;
+    const arriveeD = new Date(alarmeD); arriveeD.setHours(hh,mm,0,0);
+    const diffMin = (arriveeD.getTime() - alarmeD.getTime())/60000;
+    if(diffMin >= 0 && diffMin < 8*60){ totalMin += diffMin; nMin++; }
+  });
+  const avgResponseMin = nMin ? Math.round(totalMin/nMin) : null;
+
+  const attentionItems = activity
+    .filter(e=>{ const k = e.raw.statut_cloture; return !k || k==='action' || k==='probleme'; })
+    .sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+
+  return { total:entries.length, activityTotal:activity.length, byKind, bySite, byNature, byCloture, avgResponseMin, attentionItems };
+}
+
+function statTile(n,l){ return `<div class="stat-tile"><div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div></div>`; }
+function topEntries(obj, n){
+  const arr = Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+  if(arr.length<=n) return obj;
+  const out = {}; arr.slice(0,n).forEach(([k,v])=>out[k]=v);
+  out['Autres sites'] = arr.slice(n).reduce((s,[,v])=>s+v,0);
+  return out;
+}
+function clotureLabelsMap(byCloture){
+  const out = {}; CLOTURE_OPTIONS.forEach(o=>{ out[o.label] = byCloture[o.k]||0; }); out['Non classé'] = byCloture.non_classe||0; return out;
+}
+function clotureColorMapFromOptions(){
+  const out = {}; CLOTURE_OPTIONS.forEach(o=>{ out[o.label]=o.color; }); out['Non classé']='#999999'; return out;
+}
+function kindLabelsMap(byKind){
+  const out = {}; Object.entries(byKind).forEach(([k,n])=>{ out[`${KINDS[k]?.icon||''} ${KINDS[k]?.label||k}`] = n; }); return out;
+}
+function kindColorMapFromKinds(byKind){
+  const out = {}; Object.keys(byKind).forEach(k=>{ out[`${KINDS[k]?.icon||''} ${KINDS[k]?.label||k}`] = KINDS[k]?.color||'#8B1A1A'; }); return out;
+}
+// Barres horizontales simples (CSS pur, pas de librairie externe) : une ligne par
+// catégorie, largeur proportionnelle au maximum de la série (pas au total — sinon la
+// plus grande barre ne remplirait jamais la piste), toujours étiquetée en texte à
+// gauche ET en nombre à droite (jamais la couleur seule comme identifiant).
+function barChartHtml(countsObj, total, colorMap){
+  const entries = Object.entries(countsObj).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return '<div class="state-msg" style="padding:10px 0">Aucune donnée sur cette période.</div>';
+  const max = Math.max(...entries.map(([,n])=>n));
+  return entries.map(([label,n])=>{
+    const pct = max ? Math.round((n/max)*100) : 0;
+    const color = (colorMap && colorMap[label]) || '#8B1A1A';
+    return `<div class="bar-row"><div class="lbl" title="${esc(label)}">${esc(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="cnt">${n}</div></div>`;
+  }).join('');
+}
+
+function attentionItemHtml(e, i){
+  const def = KINDS[e.kind];
+  const badgeInfo = CLOTURE_OPTIONS.find(o=>o.k===e.raw.statut_cloture);
+  const badgeLabel = badgeInfo ? badgeInfo.label : 'Non classé';
+  const badgeColor = badgeInfo ? badgeInfo.color : '#888';
+  let title='', snip=''; try{ title = e.src.title(e.raw); snip = e.src.snippet(e.raw); }catch(_){ title = def.label; }
+  let site=''; try{ site = e.src.site(e.raw)||''; }catch(_){}
+  return `<div class="attn-item" style="border-left-color:${def.color}" onclick="openDirectionDetail(${i})">
+    <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
+    <div class="mid"><div class="t">${def.icon} ${esc(title)}</div><div class="s">${esc(snip)||'<i>Sans description</i>'}${site?' · 📍 '+esc(site):''}</div></div>
+    <span class="attn-badge" style="background:${badgeColor}">${badgeLabel}</span>
+  </div>`;
+}
+// Rouvre le détail d'un point d'attention en réutilisant openDetail/renderDetailView/
+// deleteEntry/openReport tels quels : ils indexent tous window.__renderedItems, donc
+// on l'aligne temporairement sur la liste des points d'attention plutôt que de
+// dupliquer toute la logique de la modale pour ce sous-ensemble.
+function openDirectionDetail(i){
+  window.__renderedItems = window.__dirAttentionItems;
+  openDetail(i);
+}
+
+function renderDirectionReport(){
+  const box = document.getElementById('direction-content');
+  const entries = getDirectionEntries();
+  const stats = computeDirectionStats(entries);
+  window.__dirAttentionItems = stats.attentionItems;
+  window.__dirStats = stats;
+  window.__dirPeriodLabel = dirPeriodLabel();
+
+  if(!entries.length){
+    box.innerHTML = `<div class="state-msg">Aucune donnée sur cette période${document.getElementById('dir-site').value?' pour ce site':''}.</div>`;
+    return;
+  }
+
+  const statTiles = `<div class="stat-row">
+    ${statTile(stats.total, 'Actions au journal')}
+    ${statTile(stats.activityTotal, 'Rapports standard + alarme')}
+    ${statTile(stats.attentionItems.length, "Points d'attention")}
+    ${statTile(stats.avgResponseMin!=null ? stats.avgResponseMin+' min' : '—', 'Temps de réponse alarme moyen')}
+  </div>`;
+
+  const attentionHtml = stats.attentionItems.length
+    ? stats.attentionItems.slice(0,30).map((e,i)=>attentionItemHtml(e,i)).join('')
+      + (stats.attentionItems.length>30 ? `<div class="hint" style="margin-top:6px">… et ${stats.attentionItems.length-30} de plus — affine la période ou le site pour les voir toutes.</div>` : '')
+    : `<div class="state-msg">✅ Tous les rapports standard et interventions alarme de la période sont clôturés.</div>`;
+
+  box.innerHTML = `
+    ${statTiles}
+    <div class="dir-card"><h4>⚠️ Points d'attention (non clôturés)</h4>${attentionHtml}</div>
+    <div class="dir-card"><h4>Statut de clôture — rapports standard + alarme</h4>${barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions())}</div>
+    <div class="dir-card"><h4>Nature d'activité — rapports standard + alarme</h4>${barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS)}</div>
+    <div class="dir-card"><h4>Répartition par catégorie (toutes sources)</h4>${barChartHtml(kindLabelsMap(stats.byKind), stats.total, kindColorMapFromKinds(stats.byKind))}</div>
+    <div class="dir-card"><h4>Répartition par site</h4>${barChartHtml(topEntries(stats.bySite,8), stats.total, null)}</div>
+  `;
+}
+
+/* ---------- Version imprimable du rapport direction ---------- */
+function rpSynthesisShell(labelTxt, subtitleTxt, bodyHtml){
+  return `<div style="max-width:900px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
+    <div style="background:#1a1a1a;padding:1.5rem 2rem">
+      <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
+        <div style="flex:1">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">${labelTxt}</div>
+          <div style="font-size:20px;font-weight:700;color:#fff">${esc(subtitleTxt||'—')}</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
+      </div>
+    </div>
+    <div style="padding:1.5rem 2rem">${bodyHtml}</div>
+    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
+        <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel</div>
+      </div>
+      <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève<br>Généré le ${fmtDate(new Date().toISOString())} ${fmtTime(new Date().toISOString())}</div>
+    </div>
+  </div>`;
+}
+function buildDirectionPrintable(){
+  const stats = window.__dirStats;
+  const site = document.getElementById('dir-site').value || 'Tous les sites';
+  const period = window.__dirPeriodLabel || dirPeriodLabel();
+  if(!stats) return rpSynthesisShell('Rapport direction', `${site} — ${period}`, '<div class="state-msg">Aucune donnée.</div>');
+
+  const statsHtml = rpSec('Chiffres clés', `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      ${rpFieldO('Actions au journal', stats.total)}
+      ${rpFieldO('Rapports standard + alarme', stats.activityTotal)}
+      ${rpFieldO("Points d'attention", stats.attentionItems.length)}
+      ${rpFieldO('Temps de réponse alarme moyen', stats.avgResponseMin!=null?stats.avgResponseMin+' min':'—')}
+    </div>`);
+  const clotureHtml = rpSec('Statut de clôture — rapports standard + alarme', barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions()));
+  const natureHtml = rpSec("Nature d'activité — rapports standard + alarme", barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS));
+  const kindHtml = rpSec('Répartition par catégorie (toutes sources)', barChartHtml(kindLabelsMap(stats.byKind), stats.total, kindColorMapFromKinds(stats.byKind)));
+  const siteHtml = rpSec('Répartition par site', barChartHtml(topEntries(stats.bySite,8), stats.total, null));
+
+  const attentionListHtml = stats.attentionItems.length
+    ? stats.attentionItems.map(e=>{
+        const badgeInfo = CLOTURE_OPTIONS.find(o=>o.k===e.raw.statut_cloture);
+        const badgeLabel = badgeInfo ? badgeInfo.label : 'Non classé';
+        let title='', snip=''; try{ title=e.src.title(e.raw); snip=e.src.snippet(e.raw); }catch(_){}
+        return `<div style="padding:8px 0;border-bottom:1px solid #eee"><b>${fmtDateShort(e.ts)} ${fmtTime(e.ts)}</b> — ${esc(title)} <span style="color:#888">(${badgeLabel})</span><br><span style="font-size:12.5px;color:#555">${esc(snip)}</span></div>`;
+      }).join('')
+    : `<div style="color:#1e6b1e;font-weight:bold">✅ Tous les rapports standard et interventions alarme de la période sont clôturés.</div>`;
+  const attentionHtml = rpSec("Points d'attention (non clôturés)", attentionListHtml);
+
+  const body = statsHtml + attentionHtml + clotureHtml + natureHtml + kindHtml + siteHtml;
+  return rpSynthesisShell('Rapport direction', `${site} — ${period}`, body);
+}
+function printDirectionReport(){
+  renderDirectionReport(); // s'assurer que window.__dirStats reflète les filtres actuels
+  document.getElementById('report-content').innerHTML = buildDirectionPrintable();
+  closeModal();
+  const rv = document.getElementById('report-view');
+  rv.classList.add('open');
+  rv.scrollTop = 0;
+}
 
 /* ---------- init ---------- */
 initFilters();
