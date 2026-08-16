@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v6 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v7 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -92,6 +92,13 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 .cloture-opt{display:flex;align-items:center;gap:6px;padding:.5rem .8rem;border:1.5px solid var(--line);border-radius:6px;font-size:12px;color:#666;cursor:pointer;background:#fff;user-select:none}
 .cloture-opt input{width:auto;margin:0}
 .cloture-opt:has(input:checked){border-color:#8B1A1A;background:#fdf0f0;color:#8B1A1A;font-weight:bold}
+.rev-card{border:1.5px solid var(--line);border-radius:var(--radius-section);padding:14px 16px;margin-bottom:16px;background:#fff}
+.rev-card-h{font-size:13px;font-weight:bold;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:8px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.rev-card-h .meta{font-weight:normal;color:#888;font-size:12px}
+.rev-original{margin-top:4px}
+.rev-original summary{font-size:11.5px;color:#888;cursor:pointer}
+.rev-original .txt{font-size:12.5px;color:#555;background:var(--bg-soft);border-radius:var(--radius-ui);padding:6px 8px;margin-top:4px;white-space:pre-wrap}
+.rev-apply{background:var(--bg-soft);border-radius:var(--radius-ui);padding:8px 10px;margin-top:10px}
 .photo{border:1px solid var(--line-soft);border-radius:var(--radius-ui);overflow:hidden}
 .photo img{width:100%;height:110px;object-fit:cover;display:block}
 .photo .lg{font-size:11.5px;color:#666;padding:6px 8px}
@@ -235,30 +242,11 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
       </div>
 
       <div id="ia-review" style="display:none">
-        <div class="step-box active"><strong>Étape 4</strong> — Vérifie (et corrige si besoin) le titre, la nature d'activité et le statut proposés par l'IA avant de générer le rapport final.</div>
+        <div class="step-box active"><strong>Étape 4</strong> — Chaque rapport est corrigé <u>séparément</u> (jamais mélangé avec les autres) : vérifie et corrige si besoin le texte, la nature d'activité et le statut de chacun avant de générer le rapport final.</div>
 
-        <div class="efield"><label>Titre du rapport</label><input type="text" id="rev-titre"></div>
-        <div class="efield">
-          <label>Nature d'activité</label>
-          <div id="rev-nature"></div>
-        </div>
-        <div class="efield">
-          <label>Type d'action</label>
-          <div id="rev-type"></div>
-        </div>
-        <div class="efield">
-          <label>Statut de clôture</label>
-          <div id="rev-cloture"></div>
-        </div>
-        <div class="efield">
-          <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
-            <input type="checkbox" id="rev-complet" onchange="toggleRevManquants()" style="width:auto"> Rapport complet (toutes les informations nécessaires sont présentes)
-          </label>
-        </div>
-        <div class="efield" id="rev-manquants-wrap">
-          <label>Éléments manquants</label>
-          <textarea id="rev-manquants" placeholder="Ce qu'il manque pour considérer ce rapport comme complet…"></textarea>
-        </div>
+        <div class="efield"><label>Titre du document</label><input type="text" id="rev-titre"></div>
+
+        <div id="rev-reports-list"></div>
 
         <div style="display:flex;gap:10px;margin-top:14px">
           <button class="btn" onclick="finalizeSyntheseReport()">✅ Générer le rapport final</button>
@@ -834,6 +822,8 @@ function openIAModal(){
   document.getElementById('zip-done').style.display = 'none';
   document.getElementById('ia-step3').style.display = 'block';
   document.getElementById('ia-review').style.display = 'none';
+  document.getElementById('rev-reports-list').innerHTML = '';
+  document.getElementById('rev-titre').value = '';
   const btn = document.getElementById('btn-zip');
   btn.disabled = false; btn.textContent = '📦 Télécharger le pack (photos + message)';
   const items = allReports.filter(r=>ids.includes(r.id));
@@ -911,49 +901,55 @@ function buildPromptLines(items){
   const lines = [
     'Tu es un assistant expert de RDZ Security Management SA (Genève, Suisse) — société de sécurité privée.',
     'On te fournit ' + items.length + ' rapport(s) de terrain bruts (rondes/interventions rédigés par des agents de sécurité), avec leurs photos éventuelles.',
-    'Ta tâche : rédiger UN SEUL rapport de synthèse professionnel en français, qui fusionne intelligemment ces ' + items.length + ' rapport(s) en un récit clair et cohérent, sans perdre d\'information factuelle.',
+    '',
+    'Ta tâche : reformuler CHAQUE rapport INDIVIDUELLEMENT, en gardant un résultat par rapport source. NE FUSIONNE JAMAIS les faits de deux rapports différents entre eux : chaque rapport garde son propre texte corrigé, sa propre classification, ses propres photos. Un rapport = un élément du tableau "rapports" ci-dessous, jamais mélangé avec un autre.',
     '',
     'RÉPONDS UNIQUEMENT avec ce JSON strict, sans texte avant ou après, sans commentaire, sans balise de code :',
     '{',
-    '  "titre": "Ronde parking + intervention alarme — Site X — 12.08.2026",',
-    '  "site": "Nom du/des site(s) concerné(s)",',
-    '  "periode": "12.08.2026, 22h10 – 23h45",',
-    '  "agents": "Jean Dupont, Marie Rossier",',
-    '  "resume": "Paragraphe de synthèse générale, 3 à 6 phrases, ton professionnel et factuel.",',
-    '  "chronologie": [',
-    '    { "heure": "22h10", "texte": "Arrivée sur site, ronde de contrôle standard, RAS." },',
-    '    { "heure": "23h20", "texte": "Réception alarme transmetteur 4521, intervention immédiate." }',
-    '  ],',
-    '  "actions_menees": "Description consolidée des actions menées par le(s) agent(s), au fil des rapports.",',
-    '  "resultat": "Situation à la clôture (normalisée / en cours / intervention nécessaire, etc.).",',
-    '  "points_attention": "Anomalies, éléments à signaler à la direction, ou null si aucun.",',
-    '  "statut_cloture": "regle | action | info | probleme",',
-    '  "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas, ou null",',
-    '  "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null",',
-    '  "rapport_complet": true,',
-    '  "elements_manquants": "Liste des informations qui manquent pour considérer ce rapport comme complet, ou null si le rapport est complet."',
+    '  "titre_global": "Libellé court du document (ex : site + date), ou null si non pertinent",',
+    '  "rapports": [',
+    '    {',
+    '      "id": "COPIE EXACTEMENT l\'ID indiqué ci-dessous pour ce rapport (ex: Rapport 1 — ID: xxxxxxxx-xxxx-...)",',
+    '      "situation_corrigee": "Reformulation de LA SEULE situation de CE rapport — voir style attendu plus bas.",',
+    '      "actions_corrigees": "Reformulation des SEULES actions de CE rapport — voir style attendu plus bas.",',
+    '      "resultat_corrige": "Uniquement pour une intervention alarme ; null pour un rapport standard.",',
+    '      "statut_cloture": "regle | action | info | probleme",',
+    '      "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas, ou null (rapport standard uniquement)",',
+    '      "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null (rapport standard uniquement)",',
+    '      "rapport_complet": true,',
+    '      "elements_manquants": "Ce qui manque pour que CE rapport soit complet, ou null si complet."',
+    '    }',
+    '  ]',
     '}',
+    '',
+    '- Le tableau "rapports" doit contenir EXACTEMENT ' + items.length + ' élément(s), un par rapport source listé plus bas, dans le même ordre, avec le champ "id" recopié à l\'identique.',
     '',
     '══════════════════════════════════════════',
     'RÈGLES :',
     '══════════════════════════════════════════',
-    '- N\'invente RIEN : si une information manque dans les rapports sources, écris "non renseigné" plutôt que de la déduire.',
+    '- N\'invente RIEN : si une information manque dans un rapport source, écris "non renseigné" plutôt que de la déduire — et ne la complète JAMAIS avec une information tirée d\'un AUTRE rapport source.',
     '- Corrige l\'orthographe et la grammaire, améliore la formulation, mais NE change PAS les faits, heures, lieux ou noms.',
-    '- La "chronologie" doit respecter l\'ordre réel des événements (utilise les heures fournies ci-dessous).',
-    '- Le champ "resultat" doit rester factuel (ne pas enjoliver une intervention non terminée).',
+    '- Le champ "resultat_corrige" doit rester factuel (ne pas enjoliver une intervention non terminée).',
     '- "statut_cloture" : choisis EXACTEMENT une des 4 valeurs "regle" (situation terminée), "action" (action à venir), "info" (pour information), "probleme" (problème en cours) — jamais une autre valeur.',
-    '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse les deux champs à null plutôt que de forcer une catégorie approximative.',
-    '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre l\'incident (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
-    '- Même si un seul rapport est fourni, produis quand même les mêmes champs (la synthèse peut être courte).',
+    '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse les deux champs à null plutôt que de forcer une catégorie approximative. Ne s\'applique qu\'aux rapports standard — laisse à null pour les interventions alarme.',
+    '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre CE rapport (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
     '- Utilise le registre professionnel utilisé dans les rapports de sécurité privée suisse.',
+    '',
+    '══════════════════════════════════════════',
+    'STYLE ATTENDU — phrases courtes et neutres, pas de récit à la première personne :',
+    '══════════════════════════════════════════',
+    '- Préfère des phrases courtes, factuelles, juxtaposées plutôt que de longues phrases reliées par "et"/"puis".',
+    '- À éviter : "J\'ai pris le téléphone et j\'ai appelé le service de nettoyage."',
+    '- Préféré : "Prise du téléphone. Appel au service de nettoyage."',
+    '- Reste neutre et détaché : décris l\'action, pas le vécu de l\'agent (évite "je", "j\'ai vu que", "j\'ai remarqué que" — va directement au fait constaté).',
     '',
     '══════════════════════════════════════════',
     'RAPPEL DE LA MÉTHODE DE RÉDACTION DE RAPPORT (formation interne RDZ) :',
     '══════════════════════════════════════════',
-    '- Le "resume" et la "chronologie" doivent répondre aux questions Qui / Quoi / Où / Quand / Comment.',
-    '- Décris la scène telle qu\'elle apparaît (les FAITS constatés), sans JAMAIS ajouter d\'impressions, de sentiments ou d\'interprétations qui ne figurent pas explicitement dans les rapports sources.',
+    '- Chaque "situation_corrigee" doit répondre aux questions Qui / Quoi / Où / Quand / Comment pour CE rapport.',
+    '- Décris la scène telle qu\'elle apparaît (les FAITS constatés), sans JAMAIS ajouter d\'impressions, de sentiments ou d\'interprétations qui ne figurent pas explicitement dans le rapport source.',
     '- N\'affirme AUCUNE durée ou cause qui ne serait pas explicitement rapportée par l\'agent dans le texte source (exemples à proscrire si l\'agent ne l\'a pas écrit : "c\'est comme ça depuis 3 jours", "cela fait suite à un manque d\'entretien").',
-    '- Dans "actions_menees", utilise si pertinent le vocabulaire attendu pour les mesures prises : demande de renfort(s), demande de moyens, suivi / prise en compte / action / réparation, demande du client (si un client était présent), appel aux secours (police/pompiers — matricule si mentionné), arrivée des services publics, date et heure de départ des lieux, remplacement / relève.',
+    '- Dans "actions_corrigees", utilise si pertinent le vocabulaire attendu pour les mesures prises : demande de renfort(s), demande de moyens, suivi / prise en compte / action / réparation, demande du client (si un client était présent), appel aux secours (police/pompiers — matricule si mentionné), arrivée des services publics, date et heure de départ des lieux, remplacement / relève.',
     '- Ces rapports peuvent servir de preuve dans une enquête ou un procès : écriture propre, orthographe soignée, aucune incohérence, registre professionnel.',
     '',
     '══════════════════════════════════════════',
@@ -965,7 +961,7 @@ function buildPromptLines(items){
     ]),
     '(Remarque : "Alarmes" et "Changements de pile" existent dans la liste interne RDZ mais sont HORS PÉRIMÈTRE ici — ne les propose jamais pour "nature_activite" sur ce type de rapport.)',
     '',
-    'RAPPORTS SOURCES (' + items.length + ') :',
+    'RAPPORTS SOURCES (' + items.length + ') — un élément de "rapports" par rapport ci-dessous, JAMAIS mélangés :',
     ''
   ];
   items.forEach((r,i)=>{
@@ -996,10 +992,16 @@ function buildPromptLines(items){
 }
 
 /* ---------- Application du résultat : étape de vérification, puis rendu ----------
-   Le JSON collé par Laurent est d'abord relu dans un petit formulaire de
-   vérification (titre, statut de clôture, nature d'activité, complétude)
-   qu'il peut corriger avant de générer le rapport final imprimable — l'IA
-   propose, Laurent valide ou corrige, rien n'est figé avant ce clic. */
+   IMPORTANT (retour Laurent 2026-08-16) : les rapports sélectionnés ne
+   sont JAMAIS fusionnés entre eux — chaque rapport source garde son
+   propre texte corrigé, ses propres photos, sa propre classification.
+   L'IA renvoie donc un TABLEAU "rapports" (un élément par rapport
+   source, apparié par "id"), pas un résumé unique qui mélangerait les
+   faits. Cette étape affiche une carte de révision par rapport (texte
+   corrigé modifiable, texte original consultable, classification,
+   complétude), + une case "appliquer à la fiche source" qui, si cochée,
+   mettra à jour situation/actions/résultat/statut/nature dans Supabase
+   au moment de la validation finale — rien n'est écrit avant ce clic. */
 function generateReport(){
   const raw = document.getElementById('claude-result').value.trim();
   if(!raw){ toast('⚠️ Colle le JSON de Claude d\'abord', true); return; }
@@ -1007,50 +1009,142 @@ function generateReport(){
   try{ parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
   catch(e){ toast('❌ JSON invalide — vérifie la réponse de Claude', true); return; }
 
+  const ids = window._iaIds || [];
+  const items = allReports.filter(r=>ids.includes(r.id));
+  const rapportsArr = Array.isArray(parsed.rapports) ? parsed.rapports : [];
+
   window._iaParsed = parsed;
   document.getElementById('ia-step3').style.display = 'none';
   const rev = document.getElementById('ia-review');
   rev.style.display = 'block';
-  document.getElementById('rev-titre').value = parsed.titre || '';
-  document.getElementById('rev-nature').innerHTML = natureSelectHtml('rev-nature-input', 'rev-type-input', parsed.nature_activite);
-  document.getElementById('rev-type').innerHTML = `<select id="rev-type-input">${typeActionOptionsHtml(parsed.nature_activite, parsed.type_action)}</select>`;
-  document.getElementById('rev-cloture').innerHTML = clotureSelectHtml('rev', parsed.statut_cloture);
-  document.getElementById('rev-complet').checked = parsed.rapport_complet !== false;
-  document.getElementById('rev-manquants').value = parsed.elements_manquants || '';
-  toggleRevManquants();
+  document.getElementById('rev-titre').value = parsed.titre_global || parsed.titre || '';
+
+  const list = document.getElementById('rev-reports-list');
+  list.innerHTML = items.map((r,i)=>{
+    const corr = rapportsArr.find(x=>x && x.id===r.id) || rapportsArr[i] || {};
+    return renderReviewCardHtml(i, r, corr);
+  }).join('');
+  items.forEach((r,i)=>{
+    const corr = rapportsArr.find(x=>x && x.id===r.id) || rapportsArr[i] || {};
+    if(r.kind==='standard'){
+      document.getElementById(`rev-r${i}-nature`).innerHTML = natureSelectHtml(`rev-r${i}-nature-input`, `rev-r${i}-type-input`, corr.nature_activite);
+      document.getElementById(`rev-r${i}-type`).innerHTML = `<select id="rev-r${i}-type-input">${typeActionOptionsHtml(corr.nature_activite, corr.type_action)}</select>`;
+    }
+    document.getElementById(`rev-r${i}-cloture`).innerHTML = clotureSelectHtml(`rev-r${i}`, corr.statut_cloture);
+    document.getElementById(`rev-r${i}-complet`).checked = corr.rapport_complet !== false;
+    toggleRevManquantsFor(i);
+  });
   rev.scrollIntoView({block:'nearest'});
 }
-function toggleRevManquants(){
-  const complet = document.getElementById('rev-complet').checked;
-  document.getElementById('rev-manquants-wrap').style.display = complet ? 'none' : 'block';
+
+function renderReviewCardHtml(i, r, corr){
+  const kindLbl = r.kind==='standard' ? '📝 Rapport standard' : '🚨 Intervention alarme';
+  const situationCorr = corr.situation_corrigee || r.raw.situation || '';
+  const actionsCorr = corr.actions_corrigees || r.raw.actions || '';
+  const resultatCorr = corr.resultat_corrige || r.raw.resultat || '';
+  return `<div class="rev-card" data-idx="${i}">
+    <div class="rev-card-h">
+      <div>Rapport ${i+1} — ${kindLbl}</div>
+      <div class="meta">${esc(r.site||'—')} · ${fmtDate(r.ts)} ${fmtTime(r.ts)} · ${esc(r.agent||'—')}</div>
+    </div>
+    <div class="efield">
+      <label>Situation — corrigée par l'IA (modifiable)</label>
+      <textarea id="rev-r${i}-situation">${esc(situationCorr)}</textarea>
+      ${r.raw.situation ? `<details class="rev-original"><summary>Voir le texte original saisi par l'agent</summary><div class="txt">${esc(r.raw.situation)}</div></details>` : ''}
+    </div>
+    <div class="efield">
+      <label>Actions — corrigées par l'IA (modifiable)</label>
+      <textarea id="rev-r${i}-actions">${esc(actionsCorr)}</textarea>
+      ${r.raw.actions ? `<details class="rev-original"><summary>Voir le texte original saisi par l'agent</summary><div class="txt">${esc(r.raw.actions)}</div></details>` : ''}
+    </div>
+    ${r.kind==='alarme' ? `<div class="efield">
+      <label>Résultat — corrigé (modifiable)</label>
+      <textarea id="rev-r${i}-resultat">${esc(resultatCorr)}</textarea>
+      ${r.raw.resultat ? `<details class="rev-original"><summary>Voir le texte original saisi par l'agent</summary><div class="txt">${esc(r.raw.resultat)}</div></details>` : ''}
+    </div>` : ''}
+    ${r.kind==='standard' ? `
+    <div class="efield"><label>Nature d'activité</label><div id="rev-r${i}-nature"></div></div>
+    <div class="efield"><label>Type d'action</label><div id="rev-r${i}-type"></div></div>` : ''}
+    <div class="efield"><label>Statut de clôture</label><div id="rev-r${i}-cloture"></div></div>
+    <div class="efield">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
+        <input type="checkbox" id="rev-r${i}-complet" onchange="toggleRevManquantsFor(${i})" style="width:auto"> Rapport complet
+      </label>
+    </div>
+    <div class="efield" id="rev-r${i}-manquants-wrap">
+      <label>Éléments manquants</label>
+      <textarea id="rev-r${i}-manquants">${esc(corr.elements_manquants||'')}</textarea>
+    </div>
+    <div class="rev-apply">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#555">
+        <input type="checkbox" id="rev-r${i}-apply" checked style="width:auto"> ✅ Appliquer cette correction à la fiche source (met à jour ${r.kind==='alarme'?'situation/actions/résultat':'situation/actions'} + classification dans la base)
+      </label>
+    </div>
+  </div>`;
+}
+
+function toggleRevManquantsFor(i){
+  const complet = document.getElementById(`rev-r${i}-complet`).checked;
+  document.getElementById(`rev-r${i}-manquants-wrap`).style.display = complet ? 'none' : 'block';
 }
 function backToJsonStep(){
   document.getElementById('ia-review').style.display = 'none';
   document.getElementById('ia-step3').style.display = 'block';
 }
-function finalizeSyntheseReport(){
-  const parsed = window._iaParsed || {};
-  const natEl = document.getElementById('rev-nature-input');
-  const typeEl = document.getElementById('rev-type-input');
-  const complet = document.getElementById('rev-complet').checked;
-  const data = Object.assign({}, parsed, {
-    titre: document.getElementById('rev-titre').value.trim() || parsed.titre,
-    nature_activite: natEl ? (natEl.value.trim() || null) : (parsed.nature_activite || null),
-    type_action: typeEl ? (typeEl.value.trim() || null) : (parsed.type_action || null),
-    statut_cloture: clotureSelectedValue('rev'),
-    rapport_complet: complet,
-    elements_manquants: complet ? null : (document.getElementById('rev-manquants').value.trim() || null)
-  });
 
+async function applyCorrectionToSource(r, payload){
+  const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
+  const { error } = await sb.from(table).update(payload).eq('id', r.id);
+  if(error) throw error;
+  Object.assign(r.raw, payload);
+}
+
+async function finalizeSyntheseReport(){
   const ids = window._iaIds || [];
   const items = allReports.filter(r=>ids.includes(r.id));
-  const html = buildSyntheseReport(data, items);
+  const titreGlobal = document.getElementById('rev-titre').value.trim() || null;
+
+  const corrected = items.map((r,i)=>{
+    const situation = document.getElementById(`rev-r${i}-situation`).value.trim();
+    const actions = document.getElementById(`rev-r${i}-actions`).value.trim();
+    const resultatEl = document.getElementById(`rev-r${i}-resultat`);
+    const resultat = resultatEl ? resultatEl.value.trim() : null;
+    const natEl = document.getElementById(`rev-r${i}-nature-input`);
+    const typeEl = document.getElementById(`rev-r${i}-type-input`);
+    const complet = document.getElementById(`rev-r${i}-complet`).checked;
+    const apply = document.getElementById(`rev-r${i}-apply`).checked;
+    return {
+      r, situation, actions, resultat,
+      nature_activite: natEl ? (natEl.value.trim() || null) : null,
+      type_action: typeEl ? (typeEl.value.trim() || null) : null,
+      statut_cloture: clotureSelectedValue(`rev-r${i}`),
+      rapport_complet: complet,
+      elements_manquants: complet ? null : (document.getElementById(`rev-r${i}-manquants`).value.trim() || null),
+      apply
+    };
+  });
+
+  const toApply = corrected.filter(c=>c.apply);
+  if(toApply.length){
+    const results = await Promise.allSettled(toApply.map(c=>{
+      const payload = { situation: c.situation || null, actions: c.actions || null, statut_cloture: c.statut_cloture };
+      if(c.r.kind==='alarme') payload.resultat = c.resultat || null;
+      if(c.r.kind==='standard'){ payload.nature_activite = c.nature_activite; payload.type_action = c.type_action; }
+      return applyCorrectionToSource(c.r, payload);
+    }));
+    const failed = results.filter(x=>x.status==='rejected').length;
+    if(failed) toast(`⚠️ ${failed} correction(s) non enregistrée(s) en base (voir console)`, true);
+    results.forEach(x=>{ if(x.status==='rejected') console.error(x.reason); });
+    render();
+  }
+
+  const html = buildMultiReport(titreGlobal, corrected);
   document.getElementById('report-content').innerHTML = html;
   closeIAModal();
   const rv = document.getElementById('report-view');
   rv.classList.add('open');
   rv.scrollTop = 0;
-  toast('✅ Rapport de synthèse généré');
+  toast('✅ Rapport généré' + (toApply.length ? ' — fiches source mises à jour' : ''));
 }
 function closeReport(){ document.getElementById('report-view').classList.remove('open'); }
 
@@ -1124,50 +1218,62 @@ function rpSec(numTitre, innerHtml){
   </div>`;
 }
 
-function buildSyntheseReport(data, items){
-  const chrono = Array.isArray(data.chronologie) ? data.chronologie : [];
-  const chronoHtml = chrono.length
-    ? chrono.map(c=>`<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #eee"><div style="font-weight:700;color:#C8102E;min-width:60px">${esc(c.heure||'—')}</div><div style="flex:1">${esc(c.texte||'')}</div></div>`).join('')
-    : '<div style="color:#999;font-size:13px"><i>Aucune chronologie fournie.</i></div>';
-
-  const sourcesHtml = items.map((r,i)=>{
-    const kindLbl = r.kind==='standard' ? '📝 Standard' : '🚨 Alarme';
-    return `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #eee;font-size:12.5px">
-      <div style="min-width:70px;color:#888">Rapport ${i+1}</div>
-      <div style="min-width:90px">${kindLbl}</div>
-      <div style="min-width:130px">${fmtDate(r.ts)} ${fmtTime(r.ts)}</div>
-      <div style="min-width:120px">${esc(r.agent||'—')}</div>
-      <div style="flex:1">${esc(r.site||'—')}</div>
+/* Rapport final après passage IA — retour Laurent 2026-08-16 : les
+   rapports sélectionnés ne sont JAMAIS fusionnés/mélangés entre eux.
+   Chaque élément de `corrected` (voir finalizeSyntheseReport) devient
+   son propre bloc, avec son propre texte (corrigé ou tel quel), sa
+   propre classification et UNIQUEMENT ses propres photos — un seul
+   document imprimable (un seul habillage RDZ Reports), mais autant de
+   blocs internes que de rapports sélectionnés. */
+function buildMultiReport(titreGlobal, corrected){
+  const sections = corrected.map((c,i)=>{
+    const r = c.r;
+    const kindLbl = r.kind==='standard' ? '📝 Rapport standard' : '🚨 Intervention alarme';
+    const header = `<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1a1a1a">
+      <div style="font-size:15px;font-weight:700;color:#1a1a1a">Rapport ${i+1} — ${kindLbl}</div>
+      <div style="font-size:12px;color:#888">${esc(r.site||'—')} · ${fmtDate(r.ts)} ${fmtTime(r.ts)} · ${esc(r.agent||'—')}</div>
     </div>`;
+
+    const incomplete = (c.rapport_complet === false)
+      ? `<div style="display:flex;gap:10px;align-items:flex-start;background:#fdf5f5;border:1.5px solid #C8102E;border-radius:8px;padding:10px 12px;margin-bottom:1rem"><div style="font-size:16px">⚠️</div><div><div style="font-weight:700;color:#C8102E;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Rapport incomplet</div><div style="font-size:12.5px;color:#1a1a1a">${esc(c.elements_manquants||'Éléments manquants non précisés.')}</div></div></div>`
+      : '';
+
+    let inner;
+    if(r.kind==='standard'){
+      inner = rpFieldO('Localisation', esc(r.raw.localisation||r.raw.localisation_autre||'—'))
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
+        + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
+        + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
+        + rpClotureRow(c.statut_cloture||null);
+    }else{
+      inner = rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>'
+        + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
+        + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
+        + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(c.resultat||'—'))+'</div>'
+        + rpClotureRow(c.statut_cloture||null);
+    }
+
+    const photosHtml = r.photos.length
+      ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+      : '<div style="color:#999;font-size:13px;margin-top:16px"><i>Aucune photo jointe.</i></div>';
+
+    const last = i === corrected.length - 1;
+    return `<div style="margin-bottom:2rem;${last?'':'padding-bottom:2rem;border-bottom:2px dashed #ddd'}">${header}${incomplete}${inner}${photosHtml}</div>`;
   }).join('');
 
-  const allPhotos = [];
-  items.forEach((r,i)=>{ r.photos.forEach(p=>allPhotos.push({url:p.url, legende:`Rapport ${i+1}${p.legende?' — '+p.legende:''}`})); });
-  const photosHtml = allPhotos.length
-    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${allPhotos.map(p=>rpPhotoBoxO(p.legende, p.url)).join('')}</div>`
-    : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>';
-
-  const incompleteBanner = (data.rapport_complet === false)
-    ? `<div style="display:flex;gap:10px;align-items:flex-start;background:#fdf5f5;border:1.5px solid #C8102E;border-radius:8px;padding:12px 14px;margin-bottom:1.5rem"><div style="font-size:18px">⚠️</div><div><div style="font-weight:700;color:#C8102E;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Rapport incomplet</div><div style="font-size:13px;color:#1a1a1a">${esc(data.elements_manquants||'Éléments manquants non précisés.')}</div></div></div>`
-    : '';
-
-  const body = incompleteBanner
-    + rpSec('1 — Résumé', rpFieldO('Synthèse', esc(data.resume||'—')) + (data.periode?('<div style="margin-top:10px">'+rpFieldO('Période couverte', esc(data.periode))+'</div>'):'') + (data.type_action?('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(data.type_action))+'</div>'):''))
-    + rpSec('2 — Chronologie', chronoHtml)
-    + rpSec('3 — Actions menées', rpFieldO('Actions', esc(data.actions_menees||'—')))
-    + rpSec('4 — Résultat', rpFieldO('Résultat', esc(data.resultat||'—')) + (data.points_attention ? ('<div style="margin-top:10px">'+rpFieldO('Points d\'attention', esc(data.points_attention))+'</div>') : '') + rpClotureRow(data.statut_cloture||null))
-    + rpSec('5 — Rapports sources (' + items.length + ')', sourcesHtml)
-    + rpSec('6 — Photos', photosHtml);
-
-  const sites = [...new Set(items.map(r=>r.site).filter(Boolean))];
-  const agents = [...new Set(items.map(r=>r.agent).filter(Boolean))];
+  const sites = [...new Set(corrected.map(c=>c.r.site).filter(Boolean))];
+  const agents = [...new Set(corrected.map(c=>c.r.agent).filter(Boolean))];
   const meta = {
-    site: data.site || sites.join(' / ') || '—',
-    agent_name: data.agents || agents.join(', ') || '—',
-    id: items[0] ? items[0].id : Date.now().toString(36),
+    site: sites.join(' / ') || '—',
+    agent_name: agents.join(', ') || '—',
+    id: corrected[0] ? corrected[0].r.id : Date.now().toString(36),
     created_at: new Date().toISOString()
   };
-  return rpParkShell(esc(data.titre) || 'Rapport de synthèse', esc(data.nature_activite || 'Synthèse multi-rapports'), body, meta);
+  const activiteTxt = corrected.length === 1
+    ? (corrected[0].nature_activite || (corrected[0].r.kind==='alarme' ? 'Alarme' : '—'))
+    : corrected.length + ' rapports';
+  const label = corrected.length === 1 ? 'Rapport d\'intervention' : 'Rapports (' + corrected.length + ')';
+  return rpParkShell(esc(titreGlobal) || label, esc(activiteTxt), sections, meta);
 }
 
 /* ---------- Rapports imprimables individuels (RDZ Reports), sans IA ----------
