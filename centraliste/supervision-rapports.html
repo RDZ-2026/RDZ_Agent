@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v7 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v8 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1226,12 +1226,20 @@ function rpSec(numTitre, innerHtml){
    document imprimable (un seul habillage RDZ Reports), mais autant de
    blocs internes que de rapports sélectionnés. */
 function buildMultiReport(titreGlobal, corrected){
+  /* Retour Laurent 2026-08-16 : ne pas répéter dans chaque bloc ce qui
+     est déjà visible dans le bandeau méta en haut du rapport (Date /
+     Heure / Agent / Nature) — donc plus de site + date/heure par
+     rapport ici (juste le numéro et le type), et plus de champ
+     "Localisation" séparé (le lieu est déjà dans le bandeau). Si un
+     rapport a besoin d'un horodatage plus fin que le bandeau global
+     (plusieurs heures dans un même rapport), le mentionner dans le
+     texte de "Situation" plutôt que dans un champ dédié. */
   const sections = corrected.map((c,i)=>{
     const r = c.r;
     const kindLbl = r.kind==='standard' ? '📝 Rapport standard' : '🚨 Intervention alarme';
     const header = `<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #1a1a1a">
       <div style="font-size:15px;font-weight:700;color:#1a1a1a">Rapport ${i+1} — ${kindLbl}</div>
-      <div style="font-size:12px;color:#888">${esc(r.site||'—')} · ${fmtDate(r.ts)} ${fmtTime(r.ts)} · ${esc(r.agent||'—')}</div>
+      <div style="font-size:12px;color:#888">${esc(r.agent||'—')}</div>
     </div>`;
 
     const incomplete = (c.rapport_complet === false)
@@ -1240,8 +1248,7 @@ function buildMultiReport(titreGlobal, corrected){
 
     let inner;
     if(r.kind==='standard'){
-      inner = rpFieldO('Localisation', esc(r.raw.localisation||r.raw.localisation_autre||'—'))
-        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
+      inner = (c.type_action ? rpFieldO('Type d\'action', esc(c.type_action)) : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
@@ -1263,11 +1270,15 @@ function buildMultiReport(titreGlobal, corrected){
 
   const sites = [...new Set(corrected.map(c=>c.r.site).filter(Boolean))];
   const agents = [...new Set(corrected.map(c=>c.r.agent).filter(Boolean))];
+  // Bandeau : lieu = tous les sites concernés, date/heure = la plus
+  // ancienne des dates des rapports sélectionnés (heure de début),
+  // plutôt que l'instant de génération du document.
+  const earliestTs = corrected.reduce((min,c)=> (!min || (c.r.ts && new Date(c.r.ts) < new Date(min))) ? c.r.ts : min, null);
   const meta = {
     site: sites.join(' / ') || '—',
     agent_name: agents.join(', ') || '—',
     id: corrected[0] ? corrected[0].r.id : Date.now().toString(36),
-    created_at: new Date().toISOString()
+    created_at: earliestTs || new Date().toISOString()
   };
   const activiteTxt = corrected.length === 1
     ? (corrected[0].nature_activite || (corrected[0].r.kind==='alarme' ? 'Alarme' : '—'))
