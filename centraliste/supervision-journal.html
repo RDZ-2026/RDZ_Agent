@@ -1,4 +1,33 @@
-<!-- RDZ · supervision-journal · v26 · 2026-08-16
+<!-- RDZ · supervision-journal · v29 · 2026-08-16
+     v29 : Rapport direction, partie "Par site" — widgets bibliothèque pour MDP : les
+       rapports bibliothèque portent toujours le site fixe "Bibliothèque IHEID" côté
+       données (jamais littéralement "MDP") → sur confirmation de Laurent, ils sont
+       regroupés dans la carte MDP (siteGroupName). Deux histogrammes : comptage
+       (affluence — un point par relevé si la période ne couvre qu'un jour, sinon le
+       MAX du jour) et filtrage (entrées — un point par relevé si un jour, sinon la
+       SOMME du jour, jamais un max, comme demandé). Clic sur une barre → pop-up listant
+       les relevés concernés (showEntryListPopup, factorisée depuis showSiteDrilldown)
+       → clic sur un relevé → rapport "style RDZ" (biblio_comptage/biblio_filtrage sont
+       déjà dans REPORTABLE). Un site MDP sans aucun autre rapport mais avec des relevés
+       bibliothèque s'affiche quand même (siteHasContent étendu).
+     v28 : Rapport direction, partie "Par site" — 1er widget spécifique : jauge du
+     v28 : Rapport direction, partie "Par site" — 1er widget spécifique : jauge du
+       nombre d'ouvertures de porte sur la période (kind 'ouverture', déjà présent dans
+       allEntries) pour les sites dont le nom contient "REGM", "MDP" ou "Barton"
+       (comparaison insensible à la casse, cf. doorGaugeKeywordFor — pas de table de
+       correspondance exacte des noms de site disponible). La règle d'affichage des
+       sites est généralisée (siteHasContent) : un site apparaît s'il a des rapports
+       standard/alarme OU des données pertinentes pour un widget spécifique (donc un
+       site REGM/MDP/Barton sans rapport mais avec des ouvertures s'affiche quand même,
+       avec juste la jauge, sans le graphique par type d'action). Prochains widgets :
+       bibliothèque MDP (2 graphiques), parking DLCC, badges externes, ParkGuard.
+     v27 : Rapport direction, partie "Par site" — depuis la pop-up de liste (clic sur une
+     v27 : Rapport direction, partie "Par site" — depuis la pop-up de liste (clic sur une
+       barre), cliquer sur un rapport ouvre désormais directement le rapport "style RDZ"
+       imprimable (openReport, même document que celui remis au client/à la direction)
+       plutôt que le détail générique du modal. Ce comportement (graphiques + pop-up +
+       ouverture du rapport RDZ) reste strictement local à l'onglet Rapport direction —
+       aucun changement sur les autres onglets/vues du journal.
      v26 : Rapport direction, partie "Par site" — corrections suite retour terrain :
        (1) le donut SVG ne s'affichait pas correctement → remplacé par un histogramme
        (même style que les autres graphiques de l'onglet, cohérent et fiable) ;
@@ -1923,20 +1952,107 @@ function openDirectionDetail(i){
    parking DLCC, badges externes, ParkGuard…) : à venir dans une prochaine étape. */
 function siteKeySlug(s){ return 'sk_' + String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
 
+// Un site n'est affiché que s'il a au moins une donnée pertinente sur la période :
+// des rapports standard/alarme, OU (pour les sites concernés) des données pour un
+// widget spécifique (ouvertures, bibliothèque, parking, badges, ParkGuard…). Cette
+// fonction sera étendue au fur et à mesure de l'ajout des widgets par site.
+const DOOR_GAUGE_SITE_KEYWORDS = ['REGM','MDP','Barton'];
+function siteNameIncludes(siteName, keyword){ return String(siteName).toLowerCase().includes(String(keyword).toLowerCase()); }
+function doorGaugeKeywordFor(siteName){ return DOOR_GAUGE_SITE_KEYWORDS.find(k=>siteNameIncludes(siteName,k)) || null; }
+// Les rapports bibliothèque portent toujours le site fixe "Bibliothèque IHEID" (jamais
+// littéralement "MDP") côté données — sur demande, on les rattache à la carte MDP dans
+// cette vue plutôt que de créer une carte séparée.
+function siteGroupName(rawSite){
+  return siteNameIncludes(rawSite, 'Bibliothèque IHEID') ? 'MDP' : rawSite;
+}
+function siteHasContent(siteData){
+  if(siteData.activity.length) return true;
+  if(doorGaugeKeywordFor(siteData.site) && siteData.siteEntries.some(e=>e.kind==='ouverture')) return true;
+  if(siteNameIncludes(siteData.site,'MDP') && siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage')) return true;
+  return false;
+}
+
 function computeSiteBreakdown(entries){
-  const allSites = [...new Set(entries.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const allSites = [...new Set(entries.map(e=>{ try{ return siteGroupName(e.src.site(e.raw)||''); }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
   const out = {};
   const sites = [];
   allSites.forEach(site=>{
-    const siteEntries = entries.filter(e=>{ try{ return (e.src.site(e.raw)||'')===site; }catch(_){ return false; } });
+    const siteEntries = entries.filter(e=>{ try{ return siteGroupName(e.src.site(e.raw)||'')===site; }catch(_){ return false; } });
     const activity = siteEntries.filter(e=>e.kind==='rapport_standard' || e.kind==='alarme');
-    if(!activity.length) return; // "pas besoin des sites où il n'y a pas de rapports ou données"
     const byType = {};
     activity.forEach(e=>{ const t = e.raw.type_action || 'Non classé'; (byType[t] = byType[t]||[]).push(e); });
-    out[site] = { site, siteEntries, activity, byType };
+    const siteData = { site, siteEntries, activity, byType };
+    if(!siteHasContent(siteData)) return; // "pas besoin des sites où il n'y a pas de rapports ou données"
+    out[site] = siteData;
     sites.push(site);
   });
   return { sites, bySite: out };
+}
+
+/* ---------- Bibliothèque MDP : 2 graphiques (comptage / filtrage) ---
+   Agrégation dépendante de la période : "par comptage" (un point par relevé) quand la
+   période sélectionnée ne couvre qu'un seul jour, sinon un point par jour — MAX de
+   l'affluence pour le comptage, SOMME des entrées pour le filtrage (demande explicite :
+   la moyenne/max n'a pas de sens pour du flux cumulé). */
+function isDirectionSingleDay(){
+  if(dirMode==='day') return true;
+  const from = document.getElementById('dir-from').value, to = document.getElementById('dir-to').value;
+  return !!(from && to && from===to);
+}
+function biblioTotalEntrees(e){ return Object.values(e.raw.entrees||{}).reduce((a,b)=>a+(parseInt(b)||0),0); }
+function biblioComptageSeries(siteEntries, singleDay){
+  const items = siteEntries.filter(e=>e.kind==='biblio_comptage').slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  if(singleDay) return items.map(e=>({ label: fmtTime(e.ts), value: e.raw.affluence||0, entries:[e] }));
+  const byDay = {};
+  items.forEach(e=>{
+    const day = fmtDateShort(e.ts);
+    if(!byDay[day]) byDay[day] = { label: day, value: 0, entries: [], _ts: e.ts };
+    byDay[day].entries.push(e);
+    byDay[day].value = Math.max(byDay[day].value, e.raw.affluence||0);
+  });
+  return Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
+}
+function biblioFiltrageSeries(siteEntries, singleDay){
+  const items = siteEntries.filter(e=>e.kind==='biblio_filtrage').slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  if(singleDay) return items.map(e=>({ label: fmtTime(e.ts), value: biblioTotalEntrees(e), entries:[e] }));
+  const byDay = {};
+  items.forEach(e=>{
+    const day = fmtDateShort(e.ts);
+    if(!byDay[day]) byDay[day] = { label: day, value: 0, entries: [], _ts: e.ts };
+    byDay[day].entries.push(e);
+    byDay[day].value += biblioTotalEntrees(e);
+  });
+  return Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
+}
+// Histogramme générique pour une série {label,value,entries} — même style que les autres
+// graphiques de l'onglet ; clic sur une barre → pop-up listant les relevés concernés.
+function seriesBarHtml(series, skey, seriesKey, color){
+  if(!series.length) return '<div class="state-msg" style="padding:10px 0">Aucune donnée sur cette période.</div>';
+  const max = Math.max(...series.map(s=>s.value), 1);
+  return series.map((s,i)=>{
+    const pct = Math.round((s.value/max)*100);
+    return `<div class="bar-row" style="cursor:pointer" onclick="showBiblioDrilldown('${skey}','${seriesKey}',${i})" title="Cliquer pour voir le(s) relevé(s)"><div class="lbl">${esc(s.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="cnt">${s.value}</div></div>`;
+  }).join('');
+}
+window.__dirBiblioSeries = {}; // skey -> { comptage:[...], filtrage:[...] }
+function showBiblioDrilldown(skey, seriesKey, idx){
+  const s = window.__dirBiblioSeries[skey] && window.__dirBiblioSeries[skey][seriesKey] && window.__dirBiblioSeries[skey][seriesKey][idx];
+  if(!s) return;
+  const label = seriesKey==='comptage' ? '📚 Comptage bibliothèque' : '📚 Filtrage bibliothèque';
+  showEntryListPopup(label, `${s.label} (${s.entries.length})`, s.entries);
+}
+function mdpBiblioHtml(siteData, skey){
+  if(!siteNameIncludes(siteData.site,'MDP')) return '';
+  const hasBiblio = siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage');
+  if(!hasBiblio) return '';
+  const singleDay = isDirectionSingleDay();
+  const comptageSeries = biblioComptageSeries(siteData.siteEntries, singleDay);
+  const filtrageSeries = biblioFiltrageSeries(siteData.siteEntries, singleDay);
+  window.__dirBiblioSeries[skey] = { comptage: comptageSeries, filtrage: filtrageSeries };
+  const comptageLabel = singleDay ? 'Comptage bibliothèque — affluence par relevé' : 'Comptage bibliothèque — affluence maximale par jour';
+  const filtrageLabel = singleDay ? 'Filtrage bibliothèque — entrées par relevé' : 'Filtrage bibliothèque — total des entrées par jour';
+  return `<h5>${esc(comptageLabel)}</h5>${seriesBarHtml(comptageSeries, skey, 'comptage', '#0e7490')}
+    <h5>${esc(filtrageLabel)}</h5>${seriesBarHtml(filtrageSeries, skey, 'filtrage', '#7c3aed')}`;
 }
 
 const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
@@ -1959,24 +2075,40 @@ function siteTypeActionBarHtml(byType, skey){
   }).join('');
 }
 
+// Jauge simple (chiffre + libellé) pour les indicateurs par site type "compteur sur la
+// période" (ouvertures, plus tard bibliothèque/parking/ParkGuard…) — même composant
+// visuel réutilisé pour tous, pas de librairie de graphique.
+function gaugeHtml(value, label){ return `<div class="dir-gauge"><div class="gv">${esc(String(value))}</div><div class="gl">${esc(label)}</div></div>`; }
+
+function siteWidgetsHtml(siteData){
+  const widgets = [];
+  const doorKeyword = doorGaugeKeywordFor(siteData.site);
+  if(doorKeyword){
+    const count = siteData.siteEntries.filter(e=>e.kind==='ouverture').length;
+    widgets.push(gaugeHtml(count, '🔓 Ouvertures de porte'));
+  }
+  return widgets.length ? `<div class="dir-widget-row">${widgets.join('')}</div>` : '';
+}
+
 function siteCardHtml(siteData){
   const skey = siteKeySlug(siteData.site);
+  const typeActionHtml = siteData.activity.length
+    ? `<h5>Répartition des rapports par type d'action</h5>${siteTypeActionBarHtml(siteData.byType, skey)}`
+    : '';
   return `<div class="site-card">
     <h4>📍 ${esc(siteData.site)}</h4>
-    <h5>Répartition des rapports par type d'action</h5>
-    ${siteTypeActionBarHtml(siteData.byType, skey)}
+    ${typeActionHtml}
+    ${siteWidgetsHtml(siteData)}
+    ${mdpBiblioHtml(siteData, skey)}
   </div>`;
 }
 
-// Liste des rapports concernés par une barre — affichée en pop-up (réutilise l'overlay/
+// Liste d'entrées concernées par une barre — affichée en pop-up (réutilise l'overlay/
 // modal déjà utilisé pour le détail d'un rapport, plutôt qu'un bloc affiché sous les
-// sites) : plus ergonomique, et un clic sur un rapport de la liste enchaîne directement
-// sur son détail complet dans la même pop-up.
-window.__dirSiteBreakdown = {}; // skey -> siteData (site, byType…)
-function showSiteDrilldown(skey, label){
-  const siteData = window.__dirSiteBreakdown[skey];
-  if(!siteData) return;
-  const list = siteData.byType[label] || [];
+// sites) : plus ergonomique, et un clic sur une entrée de la liste enchaîne directement
+// sur son détail/rapport complet dans la même pop-up. Fonction générique, utilisée par
+// le drill-down type_action ET par le drill-down bibliothèque (mêmes mécaniques).
+function showEntryListPopup(headerLabel, titleLabel, list){
   window.__dirDrillList = list;
   const listHtml = list.length ? list.map((e,i)=>{
     const def = KINDS[e.kind];
@@ -1985,17 +2117,29 @@ function showSiteDrilldown(skey, label){
       <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
       <div class="mid"><div class="t">${def.icon} ${esc(title)}</div><div class="s">${esc(snip)||'<i>Sans description</i>'}</div></div>
     </div>`;
-  }).join('') : '<div class="state-msg">Aucun rapport.</div>';
+  }).join('') : '<div class="state-msg">Aucun élément.</div>';
   const m = document.getElementById('modal');
   m.innerHTML = `
     <div class="mh" style="background:#1a1a1a"><button class="x" onclick="closeModal()">✕</button>
-      <div class="k">📍 ${esc(siteData.site)}</div><h3>${esc(label)} (${list.length})</h3></div>
+      <div class="k">${esc(headerLabel)}</div><h3>${esc(titleLabel)}</h3></div>
     <div class="mb">${listHtml}</div>`;
   document.getElementById('overlay').classList.add('show');
 }
+window.__dirSiteBreakdown = {}; // skey -> siteData (site, byType…)
+function showSiteDrilldown(skey, label){
+  const siteData = window.__dirSiteBreakdown[skey];
+  if(!siteData) return;
+  const list = siteData.byType[label] || [];
+  showEntryListPopup(`📍 ${siteData.site}`, `${label} (${list.length})`, list);
+}
+// Depuis le "Par site" du Rapport direction, on va directement au rapport "style RDZ"
+// imprimable (celui utilisé partout ailleurs pour rapport_standard/alarme) plutôt qu'au
+// détail générique du modal — c'est le même document que le client/la direction reçoit.
 function openSiteDrillDetail(i){
   window.__renderedItems = window.__dirDrillList;
-  openDetail(i);
+  const e = window.__dirDrillList[i];
+  if(e && REPORTABLE[e.kind]){ closeModal(); openReport(i); }
+  else openDetail(i);
 }
 
 function renderDirectionReport(){
@@ -2026,6 +2170,7 @@ function renderDirectionReport(){
 
   const siteBreakdown = computeSiteBreakdown(entries);
   window.__dirSiteBreakdown = {};
+  window.__dirBiblioSeries = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
