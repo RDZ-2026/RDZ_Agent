@@ -1,13 +1,23 @@
-<!-- RDZ · supervision-journal · v24 · 2026-08-16
+<!-- RDZ · supervision-journal · v25 · 2026-08-16
      v24 : Rapport direction — nouvelles tuiles KPI (remplacent les 4 précédentes) :
        agents en service sur la période (source planning-agendrix / agendrix_pointages,
-       chargé à la demande), total rapports standard+alarme, dont alarme, dont standard
-       nature "Sécurité", et points ouverts (statut_cloture probléme/action). Le calcul
-       "agents en service" compare les créneaux du planning aux bornes de la période
-       (jour de service ou Du/Au) et, si un site est choisi, filtre sur le nom de site
-       tel qu'il apparaît dans l'export Agendrix (best-effort si le libellé diffère de
-       celui utilisé ailleurs dans le journal). Partie "par site" du rapport direction :
-       à venir dans une prochaine étape. -->
+       chargé à la demande), total rapports ("Rapports"), dont alarme, dont standard
+       nature "Sécurité" ("Dont rapports sécurité"), et points ouverts (statut_cloture
+       probléme/action). Le calcul "agents en service" compare les créneaux du planning
+       aux bornes de la période (jour de service ou Du/Au) et, si un site est choisi,
+       filtre sur le nom de site tel qu'il apparaît dans l'export Agendrix (best-effort
+       si le libellé diffère de celui utilisé ailleurs dans le journal).
+     v25 : Rapport direction — début de la partie "Par site" (socle commun) : une carte
+       par site présent sur la période, avec (a) la liste des agents sur site tirée du
+       planning Agendrix sur la même période, et (b) un donut SVG (pas de librairie
+       externe) de la répartition des rapports standard+alarme du site par type_action,
+       cliquable — clic sur une part OU sa légende → panneau "drill-down" listant les
+       rapports concernés → clic sur un rapport → ouverture du détail complet (réutilise
+       openDetail()/le modal existant). Widgets spécifiques par site à venir dans une
+       prochaine étape : jauges ouvertures (REGM/MDP/Barton), bibliothèque MDP (2
+       graphiques, agrégation jour vs période), parking DLCC (jauges CLX/DLCC), badges
+       externes (sortis / en retard), bloc ParkGuard (3 indicateurs + vérif photos +
+       détection stationnement abusif). -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -81,6 +91,18 @@ main{flex:1;padding:18px}
 .attn-item .mid .t{font-weight:bold;font-size:13.5px}
 .attn-item .mid .s{font-size:12.5px;color:#666;margin-top:2px}
 .attn-badge{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap;color:#fff;flex-shrink:0}
+.site-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px 18px;margin-bottom:16px}
+.site-card h4{font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.site-card h5{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:#888;margin:14px 0 8px}
+.site-agents{display:flex;flex-wrap:wrap;gap:6px}
+.site-agent-chip{font-size:12px;background:var(--bg-meta);color:var(--ink);padding:4px 10px;border-radius:20px}
+.donut-legend-item{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 6px;border-radius:4px}
+.donut-legend-item:hover{background:var(--bg-meta)}
+.donut-legend-item .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dir-widget-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
+.dir-gauge{flex:1;min-width:160px;background:var(--bg-soft);border-radius:6px;padding:10px 12px}
+.dir-gauge .gv{font-size:22px;font-weight:bold;color:var(--ink)}
+.dir-gauge .gl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
 
 .timeline{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-section,8px);padding:16px 18px 12px;margin-bottom:14px}
 .timeline .tl-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;font-size:12px;color:#777}
@@ -1892,6 +1914,118 @@ function openDirectionDetail(i){
   openDetail(i);
 }
 
+/* ---------- Partie "par site" — socle commun (agents sur site + donut type_action avec drill-down) ---
+   Widgets spécifiques par site (jauges ouvertures REGM/MDP/Barton, bibliothèque MDP,
+   parking DLCC, badges externes, ParkGuard…) : à venir dans une prochaine étape. */
+function siteKeySlug(s){ return 'sk_' + String(s).replace(/[^a-zA-Z0-9]/g,'_'); }
+
+function agentsOnSite(site){
+  const { start, end } = directionPeriodBoundsForShifts();
+  const matching = agendrixShifts.filter(s=>{
+    if(s.site !== site) return false;
+    if(start && s.fin <= start) return false;
+    if(end && s.debut >= end) return false;
+    return true;
+  });
+  return [...new Set(matching.map(s=>s.agent))].sort((a,b)=>a.localeCompare(b,'fr'));
+}
+
+function computeSiteBreakdown(entries){
+  const sites = [...new Set(entries.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const out = {};
+  sites.forEach(site=>{
+    const siteEntries = entries.filter(e=>{ try{ return (e.src.site(e.raw)||'')===site; }catch(_){ return false; } });
+    const activity = siteEntries.filter(e=>e.kind==='rapport_standard' || e.kind==='alarme');
+    const byType = {};
+    activity.forEach(e=>{ const t = e.raw.type_action || 'Non classé'; (byType[t] = byType[t]||[]).push(e); });
+    out[site] = { site, siteEntries, activity, byType };
+  });
+  return { sites, bySite: out };
+}
+
+const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
+function colorForLabel(label){
+  let h = 0; for(let i=0;i<label.length;i++) h = (h*31 + label.charCodeAt(i)) >>> 0;
+  return TYPE_ACTION_PALETTE[h % TYPE_ACTION_PALETTE.length];
+}
+function polarPt(cx,cy,r,angle){ return { x: cx + r*Math.sin(angle), y: cy - r*Math.cos(angle) }; }
+function donutWedgePath(cx,cy,rOuter,rInner,startA,endA){
+  const large = (endA-startA) > Math.PI ? 1 : 0;
+  const p1 = polarPt(cx,cy,rOuter,startA), p2 = polarPt(cx,cy,rOuter,endA);
+  const p3 = polarPt(cx,cy,rInner,endA), p4 = polarPt(cx,cy,rInner,startA);
+  return `M${p1.x.toFixed(2)},${p1.y.toFixed(2)} A${rOuter},${rOuter} 0 ${large},1 ${p2.x.toFixed(2)},${p2.y.toFixed(2)} L${p3.x.toFixed(2)},${p3.y.toFixed(2)} A${rInner},${rInner} 0 ${large},0 ${p4.x.toFixed(2)},${p4.y.toFixed(2)} Z`;
+}
+// Donut cliquable : chaque part (et sa légende) ouvre la liste des rapports concernés
+// via showSiteDrilldown() — pas de librairie graphique externe, juste du SVG généré.
+function donutChartHtml(byType, skey){
+  const entries = Object.entries(byType).filter(([,arr])=>arr.length>0).sort((a,b)=>b[1].length-a[1].length);
+  const total = entries.reduce((s,[,arr])=>s+arr.length,0);
+  if(!total) return '<div class="state-msg" style="padding:10px 0">Aucun rapport standard/alarme sur cette période pour ce site.</div>';
+  const cx=90, cy=90, rOuter=80, rInner=46;
+  let angle = 0;
+  const wedges = entries.map(([label,arr])=>{
+    const frac = arr.length/total;
+    const start = angle, end = angle + frac*2*Math.PI;
+    angle = end;
+    const color = colorForLabel(label);
+    const d = donutWedgePath(cx,cy,rOuter,rInner,start,end);
+    const pct = Math.round(frac*100);
+    return `<path d="${d}" fill="${color}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="showSiteDrilldown('${skey}','${esc(label).replace(/'/g,"\\'")}')"><title>${esc(label)} — ${arr.length} (${pct}%)</title></path>`;
+  }).join('');
+  const legend = entries.map(([label,arr])=>{
+    const color = colorForLabel(label);
+    const pct = Math.round(arr.length/total*100);
+    return `<div class="donut-legend-item" onclick="showSiteDrilldown('${skey}','${esc(label).replace(/'/g,"\\'")}')"><span class="dot" style="background:${color}"></span>${esc(label)} <b>${arr.length}</b> <span style="color:#999">(${pct}%)</span></div>`;
+  }).join('');
+  return `<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <svg width="180" height="180" viewBox="0 0 180 180" style="flex-shrink:0">${wedges}<text x="90" y="86" text-anchor="middle" font-size="22" font-weight="700" fill="#1a1a1a">${total}</text><text x="90" y="104" text-anchor="middle" font-size="10" fill="#888">rapports</text></svg>
+    <div style="flex:1;min-width:180px;display:flex;flex-direction:column;gap:2px">${legend}</div>
+  </div>`;
+}
+
+function siteCardHtml(siteData){
+  const skey = siteKeySlug(siteData.site);
+  const agents = agentsOnSite(siteData.site);
+  const agentsHtml = agents.length
+    ? `<div class="site-agents">${agents.map(a=>`<span class="site-agent-chip">${esc(a)}</span>`).join('')}</div>`
+    : `<div class="hint">Aucun agent trouvé dans le planning Agendrix pour ce site sur la période.</div>`;
+  return `<div class="site-card">
+    <h4>📍 ${esc(siteData.site)}</h4>
+    <h5>Agents sur site (planning)</h5>
+    ${agentsHtml}
+    <h5>Répartition des rapports par type d'action</h5>
+    ${donutChartHtml(siteData.byType, skey)}
+  </div>`;
+}
+
+// Panneau de détail (liste des rapports concernés par une part du donut) — mis à jour
+// directement via getElementById plutôt que de redéclencher tout renderDirectionReport(),
+// pour ne pas perdre la position de scroll ni reconstruire les graphiques inutilement.
+window.__dirSiteBreakdown = {}; // skey -> siteData (site, byType…)
+function showSiteDrilldown(skey, label){
+  const siteData = window.__dirSiteBreakdown[skey];
+  if(!siteData) return;
+  const list = siteData.byType[label] || [];
+  window.__dirDrillList = list;
+  const panel = document.getElementById('dir-drilldown-panel');
+  document.getElementById('dir-drilldown-title').textContent = `${siteData.site} — ${label} (${list.length})`;
+  document.getElementById('dir-drilldown-list').innerHTML = list.length ? list.map((e,i)=>{
+    const def = KINDS[e.kind];
+    let title='', snip=''; try{ title = e.src.title(e.raw); snip = e.src.snippet(e.raw); }catch(_){ title = def.label; }
+    return `<div class="attn-item" style="border-left-color:${def.color}" onclick="openSiteDrillDetail(${i})">
+      <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
+      <div class="mid"><div class="t">${def.icon} ${esc(title)}</div><div class="s">${esc(snip)||'<i>Sans description</i>'}</div></div>
+    </div>`;
+  }).join('') : '<div class="state-msg">Aucun rapport.</div>';
+  panel.classList.remove('hidden');
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function closeSiteDrilldown(){ document.getElementById('dir-drilldown-panel').classList.add('hidden'); }
+function openSiteDrillDetail(i){
+  window.__renderedItems = window.__dirDrillList;
+  openDetail(i);
+}
+
 function renderDirectionReport(){
   const box = document.getElementById('direction-content');
   const entries = getDirectionEntries();
@@ -1907,9 +2041,9 @@ function renderDirectionReport(){
 
   const statTiles = `<div class="stat-row">
     ${statTile(computeAgentsOnDuty(), 'Agents en service (planning)')}
-    ${statTile(stats.activityTotal, 'Rapports standard + alarme')}
+    ${statTile(stats.activityTotal, 'Rapports')}
     ${statTile(stats.alarmeCount, 'Dont rapports alarme')}
-    ${statTile(stats.securiteStandardCount, 'Rapports standard · Sécurité')}
+    ${statTile(stats.securiteStandardCount, 'Dont rapports sécurité')}
     ${statTile(stats.openIssuesCount, 'Points ouverts (problème/action)')}
   </div>`;
 
@@ -1918,6 +2052,13 @@ function renderDirectionReport(){
       + (stats.attentionItems.length>30 ? `<div class="hint" style="margin-top:6px">… et ${stats.attentionItems.length-30} de plus — affine la période ou le site pour les voir toutes.</div>` : '')
     : `<div class="state-msg">✅ Tous les rapports standard et interventions alarme de la période sont clôturés.</div>`;
 
+  const siteBreakdown = computeSiteBreakdown(entries);
+  window.__dirSiteBreakdown = {};
+  siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
+  const sitesHtml = siteBreakdown.sites.length
+    ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
+    : '<div class="state-msg">Aucun site identifié sur cette période.</div>';
+
   box.innerHTML = `
     ${statTiles}
     <div class="dir-card"><h4>⚠️ Points d'attention (non clôturés)</h4>${attentionHtml}</div>
@@ -1925,6 +2066,15 @@ function renderDirectionReport(){
     <div class="dir-card"><h4>Nature d'activité — rapports standard + alarme</h4>${barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS)}</div>
     <div class="dir-card"><h4>Répartition par catégorie (toutes sources)</h4>${barChartHtml(kindLabelsMap(stats.byKind), stats.total, kindColorMapFromKinds(stats.byKind))}</div>
     <div class="dir-card"><h4>Répartition par site</h4>${barChartHtml(topEntries(stats.bySite,8), stats.total, null)}</div>
+    <h3 style="margin:22px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">📍 Par site</h3>
+    ${sitesHtml}
+    <div class="dir-card hidden" id="dir-drilldown-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h4 style="margin:0" id="dir-drilldown-title">—</h4>
+        <button class="btn-sec" style="padding:5px 12px;font-size:12px" onclick="closeSiteDrilldown()">✕ Fermer</button>
+      </div>
+      <div id="dir-drilldown-list"></div>
+    </div>
   `;
 }
 
@@ -1960,9 +2110,9 @@ function buildDirectionPrintable(){
   const statsHtml = rpSec('Chiffres clés', `
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
       ${rpFieldO('Agents en service (planning)', computeAgentsOnDuty())}
-      ${rpFieldO('Rapports standard + alarme', stats.activityTotal)}
+      ${rpFieldO('Rapports', stats.activityTotal)}
       ${rpFieldO('Dont rapports alarme', stats.alarmeCount)}
-      ${rpFieldO('Rapports standard · Sécurité', stats.securiteStandardCount)}
+      ${rpFieldO('Dont rapports sécurité', stats.securiteStandardCount)}
       ${rpFieldO('Points ouverts (problème/action)', stats.openIssuesCount)}
     </div>`);
   const clotureHtml = rpSec('Statut de clôture — rapports standard + alarme', barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions()));
