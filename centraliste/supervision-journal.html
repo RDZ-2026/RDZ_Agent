@@ -1,4 +1,16 @@
-<!-- RDZ · supervision-journal · v30 · 2026-08-16
+<!-- RDZ · supervision-journal · v31 · 2026-08-16
+     v31 : CORRECTIF IMPORTANT — la classe CSS ".hidden" n'était jamais définie dans ce
+       fichier : "class=hidden" sur #direction-panel ne cachait donc rien, et tout le
+       contenu du Rapport direction (filtres, tuiles KPI, points d'attention, par site…)
+       s'affichait en permanence à la suite de la liste chronologique, dans TOUS les
+       onglets (Journée de service, Vue complète), pas seulement dans Rapport direction.
+       Ajout de la règle ".hidden{display:none!important}" — le panneau est maintenant
+       correctement caché hors de son onglet. Nouveau widget : répartition des
+       ouvertures par nature (motif) sous la jauge, même mécanique que le type_action
+       des rapports — histogramme cliquable (groupedBarHtml, factorisé) → pop-up listant
+       les ouvertures concernées → clic → rapport "style RDZ" (ouverture est déjà dans
+       REPORTABLE).
+     v30 : Rapport direction, partie "Par site" — corrections de nommage : (1) la carte
      v30 : Rapport direction, partie "Par site" — corrections de nommage : (1) la carte
        bibliothèque regroupée s'appelle désormais "IHEID - MDP" (et non plus "MDP") ;
        (2) la jauge ouvertures de porte ne s'applique plus à MDP mais à "IHEID - MDE"
@@ -175,6 +187,7 @@ main{flex:1;padding:18px}
 .tag.ph{background:var(--bg-meta);color:#777}
 
 .state-msg{text-align:center;color:#999;font-size:14px;padding:40px 10px}
+.hidden{display:none!important}
 
 /* modal */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:20px;overflow:auto;z-index:100}
@@ -2074,16 +2087,23 @@ function colorForLabel(label){
 // Histogramme cliquable (même style que barChartHtml, mais chaque barre ouvre la liste
 // des rapports concernés dans une pop-up — cf. showSiteDrilldown). Remplace l'ancien
 // donut SVG, qui ne s'affichait pas correctement.
-function siteTypeActionBarHtml(byType, skey){
-  const countsObj = {}; Object.entries(byType).forEach(([label,arr])=>countsObj[label]=arr.length);
+// Histogramme cliquable générique à partir d'un regroupement {label: [entrées]} — chaque
+// barre appelle onClickAttr(label) pour construire son attribut onclick. Réutilisé pour
+// le type_action des rapports ET pour la nature des ouvertures (même mécanique).
+function groupedBarHtml(byGroup, onClickAttr){
+  const countsObj = {}; Object.entries(byGroup).forEach(([label,arr])=>countsObj[label]=arr.length);
   const entries = Object.entries(countsObj).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length) return '<div class="state-msg" style="padding:10px 0">Aucun rapport standard/alarme sur cette période pour ce site.</div>';
+  if(!entries.length) return null;
   const max = Math.max(...entries.map(([,n])=>n));
   return entries.map(([label,n])=>{
     const pct = max ? Math.round((n/max)*100) : 0;
     const color = colorForLabel(label);
-    return `<div class="bar-row" style="cursor:pointer" onclick="showSiteDrilldown('${skey}','${esc(label).replace(/'/g,"\\'")}')" title="Cliquer pour voir les rapports"><div class="lbl" title="${esc(label)}">${esc(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="cnt">${n}</div></div>`;
+    return `<div class="bar-row" style="cursor:pointer" onclick="${onClickAttr(label)}" title="Cliquer pour voir le détail"><div class="lbl" title="${esc(label)}">${esc(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="cnt">${n}</div></div>`;
   }).join('');
+}
+function siteTypeActionBarHtml(byType, skey){
+  const html = groupedBarHtml(byType, label=>`showSiteDrilldown('${skey}','${esc(label).replace(/'/g,"\\'")}')`);
+  return html || '<div class="state-msg" style="padding:10px 0">Aucun rapport standard/alarme sur cette période pour ce site.</div>';
 }
 
 // Jauge simple (chiffre + libellé) pour les indicateurs par site type "compteur sur la
@@ -2091,14 +2111,36 @@ function siteTypeActionBarHtml(byType, skey){
 // visuel réutilisé pour tous, pas de librairie de graphique.
 function gaugeHtml(value, label){ return `<div class="dir-gauge"><div class="gv">${esc(String(value))}</div><div class="gl">${esc(label)}</div></div>`; }
 
-function siteWidgetsHtml(siteData){
+// Répartition des ouvertures par nature (motif) — même mécanique que le type_action des
+// rapports : histogramme cliquable → pop-up listant les ouvertures concernées → clic sur
+// une ouverture → rapport "style RDZ" (ouverture est déjà dans REPORTABLE).
+window.__dirOuvertureByMotif = {}; // skey -> { motif: [entrées] }
+function showOuvertureDrilldown(skey, label){
+  const byMotif = window.__dirOuvertureByMotif[skey];
+  if(!byMotif) return;
+  const list = byMotif[label] || [];
+  showEntryListPopup('🔓 Ouvertures de porte', `${label} (${list.length})`, list);
+}
+function ouvertureMotifHtml(siteData, skey){
+  const ouvertures = siteData.siteEntries.filter(e=>e.kind==='ouverture');
+  const byMotif = {};
+  ouvertures.forEach(e=>{ const m = e.raw.motif || 'Non classé'; (byMotif[m] = byMotif[m]||[]).push(e); });
+  window.__dirOuvertureByMotif[skey] = byMotif;
+  const html = groupedBarHtml(byMotif, label=>`showOuvertureDrilldown('${skey}','${esc(label).replace(/'/g,"\\'")}')`);
+  return html || '<div class="state-msg" style="padding:10px 0">Aucune ouverture sur cette période pour ce site.</div>';
+}
+
+function siteWidgetsHtml(siteData, skey){
   const widgets = [];
   const doorKeyword = doorGaugeKeywordFor(siteData.site);
+  let doorSection = '';
   if(doorKeyword){
     const count = siteData.siteEntries.filter(e=>e.kind==='ouverture').length;
     widgets.push(gaugeHtml(count, '🔓 Ouvertures de porte'));
+    doorSection = `<h5>Répartition des ouvertures par nature</h5>${ouvertureMotifHtml(siteData, skey)}`;
   }
-  return widgets.length ? `<div class="dir-widget-row">${widgets.join('')}</div>` : '';
+  const gaugeRow = widgets.length ? `<div class="dir-widget-row">${widgets.join('')}</div>` : '';
+  return gaugeRow + doorSection;
 }
 
 function siteCardHtml(siteData){
@@ -2109,7 +2151,7 @@ function siteCardHtml(siteData){
   return `<div class="site-card">
     <h4>📍 ${esc(siteData.site)}</h4>
     ${typeActionHtml}
-    ${siteWidgetsHtml(siteData)}
+    ${siteWidgetsHtml(siteData, skey)}
     ${mdpBiblioHtml(siteData, skey)}
   </div>`;
 }
@@ -2182,6 +2224,7 @@ function renderDirectionReport(){
   const siteBreakdown = computeSiteBreakdown(entries);
   window.__dirSiteBreakdown = {};
   window.__dirBiblioSeries = {};
+  window.__dirOuvertureByMotif = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
