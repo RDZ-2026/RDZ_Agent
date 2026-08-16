@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v9 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v10 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -298,16 +298,26 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 /* Nature d'activité / catégorie + type d'action — liste fermée fournie
    par Laurent (fichier Activité.xlsx). Deux niveaux : la nature (grande
    catégorie) détermine la liste de types d'action proposée en cascade.
-   "Alarmes" et "Changements de pile" sont volontairement ABSENTS de
-   cette liste pour l'instant :
-   - "Alarmes" sera intégré au rapport alarme (buildAlarmeReport) dans
-     un second temps — les alarmes ont déjà leurs propres champs
-     (transmetteur/zone/checklist), ce module ne les reclassifie pas.
-   - "Changements de pile" suivra le modèle simplifié "ouverture
-     résident IHEID" (numéro de chambre uniquement) — module à part à
-     construire plus tard, pas dans ce sélecteur générique. */
+   ACTIVITY_TAXONOMY_ORDER = catégories proposées pour un rapport STANDARD
+   (journal_entrees) — "Alarmes" en est volontairement exclue : pour une
+   intervention alarme, la nature est toujours "Alarmes" (implicite, pas
+   de choix), seul le type d'action se choisit, dans ACTIVITY_TAXONOMY.Alarmes
+   (voir alarmeTypeActionSelectHtml plus bas). "Changements de pile"
+   reste hors périmètre : suivra le modèle simplifié "ouverture résident
+   IHEID" (numéro de chambre uniquement) — module à part à construire
+   plus tard, pas dans ce sélecteur générique. */
 const ACTIVITY_TAXONOMY_ORDER = ["Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
 const ACTIVITY_TAXONOMY = {
+  "Alarmes": [
+    "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)",
+    "INCENDIE - Alarme avec intervention pompiers",
+    "INCENDIE - Dérangement centrale feu",
+    "INTRUSION - Alarme effraction",
+    "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)",
+    "INTRUSION - Dérangement",
+    "TECHNIQUE - Alarme",
+    "Autre"
+  ],
   "Accès": [
     "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
     "Fermeture d'un accès principal ou secondaire essentiel",
@@ -403,6 +413,12 @@ function typeActionOptionsHtml(nature, currentType){
 function refreshTypeActionSelect(natId, typeId){
   const nature = document.getElementById(natId).value;
   document.getElementById(typeId).innerHTML = typeActionOptionsHtml(nature, null);
+}
+/* Rendu du sélecteur ÉDITABLE "Type d'action" pour une intervention
+   ALARME : pas de choix de nature (toujours "Alarmes", implicite),
+   juste le sous-type parmi ACTIVITY_TAXONOMY.Alarmes. */
+function alarmeTypeActionSelectHtml(id, currentType){
+  return `<select id="${id}">${typeActionOptionsHtml('Alarmes', currentType)}</select>`;
 }
 
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
@@ -697,8 +713,9 @@ function renderEditForm(r){
         <label>Type d'action</label>
         <select id="ef-type_action">${typeActionOptionsHtml(r.raw.nature_activite, r.raw.type_action)}</select>
       </div>` : `
-      <div class="efield" style="background:var(--bg-soft);border-radius:var(--radius-ui);padding:10px 12px;font-size:12.5px;color:#888">
-        <i>La classification par nature d'activité / type d'action sera ajoutée aux rapports d'alarme dans un second temps.</i>
+      <div class="efield">
+        <label>Type d'action (nature : Alarmes)</label>
+        ${alarmeTypeActionSelectHtml('ef-type_action', r.raw.type_action)}
       </div>`}
       <div class="efield">
         <label>Statut de clôture</label>
@@ -736,6 +753,10 @@ async function saveEdit(id){
   if(natEl){
     payload.nature_activite = natEl.value.trim() || null;
     payload.type_action = typeEl ? (typeEl.value.trim() || null) : null;
+  }else if(r.kind==='alarme' && typeEl){
+    // Pas de sélecteur de nature pour l'alarme : elle est toujours "Alarmes".
+    payload.type_action = typeEl.value.trim() || null;
+    payload.nature_activite = payload.type_action ? 'Alarmes' : null;
   }
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
   try{
@@ -914,8 +935,8 @@ function buildPromptLines(items){
     '      "actions_corrigees": "Reformulation des SEULES actions de CE rapport — voir style attendu plus bas.",',
     '      "resultat_corrige": "Uniquement pour une intervention alarme ; null pour un rapport standard.",',
     '      "statut_cloture": "regle | action | info | probleme",',
-    '      "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas, ou null (rapport standard uniquement)",',
-    '      "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null (rapport standard uniquement)",',
+    '      "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas (pour une intervention alarme, toujours EXACTEMENT \\"Alarmes\\"), ou null",',
+    '      "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null",',
     '      "rapport_complet": true,',
     '      "elements_manquants": "Ce qui manque pour que CE rapport soit complet, ou null si complet."',
     '    }',
@@ -931,7 +952,7 @@ function buildPromptLines(items){
     '- Corrige l\'orthographe et la grammaire, améliore la formulation, mais NE change PAS les faits, heures, lieux ou noms.',
     '- Le champ "resultat_corrige" doit rester factuel (ne pas enjoliver une intervention non terminée).',
     '- "statut_cloture" : choisis EXACTEMENT une des 4 valeurs "regle" (situation terminée), "action" (action à venir), "info" (pour information), "probleme" (problème en cours) — jamais une autre valeur.',
-    '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse les deux champs à null plutôt que de forcer une catégorie approximative. Ne s\'applique qu\'aux rapports standard — laisse à null pour les interventions alarme.',
+    '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Pour un rapport de type "Intervention alarme", "nature_activite" est TOUJOURS "Alarmes" (pas de choix) — choisis uniquement le "type_action" dans la sous-liste "Alarmes" (INCENDIE / INTRUSION / TECHNIQUE / Autre). Pour un "Rapport standard", choisis la nature parmi les 6 autres catégories. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse "type_action" à null plutôt que de forcer une catégorie approximative.',
     '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre CE rapport (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
     '- Utilise le registre professionnel utilisé dans les rapports de sécurité privée suisse.',
     '',
@@ -962,7 +983,12 @@ function buildPromptLines(items){
       '• ' + n + ' :',
       ...ACTIVITY_TAXONOMY[n].map(t => '    - ' + t)
     ]),
-    '(Remarque : "Alarmes" et "Changements de pile" existent dans la liste interne RDZ mais sont HORS PÉRIMÈTRE ici — ne les propose jamais pour "nature_activite" sur ce type de rapport.)',
+    '',
+    'Cas particulier des rapports d\'intervention ALARME : "nature_activite" est TOUJOURS exactement "Alarmes" (ce n\'est jamais un choix) — choisis uniquement le "type_action" dans cette sous-liste dédiée :',
+    '• Alarmes :',
+    ...ACTIVITY_TAXONOMY['Alarmes'].map(t => '    - ' + t),
+    '',
+    '(Remarque : "Changements de pile" existe dans la liste interne RDZ mais reste HORS PÉRIMÈTRE ici — ne le propose jamais pour "nature_activite"/"type_action", quel que soit le type de rapport.)',
     '',
     'RAPPORTS SOURCES (' + items.length + ') — un élément de "rapports" par rapport ci-dessous, JAMAIS mélangés :',
     ''
@@ -1032,6 +1058,8 @@ function generateReport(){
     if(r.kind==='standard'){
       document.getElementById(`rev-r${i}-nature`).innerHTML = natureSelectHtml(`rev-r${i}-nature-input`, `rev-r${i}-type-input`, corr.nature_activite);
       document.getElementById(`rev-r${i}-type`).innerHTML = `<select id="rev-r${i}-type-input">${typeActionOptionsHtml(corr.nature_activite, corr.type_action)}</select>`;
+    }else{
+      document.getElementById(`rev-r${i}-type`).innerHTML = alarmeTypeActionSelectHtml(`rev-r${i}-type-input`, corr.type_action);
     }
     document.getElementById(`rev-r${i}-cloture`).innerHTML = clotureSelectHtml(`rev-r${i}`, corr.statut_cloture);
     document.getElementById(`rev-r${i}-complet`).checked = corr.rapport_complet !== false;
@@ -1067,7 +1095,8 @@ function renderReviewCardHtml(i, r, corr){
     </div>` : ''}
     ${r.kind==='standard' ? `
     <div class="efield"><label>Nature d'activité</label><div id="rev-r${i}-nature"></div></div>
-    <div class="efield"><label>Type d'action</label><div id="rev-r${i}-type"></div></div>` : ''}
+    <div class="efield"><label>Type d'action</label><div id="rev-r${i}-type"></div></div>` : `
+    <div class="efield"><label>Type d'action (nature : Alarmes)</label><div id="rev-r${i}-type"></div></div>`}
     <div class="efield"><label>Statut de clôture</label><div id="rev-r${i}-cloture"></div></div>
     <div class="efield">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
@@ -1116,10 +1145,11 @@ async function finalizeSyntheseReport(){
     const typeEl = document.getElementById(`rev-r${i}-type-input`);
     const complet = document.getElementById(`rev-r${i}-complet`).checked;
     const apply = document.getElementById(`rev-r${i}-apply`).checked;
+    const type_action = typeEl ? (typeEl.value.trim() || null) : null;
+    const nature_activite = natEl ? (natEl.value.trim() || null) : (r.kind==='alarme' && type_action ? 'Alarmes' : null);
     return {
       r, situation, actions, resultat,
-      nature_activite: natEl ? (natEl.value.trim() || null) : null,
-      type_action: typeEl ? (typeEl.value.trim() || null) : null,
+      nature_activite, type_action,
       statut_cloture: clotureSelectedValue(`rev-r${i}`),
       rapport_complet: complet,
       elements_manquants: complet ? null : (document.getElementById(`rev-r${i}-manquants`).value.trim() || null),
@@ -1130,9 +1160,8 @@ async function finalizeSyntheseReport(){
   const toApply = corrected.filter(c=>c.apply);
   if(toApply.length){
     const results = await Promise.allSettled(toApply.map(c=>{
-      const payload = { situation: c.situation || null, actions: c.actions || null, statut_cloture: c.statut_cloture };
+      const payload = { situation: c.situation || null, actions: c.actions || null, statut_cloture: c.statut_cloture, nature_activite: c.nature_activite, type_action: c.type_action };
       if(c.r.kind==='alarme') payload.resultat = c.resultat || null;
-      if(c.r.kind==='standard'){ payload.nature_activite = c.nature_activite; payload.type_action = c.type_action; }
       return applyCorrectionToSource(c.r, payload);
     }));
     const failed = results.filter(x=>x.status==='rejected').length;
@@ -1261,6 +1290,7 @@ function buildMultiReport(titreGlobal, corrected){
         + rpClotureRow(c.statut_cloture||null);
     }else{
       inner = rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>'
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(c.resultat||'—'))+'</div>'
@@ -1329,7 +1359,7 @@ function buildAlarmeReport(r){
       return `<div style="padding:4px 0;border-bottom:1px solid #eee">${c.fait?'✅':'⬜'} ${esc(c.libelle)}${c.heure?' ('+esc(c.heure)+')':''}</div>`;
     }).join('');
   }catch(_){}
-  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>')
+  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>' + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', checklistHtml + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(r.raw.situation||'—'))+'</div>')
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.raw.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
     + rpSec('4 — Photos', r.photos.length
