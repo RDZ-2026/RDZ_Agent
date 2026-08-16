@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-journal · v21 · 2026-08-10 -->
+<!-- RDZ · supervision-journal · v22 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -134,7 +134,7 @@ main{flex:1;padding:18px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Ouvertures résidences · Bibliothèque IHEID · Clés & Badges · Historique matériel · Historique vestiaire · Véhicules</div>
+        <div class="sub">Supervision — journal de bord unifié · Parkings · Validations consignes · Consignes / Événements / Constats · Rapports standard · Interventions alarme · Ouvertures résidences · Bibliothèque IHEID · Clés & Badges · Historique matériel · Historique vestiaire · Véhicules</div>
       </div>
       <a class="home" href="../index.html">← Accueil</a>
     </div>
@@ -212,7 +212,44 @@ main{flex:1;padding:18px}
 
 <script>
 /* ============================================================
-   RDZ — Supervision journal de bord unifié (v21)
+   RDZ — Supervision journal de bord unifié (v22)
+   v22 : RAPPORTS STANDARD + INTERVENTIONS ALARME (tables `journal_entrees`
+   et `alarme_interventions`) — ces deux sources étaient explicitement
+   listées comme "volontairement abandonnées" dans la note de conception
+   initiale (voir plus bas) ; elles rejoignent maintenant le flux unifié,
+   au même titre que les autres kinds. Repris de supervision-rapports.html
+   (même schéma en base, même classification statut_cloture/nature_activite/
+   type_action — voir ACTIVITY_TAXONOMY et CLOTURE_OPTIONS ci-dessous) plutôt
+   que réinventé :
+   — Photos : les deux tables partagent `journal_photos` (clé entree_id),
+     chargées une fois par refresh() dans journalPhotosByEntree (voir
+     loadJournalPhotosByEntree) plutôt que via une jointure par ligne.
+   — Édition : le formulaire générique (startEdit/saveEdit) gère déjà
+     text/textarea/number/origines ; deux types de champ génériques lui
+     sont ajoutés ici — 'cloture' (les 4 pilules de statut, réutilisées
+     telles quelles de supervision-rapports.html) et 'nature_cascade'
+     (sélecteur nature d'activité → type d'action en cascade pour un
+     rapport standard, ou uniquement le type d'action — nature figée à
+     "Alarmes" — pour une intervention alarme).
+   — Suppression : supprime aussi les photos liées (journal_photos) avant
+     la ligne elle-même, comme dans supervision-rapports.html.
+   — Rapport imprimable : buildStandardReport/buildAlarmeReport, adaptés
+     au rpParkShell DE CE FICHIER (bandeau Date/Heure/Agent/Statut à 4
+     colonnes fixes, badge de statut unique) plutôt qu'au bandeau à
+     colonnes dynamiques de supervision-rapports.html — les 3 horaires
+     d'une intervention alarme (alarme/arrivée/fin) sont donc affichés
+     dans le corps du rapport (section 1) plutôt que dans le bandeau.
+   — Hors périmètre (comme dans supervision-rapports.html) : la
+     reformulation IA (pont ZIP → Claude.ai → JSON) n'est PAS reprise ici
+     — ce module reste un journal de consultation/édition rapide ; pour
+     produire un rapport de synthèse multi-rapports reformulé par l'IA,
+     utiliser supervision-rapports.html. L'édition des 3 horaires alarme
+     se limite à heure_arrivee/heure_fin (texte HH:MM) ; l'heure d'alarme
+     (composante horaire de created_at) ne se modifie que depuis
+     supervision-rapports.html, pour ne pas dupliquer cette logique plus
+     spécifique. L'ajout/suppression de photo depuis cette vue n'est pas
+     repris non plus (lecture seule ici) — utiliser supervision-rapports.html
+     pour gérer les photos d'un rapport.
    v21 : frise chronologique horizontale dans la vue Journée de service
    (span 06h30->06h29 via serviceDayBounds), un point par action de la
    liste filtrée courante, positionné selon l'heure réelle, coloré par
@@ -468,6 +505,116 @@ function rpSec(numTitre, innerHtml){
     <div style="padding:1.2rem 1rem">${innerHtml}</div>
   </div>`;
 }
+
+/* ============================================================
+   Rapports standard / alarme — classification et statut de clôture,
+   repris À L'IDENTIQUE de supervision-rapports.html (même colonnes en
+   base : statut_cloture / nature_activite / type_action sur
+   journal_entrees ET alarme_interventions) — jamais réinventé ici.
+   ============================================================ */
+const ACTIVITY_TAXONOMY_ORDER = ["Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
+const ACTIVITY_TAXONOMY = {
+  "Alarmes": [
+    "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)",
+    "INCENDIE - Alarme avec intervention pompiers",
+    "INCENDIE - Dérangement centrale feu",
+    "INTRUSION - Alarme effraction",
+    "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)",
+    "INTRUSION - Dérangement",
+    "TECHNIQUE - Alarme",
+    "Autre"
+  ],
+  "Accès": [
+    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
+    "Fermeture d'un accès principal ou secondaire essentiel",
+    "Accompagnement entreprise",
+    "Site non hermétique",
+    "Contrôle de légitimation (personnel, étudiant, locataire)",
+    "Stationnement non autorisé, stationnement gênant",
+    "Autre"
+  ],
+  "Admin / conciergerie": [
+    "Objets trouvés",
+    "Administratif (Imprimantes, colis, Poste, ...)",
+    "Housing (draps, divers, ...)",
+    "Check-In / Check-Out"
+  ],
+  "Incivilité": [
+    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
+    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
+    "Détérioration de matériel",
+    "Encombrant dans voie de fuite",
+    "Autre"
+  ],
+  "Secourisme": [
+    "Assistance à la personne - Intervention 144",
+    "Assistance à la personne - Premiers soins",
+    "Assistance divers (Ronde de contrôle)",
+    "Autre"
+  ],
+  "Sécurité": [
+    "Evacuation - Personne(s) non autorisée(s) sur espace public",
+    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
+    "Evacuation - Fête non autorisée",
+    "Evacuation - SDF",
+    "Traces de squat",
+    "Gestion de comportement / conflit",
+    "Vol",
+    "Tapage nocturne / diurne",
+    "Autre"
+  ],
+  "Technique": [
+    "Constat de dysfonctionnement d'installation",
+    "Intervention technique (Plomberie, Electricité, …)",
+    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
+    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
+    "Divers technique (Déneigement, Nettoyage sommaire...)",
+    "Autre"
+  ]
+};
+const CLOTURE_OPTIONS = [
+  {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
+  {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
+  {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
+  {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
+];
+function clotureSelectHtml(idPrefix, selKey){
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap">${CLOTURE_OPTIONS.map(o=>{
+    const checked = o.k===selKey ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:.5rem .8rem;border:1.5px solid ${o.k===selKey?'#8B1A1A':'var(--line)'};border-radius:6px;font-size:12px;color:${o.k===selKey?'#8B1A1A':'#666'};cursor:pointer;background:${o.k===selKey?'#fdf0f0':'#fff'};font-weight:${o.k===selKey?'bold':'normal'}"><input type="radio" name="${idPrefix}-statut_cloture" value="${o.k}" ${checked} style="width:auto;margin:0"> ${o.label}</label>`;
+  }).join('')}</div>`;
+}
+function clotureSelectedValue(idPrefix){
+  const el = document.querySelector(`input[name="${idPrefix}-statut_cloture"]:checked`);
+  return el ? el.value : null;
+}
+// Badge de statut unique pour le rapport imprimable (rpParkShell de CE fichier n'a
+// qu'une seule colonne "Statut", pas une rangée de 4 pilules) — celui qui correspond
+// à statut_cloture est mis en avant, ou un badge neutre si non classé.
+function rpClotureBadge(selKey){
+  const o = CLOTURE_OPTIONS.find(x=>x.k===selKey);
+  if(!o) return `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#f0f0f0;color:#888;border:1.5px solid #ccc">Non classé</span>`;
+  return `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:${o.bg};color:${o.color};border:1.5px solid ${o.color}">${o.label}</span>`;
+}
+function natureSelectHtml(natId, typeId, currentNature){
+  const opts = ['<option value="">— Non renseigné —</option>']
+    .concat(ACTIVITY_TAXONOMY_ORDER.map(n=>`<option value="${esc(n)}" ${currentNature===n?'selected':''}>${esc(n)}</option>`))
+    .join('');
+  return `<select id="${natId}" onchange="refreshTypeActionSelect('${natId}','${typeId}')">${opts}</select>`;
+}
+function typeActionOptionsHtml(nature, currentType){
+  const list = ACTIVITY_TAXONOMY[nature] || [];
+  if(!list.length) return '<option value="">— Choisis d\'abord une nature d\'activité —</option>';
+  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('');
+}
+function refreshTypeActionSelect(natId, typeId){
+  const nature = document.getElementById(natId).value;
+  document.getElementById(typeId).innerHTML = typeActionOptionsHtml(nature, null);
+}
+function alarmeTypeActionSelectHtml(id, currentType){
+  return `<select id="${id}">${typeActionOptionsHtml('Alarmes', currentType)}</select>`;
+}
+
 function buildParkingDenonciation(v){
   const badge = `<span style="display:inline-block;padding:.3rem 1rem;border-radius:20px;font-size:12px;font-weight:700;background:#fdf0f0;color:#C8102E;border:1.5px solid #C8102E">Infraction</span>`;
   const body = rpSec('1 — Véhicule en infraction',
@@ -571,7 +718,46 @@ function buildBiblioFiltrageReport(f){
   return rpParkShell('Rapport de filtrage — Bibliothèque', badge, body, meta);
 }
 
-const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport };
+// ═══ Rapports individuels standard / alarme — style "RDZ Reports" ═══
+// Mêmes champs que supervision-rapports.html, adaptés au rpParkShell DE CE FICHIER
+// (badge de statut unique via rpClotureBadge, pas la rangée de 4 pilules). Les photos
+// viennent de journalPhotosByEntree (table journal_photos, clé entree_id) — voir
+// loadJournalPhotosByEntree, appelée à chaque refresh().
+function buildStandardReport(r){
+  const photos = journalPhotosByEntree[r.id]||[];
+  const badge = rpClotureBadge(r.statut_cloture);
+  const body = rpSec('1 — Contexte',
+      rpFieldO('Localisation', esc(r.localisation||r.localisation_autre||'—'))
+      + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
+    + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')))
+    + rpSec('4 — Photos', photos.length
+        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+        : `<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>`);
+  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:r.created_at };
+  return rpParkShell("Rapport standard", badge, body, meta);
+}
+function buildAlarmeReport(r){
+  const badge = rpClotureBadge(r.statut_cloture);
+  const body = rpSec('1 — Transmetteur / Zone / Horaires',
+      rpFieldO('Transmetteur', esc(r.transmetteur_code||'—'))
+      + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.zone||'—'))+'</div>'
+      + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : '')
+      + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
+          ${rpFieldO('Heure alarme', esc(fmtTime(r.created_at)||'—'))}
+          ${rpFieldO('Arrivée sur site', esc(r.heure_arrivee||'—'))}
+          ${rpFieldO('Fin intervention', esc(r.heure_fin||'—'))}
+        </div>`)
+    + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.resultat||'—'))+'</div>')
+    + rpSec('4 — Photos', (journalPhotosByEntree[r.id]||[]).length
+        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${(journalPhotosByEntree[r.id]||[]).map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+        : `<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>`);
+  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:r.created_at };
+  return rpParkShell('Intervention alarme', badge, body, meta);
+}
+
+const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport, rapport_standard: buildStandardReport, alarme: buildAlarmeReport };
 
 function openReport(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
@@ -600,6 +786,8 @@ const KINDS = {
   historique_vestiaire:{ label:'Historique vestiaire', icon:'👕', color:'#0369a1' },
   vehicule_mouvement: { label:'Mouvement véhicule', icon:'🚗', color:'#0f766e' },
   degat_vehicule:     { label:'Dégât véhicule',     icon:'💥', color:'#dc2626' },
+  rapport_standard: { label:'Rapport standard',     icon:'📝', color:'#3b5b7a' },
+  alarme:           { label:'Intervention alarme',  icon:'🚨', color:'#8B1A1A' },
 };
 
 // Distingue un AJOUT d'une MODIFICATION ultérieure en comparant created_at/updated_at
@@ -628,6 +816,21 @@ async function loadBiblioOrigines(){
   try{ const { data } = await sb.from('bibliotheque_config_origines').select('*').eq('actif',true).order('ordre');
     biblioOrigines = data||[];
   }catch(e){ console.warn('bibliotheque_config_origines:', e.message||e); }
+}
+
+// Photos des rapports standard + interventions alarme : table PARTAGÉE journal_photos
+// (clé entree_id), rechargée à chaque refresh() (contrairement à sites/biblioOrigines,
+// chargés une seule fois au démarrage) car de nouvelles photos peuvent être ajoutées
+// entre deux rafraîchissements, depuis les modules agents ou supervision-rapports.html.
+let journalPhotosByEntree = {};
+async function loadJournalPhotosByEntree(){
+  try{
+    const { data, error } = await sb.from('journal_photos').select('*').order('created_at',{ascending:false}).limit(3000);
+    if(error) throw error;
+    const map = {};
+    (data||[]).forEach(p=>{ (map[p.entree_id] = map[p.entree_id]||[]).push({id:p.id, url:p.url, legende:p.legende||''}); });
+    journalPhotosByEntree = map;
+  }catch(e){ console.warn('journal_photos:', e.message||e); }
 }
 
 /* ============================================================
@@ -915,6 +1118,67 @@ const SOURCES = [
       return `<div class="msec"><div class="st">Dégât</div><div class="txt">${esc(DMG_LABELS[r.type]||r.type||'—')} — sévérité ${esc(r.severity||'—')}<br>Constaté le ${fmtDate(r.date)} par ${esc(r.created_by||'—')}</div></div>
         ${r.description?`<div class="msec"><div class="st">Description</div><div class="txt">${esc(r.description)}</div></div>`:''}
         <div class="msec"><div class="st">Statut</div><div class="txt">${r.resolved?'✅ Résolu'+(r.resolved_at?' le '+fmtDate(r.resolved_at):''):'⏳ Actif — non résolu'}</div></div>`; } },
+
+  { kind:'rapport_standard', table:'journal_entrees',
+    // Repris de supervision-rapports.html : rapports "standard" saisis via
+    // rapport-standard.html (journal_entrees). Photos communes avec l'intervention
+    // alarme via journal_photos (voir journalPhotosByEntree, chargé dans refresh()).
+    async fetch(){ const {data}=await sb.from('journal_entrees').select('*').order('created_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'rapport_standard', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Rapport standard — ${r.nature_activite||r.activite||'—'} — ${r.site_nom||''}`; },
+    snippet(r){ const parts=[r.activite, r.localisation||r.localisation_autre, r.situation].filter(Boolean); return parts.join(' · ')||(r.actions||''); },
+    photos(r){ return journalPhotosByEntree[r.id]||[]; },
+    detailHtml(r){
+      return `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.activite||'—')}</div></div>
+        <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.localisation||r.localisation_autre||'—')}</div></div>
+        <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation||'—')}</div></div>
+        <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.actions||'—')}</div></div>
+        <div class="msec"><div class="st">Classification</div><div class="txt">${esc(r.nature_activite||'Non classé')}${r.type_action?' — '+esc(r.type_action):''}</div></div>
+        <div class="msec"><div class="st">Statut de clôture</div><div class="txt">${rpClotureBadge(r.statut_cloture)}</div></div>`; },
+    fields(){ return [
+      {k:'site_nom',l:'Site',t:'text'},
+      {k:'activite',l:'Activité',t:'text'},
+      {k:'localisation',l:'Localisation',t:'text'},
+      {k:'localisation_autre',l:'Précision localisation',t:'text'},
+      {k:'situation',l:'Que se passe-t-il ?',t:'textarea'},
+      {k:'actions',l:'Actions',t:'textarea'},
+      {k:'nature_type', l:"Nature d'activité / Type d'action", t:'nature_cascade', alarme:false},
+      {k:'statut_cloture', l:'Statut de clôture', t:'cloture'} ]; },
+    async save(r,p){ const {error}=await sb.from('journal_entrees').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ await sb.from('journal_photos').delete().eq('entree_id',r.id); const {error}=await sb.from('journal_entrees').delete().eq('id',r.id); if(error) throw error; } },
+
+  { kind:'alarme', table:'alarme_interventions',
+    // Repris de supervision-rapports.html : interventions alarme saisies via
+    // alarme-agent.html (alarme_interventions). nature_activite y est TOUJOURS
+    // "Alarmes" (implicite, pas de sélecteur) — seul type_action se choisit.
+    async fetch(){ const {data}=await sb.from('alarme_interventions').select('*').order('created_at',{ascending:false}).limit(500); return data||[]; },
+    expand(r){ return [{ ts:r.created_at, sub:'', kind:'alarme', raw:r }]; },
+    site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
+    title(r){ return `Intervention alarme — ${r.type_action||r.transmetteur_code||'—'} — ${r.site_nom||''}`; },
+    snippet(r){ const parts=[r.transmetteur_code?('Transmetteur '+r.transmetteur_code):'', r.zone, r.resultat, r.situation].filter(Boolean); return parts.join(' · '); },
+    photos(r){ return journalPhotosByEntree[r.id]||[]; },
+    detailHtml(r){
+      return `<div class="msec"><div class="st">Transmetteur / Zone</div><div class="txt">${esc(r.transmetteur_code||'—')}${r.zone?' — '+esc(r.zone):''}</div></div>
+        <div class="msec"><div class="st">Horaires</div><div class="txt">Alarme ${esc(fmtTime(r.created_at)||'—')} · Arrivée sur site ${esc(r.heure_arrivee||'—')} · Fin d'intervention ${esc(r.heure_fin||'—')}</div></div>
+        <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation||'—')}</div></div>
+        <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.actions||'—')}</div></div>
+        <div class="msec"><div class="st">Résultat</div><div class="txt">${esc(r.resultat||'—')}</div></div>
+        <div class="msec"><div class="st">Classification</div><div class="txt">Alarmes${r.type_action?' — '+esc(r.type_action):''}</div></div>
+        <div class="msec"><div class="st">Statut de clôture</div><div class="txt">${rpClotureBadge(r.statut_cloture)}</div></div>`; },
+    fields(){ return [
+      {k:'site_nom',l:'Site',t:'text'},
+      {k:'zone',l:'Zone',t:'text'},
+      {k:'transmetteur_code',l:'Transmetteur',t:'text'},
+      {k:'situation',l:'Que se passe-t-il ?',t:'textarea'},
+      {k:'actions',l:'Actions',t:'textarea'},
+      {k:'resultat',l:'Résultat',t:'textarea'},
+      {k:'heure_arrivee',l:'Arrivée sur site (HH:MM)',t:'text'},
+      {k:'heure_fin',l:'Fin intervention (HH:MM)',t:'text'},
+      {k:'type_action', l:"Type d'action (nature : Alarmes)", t:'nature_cascade', alarme:true},
+      {k:'statut_cloture', l:'Statut de clôture', t:'cloture'} ]; },
+    async save(r,p){ const {error}=await sb.from('alarme_interventions').update(p).eq('id',r.id); if(error) throw error; },
+    async del(r){ await sb.from('journal_photos').delete().eq('entree_id',r.id); const {error}=await sb.from('alarme_interventions').delete().eq('id',r.id); if(error) throw error; } },
 ];
 
 /* ---------- État ---------- */
@@ -925,6 +1189,7 @@ async function refresh(){
   list.innerHTML = '<div class="state-msg">Chargement…</div>';
   allEntries = [];
   try{
+    await loadJournalPhotosByEntree();
     await Promise.all(SOURCES.map(async src=>{
       try{
         const rows = await src.fetch();
@@ -1271,6 +1536,20 @@ function startEdit(idx){
           biblioOrigines.map(o=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1;font-size:13px">${esc(o.label)}</span><input type="number" min="0" style="width:80px" id="ef-entree-${esc(o.label)}" value="${entrees[o.label]||0}"></div>`).join('') +
           `</div>`;
       }
+      // Statut de clôture (regle/action/info/probleme) — pilules, réutilisées telles
+      // quelles de supervision-rapports.html (voir clotureSelectHtml).
+      if(f.t==='cloture'){
+        return `<div class="efield"><label>${esc(f.l)}</label>${clotureSelectHtml('ef', r[f.k])}</div>`;
+      }
+      // Nature d'activité → type d'action en cascade (rapport standard), ou uniquement
+      // le type d'action pour une intervention alarme (nature figée à "Alarmes").
+      if(f.t==='nature_cascade'){
+        if(f.alarme){
+          return `<div class="efield"><label>${esc(f.l)}</label>${alarmeTypeActionSelectHtml('ef-'+f.k, r[f.k])}</div>`;
+        }
+        return `<div class="efield"><label>Nature d'activité</label>${natureSelectHtml('ef-nature_activite','ef-type_action', r.nature_activite)}</div>
+          <div class="efield"><label>Type d'action</label><select id="ef-type_action">${typeActionOptionsHtml(r.nature_activite, r.type_action)}</select></div>`;
+      }
       const val = r[f.k]==null?'':r[f.k];
       if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
       return `<div class="efield"><label>${esc(f.l)}</label><input type="${f.t==='number'?'number':'text'}" id="ef-${f.k}" value="${esc(val)}"></div>`;
@@ -1286,6 +1565,21 @@ async function saveEdit(idx){
       const entrees = {};
       biblioOrigines.forEach(o=>{ const el = document.getElementById('ef-entree-'+o.label); if(el) entrees[o.label] = parseInt(el.value)||0; });
       payload[f.k] = entrees;
+      return;
+    }
+    if(f.t==='cloture'){ payload[f.k] = clotureSelectedValue('ef'); return; }
+    if(f.t==='nature_cascade'){
+      if(f.alarme){
+        const el = document.getElementById('ef-'+f.k);
+        const type_action = el ? (el.value.trim()||null) : null;
+        payload[f.k] = type_action;
+        payload.nature_activite = type_action ? 'Alarmes' : null;
+      }else{
+        const natEl = document.getElementById('ef-nature_activite');
+        const typeEl = document.getElementById('ef-type_action');
+        payload.nature_activite = natEl ? (natEl.value.trim()||null) : null;
+        payload.type_action = typeEl ? (typeEl.value.trim()||null) : null;
+      }
       return;
     }
     const el = document.getElementById('ef-'+f.k); if(!el) return;
