@@ -1,4 +1,13 @@
-<!-- RDZ · supervision-journal · v29 · 2026-08-16
+<!-- RDZ · supervision-journal · v30 · 2026-08-16
+     v30 : Rapport direction, partie "Par site" — corrections de nommage : (1) la carte
+       bibliothèque regroupée s'appelle désormais "IHEID - MDP" (et non plus "MDP") ;
+       (2) la jauge ouvertures de porte ne s'applique plus à MDP mais à "IHEID - MDE"
+       (site distinct — Laurent s'était trompé) ; REGM et Barton inchangés. Confirmé par
+       ailleurs : les onglets "Journée de service" et "Vue complète" (liste chronologique
+       + frise) ne montrent et n'ont jamais montré aucun élément de ce récap/graphique —
+       tout ce travail reste strictement rendu dans #direction-content, propre à l'onglet
+       Rapport direction ; rien à supprimer côté code de ces deux onglets.
+     v29 : Rapport direction, partie "Par site" — widgets bibliothèque pour MDP : les
      v29 : Rapport direction, partie "Par site" — widgets bibliothèque pour MDP : les
        rapports bibliothèque portent toujours le site fixe "Bibliothèque IHEID" côté
        données (jamais littéralement "MDP") → sur confirmation de Laurent, ils sont
@@ -1956,14 +1965,16 @@ function siteKeySlug(s){ return 'sk_' + String(s).replace(/[^a-zA-Z0-9]/g,'_'); 
 // des rapports standard/alarme, OU (pour les sites concernés) des données pour un
 // widget spécifique (ouvertures, bibliothèque, parking, badges, ParkGuard…). Cette
 // fonction sera étendue au fur et à mesure de l'ajout des widgets par site.
-const DOOR_GAUGE_SITE_KEYWORDS = ['REGM','MDP','Barton'];
+// Jauge ouvertures de porte : REGM, IHEID - MDE (pas MDP — MDE et MDP sont deux sites
+// IHEID distincts) et Barton.
+const DOOR_GAUGE_SITE_KEYWORDS = ['REGM','MDE','Barton'];
 function siteNameIncludes(siteName, keyword){ return String(siteName).toLowerCase().includes(String(keyword).toLowerCase()); }
 function doorGaugeKeywordFor(siteName){ return DOOR_GAUGE_SITE_KEYWORDS.find(k=>siteNameIncludes(siteName,k)) || null; }
 // Les rapports bibliothèque portent toujours le site fixe "Bibliothèque IHEID" (jamais
-// littéralement "MDP") côté données — sur demande, on les rattache à la carte MDP dans
-// cette vue plutôt que de créer une carte séparée.
+// littéralement "IHEID - MDP") côté données — sur demande, on les rattache à la carte
+// "IHEID - MDP" dans cette vue plutôt que de créer une carte séparée.
 function siteGroupName(rawSite){
-  return siteNameIncludes(rawSite, 'Bibliothèque IHEID') ? 'MDP' : rawSite;
+  return siteNameIncludes(rawSite, 'Bibliothèque IHEID') ? 'IHEID - MDP' : rawSite;
 }
 function siteHasContent(siteData){
   if(siteData.activity.length) return true;
