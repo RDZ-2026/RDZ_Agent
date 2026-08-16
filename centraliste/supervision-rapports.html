@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v8 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v9 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -942,6 +942,9 @@ function buildPromptLines(items){
     '- À éviter : "J\'ai pris le téléphone et j\'ai appelé le service de nettoyage."',
     '- Préféré : "Prise du téléphone. Appel au service de nettoyage."',
     '- Reste neutre et détaché : décris l\'action, pas le vécu de l\'agent (évite "je", "j\'ai vu que", "j\'ai remarqué que" — va directement au fait constaté).',
+    '- NE RÉINTRODUIS JAMAIS la date, l\'heure ou le site dans "situation_corrigee"/"actions_corrigees" : ces informations sont déjà affichées séparément (bandeau du rapport). Une précision de lieu plus fine que le site (ex. un numéro de local) reste utile UNIQUEMENT si elle n\'apparaît nulle part ailleurs — mentionne-la alors brièvement, sans reformuler la date/heure/site autour.',
+    '- À éviter : "Le 11.08.2026 à 13h20, au Pétale 1 du site IHEID - MDP, constat de matières fécales malodorantes au sol. Dépôt attribué à une personne non identifiée."',
+    '- Préféré : "Constat de matières fécales malodorantes au sol au Pétale 1. Dépôt attribué à une personne non identifiée." (date/heure/site déjà dans le bandeau — seul le local "Pétale 1", absent du bandeau, est gardé)',
     '',
     '══════════════════════════════════════════',
     'RAPPEL DE LA MÉTHODE DE RÉDACTION DE RAPPORT (formation interne RDZ) :',
@@ -1229,11 +1232,13 @@ function buildMultiReport(titreGlobal, corrected){
   /* Retour Laurent 2026-08-16 : ne pas répéter dans chaque bloc ce qui
      est déjà visible dans le bandeau méta en haut du rapport (Date /
      Heure / Agent / Nature) — donc plus de site + date/heure par
-     rapport ici (juste le numéro et le type), et plus de champ
-     "Localisation" séparé (le lieu est déjà dans le bandeau). Si un
-     rapport a besoin d'un horodatage plus fin que le bandeau global
-     (plusieurs heures dans un même rapport), le mentionner dans le
-     texte de "Situation" plutôt que dans un champ dédié. */
+     rapport ici (juste le numéro, le type, l'agent). Le champ
+     "Localisation" (précision fine, ex. "Pétale 1" — plus précis que le
+     site du bandeau) reste affiché séparément : c'est justement pour
+     que le texte de "Situation" n'ait plus besoin de la répéter (voir
+     règle STYLE dans buildPromptLines — l'IA doit démarrer directement
+     sur le fait constaté, sans réintroduire date/heure/site/localisation
+     dans la phrase). */
   const sections = corrected.map((c,i)=>{
     const r = c.r;
     const kindLbl = r.kind==='standard' ? '📝 Rapport standard' : '🚨 Intervention alarme';
@@ -1248,7 +1253,9 @@ function buildMultiReport(titreGlobal, corrected){
 
     let inner;
     if(r.kind==='standard'){
-      inner = (c.type_action ? rpFieldO('Type d\'action', esc(c.type_action)) : '')
+      const localisation = r.raw.localisation||r.raw.localisation_autre||'';
+      inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
