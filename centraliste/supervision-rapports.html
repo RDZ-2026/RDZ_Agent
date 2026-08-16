@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v10 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v11 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -429,6 +429,25 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
 function fmtTime(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+
+/* Retrouve dans la checklist (marche à suivre) d'une intervention alarme
+   l'heure associée à un item dont le libellé correspond à un des mots-clés
+   donnés (ex. "arriv" pour "Arrivée sur site") — recherche insensible à la
+   casse et aux accents, car les libellés sont saisis librement par Laurent
+   dans alarme-config.html (pas de champ dédié en base pour cette heure). */
+function stripAccents(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function checklistTimeFor(rawChecklistJson, keywords){
+  try{
+    const cl = JSON.parse(rawChecklistJson||'[]');
+    const list = Array.isArray(cl) ? cl : [];
+    const item = list.find(c=>{
+      if(!c || !c.libelle || !c.heure) return false;
+      const lbl = stripAccents(c.libelle).toLowerCase();
+      return keywords.some(k=>lbl.includes(k));
+    });
+    return item ? item.heure : null;
+  }catch(_){ return null; }
+}
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'+(e?' err':''); setTimeout(()=>t.className='toast',2600); }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -955,6 +974,7 @@ function buildPromptLines(items){
     '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Pour un rapport de type "Intervention alarme", "nature_activite" est TOUJOURS "Alarmes" (pas de choix) — choisis uniquement le "type_action" dans la sous-liste "Alarmes" (INCENDIE / INTRUSION / TECHNIQUE / Autre). Pour un "Rapport standard", choisis la nature parmi les 6 autres catégories. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse "type_action" à null plutôt que de forcer une catégorie approximative.',
     '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre CE rapport (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
     '- Utilise le registre professionnel utilisé dans les rapports de sécurité privée suisse.',
+    '- Pour une "Intervention alarme" : la "Marche à suivre effectuée" (checklist) listée ci-dessous pour ce rapport ne s\'affiche PLUS telle quelle dans le rapport imprimé — intègre-la de façon narrative et synthétique dans "actions_corrigees" (ex. "Déplacement sur site. Contrôle des accès. Quittance effectuée." plutôt que de recopier chaque étape avec sa case à cocher). Ne la restitue jamais sous forme de liste brute.',
     '',
     '══════════════════════════════════════════',
     'STYLE ATTENDU — phrases courtes et neutres, pas de récit à la première personne :',
@@ -1216,6 +1236,23 @@ function rpClotureRow(selKey){
 function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
   const dateTxt = meta.created_at ? rpFmtDate(new Date(meta.created_at).toISOString().slice(0,10)) : '—';
   const heureTxt = meta.created_at ? fmtTime(meta.created_at) : '—';
+  /* meta.timeFields (optionnel) : pour une intervention alarme, on veut voir
+     dans le bandeau non seulement l'heure de l'alarme mais aussi l'heure
+     d'arrivée sur site et l'heure de fin d'intervention (retour Laurent
+     2026-08-16) — remplace alors la colonne "Heure" unique par autant de
+     colonnes que d'entrées fournies. Sans timeFields (rapport standard, ou
+     document multi-rapports), on garde le comportement d'origine (1 seule
+     colonne "Heure" = created_at). */
+  const timeCols = (Array.isArray(meta.timeFields) && meta.timeFields.length)
+    ? meta.timeFields.map(tf=>({label:tf.label, value:tf.value||'—'}))
+    : [{label:'Heure', value:heureTxt}];
+  const cols = [
+    {label:'Date', value:dateTxt},
+    ...timeCols,
+    {label:'Agent', value:esc(meta.agent_name||'—')},
+    {label:'Nature d\'activité', value:esc(activiteTxt||'—')}
+  ];
+  const metaGridHtml = cols.map((c,i)=>`<div style="padding:.9rem 1rem;${i<cols.length-1?'border-right:1px solid #ddd;':''}"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">${esc(c.label)}</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${c.value}</div></div>`).join('');
   return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
     <div style="background:#1a1a1a;padding:1.5rem 2rem">
       <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
@@ -1227,11 +1264,8 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
         <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:${RPTO_LOGO_MIME};base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);background:#f0f0f0">
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Date</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${dateTxt}</div></div>
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Heure</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${heureTxt}</div></div>
-      <div style="padding:.9rem 1rem;border-right:1px solid #ddd"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Agent</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(meta.agent_name||'—')}</div></div>
-      <div style="padding:.9rem 1rem"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px">Nature d'activité</label><div style="font-size:13px;color:#1a1a1a;font-weight:600">${esc(activiteTxt||'—')}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(${cols.length},1fr);background:#f0f0f0">
+      ${metaGridHtml}
     </div>
     <div style="padding:1.5rem 2rem">${bodyHtml}</div>
     <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
@@ -1317,6 +1351,21 @@ function buildMultiReport(titreGlobal, corrected){
     id: corrected[0] ? corrected[0].r.id : Date.now().toString(36),
     created_at: earliestTs || new Date().toISOString()
   };
+  // Retour Laurent 2026-08-16 : quand le document ne porte que sur UNE
+  // seule intervention alarme, le bandeau affiche ses 3 heures (alarme /
+  // arrivée / fin) plutôt qu'une simple "Heure" générique — comme pour
+  // buildAlarmeReport. Avec plusieurs rapports sélectionnés (mixtes ou
+  // non), on garde le bandeau agrégé d'origine (pas de 3 heures qui n'ont
+  // de sens que pour un seul rapport).
+  if(corrected.length === 1 && corrected[0].r.kind === 'alarme'){
+    const soloR = corrected[0].r;
+    const arriveeH = checklistTimeFor(soloR.raw.checklist, ['arriv']);
+    meta.timeFields = [
+      {label:'Heure alarme', value: esc(fmtTime(soloR.ts)||'—')},
+      {label:'Arrivée sur site', value: esc(arriveeH||'—')},
+      {label:'Fin intervention', value: esc(soloR.raw.heure_fin||'—')}
+    ];
+  }
   const activiteTxt = corrected.length === 1
     ? (corrected[0].nature_activite || (corrected[0].r.kind==='alarme' ? 'Alarme' : '—'))
     : corrected.length + ' rapports';
@@ -1348,24 +1397,29 @@ function buildStandardReport(r){
 function buildAlarmeReport(r){
   const done = String(r.raw.resultat||'').toLowerCase();
   const clotureKey = r.raw.statut_cloture || ((done.includes('termin') || done.includes('quittance')) ? 'regle' : 'probleme');
-  let checklistHtml = '<div style="color:#999;font-size:13px"><i>Aucune étape enregistrée.</i></div>';
-  try{
-    const cl = JSON.parse(r.raw.checklist||'[]');
-    const visibles = (Array.isArray(cl)?cl:[]).filter(c=>c.visible!==false);
-    if(visibles.length) checklistHtml = visibles.map(c=>{
-      if(c.type==='question') return `<div style="padding:4px 0;border-bottom:1px solid #eee">❓ ${esc(c.libelle)} → <b>${esc(c.reponse||'—')}</b></div>`;
-      if(c.type==='heure') return `<div style="padding:4px 0;border-bottom:1px solid #eee">🕐 ${esc(c.libelle)} : <b>${esc(c.heure||'—')}</b></div>`;
-      if(c.type==='note') return `<div style="padding:4px 0;border-bottom:1px solid #eee">📝 ${esc(c.libelle)} : ${esc(c.note||'—')}</div>`;
-      return `<div style="padding:4px 0;border-bottom:1px solid #eee">${c.fait?'✅':'⬜'} ${esc(c.libelle)}${c.heure?' ('+esc(c.heure)+')':''}</div>`;
-    }).join('');
-  }catch(_){}
+  /* Retour Laurent 2026-08-16 : ne plus afficher l'intégralité de la
+     checklist (marche à suivre) dans "Constats sur place" — elle reste
+     saisie et transmise à l'IA (voir buildPromptLines), qui l'intègre de
+     façon narrative dans "Actions" ; ici on ne garde que la Situation. */
   const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>' + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
-    + rpSec('2 — Constats sur place', checklistHtml + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(r.raw.situation||'—'))+'</div>')
+    + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.raw.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
     + rpSec('4 — Photos', r.photos.length
         ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
-  const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
+  /* Bandeau : heure de l'alarme (created_at), heure d'arrivée sur site
+     (retrouvée dans la checklist par mot-clé — pas de colonne dédiée en
+     base, voir checklistTimeFor) et heure de fin d'intervention
+     (r.raw.heure_fin, saisie par l'agent à la clôture). */
+  const arriveeH = checklistTimeFor(r.raw.checklist, ['arriv']);
+  const meta = {
+    site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts,
+    timeFields: [
+      {label:'Heure alarme', value: esc(fmtTime(r.ts)||'—')},
+      {label:'Arrivée sur site', value: esc(arriveeH||'—')},
+      {label:'Fin intervention', value: esc(r.raw.heure_fin||'—')}
+    ]
+  };
   return rpParkShell('Intervention alarme', r.raw.nature_activite || 'Alarme', body, meta);
 }
 
