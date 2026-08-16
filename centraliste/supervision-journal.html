@@ -506,6 +506,76 @@ function rpSec(numTitre, innerHtml){
   </div>`;
 }
 
+/* ---------- Bandeau dynamique "RDZ Reports" — repris À L'IDENTIQUE de
+   supervision-rapports.html (rpParkShell là-bas), pour le rapport final
+   d'intervention alarme : demande explicite de l'utilisateur du
+   2026-08-16 de reprendre ce style plutôt que le bandeau à 4 colonnes
+   fixes (Date/Heure/Agent/Statut) utilisé par rpParkShell ci-dessus pour
+   les autres types de rapport (parking, ouverture, bibliothèque, rapport
+   standard). Différence avec rpParkShell : nombre de colonnes variable
+   (meta.timeFields peut fournir plusieurs horaires, ex. alarme/arrivée/
+   fin, au lieu d'une seule colonne "Heure"), 4e colonne "Nature d'activité"
+   au lieu d'un badge de statut (le statut de clôture est affiché via
+   rpClotureRow dans le corps du rapport, section "Mesures prises" —
+   jamais dans le bandeau, comme dans supervision-rapports.html). Nommée
+   différemment de rpParkShell pour ne rien changer aux autres rapports
+   déjà en place dans ce fichier. */
+function rpAlarmeShell(labelTxt, activiteTxt, bodyHtml, meta){
+  const dateTxt = meta.created_at ? rpFmtDate(new Date(meta.created_at).toISOString().slice(0,10)) : '—';
+  const heureTxt = meta.created_at ? fmtTime(meta.created_at) : '—';
+  const timeCols = (Array.isArray(meta.timeFields) && meta.timeFields.length)
+    ? meta.timeFields.map(tf=>({label:tf.label, value:tf.value||'—'}))
+    : [{label:'Heure', value:heureTxt}];
+  const cols = [
+    {label:'Date', value:dateTxt},
+    ...timeCols,
+    {label:'Agent', value:esc(meta.agent_name||'—')},
+    {label:'Nature d\'activité', value:esc(activiteTxt||'—')}
+  ];
+  // Grille à deux rangées explicites (tous les libellés en rangée 1, toutes les valeurs
+  // en rangée 2) pour que des libellés de longueurs différentes ("Date" vs "Arrivée sur
+  // site") ne décalent jamais les valeurs les unes par rapport aux autres.
+  const labelRowHtml = cols.map((c,i)=>`<div style="grid-column:${i+1};grid-row:1;padding:.9rem 1rem 0;${i<cols.length-1?'border-right:1px solid #ddd;':''}"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;line-height:1.4">${esc(c.label)}</label></div>`).join('');
+  const valueRowHtml = cols.map((c,i)=>`<div style="grid-column:${i+1};grid-row:2;padding:5px 1rem .9rem;${i<cols.length-1?'border-right:1px solid #ddd;':''}"><div style="font-size:13px;color:#1a1a1a;font-weight:600">${c.value}</div></div>`).join('');
+  return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
+    <div style="background:#1a1a1a;padding:1.5rem 2rem">
+      <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
+        <div style="flex:1">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#C8102E;margin-bottom:6px">${labelTxt}</div>
+          <div style="font-size:20px;font-weight:700;color:#fff;line-height:1.3;border-bottom:1px solid #444;padding:2px 0">${esc(meta.site||'—')}</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:8px 14px;flex-shrink:0"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:52px;width:auto;display:block"></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(${cols.length},1fr);grid-template-rows:auto auto;background:#f0f0f0">
+      ${labelRowHtml}
+      ${valueRowHtml}
+    </div>
+    <div style="padding:1.5rem 2rem">${bodyHtml}</div>
+    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:image/png;base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
+        <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel</div>
+      </div>
+      <div style="font-size:10px;color:#888;line-height:1.7;text-align:right">contact@rdz-security-management.ch<br>+41 22 552 26 99 · Quai du Seujet 22, Genève</div>
+    </div>
+  </div>`;
+}
+// Statut de clôture — rangée de 4 pilules (repris à l'identique de supervision-rapports.html),
+// pour le corps du rapport alarme (section "Mesures prises") au lieu du badge unique
+// rpClotureBadge utilisé dans le bandeau à 4 colonnes fixes des autres rapports.
+function rpClotureRow(selKey){
+  return `<div style="display:flex;gap:8px;flex-wrap:nowrap;margin-top:14px">${CLOTURE_OPTIONS.map(o=>{
+    const sel = o.k===selKey;
+    const border = sel ? o.color : '#ddd';
+    const bg = sel ? o.bg : '#fff';
+    const color = sel ? o.color : '#888';
+    const weight = sel ? '700' : '400';
+    return `<div style="flex:1;padding:.55rem .3rem;border:1.5px solid ${border};border-radius:6px;text-align:center;font-size:11px;color:${color};background:${bg};font-weight:${weight};white-space:nowrap">${o.label}</div>`;
+  }).join('')}</div>`;
+}
+
 /* ============================================================
    Rapports standard / alarme — classification et statut de clôture,
    repris À L'IDENTIQUE de supervision-rapports.html (même colonnes en
@@ -738,23 +808,26 @@ function buildStandardReport(r){
   return rpParkShell("Rapport standard", badge, body, meta);
 }
 function buildAlarmeReport(r){
-  const badge = rpClotureBadge(r.statut_cloture);
-  const body = rpSec('1 — Transmetteur / Zone / Horaires',
-      rpFieldO('Transmetteur', esc(r.transmetteur_code||'—'))
-      + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.zone||'—'))+'</div>'
-      + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : '')
-      + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:10px">
-          ${rpFieldO('Heure alarme', esc(fmtTime(r.created_at)||'—'))}
-          ${rpFieldO('Arrivée sur site', esc(r.heure_arrivee||'—'))}
-          ${rpFieldO('Fin intervention', esc(r.heure_fin||'—'))}
-        </div>`)
+  const photos = journalPhotosByEntree[r.id]||[];
+  // Statut de clôture : priorité à statut_cloture (saisi/corrigé explicitement) ; à défaut,
+  // repli heuristique sur le résultat déclaré — même logique que supervision-rapports.html.
+  const done = String(r.resultat||'').toLowerCase();
+  const clotureKey = r.statut_cloture || ((done.includes('termin') || done.includes('quittance')) ? 'regle' : 'probleme');
+  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.zone||'—'))+'</div>' + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.resultat||'—'))+'</div>')
-    + rpSec('4 — Photos', (journalPhotosByEntree[r.id]||[]).length
-        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${(journalPhotosByEntree[r.id]||[]).map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
+    + rpSec('4 — Photos', photos.length
+        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
         : `<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>`);
-  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:r.created_at };
-  return rpParkShell('Intervention alarme', badge, body, meta);
+  const meta = {
+    site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:r.created_at,
+    timeFields: [
+      {label:'Heure alarme', value: esc(fmtTime(r.created_at)||'—')},
+      {label:'Arrivée sur site', value: esc(r.heure_arrivee||'—')},
+      {label:'Fin intervention', value: esc(r.heure_fin||'—')}
+    ]
+  };
+  return rpAlarmeShell('Intervention alarme', r.nature_activite || 'Alarme', body, meta);
 }
 
 const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport, rapport_standard: buildStandardReport, alarme: buildAlarmeReport };
