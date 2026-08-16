@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v4 · 2026-08-15 -->
+<!-- RDZ · supervision-rapports · v6 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -86,8 +86,12 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 /* Formulaire de modification (champs + photos) */
 .efield{margin-bottom:12px}
 .efield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#888;font-weight:bold;margin-bottom:5px}
-.efield input,.efield textarea{width:100%;font-family:var(--font);font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px}
+.efield input,.efield textarea,.efield select{width:100%;font-family:var(--font);font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 10px}
 .efield textarea{min-height:80px;resize:vertical}
+.cloture-select{display:flex;gap:8px;flex-wrap:wrap}
+.cloture-opt{display:flex;align-items:center;gap:6px;padding:.5rem .8rem;border:1.5px solid var(--line);border-radius:6px;font-size:12px;color:#666;cursor:pointer;background:#fff;user-select:none}
+.cloture-opt input{width:auto;margin:0}
+.cloture-opt:has(input:checked){border-color:#8B1A1A;background:#fdf0f0;color:#8B1A1A;font-weight:bold}
 .photo{border:1px solid var(--line-soft);border-radius:var(--radius-ui);overflow:hidden}
 .photo img{width:100%;height:110px;object-fit:cover;display:block}
 .photo .lg{font-size:11.5px;color:#666;padding:6px 8px}
@@ -203,9 +207,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
     <div class="mh"><button class="x" onclick="closeIAModal()">✕</button>
       <div class="k">Reformulation IA</div><h3>🤖 Analyse IA — Claude.ai</h3></div>
     <div class="mb">
+      <div id="ia-step3">
       <div class="step-box active"><strong>Étape 1</strong> — Clique « Télécharger le pack » — tu reçois un ZIP avec les photos des rapports sélectionnés + le message prêt pour Claude.</div>
       <div class="step-box"><strong>Étape 2</strong> — Ouvre Claude.ai, glisse toutes les photos + le fichier <code>MESSAGE_POUR_CLAUDE.txt</code>. Envoie.</div>
-      <div class="step-box"><strong>Étape 3</strong> — Copie le JSON retourné par Claude, colle-le ci-dessous, clique « Générer le rapport ».</div>
+      <div class="step-box"><strong>Étape 3</strong> — Copie le JSON retourné par Claude, colle-le ci-dessous, clique « Vérifier le résultat ».</div>
 
       <div class="section-label">Rapports sélectionnés</div>
       <div class="pack-list" id="pack-list"></div>
@@ -224,8 +229,42 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
       <textarea class="result-input" id="claude-result" placeholder="Colle ici le JSON retourné par Claude.ai…"></textarea>
 
       <div style="display:flex;gap:10px;margin-top:14px">
-        <button class="btn" onclick="generateReport()">✅ Générer le rapport de synthèse</button>
+        <button class="btn" onclick="generateReport()">🔎 Vérifier le résultat</button>
         <button class="btn btn-sec" onclick="closeIAModal()">Fermer</button>
+      </div>
+      </div>
+
+      <div id="ia-review" style="display:none">
+        <div class="step-box active"><strong>Étape 4</strong> — Vérifie (et corrige si besoin) le titre, la nature d'activité et le statut proposés par l'IA avant de générer le rapport final.</div>
+
+        <div class="efield"><label>Titre du rapport</label><input type="text" id="rev-titre"></div>
+        <div class="efield">
+          <label>Nature d'activité</label>
+          <div id="rev-nature"></div>
+        </div>
+        <div class="efield">
+          <label>Type d'action</label>
+          <div id="rev-type"></div>
+        </div>
+        <div class="efield">
+          <label>Statut de clôture</label>
+          <div id="rev-cloture"></div>
+        </div>
+        <div class="efield">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
+            <input type="checkbox" id="rev-complet" onchange="toggleRevManquants()" style="width:auto"> Rapport complet (toutes les informations nécessaires sont présentes)
+          </label>
+        </div>
+        <div class="efield" id="rev-manquants-wrap">
+          <label>Éléments manquants</label>
+          <textarea id="rev-manquants" placeholder="Ce qu'il manque pour considérer ce rapport comme complet…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn" onclick="finalizeSyntheseReport()">✅ Générer le rapport final</button>
+          <button class="btn btn-sec" onclick="backToJsonStep()">◀ Revenir au JSON</button>
+          <button class="btn btn-sec" onclick="closeIAModal()">Fermer</button>
+        </div>
       </div>
     </div>
   </div>
@@ -267,6 +306,116 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
    dans le style "RDZ Reports" (rpParkShell/rpSec, repris à l'identique
    de supervision-journal.html).
    ============================================================ */
+
+/* Nature d'activité / catégorie + type d'action — liste fermée fournie
+   par Laurent (fichier Activité.xlsx). Deux niveaux : la nature (grande
+   catégorie) détermine la liste de types d'action proposée en cascade.
+   "Alarmes" et "Changements de pile" sont volontairement ABSENTS de
+   cette liste pour l'instant :
+   - "Alarmes" sera intégré au rapport alarme (buildAlarmeReport) dans
+     un second temps — les alarmes ont déjà leurs propres champs
+     (transmetteur/zone/checklist), ce module ne les reclassifie pas.
+   - "Changements de pile" suivra le modèle simplifié "ouverture
+     résident IHEID" (numéro de chambre uniquement) — module à part à
+     construire plus tard, pas dans ce sélecteur générique. */
+const ACTIVITY_TAXONOMY_ORDER = ["Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
+const ACTIVITY_TAXONOMY = {
+  "Accès": [
+    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
+    "Fermeture d'un accès principal ou secondaire essentiel",
+    "Accompagnement entreprise",
+    "Site non hermétique",
+    "Contrôle de légitimation (personnel, étudiant, locataire)",
+    "Stationnement non autorisé, stationnement gênant",
+    "Autre"
+  ],
+  "Admin / conciergerie": [
+    "Objets trouvés",
+    "Administratif (Imprimantes, colis, Poste, ...)",
+    "Housing (draps, divers, ...)",
+    "Check-In / Check-Out"
+  ],
+  "Incivilité": [
+    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
+    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
+    "Détérioration de matériel",
+    "Encombrant dans voie de fuite",
+    "Autre"
+  ],
+  "Secourisme": [
+    "Assistance à la personne - Intervention 144",
+    "Assistance à la personne - Premiers soins",
+    "Assistance divers (Ronde de contrôle)",
+    "Autre"
+  ],
+  "Sécurité": [
+    "Evacuation - Personne(s) non autorisée(s) sur espace public",
+    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
+    "Evacuation - Fête non autorisée",
+    "Evacuation - SDF",
+    "Traces de squat",
+    "Gestion de comportement / conflit",
+    "Vol",
+    "Tapage nocturne / diurne",
+    "Autre"
+  ],
+  "Technique": [
+    "Constat de dysfonctionnement d'installation",
+    "Intervention technique (Plomberie, Electricité, …)",
+    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
+    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
+    "Divers technique (Déneigement, Nettoyage sommaire...)",
+    "Autre"
+  ]
+};
+
+/* Statut de clôture — 4 options fixes, reprises du modèle de référence
+   fourni par Laurent (rapport_intervention_rdz). Clé stable en base
+   (colonne statut_cloture), libellé + couleur pour l'affichage. */
+const CLOTURE_OPTIONS = [
+  {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
+  {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
+  {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
+  {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
+];
+
+/* Rendu d'un sélecteur de statut de clôture ÉDITABLE (radios stylées en
+   pilules), utilisé dans le formulaire de modification d'un rapport et
+   dans l'étape de vérification du résultat IA. idPrefix distingue les
+   groupes de radios quand plusieurs sélecteurs coexistent sur la page. */
+function clotureSelectHtml(idPrefix, selKey){
+  return `<div class="cloture-select">${CLOTURE_OPTIONS.map(o=>{
+    const checked = o.k===selKey ? 'checked' : '';
+    return `<label class="cloture-opt"><input type="radio" name="${idPrefix}-statut_cloture" value="${o.k}" ${checked}> ${o.label}</label>`;
+  }).join('')}</div>`;
+}
+function clotureSelectedValue(idPrefix){
+  const el = document.querySelector(`input[name="${idPrefix}-statut_cloture"]:checked`);
+  return el ? el.value : null;
+}
+
+/* Rendu du sélecteur ÉDITABLE "Nature d'activité" (menu déroulant sur
+   les 6 catégories fermées) — natId/typeId = ids DOM des deux <select>
+   à relier en cascade (le choix de la nature recharge la liste des
+   types d'action possibles via refreshTypeActionSelect). */
+function natureSelectHtml(natId, typeId, currentNature){
+  const opts = ['<option value="">— Non renseigné —</option>']
+    .concat(ACTIVITY_TAXONOMY_ORDER.map(n=>`<option value="${esc(n)}" ${currentNature===n?'selected':''}>${esc(n)}</option>`))
+    .join('');
+  return `<select id="${natId}" onchange="refreshTypeActionSelect('${natId}','${typeId}')">${opts}</select>`;
+}
+/* Options du 2e menu "Type d'action", filtrées par la nature choisie —
+   utilisé au rendu initial (avec la valeur déjà en base) et au
+   changement de nature (currentType alors toujours null). */
+function typeActionOptionsHtml(nature, currentType){
+  const list = ACTIVITY_TAXONOMY[nature] || [];
+  if(!list.length) return '<option value="">— Choisis d\'abord une nature d\'activité —</option>';
+  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('');
+}
+function refreshTypeActionSelect(natId, typeId){
+  const nature = document.getElementById(natId).value;
+  document.getElementById(typeId).innerHTML = typeActionOptionsHtml(nature, null);
+}
 
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
@@ -551,6 +700,22 @@ function renderEditForm(r){
         if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
         return `<div class="efield"><label>${esc(f.l)}</label><input type="text" id="ef-${f.k}" value="${esc(val)}"></div>`;
       }).join('')}
+      ${r.kind==='standard' ? `
+      <div class="efield">
+        <label>Nature d'activité</label>
+        ${natureSelectHtml('ef-nature_activite', 'ef-type_action', r.raw.nature_activite)}
+      </div>
+      <div class="efield">
+        <label>Type d'action</label>
+        <select id="ef-type_action">${typeActionOptionsHtml(r.raw.nature_activite, r.raw.type_action)}</select>
+      </div>` : `
+      <div class="efield" style="background:var(--bg-soft);border-radius:var(--radius-ui);padding:10px 12px;font-size:12.5px;color:#888">
+        <i>La classification par nature d'activité / type d'action sera ajoutée aux rapports d'alarme dans un second temps.</i>
+      </div>`}
+      <div class="efield">
+        <label>Statut de clôture</label>
+        ${clotureSelectHtml('ef', r.raw.statut_cloture)}
+      </div>
       <div class="efield">
         <label>Photos</label>
         <div class="photos" id="edit-photos">${r.photos.map(p=>`
@@ -577,6 +742,13 @@ async function saveEdit(id){
   const fields = editFieldsFor(r);
   const payload = {};
   fields.forEach(f=>{ const el = document.getElementById('ef-'+f.k); if(el) payload[f.k] = el.value.trim() || null; });
+  payload.statut_cloture = clotureSelectedValue('ef');
+  const natEl = document.getElementById('ef-nature_activite');
+  const typeEl = document.getElementById('ef-type_action');
+  if(natEl){
+    payload.nature_activite = natEl.value.trim() || null;
+    payload.type_action = typeEl ? (typeEl.value.trim() || null) : null;
+  }
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
   try{
     const { error } = await sb.from(table).update(payload).eq('id', id);
@@ -656,9 +828,12 @@ function openIAModal(){
   const ids = Array.from(selectedIds);
   if(!ids.length){ toast('Sélectionne au moins un rapport'); return; }
   window._iaIds = ids;
+  window._iaParsed = null;
   document.getElementById('claude-result').value = '';
   document.getElementById('zip-progress').style.display = 'none';
   document.getElementById('zip-done').style.display = 'none';
+  document.getElementById('ia-step3').style.display = 'block';
+  document.getElementById('ia-review').style.display = 'none';
   const btn = document.getElementById('btn-zip');
   btn.disabled = false; btn.textContent = '📦 Télécharger le pack (photos + message)';
   const items = allReports.filter(r=>ids.includes(r.id));
@@ -751,7 +926,12 @@ function buildPromptLines(items){
     '  ],',
     '  "actions_menees": "Description consolidée des actions menées par le(s) agent(s), au fil des rapports.",',
     '  "resultat": "Situation à la clôture (normalisée / en cours / intervention nécessaire, etc.).",',
-    '  "points_attention": "Anomalies, éléments à signaler à la direction, ou null si aucun."',
+    '  "points_attention": "Anomalies, éléments à signaler à la direction, ou null si aucun.",',
+    '  "statut_cloture": "regle | action | info | probleme",',
+    '  "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas, ou null",',
+    '  "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null",',
+    '  "rapport_complet": true,',
+    '  "elements_manquants": "Liste des informations qui manquent pour considérer ce rapport comme complet, ou null si le rapport est complet."',
     '}',
     '',
     '══════════════════════════════════════════',
@@ -761,8 +941,29 @@ function buildPromptLines(items){
     '- Corrige l\'orthographe et la grammaire, améliore la formulation, mais NE change PAS les faits, heures, lieux ou noms.',
     '- La "chronologie" doit respecter l\'ordre réel des événements (utilise les heures fournies ci-dessous).',
     '- Le champ "resultat" doit rester factuel (ne pas enjoliver une intervention non terminée).',
+    '- "statut_cloture" : choisis EXACTEMENT une des 4 valeurs "regle" (situation terminée), "action" (action à venir), "info" (pour information), "probleme" (problème en cours) — jamais une autre valeur.',
+    '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse les deux champs à null plutôt que de forcer une catégorie approximative.',
+    '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre l\'incident (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
     '- Même si un seul rapport est fourni, produis quand même les mêmes champs (la synthèse peut être courte).',
     '- Utilise le registre professionnel utilisé dans les rapports de sécurité privée suisse.',
+    '',
+    '══════════════════════════════════════════',
+    'RAPPEL DE LA MÉTHODE DE RÉDACTION DE RAPPORT (formation interne RDZ) :',
+    '══════════════════════════════════════════',
+    '- Le "resume" et la "chronologie" doivent répondre aux questions Qui / Quoi / Où / Quand / Comment.',
+    '- Décris la scène telle qu\'elle apparaît (les FAITS constatés), sans JAMAIS ajouter d\'impressions, de sentiments ou d\'interprétations qui ne figurent pas explicitement dans les rapports sources.',
+    '- N\'affirme AUCUNE durée ou cause qui ne serait pas explicitement rapportée par l\'agent dans le texte source (exemples à proscrire si l\'agent ne l\'a pas écrit : "c\'est comme ça depuis 3 jours", "cela fait suite à un manque d\'entretien").',
+    '- Dans "actions_menees", utilise si pertinent le vocabulaire attendu pour les mesures prises : demande de renfort(s), demande de moyens, suivi / prise en compte / action / réparation, demande du client (si un client était présent), appel aux secours (police/pompiers — matricule si mentionné), arrivée des services publics, date et heure de départ des lieux, remplacement / relève.',
+    '- Ces rapports peuvent servir de preuve dans une enquête ou un procès : écriture propre, orthographe soignée, aucune incohérence, registre professionnel.',
+    '',
+    '══════════════════════════════════════════',
+    'CATÉGORIES — liste fermée "nature_activite" → "type_action" (choisis exclusivement ici, n\'invente rien) :',
+    '══════════════════════════════════════════',
+    ...ACTIVITY_TAXONOMY_ORDER.flatMap(n => [
+      '• ' + n + ' :',
+      ...ACTIVITY_TAXONOMY[n].map(t => '    - ' + t)
+    ]),
+    '(Remarque : "Alarmes" et "Changements de pile" existent dans la liste interne RDZ mais sont HORS PÉRIMÈTRE ici — ne les propose jamais pour "nature_activite" sur ce type de rapport.)',
     '',
     'RAPPORTS SOURCES (' + items.length + ') :',
     ''
@@ -794,7 +995,11 @@ function buildPromptLines(items){
   return lines;
 }
 
-/* ---------- Application du résultat : rendu du rapport de synthèse ---------- */
+/* ---------- Application du résultat : étape de vérification, puis rendu ----------
+   Le JSON collé par Laurent est d'abord relu dans un petit formulaire de
+   vérification (titre, statut de clôture, nature d'activité, complétude)
+   qu'il peut corriger avant de générer le rapport final imprimable — l'IA
+   propose, Laurent valide ou corrige, rien n'est figé avant ce clic. */
 function generateReport(){
   const raw = document.getElementById('claude-result').value.trim();
   if(!raw){ toast('⚠️ Colle le JSON de Claude d\'abord', true); return; }
@@ -802,9 +1007,44 @@ function generateReport(){
   try{ parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
   catch(e){ toast('❌ JSON invalide — vérifie la réponse de Claude', true); return; }
 
+  window._iaParsed = parsed;
+  document.getElementById('ia-step3').style.display = 'none';
+  const rev = document.getElementById('ia-review');
+  rev.style.display = 'block';
+  document.getElementById('rev-titre').value = parsed.titre || '';
+  document.getElementById('rev-nature').innerHTML = natureSelectHtml('rev-nature-input', 'rev-type-input', parsed.nature_activite);
+  document.getElementById('rev-type').innerHTML = `<select id="rev-type-input">${typeActionOptionsHtml(parsed.nature_activite, parsed.type_action)}</select>`;
+  document.getElementById('rev-cloture').innerHTML = clotureSelectHtml('rev', parsed.statut_cloture);
+  document.getElementById('rev-complet').checked = parsed.rapport_complet !== false;
+  document.getElementById('rev-manquants').value = parsed.elements_manquants || '';
+  toggleRevManquants();
+  rev.scrollIntoView({block:'nearest'});
+}
+function toggleRevManquants(){
+  const complet = document.getElementById('rev-complet').checked;
+  document.getElementById('rev-manquants-wrap').style.display = complet ? 'none' : 'block';
+}
+function backToJsonStep(){
+  document.getElementById('ia-review').style.display = 'none';
+  document.getElementById('ia-step3').style.display = 'block';
+}
+function finalizeSyntheseReport(){
+  const parsed = window._iaParsed || {};
+  const natEl = document.getElementById('rev-nature-input');
+  const typeEl = document.getElementById('rev-type-input');
+  const complet = document.getElementById('rev-complet').checked;
+  const data = Object.assign({}, parsed, {
+    titre: document.getElementById('rev-titre').value.trim() || parsed.titre,
+    nature_activite: natEl ? (natEl.value.trim() || null) : (parsed.nature_activite || null),
+    type_action: typeEl ? (typeEl.value.trim() || null) : (parsed.type_action || null),
+    statut_cloture: clotureSelectedValue('rev'),
+    rapport_complet: complet,
+    elements_manquants: complet ? null : (document.getElementById('rev-manquants').value.trim() || null)
+  });
+
   const ids = window._iaIds || [];
   const items = allReports.filter(r=>ids.includes(r.id));
-  const html = buildSyntheseReport(parsed, items);
+  const html = buildSyntheseReport(data, items);
   document.getElementById('report-content').innerHTML = html;
   closeIAModal();
   const rv = document.getElementById('report-view');
@@ -838,13 +1078,7 @@ function rpPhotoBoxO(label,url){
    en version figée (lecture seule) : seule l'option correspondant à
    selKey est mise en évidence, les autres restent grisées. */
 function rpClotureRow(selKey){
-  const opts = [
-    {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
-    {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
-    {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
-    {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
-  ];
-  return `<div style="display:flex;gap:8px;flex-wrap:nowrap;margin-top:14px">${opts.map(o=>{
+  return `<div style="display:flex;gap:8px;flex-wrap:nowrap;margin-top:14px">${CLOTURE_OPTIONS.map(o=>{
     const sel = o.k===selKey;
     const border = sel ? o.color : '#ddd';
     const bg = sel ? o.bg : '#fff';
@@ -913,10 +1147,15 @@ function buildSyntheseReport(data, items){
     ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${allPhotos.map(p=>rpPhotoBoxO(p.legende, p.url)).join('')}</div>`
     : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>';
 
-  const body = rpSec('1 — Résumé', rpFieldO('Synthèse', esc(data.resume||'—')) + (data.periode?('<div style="margin-top:10px">'+rpFieldO('Période couverte', esc(data.periode))+'</div>'):''))
+  const incompleteBanner = (data.rapport_complet === false)
+    ? `<div style="display:flex;gap:10px;align-items:flex-start;background:#fdf5f5;border:1.5px solid #C8102E;border-radius:8px;padding:12px 14px;margin-bottom:1.5rem"><div style="font-size:18px">⚠️</div><div><div style="font-weight:700;color:#C8102E;font-size:13px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Rapport incomplet</div><div style="font-size:13px;color:#1a1a1a">${esc(data.elements_manquants||'Éléments manquants non précisés.')}</div></div></div>`
+    : '';
+
+  const body = incompleteBanner
+    + rpSec('1 — Résumé', rpFieldO('Synthèse', esc(data.resume||'—')) + (data.periode?('<div style="margin-top:10px">'+rpFieldO('Période couverte', esc(data.periode))+'</div>'):'') + (data.type_action?('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(data.type_action))+'</div>'):''))
     + rpSec('2 — Chronologie', chronoHtml)
     + rpSec('3 — Actions menées', rpFieldO('Actions', esc(data.actions_menees||'—')))
-    + rpSec('4 — Résultat', rpFieldO('Résultat', esc(data.resultat||'—')) + (data.points_attention ? ('<div style="margin-top:10px">'+rpFieldO('Points d\'attention', esc(data.points_attention))+'</div>') : ''))
+    + rpSec('4 — Résultat', rpFieldO('Résultat', esc(data.resultat||'—')) + (data.points_attention ? ('<div style="margin-top:10px">'+rpFieldO('Points d\'attention', esc(data.points_attention))+'</div>') : '') + rpClotureRow(data.statut_cloture||null))
     + rpSec('5 — Rapports sources (' + items.length + ')', sourcesHtml)
     + rpSec('6 — Photos', photosHtml);
 
@@ -928,7 +1167,7 @@ function buildSyntheseReport(data, items){
     id: items[0] ? items[0].id : Date.now().toString(36),
     created_at: new Date().toISOString()
   };
-  return rpParkShell(esc(data.titre) || 'Rapport de synthèse', 'Synthèse multi-rapports', body, meta);
+  return rpParkShell(esc(data.titre) || 'Rapport de synthèse', esc(data.nature_activite || 'Synthèse multi-rapports'), body, meta);
 }
 
 /* ---------- Rapports imprimables individuels (RDZ Reports), sans IA ----------
@@ -942,19 +1181,19 @@ function buildSyntheseReport(data, items){
    les styles (couleurs, tailles, espacements) sont identiques au fichier
    fourni. */
 function buildStandardReport(r){
-  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(r.raw.localisation||r.raw.localisation_autre||'—')))
+  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(r.raw.localisation||r.raw.localisation_autre||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow('info'))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
         ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
   const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
-  return rpParkShell('Rapport d\'intervention', esc(r.raw.activite||'—'), body, meta);
+  return rpParkShell('Rapport d\'intervention', esc(r.raw.nature_activite || r.raw.activite || '—'), body, meta);
 }
 
 function buildAlarmeReport(r){
   const done = String(r.raw.resultat||'').toLowerCase();
-  const clotureKey = (done.includes('termin') || done.includes('quittance')) ? 'regle' : 'probleme';
+  const clotureKey = r.raw.statut_cloture || ((done.includes('termin') || done.includes('quittance')) ? 'regle' : 'probleme');
   let checklistHtml = '<div style="color:#999;font-size:13px"><i>Aucune étape enregistrée.</i></div>';
   try{
     const cl = JSON.parse(r.raw.checklist||'[]');
@@ -973,7 +1212,7 @@ function buildAlarmeReport(r){
         ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
   const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
-  return rpParkShell('Intervention alarme', 'Alarme', body, meta);
+  return rpParkShell('Intervention alarme', r.raw.nature_activite || 'Alarme', body, meta);
 }
 
 /* ---------- init ---------- */
