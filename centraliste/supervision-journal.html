@@ -1,4 +1,13 @@
-<!-- RDZ · supervision-journal · v23 · 2026-08-16 -->
+<!-- RDZ · supervision-journal · v24 · 2026-08-16
+     v24 : Rapport direction — nouvelles tuiles KPI (remplacent les 4 précédentes) :
+       agents en service sur la période (source planning-agendrix / agendrix_pointages,
+       chargé à la demande), total rapports standard+alarme, dont alarme, dont standard
+       nature "Sécurité", et points ouverts (statut_cloture probléme/action). Le calcul
+       "agents en service" compare les créneaux du planning aux bornes de la période
+       (jour de service ou Du/Au) et, si un site est choisi, filtre sur le nom de site
+       tel qu'il apparaît dans l'export Agendrix (best-effort si le libellé diffère de
+       celui utilisé ailleurs dans le journal). Partie "par site" du rapport direction :
+       à venir dans une prochaine étape. -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1353,6 +1362,53 @@ function serviceDayBounds(dayStr){
   return { start, end };
 }
 
+/* ---------- Planning Agendrix (agendrix_pointages) — pour le KPI "agents en service" ---
+   Chargé une seule fois (table à part, pas un kind du journal), à la demande dès que
+   l'onglet Rapport direction est ouvert. Le nom de site vient tel quel de l'export
+   Agendrix ; s'il ne correspond pas exactement au nom de site utilisé ailleurs dans le
+   journal, le filtre par site ne matchera simplement rien pour ce site (best-effort). */
+let agendrixShifts = [];
+let agendrixShiftsLoaded = false;
+async function loadAgendrixShiftsOnce(){
+  if(agendrixShiftsLoaded) return;
+  agendrixShiftsLoaded = true;
+  try{
+    const { data, error } = await sb.from('agendrix_pointages').select('agent_nom,site,debut_prevu,fin_prevu');
+    if(error) throw error;
+    agendrixShifts = (data||[]).map(r=>({ agent:r.agent_nom, site:r.site, debut:new Date(r.debut_prevu), fin:new Date(r.fin_prevu) }))
+      .filter(s=>!isNaN(s.debut) && !isNaN(s.fin));
+  }catch(e){
+    console.warn('Chargement planning Agendrix impossible :', e.message);
+    agendrixShifts = [];
+  }
+}
+// Bornes de la période Rapport direction, exprimées en Date JS (fin exclusive), pour
+// les comparer aux créneaux du planning (qui ne portent pas de statut_cloture etc., donc
+// ne passent pas par getDirectionEntries()).
+function directionPeriodBoundsForShifts(){
+  if(dirMode==='day'){
+    const day = document.getElementById('dir-serviceday').value || serviceDate();
+    return serviceDayBounds(day);
+  }
+  const from = document.getElementById('dir-from').value;
+  const to = document.getElementById('dir-to').value;
+  const start = from ? new Date(from+'T00:00:00') : null;
+  let end = null;
+  if(to){ end = new Date(to+'T00:00:00'); end.setDate(end.getDate()+1); }
+  return { start, end };
+}
+function computeAgentsOnDuty(){
+  const site = document.getElementById('dir-site').value;
+  const { start, end } = directionPeriodBoundsForShifts();
+  const matching = agendrixShifts.filter(s=>{
+    if(site && s.site !== site) return false;
+    if(start && s.fin <= start) return false;
+    if(end && s.debut >= end) return false;
+    return true;
+  });
+  return new Set(matching.map(s=>s.agent)).size;
+}
+
 function switchView(mode){
   const isDirection = mode==='direction';
   document.getElementById('vtab-service').classList.toggle('active', mode==='service');
@@ -1371,6 +1427,7 @@ function switchView(mode){
     if(!document.getElementById('dir-serviceday').value) document.getElementById('dir-serviceday').value = serviceDate();
     populateDirSiteOptions();
     renderDirectionReport();
+    loadAgendrixShiftsOnce().then(renderDirectionReport); // re-rend une fois le planning chargé (no-op si déjà chargé)
     return;
   }
 
@@ -1766,28 +1823,16 @@ function computeDirectionStats(entries){
   const byCloture = {regle:0, action:0, info:0, probleme:0, non_classe:0};
   activity.forEach(e=>{ const k = e.raw.statut_cloture; byCloture[k && byCloture.hasOwnProperty(k) ? k : 'non_classe']++; });
 
-  // Temps de réponse alarme : écart entre l'heure de l'alarme (created_at) et l'heure
-  // d'arrivée sur site (heure_arrivee, "HH:MM"). Écarte les valeurs négatives (passage
-  // de minuit non géré ici) et les écarts > 8h (quasi certainement une erreur de saisie
-  // d'heure plutôt qu'une intervention réelle de cette durée).
-  const alarmesAvecArrivee = entries.filter(e=>e.kind==='alarme' && e.raw.heure_arrivee);
-  let totalMin = 0, nMin = 0;
-  alarmesAvecArrivee.forEach(e=>{
-    const alarmeD = new Date(e.ts); if(isNaN(alarmeD)) return;
-    const parts = String(e.raw.heure_arrivee).split(':').map(Number);
-    const hh = parts[0], mm = parts[1];
-    if(isNaN(hh) || isNaN(mm)) return;
-    const arriveeD = new Date(alarmeD); arriveeD.setHours(hh,mm,0,0);
-    const diffMin = (arriveeD.getTime() - alarmeD.getTime())/60000;
-    if(diffMin >= 0 && diffMin < 8*60){ totalMin += diffMin; nMin++; }
-  });
-  const avgResponseMin = nMin ? Math.round(totalMin/nMin) : null;
+  // KPI dédiés demandés par la direction (cf. tuiles) :
+  const alarmeCount = byKind['alarme'] || 0;
+  const securiteStandardCount = activity.filter(e=>e.kind==='rapport_standard' && e.raw.nature_activite==='Sécurité').length;
+  const openIssuesCount = (byCloture.probleme||0) + (byCloture.action||0);
 
   const attentionItems = activity
     .filter(e=>{ const k = e.raw.statut_cloture; return !k || k==='action' || k==='probleme'; })
     .sort((a,b)=> new Date(b.ts)-new Date(a.ts));
 
-  return { total:entries.length, activityTotal:activity.length, byKind, bySite, byNature, byCloture, avgResponseMin, attentionItems };
+  return { total:entries.length, activityTotal:activity.length, byKind, bySite, byNature, byCloture, alarmeCount, securiteStandardCount, openIssuesCount, attentionItems };
 }
 
 function statTile(n,l){ return `<div class="stat-tile"><div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div></div>`; }
@@ -1861,10 +1906,11 @@ function renderDirectionReport(){
   }
 
   const statTiles = `<div class="stat-row">
-    ${statTile(stats.total, 'Actions au journal')}
+    ${statTile(computeAgentsOnDuty(), 'Agents en service (planning)')}
     ${statTile(stats.activityTotal, 'Rapports standard + alarme')}
-    ${statTile(stats.attentionItems.length, "Points d'attention")}
-    ${statTile(stats.avgResponseMin!=null ? stats.avgResponseMin+' min' : '—', 'Temps de réponse alarme moyen')}
+    ${statTile(stats.alarmeCount, 'Dont rapports alarme')}
+    ${statTile(stats.securiteStandardCount, 'Rapports standard · Sécurité')}
+    ${statTile(stats.openIssuesCount, 'Points ouverts (problème/action)')}
   </div>`;
 
   const attentionHtml = stats.attentionItems.length
@@ -1912,11 +1958,12 @@ function buildDirectionPrintable(){
   if(!stats) return rpSynthesisShell('Rapport direction', `${site} — ${period}`, '<div class="state-msg">Aucune donnée.</div>');
 
   const statsHtml = rpSec('Chiffres clés', `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-      ${rpFieldO('Actions au journal', stats.total)}
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+      ${rpFieldO('Agents en service (planning)', computeAgentsOnDuty())}
       ${rpFieldO('Rapports standard + alarme', stats.activityTotal)}
-      ${rpFieldO("Points d'attention", stats.attentionItems.length)}
-      ${rpFieldO('Temps de réponse alarme moyen', stats.avgResponseMin!=null?stats.avgResponseMin+' min':'—')}
+      ${rpFieldO('Dont rapports alarme', stats.alarmeCount)}
+      ${rpFieldO('Rapports standard · Sécurité', stats.securiteStandardCount)}
+      ${rpFieldO('Points ouverts (problème/action)', stats.openIssuesCount)}
     </div>`);
   const clotureHtml = rpSec('Statut de clôture — rapports standard + alarme', barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions()));
   const natureHtml = rpSec("Nature d'activité — rapports standard + alarme", barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS));
