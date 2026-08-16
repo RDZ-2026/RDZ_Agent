@@ -1,4 +1,4 @@
-<!-- RDZ · supervision-rapports · v11 · 2026-08-16 -->
+<!-- RDZ · supervision-rapports · v12 · 2026-08-16 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -429,6 +429,10 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
 function fmtTime(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+/* "HH:MM" (24h, zéro-paddé) à partir d'un ISO — pour préremplir un
+   <input type="time">, qui exige ce format exact (contrairement à
+   toLocaleTimeString, dont le format dépend du navigateur). */
+function hhmmFromISO(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 
 /* Retrouve dans la checklist (marche à suivre) d'une intervention alarme
    l'heure associée à un item dont le libellé correspond à un des mots-clés
@@ -447,6 +451,14 @@ function checklistTimeFor(rawChecklistJson, keywords){
     });
     return item ? item.heure : null;
   }catch(_){ return null; }
+}
+/* Heure d'arrivée sur site d'une intervention alarme : priorité à la
+   colonne dédiée heure_arrivee (éditable manuellement dans l'écran de
+   modification, retour Laurent 2026-08-16), avec repli sur la recherche
+   par mot-clé dans la checklist pour les interventions déjà enregistrées
+   avant l'ajout de cette colonne. */
+function arriveeTimeFor(raw){
+  return (raw && raw.heure_arrivee) || checklistTimeFor(raw && raw.checklist, ['arriv']);
 }
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast show'+(e?' err':''); setTimeout(()=>t.className='toast',2600); }
 
@@ -723,6 +735,12 @@ function renderEditForm(r){
         if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
         return `<div class="efield"><label>${esc(f.l)}</label><input type="text" id="ef-${f.k}" value="${esc(val)}"></div>`;
       }).join('')}
+      ${r.kind==='alarme' ? `
+      <div class="efield" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div><label>Heure alarme</label><input type="time" id="ef-heure_alarme" value="${esc(hhmmFromISO(r.ts))}"></div>
+        <div><label>Arrivée sur site</label><input type="time" id="ef-heure_arrivee" value="${esc(r.raw.heure_arrivee||'')}"></div>
+        <div><label>Fin intervention</label><input type="time" id="ef-heure_fin" value="${esc(r.raw.heure_fin||'')}"></div>
+      </div>` : ''}
       ${r.kind==='standard' ? `
       <div class="efield">
         <label>Nature d'activité</label>
@@ -777,11 +795,34 @@ async function saveEdit(id){
     payload.type_action = typeEl.value.trim() || null;
     payload.nature_activite = payload.type_action ? 'Alarmes' : null;
   }
+  // Retour Laurent 2026-08-16 : les 3 horaires du bandeau alarme (heure
+  // alarme / arrivée sur site / fin d'intervention) doivent rester
+  // modifiables depuis cet écran. Heure alarme = composante horaire de
+  // created_at (on ne touche pas à la date) ; arrivée/fin = colonnes texte
+  // "HH:MM" indépendantes.
+  let newCreatedAt;
+  if(r.kind==='alarme'){
+    const hAlarmeEl = document.getElementById('ef-heure_alarme');
+    const hArriveeEl = document.getElementById('ef-heure_arrivee');
+    const hFinEl = document.getElementById('ef-heure_fin');
+    if(hAlarmeEl && hAlarmeEl.value){
+      const [hh,mm] = hAlarmeEl.value.split(':').map(Number);
+      const base = r.raw.created_at ? new Date(r.raw.created_at) : new Date();
+      if(!isNaN(hh) && !isNaN(mm)){
+        base.setHours(hh, mm, 0, 0);
+        newCreatedAt = base.toISOString();
+        payload.created_at = newCreatedAt;
+      }
+    }
+    if(hArriveeEl) payload.heure_arrivee = hArriveeEl.value || null;
+    if(hFinEl) payload.heure_fin = hFinEl.value || null;
+  }
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
   try{
     const { error } = await sb.from(table).update(payload).eq('id', id);
     if(error) throw error;
     Object.assign(r.raw, payload);
+    if(newCreatedAt) r.ts = newCreatedAt;
     if(payload.site_nom !== undefined) r.site = payload.site_nom || '';
     toast('✅ Rapport modifié');
     closeModal();
@@ -1359,7 +1400,7 @@ function buildMultiReport(titreGlobal, corrected){
   // de sens que pour un seul rapport).
   if(corrected.length === 1 && corrected[0].r.kind === 'alarme'){
     const soloR = corrected[0].r;
-    const arriveeH = checklistTimeFor(soloR.raw.checklist, ['arriv']);
+    const arriveeH = arriveeTimeFor(soloR.raw);
     meta.timeFields = [
       {label:'Heure alarme', value: esc(fmtTime(soloR.ts)||'—')},
       {label:'Arrivée sur site', value: esc(arriveeH||'—')},
@@ -1411,7 +1452,7 @@ function buildAlarmeReport(r){
      (retrouvée dans la checklist par mot-clé — pas de colonne dédiée en
      base, voir checklistTimeFor) et heure de fin d'intervention
      (r.raw.heure_fin, saisie par l'agent à la clôture). */
-  const arriveeH = checklistTimeFor(r.raw.checklist, ['arriv']);
+  const arriveeH = arriveeTimeFor(r.raw);
   const meta = {
     site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts,
     timeFields: [
