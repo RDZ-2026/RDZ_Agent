@@ -1,4 +1,4 @@
-<!-- RDZ · parkguard-rdz · v4 · 2026-08-05 -->
+<!-- RDZ · parkguard-rdz · v5 · 2026-08-17 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -397,14 +397,24 @@ input[type="file"]{display:none}
 <input type="file" id="file-input-camera" accept="image/*" capture="environment">
 
 <script>
-// ═══ RDZSync v4 — brique commune, collée telle quelle (voir rdz-sync-v4.js). Variante réduite :
+// ═══ RDZSync v5 — brique commune, collée telle quelle (voir rdz-sync-v4.js, version alignée le
+// 2026-08-17 avec les autres modules : suivi des erreurs, reprise automatique de la file, et
+// détection des échecs d'écriture locale — voir commentaires ci-dessous). Variante réduite :
 // sans le badge flottant auto-rendu, puisque cet écran a déjà son propre indicateur (#pending-info). ═══
 (function (global) {
   'use strict';
   var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
   var _client = null, _onChange = null, _flushingText = false, _flushingPhotos = false;
   function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
-  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+  // writeLS renvoie désormais true/false : avant (v4 réduite), une écriture localStorage qui
+  // échouait (ex. mémoire pleine — "QuotaExceededError", fréquent avec plusieurs photos en
+  // attente) était avalée en silence par le catch vide, ce qui pouvait donner l'illusion qu'un
+  // rapport était enregistré alors qu'il n'avait jamais été mis en file. On le détecte maintenant
+  // explicitement pour pouvoir réagir côté appelant (voir save()).
+  function writeLS(key, arr) {
+    try { localStorage.setItem(key, JSON.stringify(arr)); notify(); return true; }
+    catch (e) { console.warn('RDZSync: échec écriture locale (mémoire pleine ?)', key, e && (e.message || e)); notify(); return false; }
+  }
   function notify() { var st = getStatus(); if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} } }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
   function dataUrlToBlob(dataUrl) {
@@ -442,7 +452,27 @@ input[type="file"]{display:none}
       photoField: item.photoField || null, bucket: item.bucket || null,
       pendingPhotos: item.photos || [], ts: new Date().toISOString(), tries: 0
     };
-    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    var q = readLS(Q_TEXT); q.push(textEntry);
+    var ok = writeLS(Q_TEXT, q);
+    if (!ok) {
+      // La file complète (avec les photos en attente) est trop volumineuse pour la mémoire locale
+      // du téléphone : on retente sans les photos plutôt que de perdre tout le rapport en silence
+      // (le texte — plaque, motif, dénonciation... — est ce qui compte le plus pour la direction).
+      var qWithoutPhotos = readLS(Q_TEXT);
+      var textOnly = Object.assign({}, textEntry, { pendingPhotos: [] });
+      qWithoutPhotos.push(textOnly);
+      var ok2 = writeLS(Q_TEXT, qWithoutPhotos);
+      if (ok2) {
+        console.warn('RDZSync: mémoire locale pleine — rapport enregistré SANS ses photos pour', item.table);
+        if (global.toast) { try { global.toast('⚠️ Mémoire pleine : rapport enregistré sans photo(s) — videz la file dès que possible', 4000); } catch (e) {} }
+        return textOnly.id;
+      }
+      // Même le texte seul ne passe pas : la mémoire locale est vraiment pleine, on prévient
+      // clairement l'agent au lieu de le laisser croire que le rapport est enregistré.
+      console.warn('RDZSync: échec total d\'enregistrement local (mémoire pleine) pour', item.table);
+      if (global.toast) { try { global.toast('❌ Mémoire locale pleine — ce rapport n\'a PAS pu être enregistré, contactez le centraliste', 5000); } catch (e) {} }
+      return null;
+    }
     setTimeout(flushText, 0);
     return textEntry.id;
   }
@@ -451,7 +481,14 @@ input[type="file"]{display:none}
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     _flushingText = true; var q = readLS(Q_TEXT); var i = 0;
     function next() {
-      if (i >= q.length) { _flushingText = false; return; }
+      if (i >= q.length) {
+        _flushingText = false;
+        // Des entrées ont pu être ajoutées à la file pendant qu'on traitait ce lot (plusieurs
+        // rapports enchaînés rapidement) : sans cette relance, elles restaient bloquées jusqu'au
+        // prochain événement réseau ou appui manuel sur "Forcer la synchronisation".
+        if (readLS(Q_TEXT).length) setTimeout(flushText, 0);
+        return;
+      }
       var it = q[i]; var qb = _client.from(it.table);
       // Pas de .select() après écriture : ne dépend que du droit d'ÉCRITURE,
       // jamais d'un droit de LECTURE en plus, absent sur une table plus ancienne.
@@ -479,10 +516,14 @@ input[type="file"]{display:none}
           }
         }
         i++; next();
-      }).catch(function () {
+      }).catch(function (err) {
+        // Erreur consignée (console + lastError sur l'entrée) au lieu d'être avalée en silence —
+        // et on continue avec les entrées suivantes de cette même file au lieu de tout stopper :
+        // un rapport mal formé qui échoue en boucle ne doit plus bloquer ceux qui le suivent.
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
         var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
-        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
-        _flushingText = false;
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
+        i++; next();
       });
     }
     next();
@@ -493,7 +534,11 @@ input[type="file"]{display:none}
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     _flushingPhotos = true; var q = readLS(Q_PHOTO); var i = 0;
     function next() {
-      if (i >= q.length) { _flushingPhotos = false; return; }
+      if (i >= q.length) {
+        _flushingPhotos = false;
+        if (readLS(Q_PHOTO).length) setTimeout(function () { flushPhotos(force); }, 0);
+        return;
+      }
       var p = q[i]; var path = p.module + '/' + Date.now() + '_' + p.name; var blob = dataUrlToBlob(p.dataUrl);
       _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
         .then(function (res) {
@@ -511,10 +556,11 @@ input[type="file"]{display:none}
           pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
           i++; next();
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.warn('RDZSync: échec upload photo', p.module, p.table, err && (err.message || err));
           var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
-          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
-          _flushingPhotos = false;
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
+          i++; next();
         });
     }
     next();
