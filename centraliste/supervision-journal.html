@@ -1,4 +1,34 @@
-<!-- RDZ · supervision-journal · v36 · 2026-08-17
+<!-- RDZ · supervision-journal · v37 · 2026-08-17
+     v37 : Rapport direction — 4 ajustements :
+       (1) Le bloc "🪪 Badges externes" est déplacé tout en bas de l'onglet, après la
+       partie "📍 Par site" (auparavant juste après les chiffres clés, avant les sites).
+       (2) Les chiffres au-dessus de chaque point restent affichés sur les graphiques
+       bibliothèque (comptage + filtrage) — retirés une première fois pour alléger le
+       rendu multi-courbes du v36, remis sur demande explicite ("sinon on ne lit plus la
+       quantité"). Valeur 0 masquée (n'apporte rien), une valeur non nulle toujours visible,
+       dans la couleur de sa courbe.
+       (3) Robustesse : openSiteDrillDetail (clic sur une entrée depuis une pop-up de
+       détail — type_action, ouvertures, bibliothèque, DLCC, parking…) essaie maintenant
+       de construire le rapport "style RDZ" AVANT de fermer la pop-up, et retombe sur le
+       détail générique si la construction échoue (au lieu de fermer la pop-up sans rien
+       rouvrir en cas d'erreur silencieuse — filet de sécurité, notamment pour les
+       ouvertures de porte avec un motif long type "Ouverture, carte perdue, édition d'un
+       nouveau badge…", dont l'accès au rapport a été revérifié et fonctionne).
+       (4) Nouveau bloc "Contrôle parking" (ParkGuard, kind 'parking'/table 'vehicles'),
+       dernière brique du "Par site" prévue à l'origine — 3 indicateurs sur la période,
+       cliquables (même pop-up de détail que les autres graphiques) :
+         - Rondes "parking vide" — pastille ⚠️ si au moins une ronde n'a aucune des 4
+           photos possibles (véhicule/dénonciation/pare-brise/macaron).
+         - Véhicules autorisés — pastille ⚠️ si au moins un véhicule n'a pas les 2 photos
+           requises (véhicule + macaron).
+         - Dénonciations — pastille ⚠️ si au moins une dénonciation n'a pas les 3 photos
+           requises (véhicule + dénonciation + pare-brise).
+       Classification identique à buildParkingReport (routage du rapport imprimable), pour
+       rester cohérente avec ce qui s'affiche au clic. "Stationnement abusif" : un véhicule
+       autorisé (même plaque, même site) revu 3 jours consécutifs (jour du relevé + veille
+       + avant-veille) est listé séparément sous les 3 indicateurs — recherche faite sur
+       TOUTES les données chargées (allEntries), pas seulement la période affichée, pour
+       détecter le cas même si la période sélectionnée est plus courte que 3 jours.
      v36 : Rapport direction — graphiques bibliothèque enrichis (demande : "on ne voyait
      pas les refus et les rappels au règlement, ni les entrées par origine du filtrage").
      Les deux graphiques (comptage ET filtrage) passent d'une courbe unique à plusieurs
@@ -2014,6 +2044,7 @@ function siteHasContent(siteData){
   if(doorGaugeKeywordFor(siteData.site) && siteData.siteEntries.some(e=>e.kind==='ouverture')) return true;
   if(siteNameIncludes(siteData.site,'MDP') && siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage')) return true;
   if(siteNameIncludes(siteData.site,'DLCC') && siteData.siteEntries.some(e=>e.kind==='comptage')) return true;
+  if(siteData.siteEntries.some(e=>e.kind==='parking')) return true;
   return false;
 }
 
@@ -2139,15 +2170,17 @@ function lineChartHtml(series, color, onClickAttr, valueSuffix){
 // tableau `points`, une clé différente par courbe) donc un même index i pointe toujours
 // vers les mêmes entrées, quelle que soit la courbe cliquée — showBiblioDrilldown garde
 // la même signature (skey, seriesKey, idx). Légende toujours affichée dès 2 courbes (une
-// identité ne doit jamais reposer sur la couleur seule) ; pas d'étiquette de valeur sur
-// chaque point (trop dense à plusieurs courbes) — un survol/clic donne le détail exact.
+// identité ne doit jamais reposer sur la couleur seule). Chaque point porte sa valeur en
+// clair (couleur de sa courbe) — retiré une première fois pour alléger le rendu, remis
+// sur demande explicite : sans le chiffre, la quantité ne se lit plus, seule la tendance
+// reste visible (valeur 0 masquée pour ne pas surcharger, elle ne dit rien d'utile).
 function multiSeriesLineChartHtml(points, lines, onClickAttr, valueSuffix){
   const n = points.length;
   if(!n) return null;
   const activeLines = lines.filter(l=>points.some(p=>(l.get(p)||0) > 0));
   if(!activeLines.length) return null;
   const w = 640, hLegend = activeLines.length>1 ? 26 : 0;
-  const h = 170 + hLegend, padL = 8, padR = 8, padT = 16, padB = 30 + hLegend;
+  const h = 184 + hLegend, padL = 8, padR = 8, padT = 26, padB = 30 + hLegend;
   const innerW = w - padL - padR, innerH = h - padT - padB - hLegend;
   const maxV = Math.max(1, ...activeLines.flatMap(l=>points.map(p=>l.get(p)||0)));
   const stepX = n > 1 ? innerW/(n-1) : 0;
@@ -2161,7 +2194,8 @@ function multiSeriesLineChartHtml(points, lines, onClickAttr, valueSuffix){
     const pts = points.map((p,i)=>({ x:xFor(i), y:yFor(l.get(p)||0), v:l.get(p)||0, p, i }));
     const d = pts.map((pt,i)=>(i===0?'M':'L')+pt.x.toFixed(1)+','+pt.y.toFixed(1)).join(' ');
     const circles = pts.map(pt=>`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="${l.color}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onclick="${onClickAttr(pt.i)}"><title>${esc(l.name)} — ${esc(pt.p.label)} : ${pt.v}${valueSuffix||''}</title></circle>`).join('');
-    return `<path d="${d}" fill="none" stroke="${l.color}" stroke-width="2"/>${circles}`;
+    const valueLabels = pts.filter(pt=>pt.v>0).map(pt=>`<text x="${pt.x.toFixed(1)}" y="${(pt.y-7).toFixed(1)}" font-size="9" font-weight="700" fill="${l.color}" text-anchor="${anchorFor(pt.i)}">${pt.v}${valueSuffix||''}</text>`).join('');
+    return `<path d="${d}" fill="none" stroke="${l.color}" stroke-width="2"/>${circles}${valueLabels}`;
   }).join('');
   const legend = activeLines.length>1 ? `<div style="display:flex;flex-wrap:wrap;gap:2px 14px;margin-top:2px">${activeLines.map(l=>
     `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:10px;height:10px;border-radius:2px;background:${l.color};display:inline-block;flex-shrink:0"></span>${esc(l.name)}</span>`).join('')}</div>` : '';
@@ -2306,6 +2340,102 @@ function dlccParkingHtml(siteData, skey){
   return chartBlock('Occupation parking', `<div class="dir-widget-row">${gauges}</div>`) + evoBlocks;
 }
 
+/* ---------- ParkGuard : rondes de contrôle parking (kind 'parking', table 'vehicles') ---
+   3 indicateurs sur la période : rondes "parking vide" (avec vérif. photo prise à chaque
+   passage), véhicules autorisés (avec vérif. 2 photos par véhicule), dénonciations (avec
+   vérif. 3 photos par dénonciation) — même classification que buildParkingReport (routage
+   du rapport imprimable), pour rester cohérent avec ce qui s'affiche au clic.
+   "Stationnement abusif" : un véhicule autorisé revu 3 jours consécutifs (aujourd'hui,
+   veille, avant-veille) au même site est signalé — recherche dans TOUTES les données
+   chargées (allEntries, pas seulement la période du Rapport direction affichée), pour
+   détecter le cas même si la période sélectionnée ne couvre qu'un seul de ces 3 jours. */
+function parkingCategory(r){
+  const s = (r.statut||'').toLowerCase();
+  if(s.includes('infraction')) return 'infraction';
+  if(s.includes('autoris')) return 'autorise';
+  return 'vide';
+}
+function parkingHasPhoto(r, field){ return !!(r[field] && r[field]!=='null' && r[field]!=='undefined'); }
+function parkingPhotosOk(r, cat){
+  if(cat==='autorise') return parkingHasPhoto(r,'photo_vehicule_url') && parkingHasPhoto(r,'photo_macaron_url');
+  if(cat==='infraction') return parkingHasPhoto(r,'photo_vehicule_url') && parkingHasPhoto(r,'photo_denonciation_url') && parkingHasPhoto(r,'photo_parebrise_url');
+  return parkingHasPhoto(r,'photo_vehicule_url') || parkingHasPhoto(r,'photo_denonciation_url') || parkingHasPhoto(r,'photo_parebrise_url') || parkingHasPhoto(r,'photo_macaron_url');
+}
+function localDateStr(ts){ const d = new Date(ts); if(isNaN(d)) return ''; return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function dateStrMinusDays(dayStr, n){
+  const [y,m,d] = dayStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d); dt.setDate(dt.getDate()-n);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function isStationnementAbusif(entry, siteName){
+  const r = entry.raw;
+  if(!r.plaque) return false;
+  const day = localDateStr(entry.ts);
+  if(!day) return false;
+  const targets = [dateStrMinusDays(day,1), dateStrMinusDays(day,2)];
+  const plaqueNorm = r.plaque.trim().toUpperCase();
+  return targets.every(targetDay => allEntries.some(e=>{
+    if(e.kind!=='parking') return false;
+    const rr = e.raw;
+    if(parkingCategory(rr)!=='autorise') return false;
+    if(!rr.plaque || rr.plaque.trim().toUpperCase()!==plaqueNorm) return false;
+    if((rr.site||'')!==siteName) return false;
+    return localDateStr(e.ts)===targetDay;
+  }));
+}
+window.__dirParkingByCat = {}; // skey -> { vide:[...], autorise:[...], infraction:[...] }
+function showParkingDrilldown(skey, cat){
+  const byCat = window.__dirParkingByCat[skey];
+  if(!byCat) return;
+  const list = byCat[cat] || [];
+  const labels = { vide:'🅿️ Rondes — Parking vide', autorise:'✅ Véhicules autorisés', infraction:'🚨 Dénonciations' };
+  showEntryListPopup('🅿️ Contrôle parking', `${labels[cat]||cat} (${list.length})`, list);
+}
+function parkGuardTileHtml(label, list, cat, skey){
+  const n = list.length;
+  const okCount = list.filter(e=>parkingPhotosOk(e.raw, cat)).length;
+  const pill = n===0 ? ''
+    : okCount===n
+      ? `<span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e6f4ea;color:#1b7a3d">✅ Photos conformes</span>`
+      : `<span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#fdeaea;color:#8B1A1A">⚠️ ${n-okCount} sans photos complètes</span>`;
+  return `<div class="dir-gauge" ${n?`style="cursor:pointer" onclick="showParkingDrilldown('${skey}','${cat}')" title="Cliquer pour voir le détail"`:''}>
+    <div class="gv">${n}</div>
+    <div class="gl">${esc(label)}</div>
+    ${pill}
+  </div>`;
+}
+function parkGuardHtml(siteData, skey){
+  const rounds = siteData.siteEntries.filter(e=>e.kind==='parking');
+  if(!rounds.length) return '';
+  const byCat = { vide:[], autorise:[], infraction:[] };
+  rounds.forEach(e=>byCat[parkingCategory(e.raw)].push(e));
+  window.__dirParkingByCat[skey] = byCat;
+
+  const tiles = `<div class="dir-widget-row">
+    ${parkGuardTileHtml('Rondes — Parking vide', byCat.vide, 'vide', skey)}
+    ${parkGuardTileHtml('Véhicules autorisés', byCat.autorise, 'autorise', skey)}
+    ${parkGuardTileHtml('Dénonciations', byCat.infraction, 'infraction', skey)}
+  </div>`;
+
+  const abusifs = byCat.autorise.filter(e=>isStationnementAbusif(e, siteData.site));
+  const abusifHtml = abusifs.length ? `<div style="margin-top:12px">
+    <div style="font-size:11px;color:#8B1A1A;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px">⚠️ Stationnement abusif (3 jours consécutifs)</div>
+    ${abusifs.map(e=>`<div class="attn-item" style="border-left-color:#8B1A1A" onclick="openParkingAbusifDetail('${skey}','${esc(e.raw.plaque||'').replace(/'/g,"\\'")}')">
+      <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
+      <div class="mid"><div class="t">🚗 ${esc(e.raw.plaque||'—')}</div><div class="s">Vu ce jour ainsi que la veille et l'avant-veille sur ce site</div></div>
+    </div>`).join('')}
+  </div>` : '';
+  window.__dirParkingAbusifs = window.__dirParkingAbusifs || {};
+  window.__dirParkingAbusifs[skey] = abusifs;
+
+  return chartBlock('Contrôle parking', tiles + abusifHtml);
+}
+function openParkingAbusifDetail(skey, plaque){
+  const list = (window.__dirParkingAbusifs[skey]||[]).filter(e=>(e.raw.plaque||'')===plaque);
+  if(!list.length) return;
+  showEntryListPopup('⚠️ Stationnement abusif', `${plaque} (${list.length})`, list);
+}
+
 const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
 function colorForLabel(label){
   let h = 0; for(let i=0;i<label.length;i++) h = (h*31 + label.charCodeAt(i)) >>> 0;
@@ -2385,6 +2515,7 @@ function siteCardHtml(siteData){
     ${siteWidgetsHtml(siteData, skey)}
     ${mdpBiblioHtml(siteData, skey)}
     ${dlccParkingHtml(siteData, skey)}
+    ${parkGuardHtml(siteData, skey)}
   </div>`;
 }
 
@@ -2423,8 +2554,22 @@ function showSiteDrilldown(skey, label){
 function openSiteDrillDetail(i){
   window.__renderedItems = window.__dirDrillList;
   const e = window.__dirDrillList[i];
-  if(e && REPORTABLE[e.kind]){ closeModal(); openReport(i); }
-  else openDetail(i);
+  // Filet de sécurité : si la construction du rapport "style RDZ" échoue (champ manquant
+  // sur un enregistrement particulier…), on retombe sur le détail générique au lieu de
+  // laisser l'écran vide — closeModal() n'est appelé qu'une fois le rapport construit
+  // avec succès, jamais avant (sinon un échec silencieux fermerait tout sans rien rouvrir).
+  if(e && REPORTABLE[e.kind]){
+    try{
+      const html = REPORTABLE[e.kind](e.raw);
+      document.getElementById('report-content').innerHTML = html;
+      closeModal();
+      const rv = document.getElementById('report-view');
+      rv.classList.add('open');
+      rv.scrollTop = 0;
+      return;
+    }catch(err){ console.warn('Rapport indisponible, retour au détail générique :', err.message||err); }
+  }
+  openDetail(i);
 }
 
 // Widget "Badges externes" : uniquement les clés/badges remis à des tiers (receptionnaire_type
@@ -2485,9 +2630,9 @@ function renderDirectionReport(){
 
   box.innerHTML = `
     ${statTiles}
-    ${externalBadgesCardHtml(entries)}
     <h3 style="margin:22px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">📍 Par site</h3>
     ${sitesHtml}
+    ${externalBadgesCardHtml(entries)}
   `;
 }
 
