@@ -1,4 +1,25 @@
-<!-- RDZ · supervision-journal · v40 · 2026-08-17
+<!-- RDZ · supervision-journal · v41 · 2026-08-17
+     v41 : Rapport direction — 2 ajouts :
+       (1) Nouvelle carte "🔑 Clés / badges internes non rendus" (cle_badge,
+       receptionnaire_type==='agent', statut≠'rendu'), affichée juste après "🪪 Badges
+       externes" ("à la suite des badges externes"). Contrairement à la carte externe
+       (qui liste rendus ET non rendus), celle-ci ne montre QUE les non rendus — un
+       badge/clé interne déjà rendu n'a pas d'intérêt de suivi. Bug latent corrigé au
+       passage : les deux cartes badges partageaient auparavant window.__dirDrillList au
+       clic — avec deux cartes affichées simultanément, la seconde rendue aurait écrasé
+       la liste de la première (même défaut déjà rencontré et corrigé pour les registres
+       par site) ; les deux utilisent maintenant window.__dirRegisterLists['top_badges']
+       avec une clé par carte (externe/interne), comme le reste du Rapport direction.
+       (2) Nouvelle section "🚗 Par véhicule" (sous "📍 Par site") : une carte par plaque
+       avec deux listes — "💥 Dégâts véhicule" (kind degat_vehicule, toute création sur la
+       période — pas de distinction création/modification possible, la table ne trace pas
+       les éditions séparément) et "💬 Commentaires — mouvements véhicule" (kind
+       vehicule_mouvement, uniquement ceux qui portent une note non vide — un mouvement
+       sans commentaire n'a pas d'intérêt de suivi ici). Regroupement par plaque via
+       fleetVehiclePlateById (ces deux kinds résolvent déjà site(r) vers la plaque, pas un
+       site physique) — indépendant de computeSiteBreakdown pour ne pas mélanger sites et
+       véhicules dans la même liste. Vérifié par test automatisé (badges externe/interne
+       cliqués indépendamment sans collision, mouvement sans note bien exclu).
      v40 : Rapport direction — fusion des 2 graphiques d'évolution d'occupation parking
      (DLCC et CLX, jusqu'ici un graphique séparé par zone) en un seul graphique avec les
      deux courbes + légende, demande explicite ("avoir les deux courbes sur le même
@@ -2590,6 +2611,43 @@ function siteRegistersHtml(siteData, skey){
     + registerCategoryHtml('📅 Événements — création / modification', '📅', byKind('evenement'), skey, 'evenement');
 }
 
+/* ---------- Par véhicule : dégâts (créations/modifications) + commentaires laissés sur
+   les mouvements — demande explicite de Laurent. Distinct de "Par site" : les kinds
+   degat_vehicule/vehicule_mouvement résolvent déjà site(r) vers la PLAQUE du véhicule
+   (fleetVehiclePlateById[r.vehicle_id]) plutôt qu'un site physique, donc on regroupe par
+   cette même valeur plutôt que de réutiliser siteGroupName/computeSiteBreakdown (qui
+   mélangerait sites physiques et plaques dans la même liste). Un véhicule n'apparaît que
+   s'il a un dégât OU un mouvement commenté sur la période — un mouvement sans commentaire
+   n'a pas d'intérêt de suivi ici ("tout commentaire dans les mouvements", pas "tout
+   mouvement"). Réutilise registerCategoryHtml (même mécanique clic → détail générique que
+   les registres par site), avec un skey dédié par plaque pour ne pas collisionner avec
+   les skey des sites physiques. */
+function vehicleKeySlug(plate){ return 'veh_' + String(plate).replace(/[^a-zA-Z0-9]/g,'_'); }
+function computeVehicleBreakdown(entries){
+  const relevant = entries.filter(e=>e.kind==='degat_vehicule' || (e.kind==='vehicule_mouvement' && e.raw.notes && String(e.raw.notes).trim()));
+  const plateOf = e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } };
+  const plates = [...new Set(relevant.map(plateOf).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const out = {};
+  plates.forEach(plate=>{ out[plate] = relevant.filter(e=>plateOf(e)===plate); });
+  return { plates, byPlate: out };
+}
+function vehicleCardHtml(plate, vehicleEntries){
+  const skey = vehicleKeySlug(plate);
+  const degats = vehicleEntries.filter(e=>e.kind==='degat_vehicule').slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const comments = vehicleEntries.filter(e=>e.kind==='vehicule_mouvement').slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  return `<div class="site-card">
+    <h4>🚗 ${esc(plate)}</h4>
+    ${registerCategoryHtml('💥 Dégâts véhicule — créations / modifications', '💥', degats, skey, 'degat_vehicule')}
+    ${registerCategoryHtml('💬 Commentaires — mouvements véhicule', '💬', comments, skey, 'vehicule_mouvement')}
+  </div>`;
+}
+function vehiclesSectionHtml(entries){
+  const { plates, byPlate } = computeVehicleBreakdown(entries);
+  if(!plates.length) return '';
+  const cards = plates.map(p=>vehicleCardHtml(p, byPlate[p])).join('');
+  return `<h3 style="margin:22px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">🚗 Par véhicule</h3>${cards}`;
+}
+
 /* ---------- Événements du jour / de la période : distinct du bloc "création /
    modification" ci-dessus — ici on liste les événements dont la DATE (champ
    evenements.date) tombe dans la période sélectionnée, avec accès à la progression de la
@@ -2843,24 +2901,43 @@ function openSiteDrillDetail(i){ openListItemDetail(window.__dirDrillList, i); }
 // === 'externe'), avec une pastille verte "Rendu" ou rouge "⚠️ Non rendu" — volontairement compact
 // (pas de graphique), réutilise la même mécanique de clic → détail générique que le reste du
 // "Par site" (window.__dirDrillList + openSiteDrillDetail, cle_badge n'étant pas dans REPORTABLE).
-function externalBadgesCardHtml(entries){
-  const badges = entries.filter(e=>e.kind==='cle_badge' && e.raw.receptionnaire_type==='externe');
+// Cartes badges (externes + internes non rendus) : stockées dans window.__dirRegisterLists
+// sous une clé synthétique 'top_badges' (skey n'a de sens que pour les cartes "par site"/
+// "par véhicule" ; ici il n'y a qu'une seule instance de chaque carte sur toute la page).
+// Utiliser window.__dirDrillList directement serait dangereux : les deux cartes badges
+// (externe/interne) coexistent sur le même écran, et une liste globale unique verrait la
+// seconde carte rendue écraser la liste de la première au clic (bug déjà rencontré avec
+// les registres par site, corrigé de la même façon).
+function badgeListCardHtml(title, badges, cat){
   if(!badges.length) return '';
   const sorted = badges.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
-  window.__dirDrillList = sorted;
+  window.__dirRegisterLists['top_badges'] = window.__dirRegisterLists['top_badges'] || {};
+  window.__dirRegisterLists['top_badges'][cat] = sorted;
   const rows = sorted.map((e,i)=>{
     const r = e.raw;
     const rendu = r.statut==='rendu';
     const pill = rendu
       ? `<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e6f4ea;color:#1b7a3d;white-space:nowrap">✅ Rendu</span>`
       : `<span style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#fdeaea;color:#8B1A1A;white-space:nowrap">⚠️ Non rendu</span>`;
-    return `<div class="attn-item" style="border-left-color:${rendu?'#1b7a3d':'#8B1A1A'}" onclick="openSiteDrillDetail(${i})">
+    return `<div class="attn-item" style="border-left-color:${rendu?'#1b7a3d':'#8B1A1A'}" onclick="openRegisterItem('top_badges','${cat}',${i})">
       <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
       <div class="mid"><div class="t">${r.item_type==='badge'?'🪪':'🔑'} ${esc(r.item_nom||'—')}</div><div class="s">👤 ${esc(r.receptionnaire_nom||'—')}${r.receptionnaire_societe?' ('+esc(r.receptionnaire_societe)+')':''}${r.site_nom?' · 📍 '+esc(r.site_nom):''}</div></div>
       ${pill}
     </div>`;
   }).join('');
-  return `<div class="dir-card"><h4>🪪 Badges externes</h4>${rows}</div>`;
+  return `<div class="dir-card"><h4>${esc(title)}</h4>${rows}</div>`;
+}
+function externalBadgesCardHtml(entries){
+  const badges = entries.filter(e=>e.kind==='cle_badge' && e.raw.receptionnaire_type==='externe');
+  return badgeListCardHtml('🪪 Badges externes', badges, 'externe');
+}
+// Clés/badges INTERNES (receptionnaire_type==='agent') non rendus — juxtaposée à la carte
+// externe, demande explicite ("à la suite des badges externes"). Contrairement à la carte
+// externe (qui liste rendus ET non rendus), celle-ci ne montre QUE les non rendus : les
+// clés/badges internes rendus n'ont pas d'intérêt de suivi une fois la boucle bouclée.
+function internalBadgesUnreturnedCardHtml(entries){
+  const badges = entries.filter(e=>e.kind==='cle_badge' && e.raw.receptionnaire_type==='agent' && e.raw.statut!=='rendu');
+  return badgeListCardHtml('🔑 Clés / badges internes non rendus', badges, 'interne');
 }
 
 function renderDirectionReport(){
@@ -2908,7 +2985,9 @@ function renderDirectionReport(){
     ${statTiles}
     <h3 style="margin:22px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">📍 Par site</h3>
     ${sitesHtml}
+    ${vehiclesSectionHtml(entries)}
     ${externalBadgesCardHtml(entries)}
+    ${internalBadgesUnreturnedCardHtml(entries)}
   `;
 }
 
