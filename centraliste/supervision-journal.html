@@ -1,4 +1,19 @@
-<!-- RDZ · supervision-journal · v33 · 2026-08-16
+<!-- RDZ · supervision-journal · v34 · 2026-08-16
+     v34 : Rapport direction, partie "Par site" — 3 ajustements demandés :
+       (1) Bibliothèque (comptage + filtrage) : histogrammes remplacés par un graphique
+       d'évolution (SVG ligne+aire, lineChartHtml — pas de librairie externe), plus
+       lisible pour une donnée qui évolue dans le temps. Points cliquables (même
+       drill-down qu'avant), étiquettes X sous-échantillonnées au-delà de 8 points.
+       (2) Ouvertures de porte : suppression de la pastille récapitulant le nombre
+       total (jugée peu utile) — ne reste que le graphique de répartition par nature.
+       (3) Parking DLCC : la jauge affiche maintenant un pourcentage plutôt qu'un
+       compteur "X/Y" — l'affluence MAXIMALE sur la période si celle-ci ne couvre qu'un
+       jour, sinon le taux d'occupation MOYEN (une seule zone, deux règles selon la
+       période, comme pour la bibliothèque). Un graphique d'évolution par zone est
+       ajouté sous les jauges (même composant que la bibliothèque) : par relevé (heure
+       par heure) si un seul jour, sinon l'affluence MOYENNE par jour (jamais un max,
+       différent de la bibliothèque sur ce point précis, demande explicite de Laurent).
+     v33 : Rapport direction, partie "Par site" — jauges parking pour le site DLCC (zones
      v33 : Rapport direction, partie "Par site" — jauges parking pour le site DLCC (zones
        DLCC 80 places / CLX 35 places, kind 'comptage'). Contrairement aux ouvertures
        (compteur cumulé sur la période), l'occupation est un instantané : chaque jauge
@@ -2049,15 +2064,37 @@ function biblioFiltrageSeries(siteEntries, singleDay){
   });
   return Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
 }
-// Histogramme générique pour une série {label,value,entries} — même style que les autres
-// graphiques de l'onglet ; clic sur une barre → pop-up listant les relevés concernés.
-function seriesBarHtml(series, skey, seriesKey, color){
-  if(!series.length) return '<div class="state-msg" style="padding:10px 0">Aucune donnée sur cette période.</div>';
-  const max = Math.max(...series.map(s=>s.value), 1);
-  return series.map((s,i)=>{
-    const pct = Math.round((s.value/max)*100);
-    return `<div class="bar-row" style="cursor:pointer" onclick="showBiblioDrilldown('${skey}','${seriesKey}',${i})" title="Cliquer pour voir le(s) relevé(s)"><div class="lbl">${esc(s.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="cnt">${s.value}</div></div>`;
-  }).join('');
+// Graphique d'évolution (ligne + aire légère) générique pour une série {label,value,
+// entries} — une donnée qui change dans le temps se lit mieux en évolution qu'en barres
+// horizontales. SVG pur, pas de librairie externe. Point cliquable → pop-up (via
+// onClickAttr(idx), même mécanique que les histogrammes). Étiquettes de l'axe X sous-
+// échantillonnées au-delà de 8 points pour rester lisibles.
+function lineChartHtml(series, color, onClickAttr, valueSuffix){
+  if(!series.length) return null;
+  const w = 640, h = 170, padL = 8, padR = 8, padT = 16, padB = 30;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const maxV = Math.max(...series.map(s=>s.value), 1);
+  const stepX = series.length > 1 ? innerW/(series.length-1) : 0;
+  const pts = series.map((s,i)=>{
+    const x = padL + (series.length > 1 ? i*stepX : innerW/2);
+    const y = padT + innerH - (s.value/maxV)*innerH;
+    return { x, y, s, i };
+  });
+  const pathD = pts.map((p,i)=> (i===0?'M':'L') + p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const areaD = pathD + ` L${pts[pts.length-1].x.toFixed(1)},${(padT+innerH).toFixed(1)} L${pts[0].x.toFixed(1)},${(padT+innerH).toFixed(1)} Z`;
+  const showEvery = Math.max(1, Math.ceil(series.length/8));
+  const labels = pts.filter((p,i)=> i%showEvery===0 || i===pts.length-1)
+    .map(p=>`<text x="${p.x.toFixed(1)}" y="${h-10}" font-size="10" fill="#888" text-anchor="middle">${esc(p.s.label)}</text>`).join('');
+  const circles = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="${color}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="${onClickAttr(p.i)}"><title>${esc(p.s.label)} — ${p.s.value}${valueSuffix||''}</title></circle>`).join('');
+  const valueLabels = pts.map(p=>`<text x="${p.x.toFixed(1)}" y="${(p.y-9).toFixed(1)}" font-size="10" font-weight="700" fill="#555" text-anchor="middle">${p.s.value}${valueSuffix||''}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMinYMin meet">
+    <line x1="${padL}" y1="${(padT+innerH).toFixed(1)}" x2="${w-padR}" y2="${(padT+innerH).toFixed(1)}" stroke="#e0e0e0" stroke-width="1"/>
+    <path d="${areaD}" fill="${color}" opacity="0.1"/>
+    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2"/>
+    ${circles}
+    ${valueLabels}
+    ${labels}
+  </svg>`;
 }
 window.__dirBiblioSeries = {}; // skey -> { comptage:[...], filtrage:[...] }
 function showBiblioDrilldown(skey, seriesKey, idx){
@@ -2081,29 +2118,57 @@ function mdpBiblioHtml(siteData, skey){
   const comptageLabel = singleDay ? 'Comptage bibliothèque — affluence par relevé' : 'Comptage bibliothèque — affluence maximale par jour';
   const filtrageLabel = singleDay ? 'Filtrage bibliothèque — entrées par relevé' : 'Filtrage bibliothèque — total des entrées par jour';
   let html = '';
-  if(comptageSeries.length) html += chartBlock(comptageLabel, seriesBarHtml(comptageSeries, skey, 'comptage', '#0e7490'));
-  if(filtrageSeries.length) html += chartBlock(filtrageLabel, seriesBarHtml(filtrageSeries, skey, 'filtrage', '#7c3aed'));
+  if(comptageSeries.length) html += chartBlock(comptageLabel, lineChartHtml(comptageSeries, '#0e7490', idx=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
+  if(filtrageSeries.length) html += chartBlock(filtrageLabel, lineChartHtml(filtrageSeries, '#7c3aed', idx=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
   return html;
 }
 
-/* ---------- Parking DLCC : jauges d'occupation par zone (DLCC 80 places / CLX 35 places) ---
-   Une jauge par zone présente sur la période, avec le DERNIER relevé (occupation à un
-   instant donné — une somme/max n'aurait pas de sens ici, contrairement aux compteurs
-   cumulatifs comme les ouvertures). Clic sur une jauge → pop-up des relevés de la zone
-   sur la période, du plus récent au plus ancien → clic sur un relevé → détail (comptage
-   n'est pas dans REPORTABLE, donc openSiteDrillDetail retombe sur le détail générique). */
+/* ---------- Parking DLCC : jauges + évolution d'occupation par zone (DLCC 80 places /
+   CLX 35 places) ---
+   Jauge (%) : affluence MAXIMALE sur la période si la période ne couvre qu'un jour,
+   sinon le taux d'occupation MOYEN (une seule valeur ne peut pas être "maximale" sur
+   plusieurs jours de façon utile — la moyenne reflète mieux une tendance). En dessous,
+   un graphique d'évolution par zone (même composant que la bibliothèque) : par relevé
+   (heure par heure) si un seul jour, sinon l'affluence MOYENNE par jour (jamais un max)
+   sur la plage. Clic sur la jauge → tous les relevés de la zone ; clic sur un point du
+   graphique → seulement les relevés de ce point (ce jour, ou ce relevé). */
 function comptageZoneName(r){
   if(r.zones && r.zones.nom) return r.zones.nom;
   if(r.places_totales===80) return 'DLCC';
   if(r.places_totales===35) return 'CLX';
   return 'Zone';
 }
-window.__dirComptageByZone = {}; // skey -> { zoneName: [entrées, plus récent d'abord] }
+function comptageOccupPct(e){ return e.raw.places_totales ? (e.raw.vehicules_presents||0)/e.raw.places_totales*100 : 0; }
+function dlccZoneGaugePct(readings, singleDay){
+  if(!readings.length) return 0;
+  const pcts = readings.map(comptageOccupPct);
+  return Math.round(singleDay ? Math.max(...pcts) : (pcts.reduce((a,b)=>a+b,0)/pcts.length));
+}
+function dlccZoneSeries(readings, singleDay){
+  const sorted = readings.slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  if(singleDay) return sorted.map(e=>({ label: fmtTime(e.ts), value: Math.round(comptageOccupPct(e)), entries:[e] }));
+  const byDay = {};
+  sorted.forEach(e=>{
+    const day = fmtDateShort(e.ts);
+    if(!byDay[day]) byDay[day] = { label: day, entries: [], _sum: 0, _n: 0, _ts: e.ts };
+    byDay[day].entries.push(e);
+    byDay[day]._sum += comptageOccupPct(e);
+    byDay[day]._n++;
+  });
+  return Object.values(byDay).map(d=>({ label: d.label, value: Math.round(d._sum/d._n), entries: d.entries, _ts: d._ts })).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
+}
+window.__dirComptageByZone = {}; // skey -> { zoneName: [entrées, plus récent d'abord] } (clic jauge)
+window.__dirDlccSeries = {}; // skey -> { zoneName: [{label,value,entries}] } (clic point du graphique)
 function showComptageDrilldown(skey, zoneName){
   const byZone = window.__dirComptageByZone[skey];
   if(!byZone) return;
   const list = byZone[zoneName] || [];
-  showEntryListPopup('🅿️ Parking', `${zoneName} (${list.length})`, list);
+  showEntryListPopup('🅿️ Parking', `${zoneName} — tous les relevés (${list.length})`, list);
+}
+function showDlccPointDrilldown(skey, zoneName, idx){
+  const s = window.__dirDlccSeries[skey] && window.__dirDlccSeries[skey][zoneName] && window.__dirDlccSeries[skey][zoneName][idx];
+  if(!s) return;
+  showEntryListPopup('🅿️ Parking', `${zoneName} — ${s.label} (${s.entries.length})`, s.entries);
 }
 function dlccParkingHtml(siteData, skey){
   if(!siteNameIncludes(siteData.site,'DLCC')) return '';
@@ -2113,12 +2178,25 @@ function dlccParkingHtml(siteData, skey){
   comptages.forEach(e=>{ const z = comptageZoneName(e.raw); (byZone[z] = byZone[z]||[]).push(e); });
   Object.values(byZone).forEach(list=>list.sort((a,b)=>new Date(b.ts)-new Date(a.ts)));
   window.__dirComptageByZone[skey] = byZone;
+  window.__dirDlccSeries[skey] = {};
+  const singleDay = isDirectionSingleDay();
   const zones = Object.keys(byZone).sort((a,b)=>a.localeCompare(b,'fr'));
+
   const gauges = zones.map(zone=>{
-    const latest = byZone[zone][0].raw;
-    return occupancyGaugeHtml(zone, latest.vehicules_presents||0, latest.places_totales||0, `showComptageDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}')`);
+    const pct = dlccZoneGaugePct(byZone[zone], singleDay);
+    const gaugeLabel = `${zone} — ${singleDay ? 'Affluence max' : "Taux d'occupation moyen"}`;
+    return occupancyPctGaugeHtml(gaugeLabel, pct, `showComptageDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}')`);
   }).join('');
-  return chartBlock('Occupation parking (dernier relevé)', `<div class="dir-widget-row">${gauges}</div>`);
+
+  const evoBlocks = zones.map(zone=>{
+    const series = dlccZoneSeries(byZone[zone], singleDay);
+    window.__dirDlccSeries[skey][zone] = series;
+    const label = `Évolution occupation — ${zone}${singleDay ? ' (par relevé)' : ' (moyenne par jour)'}`;
+    const chart = lineChartHtml(series, colorForLabel(zone), idx=>`showDlccPointDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}',${idx})`, '%');
+    return chart ? chartBlock(label, chart) : '';
+  }).join('');
+
+  return chartBlock('Occupation parking', `<div class="dir-widget-row">${gauges}</div>`) + evoBlocks;
 }
 
 const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
@@ -2148,23 +2226,15 @@ function siteTypeActionBarHtml(byType, skey){
   return html || '<div class="state-msg" style="padding:10px 0">Aucun rapport standard/alarme sur cette période pour ce site.</div>';
 }
 
-// Jauge simple (chiffre + libellé) pour les indicateurs par site type "compteur sur la
-// période" (ouvertures, plus tard bibliothèque/parking/ParkGuard…) — même composant
-// visuel réutilisé pour tous, pas de librairie de graphique.
-function gaugeHtml(value, label){ return `<div class="dir-gauge"><div class="gv">${esc(String(value))}</div><div class="gl">${esc(label)}</div></div>`; }
-
-// Jauge d'occupation (compteur X / total, avec barre de remplissage) — pour les zones de
-// comptage (parking DLCC/CLX, etc.) où l'indicateur pertinent est un taux d'occupation,
-// pas un simple total cumulé. Couleur par seuil, comme dans parkguard-rdz.html.
-// Cliquable si onClickAttr est fourni : ouvre la pop-up des derniers relevés de la zone.
-function occupancyGaugeHtml(label, count, total, onClickAttr){
-  const pct = total ? Math.min(100, Math.round((count/total)*100)) : 0;
+// Jauge en pourcentage (occupation parking) — barre de remplissage colorée par seuil,
+// comme dans parkguard-rdz.html. Le libellé précise ce que représente le chiffre
+// (affluence max si période = un jour, taux d'occupation moyen sinon).
+function occupancyPctGaugeHtml(label, pct, onClickAttr){
   const color = pct>=90 ? '#8B1A1A' : (pct>=70 ? '#b8860b' : '#0e7490');
-  return `<div class="dir-gauge"${onClickAttr?` style="cursor:pointer" onclick="${onClickAttr}" title="Cliquer pour voir les derniers relevés"`:''}>
-    <div class="gv">${count} / ${total}</div>
+  return `<div class="dir-gauge"${onClickAttr?` style="cursor:pointer" onclick="${onClickAttr}" title="Cliquer pour voir les relevés"`:''}>
+    <div class="gv">${pct}%</div>
     <div class="gl">${esc(label)}</div>
-    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-    <div style="font-size:11px;color:#888;margin-top:3px;text-align:right">${pct}% occupé</div>
+    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" style="width:${Math.min(100,pct)}%;background:${color}"></div></div>
   </div>`;
 }
 
@@ -2191,9 +2261,10 @@ function siteWidgetsHtml(siteData, skey){
   const doorKeyword = doorGaugeKeywordFor(siteData.site);
   if(!doorKeyword) return '';
   const ouvertures = siteData.siteEntries.filter(e=>e.kind==='ouverture');
-  if(!ouvertures.length) return ''; // pas d'ouverture sur la période -> pas de jauge ni de graphique
-  const gaugeBlock = `<div class="chart-block"><div class="dir-widget-row">${gaugeHtml(ouvertures.length, '🔓 Ouvertures de porte')}</div></div>`;
-  return gaugeBlock + chartBlock('Répartition des ouvertures par nature', ouvertureMotifHtml(siteData, skey));
+  if(!ouvertures.length) return ''; // pas d'ouverture sur la période -> pas de graphique
+  // Sur demande : plus de pastille récapitulant le nombre total d'ouvertures, seulement
+  // le graphique de répartition par nature.
+  return chartBlock('Répartition des ouvertures par nature', ouvertureMotifHtml(siteData, skey));
 }
 
 function siteCardHtml(siteData){
@@ -2274,6 +2345,7 @@ function renderDirectionReport(){
   window.__dirBiblioSeries = {};
   window.__dirOuvertureByMotif = {};
   window.__dirComptageByZone = {};
+  window.__dirDlccSeries = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
