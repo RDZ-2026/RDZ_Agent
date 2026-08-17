@@ -1,4 +1,24 @@
-<!-- RDZ · supervision-journal · v39 · 2026-08-17
+<!-- RDZ · supervision-journal · v40 · 2026-08-17
+     v40 : Rapport direction — fusion des 2 graphiques d'évolution d'occupation parking
+     (DLCC et CLX, jusqu'ici un graphique séparé par zone) en un seul graphique avec les
+     deux courbes + légende, demande explicite ("avoir les deux courbes sur le même
+     graphique avec une légende"). Réutilise multiSeriesLineChartHtml (déjà utilisé pour
+     la bibliothèque) — mais DLCC/CLX ne sont PAS relevés forcément au même instant, donc
+     contrairement à la bibliothèque (où toutes les courbes d'un point partagent les mêmes
+     entrées), chaque zone garde ses propres entrées par point (mergeZoneSeriesForChart
+     fusionne les deux séries sur un axe X commun par libellé, une valeur/zone manquante
+     à un point affiche 0 plutôt que de décaler l'axe). En conséquence :
+       - multiSeriesLineChartHtml prend maintenant onClickAttr(key, idx) au lieu de
+         onClickAttr(idx) — `key` porte la zone cliquée pour DLCC/CLX (ignoré, sans
+         risque, par la bibliothèque qui n'en a pas besoin).
+       - showDlccPointDrilldown(skey, zone, idx) ne montre plus que les relevés de LA
+         zone cliquée à ce point, jamais les deux zones mélangées.
+       - lineChartHtml (composant à une seule courbe) supprimé : plus aucun appelant
+         après cette fusion (bibliothèque et DLCC utilisent tous deux
+         multiSeriesLineChartHtml désormais).
+     Vérifié par test automatisé : légende affichée, valeurs par zone correctes y compris
+     quand les deux zones n'ont pas exactement les mêmes horaires de relevé, et clic sur
+     un point d'UNE zone n'ouvre que ses propres relevés.
      v39 : Rapport direction — 2 ajustements sur les blocs consignes/constats/événements
      ajoutés en v38 :
        (1) Un site apparaît désormais même s'il n'a NI rapport, NI porte, NI bibliothèque,
@@ -2234,53 +2254,16 @@ function biblioFiltrageSeries(siteEntries, singleDay){
   series.originKeys = originKeys;
   return series;
 }
-// Graphique d'évolution (ligne + aire légère) générique pour une série {label,value,
-// entries} — une donnée qui change dans le temps se lit mieux en évolution qu'en barres
-// horizontales. SVG pur, pas de librairie externe. Point cliquable → pop-up (via
-// onClickAttr(idx), même mécanique que les histogrammes). Étiquettes de l'axe X sous-
-// échantillonnées au-delà de 8 points pour rester lisibles.
-function lineChartHtml(series, color, onClickAttr, valueSuffix){
-  if(!series.length) return null;
-  const w = 640, h = 170, padL = 8, padR = 8, padT = 16, padB = 30;
-  const innerW = w - padL - padR, innerH = h - padT - padB;
-  const maxV = Math.max(...series.map(s=>s.value), 1);
-  const stepX = series.length > 1 ? innerW/(series.length-1) : 0;
-  const pts = series.map((s,i)=>{
-    const x = padL + (series.length > 1 ? i*stepX : innerW/2);
-    const y = padT + innerH - (s.value/maxV)*innerH;
-    return { x, y, s, i };
-  });
-  const pathD = pts.map((p,i)=> (i===0?'M':'L') + p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
-  const areaD = pathD + ` L${pts[pts.length-1].x.toFixed(1)},${(padT+innerH).toFixed(1)} L${pts[0].x.toFixed(1)},${(padT+innerH).toFixed(1)} Z`;
-  // Ancrage du texte : les points de bord (premier/dernier) sont ancrés côté intérieur
-  // (start/end) plutôt que centrés, sinon la moitié du libellé déborde hors du viewBox
-  // et se retrouve invisible (coupé par le cadre) — pour l'horaire ET pour la valeur.
-  const anchorFor = p => p.i===0 ? 'start' : (p.i===pts.length-1 ? 'end' : 'middle');
-  const showEvery = Math.max(1, Math.ceil(series.length/8));
-  const labels = pts.filter((p,i)=> i%showEvery===0 || i===pts.length-1)
-    .map(p=>`<text x="${p.x.toFixed(1)}" y="${h-10}" font-size="10" fill="#888" text-anchor="${anchorFor(p)}">${esc(p.s.label)}</text>`).join('');
-  const circles = pts.map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4.5" fill="${color}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="${onClickAttr(p.i)}"><title>${esc(p.s.label)} — ${p.s.value}${valueSuffix||''}</title></circle>`).join('');
-  const valueLabels = pts.map(p=>`<text x="${p.x.toFixed(1)}" y="${(p.y-9).toFixed(1)}" font-size="10" font-weight="700" fill="#555" text-anchor="${anchorFor(p)}">${p.s.value}${valueSuffix||''}</text>`).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMinYMin meet">
-    <line x1="${padL}" y1="${(padT+innerH).toFixed(1)}" x2="${w-padR}" y2="${(padT+innerH).toFixed(1)}" stroke="#e0e0e0" stroke-width="1"/>
-    <path d="${areaD}" fill="${color}" opacity="0.1"/>
-    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2"/>
-    ${circles}
-    ${valueLabels}
-    ${labels}
-  </svg>`;
-}
-// Graphique d'évolution à plusieurs courbes (même composant SVG que lineChartHtml, mais
-// N lignes superposées sur un même axe — un seul axe, jamais un double axe, cf. skill
-// dataviz) : utilisé pour comptage/filtrage bibliothèque une fois qu'on y ajoute rappels
-// au règlement / refus / origines. Toutes les courbes partagent les mêmes points X (même
-// tableau `points`, une clé différente par courbe) donc un même index i pointe toujours
-// vers les mêmes entrées, quelle que soit la courbe cliquée — showBiblioDrilldown garde
-// la même signature (skey, seriesKey, idx). Légende toujours affichée dès 2 courbes (une
-// identité ne doit jamais reposer sur la couleur seule). Chaque point porte sa valeur en
-// clair (couleur de sa courbe) — retiré une première fois pour alléger le rendu, remis
-// sur demande explicite : sans le chiffre, la quantité ne se lit plus, seule la tendance
-// reste visible (valeur 0 masquée pour ne pas surcharger, elle ne dit rien d'utile).
+// Graphique d'évolution à plusieurs courbes — un seul axe, jamais un double axe, cf. skill
+// dataviz) : utilisé pour comptage/filtrage bibliothèque (rappels/refus/origines) ET pour
+// DLCC+CLX fusionnés sur un même graphique (demande explicite). Chaque courbe porte une
+// `key` optionnelle (ex. le nom de la zone) transmise à onClickAttr(key, idx) en plus de
+// l'index — nécessaire quand les courbes ne partagent PAS les mêmes entrées par point
+// (DLCC/CLX : chaque zone a ses propres relevés) ; pour la bibliothèque, où toutes les
+// courbes d'un même point partagent les mêmes entrées, `key` est simplement ignoré par
+// l'appelant. Légende toujours affichée dès 2 courbes (une identité ne doit jamais
+// reposer sur la couleur seule). Chaque point porte sa valeur en clair (couleur de sa
+// courbe) — valeur 0 masquée pour ne pas surcharger, elle ne dit rien d'utile.
 function multiSeriesLineChartHtml(points, lines, onClickAttr, valueSuffix){
   const n = points.length;
   if(!n) return null;
@@ -2300,7 +2283,7 @@ function multiSeriesLineChartHtml(points, lines, onClickAttr, valueSuffix){
   const curves = activeLines.map(l=>{
     const pts = points.map((p,i)=>({ x:xFor(i), y:yFor(l.get(p)||0), v:l.get(p)||0, p, i }));
     const d = pts.map((pt,i)=>(i===0?'M':'L')+pt.x.toFixed(1)+','+pt.y.toFixed(1)).join(' ');
-    const circles = pts.map(pt=>`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="${l.color}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onclick="${onClickAttr(pt.i)}"><title>${esc(l.name)} — ${esc(pt.p.label)} : ${pt.v}${valueSuffix||''}</title></circle>`).join('');
+    const circles = pts.map(pt=>`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="${l.color}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onclick="${onClickAttr(l.key, pt.i)}"><title>${esc(l.name)} — ${esc(pt.p.label)} : ${pt.v}${valueSuffix||''}</title></circle>`).join('');
     const valueLabels = pts.filter(pt=>pt.v>0).map(pt=>`<text x="${pt.x.toFixed(1)}" y="${(pt.y-7).toFixed(1)}" font-size="9" font-weight="700" fill="${l.color}" text-anchor="${anchorFor(pt.i)}">${pt.v}${valueSuffix||''}</text>`).join('');
     return `<path d="${d}" fill="none" stroke="${l.color}" stroke-width="2"/>${circles}${valueLabels}`;
   }).join('');
@@ -2351,8 +2334,8 @@ function mdpBiblioHtml(siteData, skey){
   ];
 
   let html = '';
-  if(comptageSeries.length) html += chartBlock(comptageLabel, multiSeriesLineChartHtml(comptageSeries, comptageLines, idx=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
-  if(filtrageSeries.length) html += chartBlock(filtrageLabel, multiSeriesLineChartHtml(filtrageSeries, filtrageLines, idx=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
+  if(comptageSeries.length) html += chartBlock(comptageLabel, multiSeriesLineChartHtml(comptageSeries, comptageLines, (key,idx)=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
+  if(filtrageSeries.length) html += chartBlock(filtrageLabel, multiSeriesLineChartHtml(filtrageSeries, filtrageLines, (key,idx)=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
   return html;
 }
 
@@ -2406,17 +2389,40 @@ function sortDlccZones(zones){
   });
 }
 window.__dirComptageByZone = {}; // skey -> { zoneName: [entrées, plus récent d'abord] } (clic jauge)
-window.__dirDlccSeries = {}; // skey -> { zoneName: [{label,value,entries}] } (clic point du graphique)
+window.__dirDlccMergedPoints = {}; // skey -> [{label, ts, values:{zone:val}, entriesByZone:{zone:[entrées]}}] (clic point du graphique fusionné)
 function showComptageDrilldown(skey, zoneName){
   const byZone = window.__dirComptageByZone[skey];
   if(!byZone) return;
   const list = byZone[zoneName] || [];
   showEntryListPopup('🅿️ Parking', `${zoneName} — tous les relevés (${list.length})`, list);
 }
+// Un même point du graphique fusionné DLCC+CLX peut porter deux relevés distincts (un par
+// zone, pas forcément au même instant exact) — d'où le paramètre `zoneName` en plus de
+// l'idx : on ne veut que les entrées de la zone dont la courbe a été cliquée, pas les deux.
 function showDlccPointDrilldown(skey, zoneName, idx){
-  const s = window.__dirDlccSeries[skey] && window.__dirDlccSeries[skey][zoneName] && window.__dirDlccSeries[skey][zoneName][idx];
-  if(!s) return;
-  showEntryListPopup('🅿️ Parking', `${zoneName} — ${s.label} (${s.entries.length})`, s.entries);
+  const p = window.__dirDlccMergedPoints[skey] && window.__dirDlccMergedPoints[skey][idx];
+  const list = p && p.entriesByZone && p.entriesByZone[zoneName];
+  if(!list || !list.length) return;
+  showEntryListPopup('🅿️ Parking', `${zoneName} — ${p.label} (${list.length})`, list);
+}
+// Fusionne les séries par zone (dlccZoneSeries) sur un seul axe X commun, pour un seul
+// graphique DLCC+CLX avec légende plutôt qu'un graphique par zone (demande explicite) —
+// même principe que multiSeriesLineChartHtml pour la bibliothèque, mais ici chaque zone
+// garde SES PROPRES entrées par point (les deux zones ne sont pas forcément relevées au
+// même instant), d'où values/entriesByZone séparés par zone plutôt qu'un point partagé.
+function mergeZoneSeriesForChart(seriesByZone){
+  const pointMap = new Map();
+  Object.entries(seriesByZone).forEach(([zone, series])=>{
+    series.forEach(p=>{
+      const ts = p._ts || (p.entries && p.entries[0] && p.entries[0].ts) || null;
+      if(!pointMap.has(p.label)) pointMap.set(p.label, { label: p.label, ts, values:{}, entriesByZone:{} });
+      const point = pointMap.get(p.label);
+      point.values[zone] = p.value;
+      point.entriesByZone[zone] = p.entries;
+      if(!point.ts) point.ts = ts;
+    });
+  });
+  return [...pointMap.values()].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
 }
 function dlccParkingHtml(siteData, skey){
   if(!siteNameIncludes(siteData.site,'DLCC')) return '';
@@ -2426,7 +2432,6 @@ function dlccParkingHtml(siteData, skey){
   comptages.forEach(e=>{ const z = comptageZoneName(e.raw); (byZone[z] = byZone[z]||[]).push(e); });
   Object.values(byZone).forEach(list=>list.sort((a,b)=>new Date(b.ts)-new Date(a.ts)));
   window.__dirComptageByZone[skey] = byZone;
-  window.__dirDlccSeries[skey] = {};
   const singleDay = isDirectionSingleDay();
   const zones = sortDlccZones(Object.keys(byZone));
 
@@ -2436,15 +2441,16 @@ function dlccParkingHtml(siteData, skey){
     return occupancyPctGaugeHtml(gaugeLabel, pct, `showComptageDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}')`);
   }).join('');
 
-  const evoBlocks = zones.map(zone=>{
-    const series = dlccZoneSeries(byZone[zone], singleDay);
-    window.__dirDlccSeries[skey][zone] = series;
-    const label = `Évolution occupation — ${zone}${singleDay ? ' (par relevé, nombre de véhicules)' : ' (nombre moyen de véhicules par jour)'}`;
-    const chart = lineChartHtml(series, colorForLabel(zone), idx=>`showDlccPointDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}',${idx})`, '');
-    return chart ? chartBlock(label, chart) : '';
-  }).join('');
+  const seriesByZone = {};
+  zones.forEach(zone=>{ seriesByZone[zone] = dlccZoneSeries(byZone[zone], singleDay); });
+  const merged = mergeZoneSeriesForChart(seriesByZone);
+  window.__dirDlccMergedPoints[skey] = merged;
+  const lines = zones.map(zone=>({ key: zone, name: zone, color: colorForLabel(zone), get: p=>p.values[zone]||0 }));
+  const evoLabel = `Évolution occupation — DLCC & CLX${singleDay ? ' (par relevé, nombre de véhicules)' : ' (nombre moyen de véhicules par jour)'}`;
+  const chart = merged.length ? multiSeriesLineChartHtml(merged, lines, (zone,idx)=>`showDlccPointDrilldown('${skey}','${esc(zone||'').replace(/'/g,"\\'")}',${idx})`, '') : null;
+  const evoBlock = chart ? chartBlock(evoLabel, chart) : '';
 
-  return chartBlock('Occupation parking', `<div class="dir-widget-row">${gauges}</div>`) + evoBlocks;
+  return chartBlock('Occupation parking', `<div class="dir-widget-row">${gauges}</div>`) + evoBlock;
 }
 
 /* ---------- ParkGuard : rondes de contrôle parking (kind 'parking', table 'vehicles') ---
@@ -2888,7 +2894,7 @@ function renderDirectionReport(){
   window.__dirBiblioSeries = {};
   window.__dirOuvertureByMotif = {};
   window.__dirComptageByZone = {};
-  window.__dirDlccSeries = {};
+  window.__dirDlccMergedPoints = {};
   window.__dirParkingByCat = {};
   window.__dirParkingAbusifs = {};
   window.__dirRegisterLists = {};
