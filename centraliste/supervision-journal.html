@@ -1,4 +1,43 @@
-<!-- RDZ · supervision-journal · v37 · 2026-08-17
+<!-- RDZ · supervision-journal · v39 · 2026-08-17
+     v39 : Rapport direction — 2 ajustements sur les blocs consignes/constats/événements
+     ajoutés en v38 :
+       (1) Un site apparaît désormais même s'il n'a NI rapport, NI porte, NI bibliothèque,
+       NI DLCC, NI parking — à condition qu'il y ait une création/modification de
+       consigne, un constat, ou un événement sur la période (siteHasContent étendu).
+       (2) Nouveau bloc distinct "📅 Événements du jour / de la période" (le bloc existant
+       est renommé "Événements — création / modification" pour clarifier la différence) :
+       liste les événements dont la DATE réelle (evenements.date, pas le ts de création/
+       modification de la fiche) tombe dans la période sélectionnée — donc y compris un
+       événement créé il y a longtemps mais qui SE DÉROULE pendant la période. Pour
+       chacun : progression des 2 checklists (générique/responsable, tables
+       evenements_checklist_*, chargées via loadEvenementsExtras() dans refresh()) et
+       statut du rapport de fin d'événement (evenements_rapports). Clic → détail dédié
+       (openEvenementPeriodDetail, pas le détail générique) : fiche événement + le détail
+       coché/non coché de chaque item de checklist + le contenu du rapport de fin
+       d'événement s'il existe.
+       Effet de bord nécessaire : un site n'ayant qu'un tel événement (aucune autre
+       donnée dans la période au sens ts) n'aurait jamais eu de carte auparavant —
+       computeSiteBreakdown et le garde-fou "Aucune donnée" de renderDirectionReport ont
+       été étendus (sitesWithPeriodEvents) pour que ce cas s'affiche quand même. Vérifié
+       par test automatisé (site avec un seul événement daté dans la période, créé hors
+       période).
+     v38 : Rapport direction — à la toute fin de chaque carte site (après le parking),
+     3 nouveaux blocs listant ce qui a été ajouté/modifié sur la période, un par kind déjà
+     chargé (consigne/constat/evenement — aucune nouvelle requête Supabase), chacun masqué
+     si vide :
+       - "📌 Consignes — ajouts / modifications"
+       - "📋 Registre de constats"
+       - "📅 Événements"
+     Clic sur une ligne → détail générique (ces 3 kinds n'ont pas de rapport "style RDZ"
+     imprimable, comme les badges externes). Réutilise openListItemDetail (factorisé à
+     partir de l'ancien openSiteDrillDetail) plutôt qu'une seule liste globale partagée :
+     chaque site ET chaque catégorie garde sa propre liste
+     (window.__dirRegisterLists[skey][cat]), donc plusieurs cartes site affichées en même
+     temps ne s'écrasent pas les unes les autres au clic — vérifié par test automatisé
+     avec 2 sites simultanés.
+     Périmètre volontairement inchangé par ailleurs : ces 3 blocs n'apparaissent que sur
+     des sites déjà affichés (siteHasContent n'a pas été étendu à ces 3 kinds seuls) et ne
+     sont pas répercutés dans la version imprimable (qui ne détaille pas le "Par site").
      v37 : Rapport direction — 4 ajustements :
        (1) Le bloc "🪪 Badges externes" est déplacé tout en bas de l'onglet, après la
        partie "📍 Par site" (auparavant juste après les chiffres clés, avant les sites).
@@ -1416,6 +1455,23 @@ const SOURCES = [
 
 /* ---------- État ---------- */
 let allEntries = [];   // {ts, kind, sub, raw, src}
+// Données complémentaires des événements (checklist-evenement-agent.html) — chargées à
+// part de SOURCES/allEntries car ce ne sont pas des "entrées du journal" à proprement
+// parler, seulement des données utilisées pour enrichir la section "Événements du jour /
+// de la période" du Rapport direction (progression checklist + statut du rapport de fin
+// d'événement, cf. loadEvenementsExtras() appelé depuis refresh()).
+let evtChecklistSections = [], evtChecklistItems = [], evtChecklistReponses = [], evtRapports = [];
+async function loadEvenementsExtras(){
+  try{
+    const [{data:sec},{data:items},{data:rep},{data:rap}] = await Promise.all([
+      sb.from('evenements_checklist_sections').select('*').eq('actif',true).order('ordre'),
+      sb.from('evenements_checklist_items').select('*').eq('actif',true).order('ordre'),
+      sb.from('evenements_checklist_reponses').select('*'),
+      sb.from('evenements_rapports').select('*'),
+    ]);
+    evtChecklistSections = sec||[]; evtChecklistItems = items||[]; evtChecklistReponses = rep||[]; evtRapports = rap||[];
+  }catch(err){ console.warn('Extras événements en échec :', err.message||err); }
+}
 
 async function refresh(){
   const list = document.getElementById('list');
@@ -1423,17 +1479,20 @@ async function refresh(){
   allEntries = [];
   try{
     await loadJournalPhotosByEntree();
-    await Promise.all(SOURCES.map(async src=>{
-      try{
-        const rows = await src.fetch();
-        rows.forEach(r=>{
-          src.expand(r).forEach(e=>{
-            if(!e.ts) return;
-            allEntries.push({ ts:e.ts, kind:e.kind, sub:e.sub, raw:e.raw, src });
+    await Promise.all([
+      ...SOURCES.map(async src=>{
+        try{
+          const rows = await src.fetch();
+          rows.forEach(r=>{
+            src.expand(r).forEach(e=>{
+              if(!e.ts) return;
+              allEntries.push({ ts:e.ts, kind:e.kind, sub:e.sub, raw:e.raw, src });
+            });
           });
-        });
-      }catch(err){ console.warn('Source en échec :', src.table, err.message||err); }
-    }));
+        }catch(err){ console.warn('Source en échec :', src.table, err.message||err); }
+      }),
+      loadEvenementsExtras(),
+    ]);
     allEntries.sort((a,b)=> new Date(b.ts) - new Date(a.ts));
     populateFilterOptions();
     render();
@@ -1975,6 +2034,24 @@ function getDirectionEntries(){
     return true;
   });
 }
+// Bornes de dates (chaînes "YYYY-MM-DD") de la période Rapport direction actuellement
+// sélectionnée — même logique que getDirectionEntries, mais exprimée en dates simples
+// plutôt qu'en filtrage d'entrées, pour être réutilisable sur un champ "date" brut (ex.
+// evenements.date) plutôt que sur le timestamp ts d'une entrée du journal.
+function directionDateBounds(){
+  if(dirMode==='day'){
+    const day = document.getElementById('dir-serviceday').value || serviceDate();
+    return { from: day, to: day };
+  }
+  return { from: document.getElementById('dir-from').value || '', to: document.getElementById('dir-to').value || '' };
+}
+function dateInDirectionBounds(dateStr){
+  if(!dateStr) return false;
+  const { from, to } = directionDateBounds();
+  if(from && dateStr < from) return false;
+  if(to && dateStr > to) return false;
+  return true;
+}
 function dirPeriodLabel(){
   if(dirMode==='day'){
     const day = document.getElementById('dir-serviceday').value || serviceDate();
@@ -2045,11 +2122,38 @@ function siteHasContent(siteData){
   if(siteNameIncludes(siteData.site,'MDP') && siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage')) return true;
   if(siteNameIncludes(siteData.site,'DLCC') && siteData.siteEntries.some(e=>e.kind==='comptage')) return true;
   if(siteData.siteEntries.some(e=>e.kind==='parking')) return true;
+  // Un site n'ayant NI rapport, NI porte, NI bibliothèque, NI DLCC, NI parking doit quand
+  // même apparaître s'il y a eu une création/modification de consigne, un constat, ou un
+  // événement sur la période (demande explicite : "même pour les sites qui n'ont rien
+  // d'autre... uniquement s'il y a création ou modification").
+  if(siteData.siteEntries.some(e=>e.kind==='consigne' || e.kind==='constat' || e.kind==='evenement')) return true;
   return false;
 }
 
+// Sites ayant un événement dont la DATE (pas le ts de création/modification) tombe dans
+// la période sélectionnée — relit allEntries directement (indépendant du filtrage par ts
+// de `entries`) car un événement peut avoir été créé bien avant la période mais SE
+// DÉROULER pendant celle-ci (cf. evenementsPeriodHtml). Sans ceci, un site n'ayant qu'un
+// tel événement (aucun rapport/porte/bibliothèque/DLCC/parking/consigne/constat créé
+// pendant la période) n'obtiendrait jamais de carte site, et le bloc "Événements du jour /
+// de la période" ne pourrait jamais s'afficher pour lui.
+function sitesWithPeriodEvents(){
+  const siteFilter = document.getElementById('dir-site').value;
+  const set = new Set();
+  allEntries.forEach(e=>{
+    if(e.kind!=='evenement' || !dateInDirectionBounds(e.raw.date)) return;
+    let s=''; try{ s = siteGroupName(e.src.site(e.raw)||''); }catch(_){ return; }
+    if(!s || (siteFilter && s!==siteFilter)) return;
+    set.add(s);
+  });
+  return set;
+}
 function computeSiteBreakdown(entries){
-  const allSites = [...new Set(entries.map(e=>{ try{ return siteGroupName(e.src.site(e.raw)||''); }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const periodEventSites = sitesWithPeriodEvents();
+  const allSites = [...new Set([
+    ...entries.map(e=>{ try{ return siteGroupName(e.src.site(e.raw)||''); }catch(_){ return ''; } }),
+    ...periodEventSites,
+  ])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fr'));
   const out = {};
   const sites = [];
   allSites.forEach(site=>{
@@ -2058,7 +2162,10 @@ function computeSiteBreakdown(entries){
     const byType = {};
     activity.forEach(e=>{ const t = e.raw.type_action || 'Non classé'; (byType[t] = byType[t]||[]).push(e); });
     const siteData = { site, siteEntries, activity, byType };
-    if(!siteHasContent(siteData)) return; // "pas besoin des sites où il n'y a pas de rapports ou données"
+    // "pas besoin des sites où il n'y a pas de rapports ou données" — sauf si le seul
+    // contenu est un événement de la période (periodEventSites), auquel cas le site doit
+    // quand même apparaître pour afficher ce bloc.
+    if(!siteHasContent(siteData) && !periodEventSites.has(site)) return;
     out[site] = siteData;
     sites.push(site);
   });
@@ -2436,6 +2543,155 @@ function openParkingAbusifDetail(skey, plaque){
   showEntryListPopup('⚠️ Stationnement abusif', `${plaque} (${list.length})`, list);
 }
 
+/* ---------- Registres du site : consignes (ajouts/modifications), constats, événements ---
+   Affichés à la toute fin de chaque carte site (après le parking), demande explicite : "les
+   ajouts ou les modifications qui sont faites sur les consignes, sur les registres de constat
+   [...] et les événements". Trois listes indépendantes (une par kind), chacune masquée si
+   vide — même convention que le reste du Rapport direction. Clic sur une ligne → détail
+   générique (consigne/constat/evenement n'ont pas de rapport "style RDZ" imprimable),
+   via openListItemDetail — chaque liste est stockée séparément par site ET par catégorie
+   (window.__dirRegisterLists[skey][cat]) pour ne pas s'écraser entre les 3 blocs d'un même
+   site ni entre plusieurs sites affichés en même temps. */
+window.__dirRegisterLists = {};
+function openRegisterItem(skey, cat, idx){
+  const list = (window.__dirRegisterLists[skey]||{})[cat] || [];
+  openListItemDetail(list, idx);
+}
+function registerCategoryHtml(label, icon, list, skey, cat){
+  if(!list.length) return '';
+  window.__dirRegisterLists[skey] = window.__dirRegisterLists[skey] || {};
+  window.__dirRegisterLists[skey][cat] = list;
+  const rows = list.map((e,i)=>{
+    let title='', snip=''; try{ title = e.src.title(e.raw); snip = e.src.snippet(e.raw); }catch(_){ title = KINDS[e.kind]?.label||''; }
+    return `<div class="attn-item" style="border-left-color:${KINDS[e.kind]?.color||'#8B1A1A'}" onclick="openRegisterItem('${skey}','${cat}',${i})">
+      <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
+      <div class="mid"><div class="t">${icon} ${esc(title)}</div><div class="s">${esc(snip)||'<i>Sans description</i>'}</div></div>
+    </div>`;
+  }).join('');
+  return chartBlock(label, rows);
+}
+function siteRegistersHtml(siteData, skey){
+  const byKind = k => siteData.siteEntries.filter(e=>e.kind===k).slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  // "Événements — création / modification" (ci-dessous) ≠ "Événements du jour / de la
+  // période" (evenementsPeriodHtml, plus bas) : le premier liste les FICHES événement
+  // créées/modifiées pendant la période (ts = created_at/updated_at) — un simple journal
+  // d'édition, sans accès checklist/rapport. Le second liste les événements qui SE
+  // DÉROULENT pendant la période (champ evenements.date), avec accès à la progression de
+  // la checklist et au rapport de fin d'événement — deux besoins différents, demande
+  // explicite de Laurent ("tu saisis la différence ?").
+  return registerCategoryHtml('📌 Consignes — ajouts / modifications', '📌', byKind('consigne'), skey, 'consigne')
+    + registerCategoryHtml('📋 Registre de constats', '📋', byKind('constat'), skey, 'constat')
+    + registerCategoryHtml('📅 Événements — création / modification', '📅', byKind('evenement'), skey, 'evenement');
+}
+
+/* ---------- Événements du jour / de la période : distinct du bloc "création /
+   modification" ci-dessus — ici on liste les événements dont la DATE (champ
+   evenements.date) tombe dans la période sélectionnée, avec accès à la progression de la
+   checklist (evenements_checklist_*) et au statut du rapport de fin d'événement
+   (evenements_rapports), comme demandé ("j'aimerais derrière avoir accès aux checklist et
+   rapport"). Indépendant de siteData.siteEntries (qui filtre par ts de création/
+   modification) : relit allEntries directement et filtre par date d'événement. */
+function evenementChecklistProgress(evenementId){
+  const out = {};
+  ['generique','responsable'].forEach(f=>{
+    const secIds = evtChecklistSections.filter(s=>s.formulaire===f).map(s=>s.id);
+    const items = evtChecklistItems.filter(i=>secIds.includes(i.section_id));
+    const done = evtChecklistReponses.filter(r=>r.evenement_id===evenementId && r.checked && items.some(i=>i.id===r.item_id)).length;
+    out[f] = { done, total: items.length };
+  });
+  return out;
+}
+function evenementRapportFor(evenementId){
+  return evtRapports.find(r=>r.evenement_id===evenementId) || null;
+}
+window.__dirEvenementsPeriod = {};
+function evenementsForSitePeriod(siteName){
+  return allEntries.filter(e=>{
+    if(e.kind!=='evenement') return false;
+    let s=''; try{ s = siteGroupName(e.src.site(e.raw)||''); }catch(_){ return false; }
+    if(s!==siteName) return false;
+    return dateInDirectionBounds(e.raw.date);
+  }).sort((a,b)=> `${a.raw.date||''}${a.raw.heure_debut||''}`.localeCompare(`${b.raw.date||''}${b.raw.heure_debut||''}`));
+}
+function pillHtml(ok, okLabel, badLabel){
+  return ok
+    ? `<span style="display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e6f4ea;color:#1b7a3d;white-space:nowrap">${okLabel}</span>`
+    : `<span style="display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:#fdeaea;color:#8B1A1A;white-space:nowrap">${badLabel}</span>`;
+}
+function evenementsPeriodHtml(siteData, skey){
+  const list = evenementsForSitePeriod(siteData.site);
+  if(!list.length) return '';
+  window.__dirEvenementsPeriod[skey] = list;
+  const rows = list.map((e,i)=>{
+    const r = e.raw;
+    const prog = evenementChecklistProgress(r.id);
+    const rap = evenementRapportFor(r.id);
+    const clParts = [];
+    if(prog.generique.total) clParts.push(`Checklist générique ${prog.generique.done}/${prog.generique.total}`);
+    if(prog.responsable.total) clParts.push(`Checklist responsable ${prog.responsable.done}/${prog.responsable.total}`);
+    const rapportPill = pillHtml(!!(rap && rap.statut==='cloture'), '✅ Rapport clôturé', rap ? '⏳ Rapport en cours' : '⚠️ Rapport non rédigé');
+    return `<div class="attn-item" style="border-left-color:#b8860b" onclick="openEvenementPeriodDetail('${skey}',${i})">
+      <div class="when">${fmtDate(r.date+'T00:00:00')}${r.heure_debut?'<br>'+String(r.heure_debut).slice(0,5):''}</div>
+      <div class="mid"><div class="t">📅 ${esc(r.titre||'Événement')}</div><div class="s">${esc(clParts.join(' · ')||'Aucune checklist configurée')}</div></div>
+      ${rapportPill}
+    </div>`;
+  }).join('');
+  return chartBlock('📅 Événements du jour / de la période', rows);
+}
+// Détail enrichi (pas le détail générique) : fiche événement + progression checklist par
+// section + contenu du rapport de fin d'événement s'il existe — c'est précisément l'accès
+// "checklist et rapport" demandé, pas seulement le titre/lieu de l'événement.
+function openEvenementPeriodDetail(skey, idx){
+  const e = (window.__dirEvenementsPeriod[skey]||[])[idx];
+  if(!e) return;
+  const r = e.raw;
+  const rap = evenementRapportFor(r.id);
+  const checklistHtml = ['generique','responsable'].map(f=>{
+    const secs = evtChecklistSections.filter(s=>s.formulaire===f).sort((a,b)=>a.ordre-b.ordre);
+    if(!secs.length) return '';
+    const secsHtml = secs.map(sec=>{
+      const items = evtChecklistItems.filter(i=>i.section_id===sec.id).sort((a,b)=>a.ordre-b.ordre);
+      if(!items.length) return '';
+      const itemsHtml = items.map(it=>{
+        const rep = evtChecklistReponses.find(x=>x.evenement_id===r.id && x.item_id===it.id);
+        const checked = !!(rep && rep.checked);
+        return `<div style="display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:12.5px">
+          <span style="flex-shrink:0">${checked?'✅':'⬜'}</span>
+          <span style="color:${checked?'var(--ink)':'#999'}">${esc(it.label||'')}${checked && rep.agent_nom ? ` <span style="color:#999;font-size:11px">— ${esc(rep.agent_nom)}</span>` : ''}</span>
+        </div>`;
+      }).join('');
+      return `<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">${esc(sec.label||'')}</div>${itemsHtml}</div>`;
+    }).join('');
+    return `<div class="msec"><div class="st">${f==='generique'?'Checklist générique':'Checklist responsable'}</div>${secsHtml||'<div class="txt"><i>Aucun item.</i></div>'}</div>`;
+  }).join('');
+  const rapportHtml = rap ? `<div class="msec"><div class="st">Rapport de fin d'événement</div>
+      <div class="txt">
+        Statut : ${rap.statut==='cloture' ? '✅ Clôturé' : '⏳ En cours'}${rap.agent_nom?' · Par '+esc(rap.agent_nom):''}<br>
+        ${rap.controle_issues_secours!=null ? `Contrôle issues de secours / extincteurs / défibrillateur : ${rap.controle_issues_secours ? 'Oui' : 'Non'}<br>` : ''}
+        ${rap.affluence_max ? `Affluence maximum : ${esc(rap.affluence_max)}<br>` : ''}
+        ${rap.evenement_particulier_1 ? `Événement particulier : ${esc(rap.evenement_particulier_1)}<br>` : ''}
+        ${rap.evenement_particulier_2 ? `Événement particulier (2) : ${esc(rap.evenement_particulier_2)}<br>` : ''}
+        ${rap.depart_invites_heure ? `Départ des invités : ${String(rap.depart_invites_heure).slice(0,5)}<br>` : ''}
+        ${rap.heure_fin_service ? `Fin de service : ${String(rap.heure_fin_service).slice(0,5)}` : ''}
+      </div></div>`
+    : `<div class="msec"><div class="st">Rapport de fin d'événement</div><div class="txt"><i>⚠️ Non rédigé pour le moment.</i></div></div>`;
+  const m = document.getElementById('modal');
+  m.innerHTML = `
+    <div class="mh" style="background:#b8860b"><button class="x" onclick="closeModal()">✕</button>
+      <div class="k">📅 Événement</div><h3>${esc(r.titre||'Événement')}</h3></div>
+    <div class="mb">
+      <div class="mgrid">
+        <div class="mcell"><div class="k">Date</div><div class="v">${fmtDate(r.date+'T00:00:00')}${r.heure_debut?' · '+String(r.heure_debut).slice(0,5):''}${r.heure_fin?' → '+String(r.heure_fin).slice(0,5):''}</div></div>
+        <div class="mcell"><div class="k">Lieu</div><div class="v">${esc(r.lieu||siteNameById[r.site_id]||'—')}</div></div>
+      </div>
+      ${r.consignes?`<div class="msec"><div class="st">Consignes spécifiques</div><div class="txt">${esc(r.consignes)}</div></div>`:''}
+      ${checklistHtml}
+      ${rapportHtml}
+      <div class="editbar"><button class="btn btn-sec" onclick="closeModal()">Fermer</button></div>
+    </div>`;
+  document.getElementById('overlay').classList.add('show');
+}
+
 const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
 function colorForLabel(label){
   let h = 0; for(let i=0;i<label.length;i++) h = (h*31 + label.charCodeAt(i)) >>> 0;
@@ -2516,6 +2772,8 @@ function siteCardHtml(siteData){
     ${mdpBiblioHtml(siteData, skey)}
     ${dlccParkingHtml(siteData, skey)}
     ${parkGuardHtml(siteData, skey)}
+    ${evenementsPeriodHtml(siteData, skey)}
+    ${siteRegistersHtml(siteData, skey)}
   </div>`;
 }
 
@@ -2551,13 +2809,15 @@ function showSiteDrilldown(skey, label){
 // Depuis le "Par site" du Rapport direction, on va directement au rapport "style RDZ"
 // imprimable (celui utilisé partout ailleurs pour rapport_standard/alarme) plutôt qu'au
 // détail générique du modal — c'est le même document que le client/la direction reçoit.
-function openSiteDrillDetail(i){
-  window.__renderedItems = window.__dirDrillList;
-  const e = window.__dirDrillList[i];
-  // Filet de sécurité : si la construction du rapport "style RDZ" échoue (champ manquant
-  // sur un enregistrement particulier…), on retombe sur le détail générique au lieu de
-  // laisser l'écran vide — closeModal() n'est appelé qu'une fois le rapport construit
-  // avec succès, jamais avant (sinon un échec silencieux fermerait tout sans rien rouvrir).
+// Ouvre le détail d'une entrée d'une liste quelconque (pas forcément window.__dirDrillList)
+// — factorisé pour être réutilisé par toutes les pop-up/listes du Rapport direction
+// (type_action, ouvertures, bibliothèque, DLCC, parking, ET désormais consignes/constats/
+// événements). Essaie le rapport "style RDZ" d'abord (si le kind est REPORTABLE), retombe
+// sur le détail générique si la construction échoue ou si le kind n'a pas de rapport
+// imprimable (consigne/constat/evenement/cle_badge n'en ont pas).
+function openListItemDetail(list, i){
+  window.__renderedItems = list;
+  const e = list[i];
   if(e && REPORTABLE[e.kind]){
     try{
       const html = REPORTABLE[e.kind](e.raw);
@@ -2571,6 +2831,7 @@ function openSiteDrillDetail(i){
   }
   openDetail(i);
 }
+function openSiteDrillDetail(i){ openListItemDetail(window.__dirDrillList, i); }
 
 // Widget "Badges externes" : uniquement les clés/badges remis à des tiers (receptionnaire_type
 // === 'externe'), avec une pastille verte "Rendu" ou rouge "⚠️ Non rendu" — volontairement compact
@@ -2604,7 +2865,12 @@ function renderDirectionReport(){
   window.__dirEntries = entries;
   window.__dirPeriodLabel = dirPeriodLabel();
 
-  if(!entries.length){
+  // Ne pas s'arrêter ici sur le seul compte de `entries` (filtré par ts de création/
+  // modification) : un événement peut n'avoir aucune entrée ts dans la période tout en SE
+  // DÉROULANT pendant celle-ci (sitesWithPeriodEvents) — dans ce cas il y a bien quelque
+  // chose à afficher (le bloc "Événements du jour / de la période"), même si les chiffres
+  // clés eux-mêmes resteront à zéro.
+  if(!entries.length && !sitesWithPeriodEvents().size){
     box.innerHTML = `<div class="state-msg">Aucune donnée sur cette période${document.getElementById('dir-site').value?' pour ce site':''}.</div>`;
     return;
   }
@@ -2623,6 +2889,10 @@ function renderDirectionReport(){
   window.__dirOuvertureByMotif = {};
   window.__dirComptageByZone = {};
   window.__dirDlccSeries = {};
+  window.__dirParkingByCat = {};
+  window.__dirParkingAbusifs = {};
+  window.__dirRegisterLists = {};
+  window.__dirEvenementsPeriod = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
