@@ -1,4 +1,23 @@
-<!-- RDZ · supervision-journal · v35 · 2026-08-17
+<!-- RDZ · supervision-journal · v36 · 2026-08-17
+     v36 : Rapport direction — graphiques bibliothèque enrichis (demande : "on ne voyait
+     pas les refus et les rappels au règlement, ni les entrées par origine du filtrage").
+     Les deux graphiques (comptage ET filtrage) passent d'une courbe unique à plusieurs
+     courbes superposées sur le même axe (nouveau composant générique
+     multiSeriesLineChartHtml — un seul axe, jamais de double axe) :
+       - Comptage : Affluence (courbe principale, inchangée) + Rappels au règlement +
+         Évictions (ces deux dernières en SOMME/jour si période multi-jours, comme des
+         compteurs d'événements — l'affluence reste en MAX/jour, elle, car instantanée).
+       - Filtrage : la courbe unique "Total entrées" est remplacée par une courbe par
+         origine (IHEID, UNIGE, Autres… — déduites dynamiquement des données de la
+         période, pas de liste figée) + Rappels au règlement + Refus/évictions, toutes
+         en SOMME/jour si multi-jours (inchangé pour les origines, ajouté pour les 2
+         autres).
+     Légende toujours affichée dès 2 courbes (couleurs : palette catégorielle existante
+     colorForLabel() pour les origines, ambre/rouge fixes pour rappels/refus, cohérent
+     avec les seuils déjà utilisés ailleurs). Le clic sur un point garde exactement le
+     même comportement qu'avant (showBiblioDrilldown, un même point-index pointe vers les
+     mêmes entrées quelle que soit la courbe cliquée, puisque toutes dérivent du même
+     relevé/jour).
      v35 : Rapport direction — 5 ajustements demandés :
        (1) Ordre DLCC avant CLX (jauges ET graphiques d'évolution), au lieu de l'ordre
        alphabétique qui mettait CLX en premier (DLCC_ZONE_ORDER + sortDlccZones).
@@ -2026,29 +2045,56 @@ function isDirectionSingleDay(){
   return !!(from && to && from===to);
 }
 function biblioTotalEntrees(e){ return Object.values(e.raw.entrees||{}).reduce((a,b)=>a+(parseInt(b)||0),0); }
+// Comptage : "value" (affluence) reste la courbe principale (instantané → MAX/jour en
+// multi-jours) ; rappels au règlement et évictions sont des compteurs d'événements
+// cumulés sur le relevé → SOMME/jour en multi-jours, comme le filtrage plus bas
+// (demande explicite de Laurent : intégrer refus + rappels dans les deux graphiques).
 function biblioComptageSeries(siteEntries, singleDay){
   const items = siteEntries.filter(e=>e.kind==='biblio_comptage').slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
-  if(singleDay) return items.map(e=>({ label: fmtTime(e.ts), value: e.raw.affluence||0, entries:[e] }));
+  if(singleDay) return items.map(e=>({ label: fmtTime(e.ts), value: e.raw.affluence||0, rappels: e.raw.rappels_reglement||0, evictions: e.raw.evictions||0, entries:[e] }));
   const byDay = {};
   items.forEach(e=>{
     const day = fmtDateShort(e.ts);
-    if(!byDay[day]) byDay[day] = { label: day, value: 0, entries: [], _ts: e.ts };
+    if(!byDay[day]) byDay[day] = { label: day, value: 0, rappels: 0, evictions: 0, entries: [], _ts: e.ts };
     byDay[day].entries.push(e);
     byDay[day].value = Math.max(byDay[day].value, e.raw.affluence||0);
+    byDay[day].rappels += (e.raw.rappels_reglement||0);
+    byDay[day].evictions += (e.raw.evictions||0);
   });
   return Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
 }
+// Filtrage : "value" (total entrées, toutes origines confondues) reste la courbe
+// principale ; en plus, on décompose par origine (les clés du champ "entrees" —
+// dynamiques, définies dans bibliotheque_config_origines, ex. "IHEID", "UNIGE",
+// "Autres"…) et on ajoute rappels au règlement + refus/évictions, toujours en SOMME.
+// La liste des origines est déduite des données de la période (pas d'appel réseau
+// supplémentaire) : toute origine effectivement saisie apparaît, dans son ordre
+// d'apparition.
 function biblioFiltrageSeries(siteEntries, singleDay){
   const items = siteEntries.filter(e=>e.kind==='biblio_filtrage').slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
-  if(singleDay) return items.map(e=>({ label: fmtTime(e.ts), value: biblioTotalEntrees(e), entries:[e] }));
-  const byDay = {};
-  items.forEach(e=>{
-    const day = fmtDateShort(e.ts);
-    if(!byDay[day]) byDay[day] = { label: day, value: 0, entries: [], _ts: e.ts };
-    byDay[day].entries.push(e);
-    byDay[day].value += biblioTotalEntrees(e);
-  });
-  return Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
+  const originKeys = [];
+  items.forEach(e=>Object.keys(e.raw.entrees||{}).forEach(k=>{ if(!originKeys.includes(k)) originKeys.push(k); }));
+  let series;
+  if(singleDay){
+    series = items.map(e=>{
+      const origins = {}; originKeys.forEach(k=> origins[k] = parseInt((e.raw.entrees||{})[k])||0 );
+      return { label: fmtTime(e.ts), value: biblioTotalEntrees(e), rappels: e.raw.rappels_reglement||0, refus: e.raw.evictions_refus||0, origins, entries:[e] };
+    });
+  } else {
+    const byDay = {};
+    items.forEach(e=>{
+      const day = fmtDateShort(e.ts);
+      if(!byDay[day]){ byDay[day] = { label: day, entries: [], rappels: 0, refus: 0, origins: {}, _ts: e.ts }; originKeys.forEach(k=>byDay[day].origins[k]=0); }
+      byDay[day].entries.push(e);
+      byDay[day].rappels += (e.raw.rappels_reglement||0);
+      byDay[day].refus += (e.raw.evictions_refus||0);
+      originKeys.forEach(k=> byDay[day].origins[k] += (parseInt((e.raw.entrees||{})[k])||0) );
+    });
+    series = Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts))
+      .map(d=>({ label: d.label, value: Object.values(d.origins).reduce((a,b)=>a+b,0), rappels: d.rappels, refus: d.refus, origins: d.origins, entries: d.entries }));
+  }
+  series.originKeys = originKeys;
+  return series;
 }
 // Graphique d'évolution (ligne + aire légère) générique pour une série {label,value,
 // entries} — une donnée qui change dans le temps se lit mieux en évolution qu'en barres
@@ -2086,6 +2132,49 @@ function lineChartHtml(series, color, onClickAttr, valueSuffix){
     ${labels}
   </svg>`;
 }
+// Graphique d'évolution à plusieurs courbes (même composant SVG que lineChartHtml, mais
+// N lignes superposées sur un même axe — un seul axe, jamais un double axe, cf. skill
+// dataviz) : utilisé pour comptage/filtrage bibliothèque une fois qu'on y ajoute rappels
+// au règlement / refus / origines. Toutes les courbes partagent les mêmes points X (même
+// tableau `points`, une clé différente par courbe) donc un même index i pointe toujours
+// vers les mêmes entrées, quelle que soit la courbe cliquée — showBiblioDrilldown garde
+// la même signature (skey, seriesKey, idx). Légende toujours affichée dès 2 courbes (une
+// identité ne doit jamais reposer sur la couleur seule) ; pas d'étiquette de valeur sur
+// chaque point (trop dense à plusieurs courbes) — un survol/clic donne le détail exact.
+function multiSeriesLineChartHtml(points, lines, onClickAttr, valueSuffix){
+  const n = points.length;
+  if(!n) return null;
+  const activeLines = lines.filter(l=>points.some(p=>(l.get(p)||0) > 0));
+  if(!activeLines.length) return null;
+  const w = 640, hLegend = activeLines.length>1 ? 26 : 0;
+  const h = 170 + hLegend, padL = 8, padR = 8, padT = 16, padB = 30 + hLegend;
+  const innerW = w - padL - padR, innerH = h - padT - padB - hLegend;
+  const maxV = Math.max(1, ...activeLines.flatMap(l=>points.map(p=>l.get(p)||0)));
+  const stepX = n > 1 ? innerW/(n-1) : 0;
+  const xFor = i => padL + (n > 1 ? i*stepX : innerW/2);
+  const yFor = v => padT + innerH - (v/maxV)*innerH;
+  const anchorFor = i => i===0 ? 'start' : (i===n-1 ? 'end' : 'middle');
+  const showEvery = Math.max(1, Math.ceil(n/8));
+  const axisLabels = points.map((p,i)=>({p,i})).filter(({i})=> i%showEvery===0 || i===n-1)
+    .map(({p,i})=>`<text x="${xFor(i).toFixed(1)}" y="${h-hLegend-10}" font-size="10" fill="#888" text-anchor="${anchorFor(i)}">${esc(p.label)}</text>`).join('');
+  const curves = activeLines.map(l=>{
+    const pts = points.map((p,i)=>({ x:xFor(i), y:yFor(l.get(p)||0), v:l.get(p)||0, p, i }));
+    const d = pts.map((pt,i)=>(i===0?'M':'L')+pt.x.toFixed(1)+','+pt.y.toFixed(1)).join(' ');
+    const circles = pts.map(pt=>`<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="${l.color}" stroke="#fff" stroke-width="1.2" style="cursor:pointer" onclick="${onClickAttr(pt.i)}"><title>${esc(l.name)} — ${esc(pt.p.label)} : ${pt.v}${valueSuffix||''}</title></circle>`).join('');
+    return `<path d="${d}" fill="none" stroke="${l.color}" stroke-width="2"/>${circles}`;
+  }).join('');
+  const legend = activeLines.length>1 ? `<div style="display:flex;flex-wrap:wrap;gap:2px 14px;margin-top:2px">${activeLines.map(l=>
+    `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#555"><span style="width:10px;height:10px;border-radius:2px;background:${l.color};display:inline-block;flex-shrink:0"></span>${esc(l.name)}</span>`).join('')}</div>` : '';
+  return `<div>
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMinYMin meet">
+      <line x1="${padL}" y1="${(padT+innerH).toFixed(1)}" x2="${w-padR}" y2="${(padT+innerH).toFixed(1)}" stroke="#e0e0e0" stroke-width="1"/>
+      ${curves}
+      ${axisLabels}
+    </svg>
+    ${legend}
+  </div>`;
+}
+
 window.__dirBiblioSeries = {}; // skey -> { comptage:[...], filtrage:[...] }
 function showBiblioDrilldown(skey, seriesKey, idx){
   const s = window.__dirBiblioSeries[skey] && window.__dirBiblioSeries[skey][seriesKey] && window.__dirBiblioSeries[skey][seriesKey][idx];
@@ -2107,9 +2196,22 @@ function mdpBiblioHtml(siteData, skey){
   window.__dirBiblioSeries[skey] = { comptage: comptageSeries, filtrage: filtrageSeries };
   const comptageLabel = singleDay ? 'Comptage bibliothèque — affluence par relevé' : 'Comptage bibliothèque — affluence maximale par jour';
   const filtrageLabel = singleDay ? 'Filtrage bibliothèque — entrées par relevé' : 'Filtrage bibliothèque — total des entrées par jour';
+
+  const comptageLines = [
+    { name:'Affluence', color:'#0e7490', get:p=>p.value },
+    { name:'Rappels au règlement', color:'#b8860b', get:p=>p.rappels },
+    { name:'Évictions', color:'#8B1A1A', get:p=>p.evictions },
+  ];
+  const filtrageOriginColors = (filtrageSeries.originKeys||[]).map(k=>({ name:k, color:colorForLabel(k), get:p=>(p.origins||{})[k]||0 }));
+  const filtrageLines = [
+    ...filtrageOriginColors,
+    { name:'Rappels au règlement', color:'#b8860b', get:p=>p.rappels },
+    { name:'Refus / évictions', color:'#8B1A1A', get:p=>p.refus },
+  ];
+
   let html = '';
-  if(comptageSeries.length) html += chartBlock(comptageLabel, lineChartHtml(comptageSeries, '#0e7490', idx=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
-  if(filtrageSeries.length) html += chartBlock(filtrageLabel, lineChartHtml(filtrageSeries, '#7c3aed', idx=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
+  if(comptageSeries.length) html += chartBlock(comptageLabel, multiSeriesLineChartHtml(comptageSeries, comptageLines, idx=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
+  if(filtrageSeries.length) html += chartBlock(filtrageLabel, multiSeriesLineChartHtml(filtrageSeries, filtrageLines, idx=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
   return html;
 }
 
