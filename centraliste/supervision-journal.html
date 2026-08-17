@@ -1,4 +1,12 @@
-<!-- RDZ · supervision-journal · v42 · 2026-08-17
+<!-- RDZ · supervision-journal · v43 · 2026-08-17
+     v43 : Widget "Changements de pile" (Rapport direction) revu à la demande de Laurent —
+       remplace la liste d'attn-item de la v42 par une JAUGE (comptage), même mécanique
+       que "Contrôle parking" (parkGuardTileHtml/showParkingDrilldown) : clic sur la jauge
+       → pop-up listant tous les changements de la période pour ce site
+       (showEntryListPopup) → clic sur un changement → rapport "style RDZ" (déjà branché
+       via openSiteDrillDetail → openListItemDetail → REPORTABLE.changement_pile).
+       Registre renommé window.__dirChangementPileList (remplace
+       window.__dirChangementPile de la v42, qui stockait la liste affichée telle quelle).
      v42 : Nouveau module "Changements de pile" (changement-pile-agent.html, table
        changements_pile) — intégré au Rapport direction comme demandé explicitement par
        Laurent : "il faudra bien sûr pouvoir avoir le site, l'agent et l'horodatage, et
@@ -10,11 +18,7 @@
        buildOuvertureReport mais sans motif/personne/photo (portée validée : uniquement
        site + localisation + heure/date + agent, "Localisation uniquement").
        (3) Nouveau widget changementPileHtml(siteData, skey), câblé dans siteCardHtml
-       juste après siteWidgetsHtml (le widget "façon ouverture de porte" demandé) —
-       PAS le style liste plate utilisé pour consigne/constat/evenement (siteRegistersHtml) :
-       même mécanique que evenementsPeriodHtml (attn-item cliquable → openListItemDetail
-       → rapport imprimable via REPORTABLE), avec son propre registre
-       window.__dirChangementPile[skey] pour éviter toute collision de liste au clic.
+       juste après siteWidgetsHtml (le widget "façon ouverture de porte" demandé).
        (4) siteHasContent étendu au kind changement_pile.
      v41 : Rapport direction — 2 ajouts :
        (1) Nouvelle carte "🔑 Clés / badges internes non rendus" (cle_badge,
@@ -2870,28 +2874,27 @@ function siteWidgetsHtml(siteData, skey){
   return chartBlock('Répartition des ouvertures par nature', ouvertureMotifHtml(siteData, skey));
 }
 
-// Widget "façon ouverture de porte" pour les changements de pile — même mécanique que
-// evenementsPeriodHtml (liste d'attn-item cliquables), PAS le style liste plate des
-// registres (siteRegistersHtml) : demande explicite de Laurent ("un rapport 'reporting'
-// pour le client par site 'façon ouverture de porte'"). Registre dédié
-// (window.__dirChangementPile[skey]) pour ne pas collisionner avec les autres listes.
-window.__dirChangementPile = {}; // skey -> [entrées changement_pile de la période, plus récent d'abord]
+// Widget "façon ouverture de porte" pour les changements de pile — repris sur demande de
+// Laurent (2026-08-17) : une JAUGE (comptage), pas une carte par changement. Même
+// mécanique que parkGuardTileHtml/showParkingDrilldown : clic sur la jauge → liste des
+// changements concernés (showEntryListPopup, réutilise window.__dirDrillList) → clic sur
+// un changement → rapport "style RDZ" (via openSiteDrillDetail → openListItemDetail →
+// REPORTABLE.changement_pile, déjà branché). Registre dédié par site
+// (window.__dirChangementPileList[skey]) pour ne pas collisionner avec les autres listes.
+window.__dirChangementPileList = {}; // skey -> [entrées changement_pile de la période, plus récent d'abord]
+function showChangementPileDrilldown(skey){
+  const list = window.__dirChangementPileList[skey] || [];
+  showEntryListPopup('🔋 Changements de pile', `Changements de pile (${list.length})`, list);
+}
 function changementPileHtml(siteData, skey){
   const list = siteData.siteEntries.filter(e=>e.kind==='changement_pile').slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts));
   if(!list.length) return '';
-  window.__dirChangementPile[skey] = list;
-  const rows = list.map((e,i)=>{
-    const r = e.raw;
-    return `<div class="attn-item" style="border-left-color:#a16207" onclick="openChangementPileDetail('${skey}',${i})">
-      <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
-      <div class="mid"><div class="t">🔋 Changement de pile</div><div class="s">${esc(r.localisation||'—')}${r.agent_nom?' · '+esc(r.agent_nom):''}</div></div>
-    </div>`;
-  }).join('');
-  return chartBlock('🔋 Changements de pile', rows);
-}
-function openChangementPileDetail(skey, idx){
-  const list = window.__dirChangementPile[skey] || [];
-  openListItemDetail(list, idx);
+  window.__dirChangementPileList[skey] = list;
+  const gauge = `<div class="dir-gauge" style="cursor:pointer" onclick="showChangementPileDrilldown('${skey}')" title="Cliquer pour voir le détail">
+    <div class="gv">${list.length}</div>
+    <div class="gl">🔋 Changements de pile</div>
+  </div>`;
+  return chartBlock('Changements de pile', `<div class="dir-widget-row">${gauge}</div>`);
 }
 
 function siteCardHtml(siteData){
@@ -3047,7 +3050,7 @@ function renderDirectionReport(){
   window.__dirParkingAbusifs = {};
   window.__dirRegisterLists = {};
   window.__dirEvenementsPeriod = {};
-  window.__dirChangementPile = {};
+  window.__dirChangementPileList = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
