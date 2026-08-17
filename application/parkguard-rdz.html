@@ -1,4 +1,4 @@
-<!-- RDZ · parkguard-rdz · v5 · 2026-08-17 -->
+<!-- RDZ · parkguard-rdz · v6 · 2026-08-17 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -146,7 +146,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;font-family:-apple-system,Bl
 .rdz-bar-back{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:12px;font-weight:700;padding:6px 11px;border-radius:6px;text-decoration:none;white-space:nowrap;flex-shrink:0}
 .rdz-bar-back:active{background:rgba(255,255,255,.25)}
 
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--black);color:var(--white);padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--black);color:var(--white);padding:12px 18px;border-radius:14px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;white-space:normal;text-align:center;line-height:1.4;max-width:calc(100% - 32px);width:max-content;pointer-events:none}
 .toast.show{opacity:1}
 input[type="file"]{display:none}
 </style>
@@ -1340,6 +1340,51 @@ function fileToDataUrl(fileOrBlob) {
   });
 }
 
+// ═══ COMPRESSION PHOTO AVANT MISE EN FILE (RDZSync) ═══
+// Une photo caméra en pleine résolution (souvent plusieurs Mo une fois encodée en dataURL) peut,
+// à elle seule ou combinée à 2-3 autres sur un même rapport (ex. dénonciation : véhicule +
+// dénonciation + pare-brise), dépasser la mémoire locale disponible pour la file RDZSync
+// (localStorage, plafonnée à quelques Mo selon le navigateur) — le rapport reste alors bloqué
+// sans pouvoir envoyer ses photos, avec un message "mémoire pleine". On redimensionne et
+// recompresse systématiquement chaque photo avant de la donner à RDZSync : à 1600px de large et
+// qualité JPEG ~72%, la plaque et le texte manuscrit restent parfaitement lisibles, pour une
+// taille de fichier divisée par 5 à 15 selon la photo d'origine.
+function compressImageToDataUrl(source, maxDim, quality) {
+  maxDim = maxDim || 1600;
+  quality = quality || 0.72;
+  return new Promise(function (resolve, reject) {
+    const isBlob = (typeof Blob !== 'undefined') && (source instanceof Blob);
+    const url = isBlob ? URL.createObjectURL(source) : source;
+    const img = new Image();
+    img.onload = function () {
+      if (isBlob) URL.revokeObjectURL(url);
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, cw, ch);
+      try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+      catch (e) { reject(e); }
+    };
+    img.onerror = function (e) { if (isBlob) URL.revokeObjectURL(url); reject(e || new Error('Erreur chargement image pour compression')); };
+    img.src = url;
+  });
+}
+async function compressPhotoForSync(source, maxDim, quality) {
+  try {
+    return await compressImageToDataUrl(source, maxDim, quality);
+  } catch (e) {
+    // En dernier recours (format non décodable par le canvas, par ex.) : on envoie la photo en
+    // taille originale plutôt que de la perdre — mieux vaut risquer la mémoire pleine que de ne
+    // rien avoir du tout.
+    console.warn('RDZSync: compression photo échouée, envoi en taille originale', e && (e.message || e));
+    if (source instanceof Blob) return await fileToDataUrl(source);
+    return source;
+  }
+}
+
 async function saveVideRonde() {
   const time     = nowStr();
   const remarque = document.getElementById('vide-remarque').value.trim();
@@ -1363,9 +1408,10 @@ async function saveVideRonde() {
   for (let i = 0; i < videPhotos.length && i < 4; i++) {
     photos.push({ name: entryId + '_vide_' + (i + 1) + '.jpg', field: photoFieldByIndex[i], file: videPhotos[i].file });
   }
-  // Conversion en dataURL : nécessaire pour que les photos survivent en localStorage
-  // même si l'agent est hors-ligne et ferme l'appli avant le retour du réseau.
-  const photosWithDataUrl = await Promise.all(photos.map(p => fileToDataUrl(p.file).then(dataUrl => ({ name: p.name, field: p.field, dataUrl }))));
+  // Conversion en dataURL (compressée) : nécessaire pour que les photos survivent en localStorage
+  // même si l'agent est hors-ligne et ferme l'appli avant le retour du réseau — voir
+  // compressPhotoForSync() plus haut pour la raison de la compression.
+  const photosWithDataUrl = await Promise.all(photos.map(p => compressPhotoForSync(p.file).then(dataUrl => ({ name: p.name, field: p.field, dataUrl }))));
 
   RDZSync.save({
     module: 'parkguard', table: 'vehicles', row: entry,
@@ -1497,9 +1543,9 @@ async function collectFlowPhotosAsDataUrl() {
   const out = [];
   for (const [key, field] of Object.entries(photoMap)) {
     if (flowBlobs[key]) {
-      out.push({ name: key + '.jpg', field, dataUrl: await fileToDataUrl(flowBlobs[key]) });
+      out.push({ name: key + '.jpg', field, dataUrl: await compressPhotoForSync(flowBlobs[key]) });
     } else if (flowPhotos[key]) {
-      out.push({ name: key + '.jpg', field, dataUrl: flowPhotos[key] }); // déjà une dataURL
+      out.push({ name: key + '.jpg', field, dataUrl: await compressPhotoForSync(flowPhotos[key]) }); // déjà une dataURL, compressée par précaution
     }
   }
   return out;
