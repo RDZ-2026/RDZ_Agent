@@ -1,4 +1,25 @@
-<!-- RDZ · supervision-journal · v31 · 2026-08-16
+<!-- RDZ · supervision-journal · v33 · 2026-08-16
+     v33 : Rapport direction, partie "Par site" — jauges parking pour le site DLCC (zones
+       DLCC 80 places / CLX 35 places, kind 'comptage'). Contrairement aux ouvertures
+       (compteur cumulé sur la période), l'occupation est un instantané : chaque jauge
+       affiche le DERNIER relevé de la zone sur la période (occupancyGaugeHtml — barre de
+       remplissage colorée par seuil, comme dans parkguard-rdz.html), pas une somme ni un
+       maximum. Clic sur une jauge → pop-up des relevés de la zone sur la période, du
+       plus récent au plus ancien → clic sur un relevé → détail (comptage n'étant pas
+       dans REPORTABLE, openSiteDrillDetail retombe sur le détail générique, comme prévu).
+     v32 : Rapport direction — (1) suppression des 3 blocs "⚠️ Points d'attention (non
+     v32 : Rapport direction — (1) suppression des 3 blocs "⚠️ Points d'attention (non
+       clôturés)", "Statut de clôture — rapports standard + alarme" et "Nature d'activité
+       — rapports standard + alarme" (écran + version imprimable) ; attentionItemHtml/
+       openDirectionDetail retirés (plus utilisés). (2) Chaque graphique par site (type
+       d'action, jauge+nature d'ouverture, comptage/filtrage bibliothèque) est maintenant
+       dans son propre "chart-block", séparé des autres par une marge + un filet
+       horizontal (classe .chart-block, pas de bordure pour le premier bloc d'une carte).
+       (3) Une partie sans donnée sur la période ne s'affiche plus du tout : jauge +
+       graphique ouvertures masqués si aucune ouverture, comptage/filtrage bibliothèque
+       masqués indépendamment l'un de l'autre si vide (auparavant ils affichaient un
+       message "Aucune donnée" à la place).
+     v31 : CORRECTIF IMPORTANT — la classe CSS ".hidden" n'était jamais définie dans ce
      v31 : CORRECTIF IMPORTANT — la classe CSS ".hidden" n'était jamais définie dans ce
        fichier : "class=hidden" sur #direction-panel ne cachait donc rien, et tout le
        contenu du Rapport direction (filtres, tuiles KPI, points d'attention, par site…)
@@ -149,10 +170,11 @@ main{flex:1;padding:18px}
 .attn-item .mid{flex:1;min-width:0}
 .attn-item .mid .t{font-weight:bold;font-size:13.5px}
 .attn-item .mid .s{font-size:12.5px;color:#666;margin-top:2px}
-.attn-badge{font-size:10.5px;font-weight:bold;padding:3px 9px;border-radius:20px;white-space:nowrap;color:#fff;flex-shrink:0}
 .site-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px 18px;margin-bottom:16px}
 .site-card h4{font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.site-card h5{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:#888;margin:14px 0 8px}
+.site-card h5{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:#888;margin:0 0 8px}
+.chart-block{margin-top:24px;padding-top:18px;border-top:1px solid var(--line-soft)}
+.chart-block:first-of-type{margin-top:0;padding-top:0;border-top:none}
 .dir-widget-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px}
 .dir-gauge{flex:1;min-width:160px;background:var(--bg-soft);border-radius:6px;padding:10px 12px}
 .dir-gauge .gv{font-size:22px;font-weight:bold;color:var(--ink)}
@@ -1947,28 +1969,6 @@ function barChartHtml(countsObj, total, colorMap){
   }).join('');
 }
 
-function attentionItemHtml(e, i){
-  const def = KINDS[e.kind];
-  const badgeInfo = CLOTURE_OPTIONS.find(o=>o.k===e.raw.statut_cloture);
-  const badgeLabel = badgeInfo ? badgeInfo.label : 'Non classé';
-  const badgeColor = badgeInfo ? badgeInfo.color : '#888';
-  let title='', snip=''; try{ title = e.src.title(e.raw); snip = e.src.snippet(e.raw); }catch(_){ title = def.label; }
-  let site=''; try{ site = e.src.site(e.raw)||''; }catch(_){}
-  return `<div class="attn-item" style="border-left-color:${def.color}" onclick="openDirectionDetail(${i})">
-    <div class="when">${fmtDateShort(e.ts)}<br>${fmtTime(e.ts)}</div>
-    <div class="mid"><div class="t">${def.icon} ${esc(title)}</div><div class="s">${esc(snip)||'<i>Sans description</i>'}${site?' · 📍 '+esc(site):''}</div></div>
-    <span class="attn-badge" style="background:${badgeColor}">${badgeLabel}</span>
-  </div>`;
-}
-// Rouvre le détail d'un point d'attention en réutilisant openDetail/renderDetailView/
-// deleteEntry/openReport tels quels : ils indexent tous window.__renderedItems, donc
-// on l'aligne temporairement sur la liste des points d'attention plutôt que de
-// dupliquer toute la logique de la modale pour ce sous-ensemble.
-function openDirectionDetail(i){
-  window.__renderedItems = window.__dirAttentionItems;
-  openDetail(i);
-}
-
 /* ---------- Partie "par site" — socle commun (agents sur site + donut type_action avec drill-down) ---
    Widgets spécifiques par site (jauges ouvertures REGM/MDP/Barton, bibliothèque MDP,
    parking DLCC, badges externes, ParkGuard…) : à venir dans une prochaine étape. */
@@ -1993,6 +1993,7 @@ function siteHasContent(siteData){
   if(siteData.activity.length) return true;
   if(doorGaugeKeywordFor(siteData.site) && siteData.siteEntries.some(e=>e.kind==='ouverture')) return true;
   if(siteNameIncludes(siteData.site,'MDP') && siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage')) return true;
+  if(siteNameIncludes(siteData.site,'DLCC') && siteData.siteEntries.some(e=>e.kind==='comptage')) return true;
   return false;
 }
 
@@ -2065,18 +2066,59 @@ function showBiblioDrilldown(skey, seriesKey, idx){
   const label = seriesKey==='comptage' ? '📚 Comptage bibliothèque' : '📚 Filtrage bibliothèque';
   showEntryListPopup(label, `${s.label} (${s.entries.length})`, s.entries);
 }
+// Bloc titre+graphique, espacé visuellement des autres (séparateur + marge) — utilisé
+// pour chaque graphique d'une carte site. N'est appelé que quand il y a des données :
+// une partie sans donnée (rapport, jauge ouverture, bibliothèque…) ne s'affiche pas du
+// tout plutôt que de montrer un graphique vide.
+function chartBlock(label, bodyHtml){ return `<div class="chart-block"><h5>${esc(label)}</h5>${bodyHtml}</div>`; }
+
 function mdpBiblioHtml(siteData, skey){
   if(!siteNameIncludes(siteData.site,'MDP')) return '';
-  const hasBiblio = siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage');
-  if(!hasBiblio) return '';
   const singleDay = isDirectionSingleDay();
   const comptageSeries = biblioComptageSeries(siteData.siteEntries, singleDay);
   const filtrageSeries = biblioFiltrageSeries(siteData.siteEntries, singleDay);
   window.__dirBiblioSeries[skey] = { comptage: comptageSeries, filtrage: filtrageSeries };
   const comptageLabel = singleDay ? 'Comptage bibliothèque — affluence par relevé' : 'Comptage bibliothèque — affluence maximale par jour';
   const filtrageLabel = singleDay ? 'Filtrage bibliothèque — entrées par relevé' : 'Filtrage bibliothèque — total des entrées par jour';
-  return `<h5>${esc(comptageLabel)}</h5>${seriesBarHtml(comptageSeries, skey, 'comptage', '#0e7490')}
-    <h5>${esc(filtrageLabel)}</h5>${seriesBarHtml(filtrageSeries, skey, 'filtrage', '#7c3aed')}`;
+  let html = '';
+  if(comptageSeries.length) html += chartBlock(comptageLabel, seriesBarHtml(comptageSeries, skey, 'comptage', '#0e7490'));
+  if(filtrageSeries.length) html += chartBlock(filtrageLabel, seriesBarHtml(filtrageSeries, skey, 'filtrage', '#7c3aed'));
+  return html;
+}
+
+/* ---------- Parking DLCC : jauges d'occupation par zone (DLCC 80 places / CLX 35 places) ---
+   Une jauge par zone présente sur la période, avec le DERNIER relevé (occupation à un
+   instant donné — une somme/max n'aurait pas de sens ici, contrairement aux compteurs
+   cumulatifs comme les ouvertures). Clic sur une jauge → pop-up des relevés de la zone
+   sur la période, du plus récent au plus ancien → clic sur un relevé → détail (comptage
+   n'est pas dans REPORTABLE, donc openSiteDrillDetail retombe sur le détail générique). */
+function comptageZoneName(r){
+  if(r.zones && r.zones.nom) return r.zones.nom;
+  if(r.places_totales===80) return 'DLCC';
+  if(r.places_totales===35) return 'CLX';
+  return 'Zone';
+}
+window.__dirComptageByZone = {}; // skey -> { zoneName: [entrées, plus récent d'abord] }
+function showComptageDrilldown(skey, zoneName){
+  const byZone = window.__dirComptageByZone[skey];
+  if(!byZone) return;
+  const list = byZone[zoneName] || [];
+  showEntryListPopup('🅿️ Parking', `${zoneName} (${list.length})`, list);
+}
+function dlccParkingHtml(siteData, skey){
+  if(!siteNameIncludes(siteData.site,'DLCC')) return '';
+  const comptages = siteData.siteEntries.filter(e=>e.kind==='comptage');
+  if(!comptages.length) return '';
+  const byZone = {};
+  comptages.forEach(e=>{ const z = comptageZoneName(e.raw); (byZone[z] = byZone[z]||[]).push(e); });
+  Object.values(byZone).forEach(list=>list.sort((a,b)=>new Date(b.ts)-new Date(a.ts)));
+  window.__dirComptageByZone[skey] = byZone;
+  const zones = Object.keys(byZone).sort((a,b)=>a.localeCompare(b,'fr'));
+  const gauges = zones.map(zone=>{
+    const latest = byZone[zone][0].raw;
+    return occupancyGaugeHtml(zone, latest.vehicules_presents||0, latest.places_totales||0, `showComptageDrilldown('${skey}','${esc(zone).replace(/'/g,"\\'")}')`);
+  }).join('');
+  return chartBlock('Occupation parking (dernier relevé)', `<div class="dir-widget-row">${gauges}</div>`);
 }
 
 const TYPE_ACTION_PALETTE = ['#8B1A1A','#1e3a5f','#166534','#92400e','#5b21b6','#0e7490','#9d174d','#3f6212','#1f2937','#a16207','#c0272d','#2563eb'];
@@ -2111,6 +2153,21 @@ function siteTypeActionBarHtml(byType, skey){
 // visuel réutilisé pour tous, pas de librairie de graphique.
 function gaugeHtml(value, label){ return `<div class="dir-gauge"><div class="gv">${esc(String(value))}</div><div class="gl">${esc(label)}</div></div>`; }
 
+// Jauge d'occupation (compteur X / total, avec barre de remplissage) — pour les zones de
+// comptage (parking DLCC/CLX, etc.) où l'indicateur pertinent est un taux d'occupation,
+// pas un simple total cumulé. Couleur par seuil, comme dans parkguard-rdz.html.
+// Cliquable si onClickAttr est fourni : ouvre la pop-up des derniers relevés de la zone.
+function occupancyGaugeHtml(label, count, total, onClickAttr){
+  const pct = total ? Math.min(100, Math.round((count/total)*100)) : 0;
+  const color = pct>=90 ? '#8B1A1A' : (pct>=70 ? '#b8860b' : '#0e7490');
+  return `<div class="dir-gauge"${onClickAttr?` style="cursor:pointer" onclick="${onClickAttr}" title="Cliquer pour voir les derniers relevés"`:''}>
+    <div class="gv">${count} / ${total}</div>
+    <div class="gl">${esc(label)}</div>
+    <div class="bar-track" style="margin-top:8px"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <div style="font-size:11px;color:#888;margin-top:3px;text-align:right">${pct}% occupé</div>
+  </div>`;
+}
+
 // Répartition des ouvertures par nature (motif) — même mécanique que le type_action des
 // rapports : histogramme cliquable → pop-up listant les ouvertures concernées → clic sur
 // une ouverture → rapport "style RDZ" (ouverture est déjà dans REPORTABLE).
@@ -2131,28 +2188,25 @@ function ouvertureMotifHtml(siteData, skey){
 }
 
 function siteWidgetsHtml(siteData, skey){
-  const widgets = [];
   const doorKeyword = doorGaugeKeywordFor(siteData.site);
-  let doorSection = '';
-  if(doorKeyword){
-    const count = siteData.siteEntries.filter(e=>e.kind==='ouverture').length;
-    widgets.push(gaugeHtml(count, '🔓 Ouvertures de porte'));
-    doorSection = `<h5>Répartition des ouvertures par nature</h5>${ouvertureMotifHtml(siteData, skey)}`;
-  }
-  const gaugeRow = widgets.length ? `<div class="dir-widget-row">${widgets.join('')}</div>` : '';
-  return gaugeRow + doorSection;
+  if(!doorKeyword) return '';
+  const ouvertures = siteData.siteEntries.filter(e=>e.kind==='ouverture');
+  if(!ouvertures.length) return ''; // pas d'ouverture sur la période -> pas de jauge ni de graphique
+  const gaugeBlock = `<div class="chart-block"><div class="dir-widget-row">${gaugeHtml(ouvertures.length, '🔓 Ouvertures de porte')}</div></div>`;
+  return gaugeBlock + chartBlock('Répartition des ouvertures par nature', ouvertureMotifHtml(siteData, skey));
 }
 
 function siteCardHtml(siteData){
   const skey = siteKeySlug(siteData.site);
   const typeActionHtml = siteData.activity.length
-    ? `<h5>Répartition des rapports par type d'action</h5>${siteTypeActionBarHtml(siteData.byType, skey)}`
+    ? chartBlock("Répartition des rapports par type d'action", siteTypeActionBarHtml(siteData.byType, skey))
     : '';
   return `<div class="site-card">
     <h4>📍 ${esc(siteData.site)}</h4>
     ${typeActionHtml}
     ${siteWidgetsHtml(siteData, skey)}
     ${mdpBiblioHtml(siteData, skey)}
+    ${dlccParkingHtml(siteData, skey)}
   </div>`;
 }
 
@@ -2199,7 +2253,6 @@ function renderDirectionReport(){
   const box = document.getElementById('direction-content');
   const entries = getDirectionEntries();
   const stats = computeDirectionStats(entries);
-  window.__dirAttentionItems = stats.attentionItems;
   window.__dirStats = stats;
   window.__dirPeriodLabel = dirPeriodLabel();
 
@@ -2216,15 +2269,11 @@ function renderDirectionReport(){
     ${statTile(stats.openIssuesCount, 'Points ouverts (problème/action)')}
   </div>`;
 
-  const attentionHtml = stats.attentionItems.length
-    ? stats.attentionItems.slice(0,30).map((e,i)=>attentionItemHtml(e,i)).join('')
-      + (stats.attentionItems.length>30 ? `<div class="hint" style="margin-top:6px">… et ${stats.attentionItems.length-30} de plus — affine la période ou le site pour les voir toutes.</div>` : '')
-    : `<div class="state-msg">✅ Tous les rapports standard et interventions alarme de la période sont clôturés.</div>`;
-
   const siteBreakdown = computeSiteBreakdown(entries);
   window.__dirSiteBreakdown = {};
   window.__dirBiblioSeries = {};
   window.__dirOuvertureByMotif = {};
+  window.__dirComptageByZone = {};
   siteBreakdown.sites.forEach(site=>{ window.__dirSiteBreakdown[siteKeySlug(site)] = siteBreakdown.bySite[site]; });
   const sitesHtml = siteBreakdown.sites.length
     ? siteBreakdown.sites.map(site=>siteCardHtml(siteBreakdown.bySite[site])).join('')
@@ -2232,9 +2281,6 @@ function renderDirectionReport(){
 
   box.innerHTML = `
     ${statTiles}
-    <div class="dir-card"><h4>⚠️ Points d'attention (non clôturés)</h4>${attentionHtml}</div>
-    <div class="dir-card"><h4>Statut de clôture — rapports standard + alarme</h4>${barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions())}</div>
-    <div class="dir-card"><h4>Nature d'activité — rapports standard + alarme</h4>${barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS)}</div>
     <div class="dir-card"><h4>Répartition par catégorie (toutes sources)</h4>${barChartHtml(kindLabelsMap(stats.byKind), stats.total, kindColorMapFromKinds(stats.byKind))}</div>
     <div class="dir-card"><h4>Répartition par site</h4>${barChartHtml(topEntries(stats.bySite,8), stats.total, null)}</div>
     <h3 style="margin:22px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">📍 Par site</h3>
@@ -2279,22 +2325,10 @@ function buildDirectionPrintable(){
       ${rpFieldO('Dont rapports sécurité', stats.securiteStandardCount)}
       ${rpFieldO('Points ouverts (problème/action)', stats.openIssuesCount)}
     </div>`);
-  const clotureHtml = rpSec('Statut de clôture — rapports standard + alarme', barChartHtml(clotureLabelsMap(stats.byCloture), stats.activityTotal, clotureColorMapFromOptions()));
-  const natureHtml = rpSec("Nature d'activité — rapports standard + alarme", barChartHtml(stats.byNature, stats.activityTotal, NATURE_COLORS));
   const kindHtml = rpSec('Répartition par catégorie (toutes sources)', barChartHtml(kindLabelsMap(stats.byKind), stats.total, kindColorMapFromKinds(stats.byKind)));
   const siteHtml = rpSec('Répartition par site', barChartHtml(topEntries(stats.bySite,8), stats.total, null));
 
-  const attentionListHtml = stats.attentionItems.length
-    ? stats.attentionItems.map(e=>{
-        const badgeInfo = CLOTURE_OPTIONS.find(o=>o.k===e.raw.statut_cloture);
-        const badgeLabel = badgeInfo ? badgeInfo.label : 'Non classé';
-        let title='', snip=''; try{ title=e.src.title(e.raw); snip=e.src.snippet(e.raw); }catch(_){}
-        return `<div style="padding:8px 0;border-bottom:1px solid #eee"><b>${fmtDateShort(e.ts)} ${fmtTime(e.ts)}</b> — ${esc(title)} <span style="color:#888">(${badgeLabel})</span><br><span style="font-size:12.5px;color:#555">${esc(snip)}</span></div>`;
-      }).join('')
-    : `<div style="color:#1e6b1e;font-weight:bold">✅ Tous les rapports standard et interventions alarme de la période sont clôturés.</div>`;
-  const attentionHtml = rpSec("Points d'attention (non clôturés)", attentionListHtml);
-
-  const body = statsHtml + attentionHtml + clotureHtml + natureHtml + kindHtml + siteHtml;
+  const body = statsHtml + kindHtml + siteHtml;
   return rpSynthesisShell('Rapport direction', `${site} — ${period}`, body);
 }
 function printDirectionReport(){
