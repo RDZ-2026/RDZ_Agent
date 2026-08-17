@@ -1,4 +1,16 @@
-<!-- RDZ · supervision-journal · v43 · 2026-08-17
+<!-- RDZ · supervision-journal · v44 · 2026-08-17
+     v44 : 4 tuiles "Chiffres clés" rendues cliquables — Rapports / Dont rapports alarme /
+       Dont rapports sécurité / Points ouverts (problème/action) — à l'écran (statTile) ET
+       dans la version imprimable (buildDirectionPrintable), demande explicite de Laurent.
+       Clic → showKpiDrilldown(key) → liste des rapports concernés (showEntryListPopup,
+       listes exactes stats.rapportsList/alarmeList/securiteList/openIssuesList calculées
+       dans computeDirectionStats) → clic sur un rapport → détail "style RDZ" (déjà
+       branché via openSiteDrillDetail/openListItemDetail). "Agents en service" reste non
+       cliquable (pas de liste de rapports derrière un effectif). Bug latent corrigé au
+       passage : .overlay (z-index:100) passait SOUS .report-view (z-index:150) — un clic
+       sur une tuile depuis la version imprimable (affichée dans #report-content, donc
+       dans #report-view) aurait ouvert la pop-up invisible, cachée dessous. .overlay
+       passé à z-index:160.
      v43 : Widget "Changements de pile" (Rapport direction) revu à la demande de Laurent —
        remplace la liste d'attn-item de la v42 par une JAUGE (comptage), même mécanique
        que "Contrôle parking" (parkGuardTileHtml/showParkingDrilldown) : clic sur la jauge
@@ -396,7 +408,7 @@ main{flex:1;padding:18px}
 .hidden{display:none!important}
 
 /* modal */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:20px;overflow:auto;z-index:100}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:20px;overflow:auto;z-index:160}
 .overlay.show{display:flex}
 .modal{background:#fff;border-radius:var(--radius-card);max-width:640px;width:100%;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3)}
 .modal .mh{padding:16px 18px;color:#fff;position:relative}
@@ -2181,10 +2193,32 @@ function computeDirectionStats(entries){
     .filter(e=>{ const k = e.raw.statut_cloture; return !k || k==='action' || k==='probleme'; })
     .sort((a,b)=> new Date(b.ts)-new Date(a.ts));
 
-  return { total:entries.length, activityTotal:activity.length, byKind, bySite, byNature, byCloture, alarmeCount, securiteStandardCount, openIssuesCount, attentionItems };
+  // Listes exactes derrière chaque tuile "Chiffres clés" (drill-down demandé par Laurent) —
+  // même filtre que le comptage correspondant, triées plus récent d'abord.
+  const rapportsList = activity.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  const alarmeList = activity.filter(e=>e.kind==='alarme').sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  const securiteList = activity.filter(e=>e.kind==='rapport_standard' && e.raw.nature_activite==='Sécurité').sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  const openIssuesList = activity.filter(e=>e.raw.statut_cloture==='action' || e.raw.statut_cloture==='probleme').sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+
+  return { total:entries.length, activityTotal:activity.length, byKind, bySite, byNature, byCloture, alarmeCount, securiteStandardCount, openIssuesCount, attentionItems, rapportsList, alarmeList, securiteList, openIssuesList };
 }
 
-function statTile(n,l){ return `<div class="stat-tile"><div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div></div>`; }
+function statTile(n,l,onClickAttr){
+  return `<div class="stat-tile"${onClickAttr?` style="cursor:pointer" onclick="${onClickAttr}" title="Cliquer pour voir les rapports concernés"`:''}><div class="n">${esc(String(n))}</div><div class="l">${esc(l)}</div></div>`;
+}
+// Drill-down des 4 tuiles "Chiffres clés" cliquables (Rapports / Dont rapports alarme /
+// Dont rapports sécurité / Points ouverts), demandé par Laurent — réutilise
+// showEntryListPopup (clic sur une entrée → rapport "style RDZ" via
+// openSiteDrillDetail/openListItemDetail, déjà branché). window.__dirKpiLists est
+// alimenté par renderDirectionReport ; la version imprimable (buildDirectionPrintable)
+// appelle toujours renderDirectionReport() juste avant (voir printDirectionReport), donc
+// les mêmes listes sont disponibles pour les tuiles cliquables du rapport imprimé.
+window.__dirKpiLists = {};
+const KPI_LABELS = { rapports:'📊 Rapports', alarme:'🚨 Dont rapports alarme', securite:'🛡️ Dont rapports sécurité', ouverts:'⚠️ Points ouverts (problème/action)' };
+function showKpiDrilldown(key){
+  const list = window.__dirKpiLists[key] || [];
+  showEntryListPopup(KPI_LABELS[key] || 'Chiffres clés', `${KPI_LABELS[key]||key} (${list.length})`, list);
+}
 
 /* ---------- Partie "par site" — socle commun (agents sur site + donut type_action avec drill-down) ---
    Widgets spécifiques par site (jauges ouvertures REGM/MDP/Barton, bibliothèque MDP,
@@ -3021,6 +3055,7 @@ function renderDirectionReport(){
   window.__dirStats = stats;
   window.__dirEntries = entries;
   window.__dirPeriodLabel = dirPeriodLabel();
+  window.__dirKpiLists = { rapports: stats.rapportsList, alarme: stats.alarmeList, securite: stats.securiteList, ouverts: stats.openIssuesList };
 
   // Ne pas s'arrêter ici sur le seul compte de `entries` (filtré par ts de création/
   // modification) : un événement peut n'avoir aucune entrée ts dans la période tout en SE
@@ -3034,10 +3069,10 @@ function renderDirectionReport(){
 
   const statTiles = `<div class="stat-row">
     ${statTile(computeAgentsOnDuty(), 'Agents en service (planning)')}
-    ${statTile(stats.activityTotal, 'Rapports')}
-    ${statTile(stats.alarmeCount, 'Dont rapports alarme')}
-    ${statTile(stats.securiteStandardCount, 'Dont rapports sécurité')}
-    ${statTile(stats.openIssuesCount, 'Points ouverts (problème/action)')}
+    ${statTile(stats.activityTotal, 'Rapports', "showKpiDrilldown('rapports')")}
+    ${statTile(stats.alarmeCount, 'Dont rapports alarme', "showKpiDrilldown('alarme')")}
+    ${statTile(stats.securiteStandardCount, 'Dont rapports sécurité', "showKpiDrilldown('securite')")}
+    ${statTile(stats.openIssuesCount, 'Points ouverts (problème/action)', "showKpiDrilldown('ouverts')")}
   </div>`;
 
   const siteBreakdown = computeSiteBreakdown(entries);
@@ -3095,13 +3130,19 @@ function buildDirectionPrintable(){
   const period = window.__dirPeriodLabel || dirPeriodLabel();
   if(!stats) return rpSynthesisShell('Rapport direction', `${site} — ${period}`, '<div class="state-msg">Aucune donnée.</div>');
 
+  // Tuiles cliquables (Rapports / Dont rapports alarme / Dont rapports sécurité / Points
+  // ouverts) : même mécanique que les tuiles à l'écran (showKpiDrilldown), le rendu
+  // imprimable étant affiché dans le même #report-content — les onclick fonctionnent à
+  // l'identique. "Agents en service" reste non cliquable (pas de liste de rapports
+  // derrière un effectif).
+  const kpiValue = (n, key) => `<span style="cursor:pointer;color:#8B1A1A;font-weight:700;text-decoration:underline" onclick="showKpiDrilldown('${key}')" title="Cliquer pour voir les rapports concernés">${esc(String(n))}</span>`;
   const statsHtml = rpSec('Chiffres clés', `
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
       ${rpFieldO('Agents en service (planning)', computeAgentsOnDuty())}
-      ${rpFieldO('Rapports', stats.activityTotal)}
-      ${rpFieldO('Dont rapports alarme', stats.alarmeCount)}
-      ${rpFieldO('Dont rapports sécurité', stats.securiteStandardCount)}
-      ${rpFieldO('Points ouverts (problème/action)', stats.openIssuesCount)}
+      ${rpFieldO('Rapports', kpiValue(stats.activityTotal,'rapports'))}
+      ${rpFieldO('Dont rapports alarme', kpiValue(stats.alarmeCount,'alarme'))}
+      ${rpFieldO('Dont rapports sécurité', kpiValue(stats.securiteStandardCount,'securite'))}
+      ${rpFieldO('Points ouverts (problème/action)', kpiValue(stats.openIssuesCount,'ouverts'))}
     </div>`);
   const entries = window.__dirEntries || [];
   const badges = entries.filter(e=>e.kind==='cle_badge' && e.raw.receptionnaire_type==='externe');
