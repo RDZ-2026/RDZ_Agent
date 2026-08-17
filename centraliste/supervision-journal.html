@@ -1,4 +1,14 @@
-<!-- RDZ · supervision-journal · v44 · 2026-08-17
+<!-- RDZ · supervision-journal · v45 · 2026-08-17
+     v45 : Rapport direction — 2 ajouts demandés par Laurent :
+       (1) Bouton "🔄 Actualiser" (refreshDirectionReport) à côté de "🖨 Version
+       imprimable" : relance un refresh() complet (rechargement de toutes les SOURCES
+       depuis Supabase), pas un simple redessin depuis allEntries déjà en mémoire.
+       (2) Version imprimable alignée sur l'écran : buildDirectionPrintable() ne
+       reconstruit plus son propre contenu en parallèle (chiffres clés + badges externes
+       seulement, comme avant) — elle reprend tel quel le HTML de #direction-content déjà
+       construit par renderDirectionReport() (Par site, véhicules, badges internes/
+       externes, changements de pile, etc.), ce qui élimine par construction tout risque
+       de désynchronisation future entre les deux vues.
      v44 : 4 tuiles "Chiffres clés" rendues cliquables — Rapports / Dont rapports alarme /
        Dont rapports sécurité / Points ouverts (problème/action) — à l'écran (statTile) ET
        dans la version imprimable (buildDirectionPrintable), demande explicite de Laurent.
@@ -565,6 +575,7 @@ main{flex:1;padding:18px}
               <option value="">Tous les sites</option>
             </select>
           </div>
+          <button class="btn btn-sec" id="dir-refresh-btn" onclick="refreshDirectionReport()">🔄 Actualiser</button>
           <button class="btn btn-sec" onclick="printDirectionReport()">🖨 Version imprimable</button>
         </div>
         <div class="hint">Chiffres clés + points d'attention (rapports standard et interventions alarme non clôturés) sur la période choisie, tous sites confondus par défaut.</div>
@@ -3048,6 +3059,29 @@ function internalBadgesUnreturnedCardHtml(entries){
   return badgeListCardHtml('🔑 Clés / badges internes non rendus', badges, 'interne');
 }
 
+// Bouton "🔄 Actualiser" du Rapport direction — demande explicite de Laurent. Contrairement
+// à un simple renderDirectionReport() (qui ne fait que recalculer à partir des données déjà
+// en mémoire dans allEntries), on relance ici un refresh() complet : rechargement de toutes
+// les SOURCES depuis Supabase, puis redessin du Rapport direction avec les données fraîches
+// (refresh() s'en charge déjà lui-même si le panel est visible — voir plus haut). Utile
+// quand la direction garde l'onglet ouvert un moment pendant que des rapports terrain
+// continuent d'arriver.
+async function refreshDirectionReport(){
+  const btn = document.getElementById('dir-refresh-btn');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Actualisation…';
+  try{
+    await refresh();
+    toast('✓ Données actualisées');
+  }catch(e){
+    toast('Erreur lors de l\'actualisation', true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
 function renderDirectionReport(){
   const box = document.getElementById('direction-content');
   const entries = getDirectionEntries();
@@ -3130,32 +3164,18 @@ function buildDirectionPrintable(){
   const period = window.__dirPeriodLabel || dirPeriodLabel();
   if(!stats) return rpSynthesisShell('Rapport direction', `${site} — ${period}`, '<div class="state-msg">Aucune donnée.</div>');
 
-  // Tuiles cliquables (Rapports / Dont rapports alarme / Dont rapports sécurité / Points
-  // ouverts) : même mécanique que les tuiles à l'écran (showKpiDrilldown), le rendu
-  // imprimable étant affiché dans le même #report-content — les onclick fonctionnent à
-  // l'identique. "Agents en service" reste non cliquable (pas de liste de rapports
-  // derrière un effectif).
-  const kpiValue = (n, key) => `<span style="cursor:pointer;color:#8B1A1A;font-weight:700;text-decoration:underline" onclick="showKpiDrilldown('${key}')" title="Cliquer pour voir les rapports concernés">${esc(String(n))}</span>`;
-  const statsHtml = rpSec('Chiffres clés', `
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
-      ${rpFieldO('Agents en service (planning)', computeAgentsOnDuty())}
-      ${rpFieldO('Rapports', kpiValue(stats.activityTotal,'rapports'))}
-      ${rpFieldO('Dont rapports alarme', kpiValue(stats.alarmeCount,'alarme'))}
-      ${rpFieldO('Dont rapports sécurité', kpiValue(stats.securiteStandardCount,'securite'))}
-      ${rpFieldO('Points ouverts (problème/action)', kpiValue(stats.openIssuesCount,'ouverts'))}
-    </div>`);
-  const entries = window.__dirEntries || [];
-  const badges = entries.filter(e=>e.kind==='cle_badge' && e.raw.receptionnaire_type==='externe');
-  const badgesHtml = badges.length ? rpSec('Badges externes', badges.slice().sort((a,b)=>new Date(b.ts)-new Date(a.ts)).map(e=>{
-    const r = e.raw;
-    const rendu = r.statut==='rendu';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;font-size:12px">
-      <span>${r.item_type==='badge'?'🪪':'🔑'} ${esc(r.item_nom||'—')} — ${esc(r.receptionnaire_nom||'—')}${r.receptionnaire_societe?' ('+esc(r.receptionnaire_societe)+')':''}${r.site_nom?' · '+esc(r.site_nom):''}</span>
-      <span style="font-weight:700;color:${rendu?'#1b7a3d':'#8B1A1A'}">${rendu?'✅ Rendu':'⚠️ Non rendu'}</span>
-    </div>`;
-  }).join('')) : '';
-
-  const body = statsHtml + badgesHtml;
+  // Alignée sur l'écran (demande explicite de Laurent, 2026-08-17) : la version imprimable
+  // reconstruisait auparavant son propre contenu en parallèle de renderDirectionReport()
+  // (chiffres clés + badges externes seulement) — chaque nouvelle section ajoutée à
+  // l'écran depuis (Par site, véhicules, badges internes, changements de pile…) n'était
+  // donc JAMAIS répercutée ici, d'où l'écart signalé. Plutôt que de dupliquer à nouveau la
+  // construction (et de rouvrir le même risque de désynchronisation à la prochaine
+  // fonctionnalité), on reprend tel quel le HTML déjà construit et affiché dans
+  // #direction-content par renderDirectionReport() — appelé juste avant par
+  // printDirectionReport(), donc toujours à jour au moment de l'impression. Les onclick
+  // (tuiles, jauges, histogrammes…) restent valides : ils s'appuient sur l'état global
+  // (window.__dir*), pas sur la position du HTML dans la page.
+  const body = document.getElementById('direction-content').innerHTML;
   return rpSynthesisShell('Rapport direction', `${site} — ${period}`, body);
 }
 function printDirectionReport(){
