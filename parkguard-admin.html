@@ -80,7 +80,7 @@ tr.selected td{background:var(--red-light)}
 .photo-thumb:hover{opacity:.8}
 .photos-cell{display:flex;gap:4px;flex-wrap:wrap}
 
-input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--red)}
+input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--red)}
 
 .filter-row{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .filter-select{padding:7px 11px;font-size:13px;border:1px solid var(--gray-border);border-radius:var(--radius-sm);background:var(--white);font-family:inherit}
@@ -219,9 +219,12 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
   <!-- ══════════════════════ HISTORIQUE ══════════════════════ -->
   <div id="view-historique" class="view-section">
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
         <div class="card-title" style="margin:0">🔍 Historique des rapports</div>
-        <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-green btn-sm" onclick="exportHistoriqueXLSX()">📊 Export Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
       </div>
       <div class="filter-row">
         <input type="text" class="filter-select" id="h-search" placeholder="🔍 Plaque ou N° dénonciation..." oninput="renderHistorique()" style="min-width:220px">
@@ -259,7 +262,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
   <!-- ══════════════════════ PASSAGES PARKING (COMPTAGES) ══════════════════════ -->
   <div id="view-comptages-hist" class="view-section">
     <div class="card">
-      <div class="card-title" style="margin-bottom:12px">📋 Historique des passages sur les parkings</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+        <div class="card-title" style="margin:0">📋 Historique des passages sur les parkings</div>
+        <button class="btn btn-green btn-sm" onclick="exportComptagesXLSX()">📊 Export Excel</button>
+      </div>
       <div class="filter-row">
         <select class="filter-select" id="ch-site">
           <option value="">Tous les sites guidage</option>
@@ -389,6 +395,8 @@ let allVehicles  = [];   // dataset unique : tous les rapports (remplace l'ancie
 let selectedIds  = new Set();
 let editingId    = null;
 let filteredData = [];   // dernier jeu filtré affiché dans l'onglet "En attente IA" (pour la sélection globale)
+let lastHistoriqueFiltered = []; // dernier jeu filtré affiché dans l'onglet "Historique" (pour l'export Excel/CSV)
+let lastComptagesFiltered  = []; // dernier jeu filtré affiché dans l'onglet "Passages parking" (pour l'export Excel)
 
 // ═══ TOAST ═══
 function toast(msg, ms=3000) {
@@ -1051,6 +1059,11 @@ function renderHistorique() {
     return true;
   });
 
+  // Jeu complet filtré, conservé pour les exports (Excel/CSV) — le tableau à l'écran
+  // n'affiche que les 300 premières lignes (voir plus bas), mais l'export doit refléter
+  // tout ce que les filtres sélectionnent, pas seulement ce qui est visible à l'écran.
+  lastHistoriqueFiltered = filtered;
+
   document.getElementById('h-count').textContent = filtered.length + ' résultat(s)';
   var tbody = document.getElementById('historique-table-body');
   if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--gray-mid)">Aucun rapport.</td></tr>'; return; }
@@ -1169,6 +1182,10 @@ async function loadComptagesHist() {
   try {
     const { data: sites } = await db.from('sites').select('id,nom').eq('type','guidage');
     const siteIds = (sites||[]).map(s=>s.id);
+    // Nom des sites, conservé pour l'export Excel (la table à l'écran ne montre pas le
+    // site en colonne — filtrable via le sélecteur — mais l'export doit le préciser).
+    window._sitesComptagesHistMap = {};
+    (sites||[]).forEach(s => window._sitesComptagesHistMap[s.id] = s.nom);
     const sel = document.getElementById('ch-site');
     sel.innerHTML = '<option value="">Tous les sites guidage</option>' + (sites||[]).map(s=>'<option value="'+s.id+'">'+s.nom+'</option>').join('');
     sel.onchange = renderComptagesHist;
@@ -1194,6 +1211,10 @@ function renderComptagesHist() {
     if (dFin   && c.created_at.slice(0,10) > dFin)   return false;
     return true;
   });
+
+  // Jeu filtré conservé pour l'export Excel (même filtres que ceux affichés à l'écran).
+  lastComptagesFiltered = filtered;
+
   document.getElementById('ch-count').textContent = filtered.length + ' relevé(s)';
   const tbody = document.getElementById('comptages-hist-body');
   if (!filtered.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-mid);padding:20px">Aucun résultat</td></tr>'; return; }
@@ -1234,7 +1255,7 @@ function buildCSV(data) {
   return [headers,...rows].map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
 }
 function downloadCSV(csv, name) {
-  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href=url; a.download=name; a.click();
   URL.revokeObjectURL(url);
@@ -1248,6 +1269,102 @@ function exportSelectedCSV() {
   if (!ids.length) { toast('Aucune sélection'); return; }
   downloadCSV(buildCSV(getExportData(ids)), 'parkguard-selection-' + new Date().toISOString().slice(0,10) + '.csv');
   toast('📥 CSV sélection exporté');
+}
+
+// ═══ EXPORT EXCEL (.xlsx) — historique des rapports + passages parking ═══
+// Chargement paresseux de SheetJS (uniquement quand un export est réellement demandé, pour ne
+// pas alourdir le chargement de la page). Les deux exports respectent les filtres actuellement
+// affichés à l'écran (lastHistoriqueFiltered / lastComptagesFiltered, mis à jour par renderHistorique()
+// et renderComptagesHist() à chaque changement de filtre) plutôt que la totalité des données chargées.
+async function ensureXLSXLib() {
+  if (window.XLSX) return;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+}
+
+function autoFitColumns(rows) {
+  // Largeur approximative de chaque colonne à partir du contenu le plus long (en-tête inclus),
+  // pour éviter un fichier avec des colonnes toutes tassées à l'ouverture dans Excel.
+  if (!rows.length) return [];
+  const colCount = rows[0].length;
+  const widths = [];
+  for (let c = 0; c < colCount; c++) {
+    let max = 8;
+    for (let r = 0; r < rows.length; r++) {
+      const v = rows[r][c];
+      const len = v === null || v === undefined ? 0 : String(v).length;
+      if (len > max) max = len;
+    }
+    widths.push({ wch: Math.min(max + 2, 45) });
+  }
+  return widths;
+}
+
+async function exportHistoriqueXLSX() {
+  const data = lastHistoriqueFiltered;
+  if (!data.length) { toast('⚠️ Aucun rapport à exporter avec ces filtres'); return; }
+  toast('⏳ Préparation du fichier Excel...');
+  try {
+    await ensureXLSXLib();
+    const statutLabel = { infraction:'Infraction', autorise:'Autorisé', parking_vide:'Parking vide' };
+    const headers = ['Date','Heure','Site','Agent','Statut','Plaque','Motif','N° Dénonciation','N° Macaron','Remarque','Nb photos','IA traitée'];
+    const rows = data.map(function(v) {
+      const dt = new Date(v.created_at);
+      const st = v.statut === 'parking_vide' || v.motif === 'PARKING_VIDE' ? 'parking_vide' : v.statut;
+      return [
+        dt.toLocaleDateString('fr-CH'), dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}),
+        v.site || '', v.agent_name || '', statutLabel[st] || st || '',
+        v.plaque || '', v.motif || '', v.num_denonciation || '', v.num_macaron || '',
+        v.remarque || '', v.photos_count || 0, v.ia_pending ? 'Non' : 'Oui'
+      ];
+    });
+    const aoa = [headers].concat(rows);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = autoFitColumns(aoa);
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:aoa.length-1,c:headers.length-1} }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Historique parking');
+    const name = 'parkguard-historique-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    XLSX.writeFile(wb, name);
+    toast('📊 Excel exporté — ' + data.length + ' rapport(s)');
+  } catch(e) {
+    console.error(e);
+    toast('❌ Export Excel impossible — ' + e.message);
+  }
+}
+
+async function exportComptagesXLSX() {
+  const data = lastComptagesFiltered;
+  if (!data.length) { toast('⚠️ Aucun relevé à exporter avec ces filtres'); return; }
+  toast('⏳ Préparation du fichier Excel...');
+  try {
+    await ensureXLSXLib();
+    const siteMap = window._sitesComptagesHistMap || {};
+    const headers = ['Date','Heure','Site','Agent','Zone','Véhicules présents','Places totales','Taux occupation (%)'];
+    const rows = data.map(function(c) {
+      const dt = new Date(c.created_at);
+      const zoneName = c.zones ? c.zones.nom : (c.places_totales===80?'DLCC':c.places_totales===35?'CLX':'?');
+      const taux = c.taux_occupation !== null && c.taux_occupation !== undefined
+        ? parseFloat(c.taux_occupation)
+        : Math.round((c.vehicules_presents/(c.places_totales||1))*100);
+      return [
+        dt.toLocaleDateString('fr-CH'), dt.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}),
+        siteMap[c.site_id] || c.site_id || '', c.agent_name || '', zoneName,
+        c.vehicules_presents, c.places_totales, taux
+      ];
+    });
+    const aoa = [headers].concat(rows);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = autoFitColumns(aoa);
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{r:0,c:0}, e:{r:aoa.length-1,c:headers.length-1} }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Passages parking');
+    const name = 'parkguard-passages-' + new Date().toISOString().slice(0,10) + '.xlsx';
+    XLSX.writeFile(wb, name);
+    toast('📊 Excel exporté — ' + data.length + ' relevé(s)');
+  } catch(e) {
+    console.error(e);
+    toast('❌ Export Excel impossible — ' + e.message);
+  }
 }
 
 // ═══ INIT ═══
