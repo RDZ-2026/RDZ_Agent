@@ -415,6 +415,7 @@ function render() {
           </div>
           <div class="event-actions">
             <button class="icon-btn" onclick="openEdit('${e.id}')" title="Modifier">✎</button>
+            <button class="icon-btn" onclick="duplicateEvent('${e.id}')" title="Dupliquer">⧉</button>
             <button class="icon-btn del" onclick="deleteEvent('${e.id}')" title="Supprimer">✕</button>
           </div>
         </div>
@@ -453,6 +454,36 @@ function openEdit(id) {
   document.getElementById('f-titre').value = e.titre || '';
   document.getElementById('f-lieu').value = e.lieu || '';
   document.getElementById('f-date').value = e.date || '';
+  document.getElementById('f-heure-debut').value = e.heure_debut ? e.heure_debut.slice(0,5) : '';
+  document.getElementById('f-heure-fin').value = e.heure_fin ? e.heure_fin.slice(0,5) : '';
+  document.getElementById('f-heure-service').value = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : '';
+  document.getElementById('f-heure-fin-service').value = e.heure_service_fin ? e.heure_service_fin.slice(0,5) : '';
+  document.getElementById('f-nb-agents').value = e.nb_agents || 0;
+  document.getElementById('f-agents').value = e.agents || '';
+  document.getElementById('f-tenue').value = e.tenue || '';
+  document.getElementById('f-contact').value = e.contact || '';
+  document.getElementById('f-consignes').value = e.consignes || '';
+  document.getElementById('f-remarques').value = e.remarques || '';
+  document.getElementById('f-site').innerHTML = sites.map(s =>
+    `<option value="${s.id}"${s.id === e.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
+  document.getElementById('modal-event').classList.add('open');
+}
+
+// Duplique un événement existant : pré-remplit le formulaire avec toutes les
+// informations de l'événement source (mêmes agents, consignes, horaires, tenue,
+// etc.) et la même date, mais sans l'associer à l'entrée d'origine (editId reste
+// null) — "Enregistrer" crée donc une toute nouvelle ligne en base plutôt que
+// d'écraser l'originale. L'utilisateur peut ajuster n'importe quel champ (et en
+// particulier la date, pour replacer la copie à une date ultérieure) avant de
+// valider.
+function duplicateEvent(id) {
+  editId = null;
+  const e = events.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('modal-title').textContent = 'Dupliquer l’événement';
+  document.getElementById('f-titre').value = e.titre ? `${e.titre} (copie)` : '';
+  document.getElementById('f-lieu').value = e.lieu || '';
+  document.getElementById('f-date').value = e.date || (document.getElementById('ref-date').value || today());
   document.getElementById('f-heure-debut').value = e.heure_debut ? e.heure_debut.slice(0,5) : '';
   document.getElementById('f-heure-fin').value = e.heure_fin ? e.heure_fin.slice(0,5) : '';
   document.getElementById('f-heure-service').value = e.heure_service_debut ? e.heure_service_debut.slice(0,5) : '';
