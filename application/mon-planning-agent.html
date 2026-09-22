@@ -1,0 +1,184 @@
+<!-- RDZ · mon-planning-agent · v1 · 2026-09-22 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ Agent — Mon planning</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --rdz-red: #8B1A1A;
+    --rdz-red-dark: #6B1212;
+    --rdz-red-light: #f5e8e8;
+    --rdz-black: #1a1a1a;
+    --rdz-gray: #4a4a4a;
+    --rdz-border: #d0ccc5;
+    --rdz-bg: #f5f4f2;
+  }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+  .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .app-header-txt { display: flex; flex-direction: column; gap: 2px; }
+  .app-header-name { font-size: 13px; font-weight: 700; color: #fff; letter-spacing: .06em; text-transform: uppercase; }
+  .app-header-sub { font-size: 10.5px; color: rgba(255,255,255,.65); }
+  .back-btn { background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4); color: #fff; font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 2px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .back-btn:active { background: rgba(255,255,255,.3); }
+
+  .content { padding: 16px; padding-bottom: 40px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn { flex: 1; background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 10px; font-size: 12.5px; font-weight: 700; color: var(--rdz-gray); cursor: pointer; text-align: center; }
+  .tab-btn.active { background: var(--rdz-black); border-color: var(--rdz-black); color: #fff; }
+  .tab-count { font-size: 10.5px; font-weight: 400; opacity: .75; margin-left: 3px; }
+
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rdz-gray); margin: 18px 0 8px; }
+  .section-label:first-child { margin-top: 0; }
+
+  .shift-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-black); border-radius: 2px; padding: 12px 14px; margin-bottom: 10px; }
+  .shift-card.past { border-left-color: var(--rdz-border); opacity: .92; }
+  .shift-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .shift-date { font-size: 13.5px; font-weight: 700; text-transform: capitalize; }
+  .shift-badge { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap; text-transform: uppercase; letter-spacing: .03em; }
+  .b-grey { background: var(--rdz-bg); color: var(--rdz-gray); }
+  .b-blue { background: #eff6ff; color: #1d4ed8; }
+  .b-green { background: #f0fdf4; color: #15803d; }
+  .b-orange { background: #fffbeb; color: #b45309; }
+
+  .shift-site { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .shift-post { font-size: 11.5px; color: var(--rdz-gray); margin-bottom: 6px; }
+  .shift-hours { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--rdz-black); }
+  .shift-actual { font-family: monospace; font-size: 11px; color: var(--rdz-gray); margin-top: 2px; }
+  .shift-desc { font-size: 11.5px; color: var(--rdz-gray); line-height: 1.4; margin-top: 6px; border-top: 1px dashed var(--rdz-border); padding-top: 6px; }
+  .shift-break { font-size: 10.5px; color: var(--rdz-gray); margin-top: 4px; }
+
+  .state-msg { text-align: center; padding: 50px 20px; }
+  .state-msg .ico { font-size: 32px; margin-bottom: 12px; }
+  .state-msg p { font-size: 13.5px; color: var(--rdz-gray); }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-txt">
+    <div class="app-header-name">RDZ Security Management</div>
+    <div class="app-header-sub" id="agent-badge">Mon planning</div>
+  </div>
+  <a class="back-btn" href="mobile.html">‹ Retour</a>
+</div>
+
+<div class="content">
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-avenir" onclick="setTab('avenir')">À venir<span class="tab-count" id="count-avenir"></span></button>
+    <button class="tab-btn" id="tab-historique" onclick="setTab('historique')">Historique<span class="tab-count" id="count-historique"></span></button>
+  </div>
+  <div id="list-root">
+    <div class="state-msg"><div class="ico">⏳</div><p>Chargement de votre planning…</p></div>
+  </div>
+</div>
+
+<script>
+// ═══ CONFIG — base Flotte/RouteOps (lecture seule, via RPC dédiée) ═══
+const RO_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const RO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+
+const AGENT_ID = localStorage.getItem('rdz_agent_id');
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom');
+if (!AGENT_ID) { window.location.href = 'mobile.html'; }
+
+let SHIFTS = [];
+let TAB = 'avenir';
+
+function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function todayStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Zurich' }); }
+function fmtDate(d) {
+  try { return new Date(d+'T12:00:00').toLocaleDateString('fr-CH', { weekday:'long', day:'2-digit', month:'long', year:'numeric' }); }
+  catch(e) { return d; }
+}
+function fmtTime(t) { return t ? t.slice(0,5) : '—'; }
+function fmtDateTime(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'Europe/Zurich'})
+      + ' à ' + d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Zurich'});
+  } catch(e) { return iso; }
+}
+
+const STATUS_BADGE = { 'Publiée':'b-blue', 'Vue':'b-blue', 'Validée':'b-green', 'Effectuée':'b-orange', 'Contrôlée':'b-green' };
+const BREAK_LABEL = { 0:'Aucune', 30:'30 min', 60:'1 h', 90:'1 h 30', 120:'2 h' };
+
+async function loadShifts() {
+  try {
+    const r = await fetch(RO_URL + '/rest/v1/rpc/rdz_planning_agent_shifts', {
+      method: 'POST',
+      headers: { 'apikey': RO_KEY, 'Authorization': 'Bearer ' + RO_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_agent_id: AGENT_ID })
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((data && (data.message || data.error)) || 'Lecture impossible');
+    SHIFTS = data || [];
+    render();
+  } catch (err) {
+    document.getElementById('list-root').innerHTML =
+      `<div class="state-msg"><div class="ico">⚠️</div><p>Connexion impossible.<br>${escHtml(err.message||'')}</p></div>`;
+  }
+}
+
+function setTab(t) {
+  TAB = t;
+  document.getElementById('tab-avenir').classList.toggle('active', t === 'avenir');
+  document.getElementById('tab-historique').classList.toggle('active', t === 'historique');
+  render();
+}
+
+function shiftCard(s, isPast) {
+  const badgeClass = STATUS_BADGE[s.status] || 'b-grey';
+  let html = `<div class="shift-card${isPast?' past':''}">
+    <div class="shift-top">
+      <div class="shift-date">${escHtml(fmtDate(s.date))}</div>
+      <div class="shift-badge ${badgeClass}">${escHtml(s.status||'')}</div>
+    </div>
+    <div class="shift-site">${escHtml(s.site_name || 'Site à confirmer')}</div>
+    <div class="shift-post">${escHtml(s.post_name || '')}</div>
+    <div class="shift-hours">${fmtTime(s.start_time)} – ${fmtTime(s.end_time)}</div>`;
+  if (s.actual_start || s.actual_end) {
+    html += `<div class="shift-actual">Réel : ${fmtTime(s.actual_start)} – ${fmtTime(s.actual_end)}</div>`;
+  }
+  if (s.break_minutes) {
+    html += `<div class="shift-break">Pause ${BREAK_LABEL[s.break_minutes] || (s.break_minutes+' min')}${s.break_paid?' (payée)':' (non payée)'}</div>`;
+  }
+  if (s.description) {
+    html += `<div class="shift-desc">${escHtml(s.description)}</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function render() {
+  const today = todayStr();
+  const avenir = SHIFTS.filter(s => s.date >= today).sort((a,b) => a.date.localeCompare(b.date) || (a.start_time||'').localeCompare(b.start_time||''));
+  const historique = SHIFTS.filter(s => s.date < today); // déjà triées date desc par la fonction SQL
+
+  document.getElementById('count-avenir').textContent = avenir.length ? ' ('+avenir.length+')' : '';
+  document.getElementById('count-historique').textContent = historique.length ? ' ('+historique.length+')' : '';
+
+  const root = document.getElementById('list-root');
+  const list = TAB === 'avenir' ? avenir : historique;
+
+  if (!list.length) {
+    root.innerHTML = TAB === 'avenir'
+      ? `<div class="state-msg"><div class="ico">📅</div><p>Aucune vacation à venir pour l'instant.</p></div>`
+      : `<div class="state-msg"><div class="ico">📭</div><p>Aucun historique disponible.</p></div>`;
+    return;
+  }
+
+  root.innerHTML = list.map(s => shiftCard(s, TAB === 'historique')).join('');
+}
+
+document.getElementById('agent-badge').textContent = '👤 ' + (AGENT_NOM || '—') + ' — Mon planning';
+loadShifts();
+</script>
+</body>
+</html>
