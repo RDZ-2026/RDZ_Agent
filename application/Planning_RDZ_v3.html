@@ -1,4 +1,3 @@
-<!-- RDZ · planning · v4 · 2026-09-22 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -135,6 +134,12 @@ td{padding:8px 10px;border-bottom:1px solid #f0eeeb;font-size:12.5px;vertical-al
 
 /* Planning — grille site/poste × jours */
 .calendar-scroll{overflow:auto;border:1px solid var(--border);border-radius:10px;background:#fff;max-height:74vh;-webkit-overflow-scrolling:touch;}
+.cs-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cs-dow{font-size:10px;color:var(--text3);text-align:center;font-weight:600;padding:2px 0;}
+.cs-day{text-align:center;padding:6px 0;border-radius:6px;font-size:12px;cursor:pointer;background:#f1f5f9;user-select:none;}
+.cs-day:hover{background:#e2e8f0;}
+.cs-day.cs-selected{background:var(--red);color:#fff;font-weight:700;}
+.cs-day.cs-empty{cursor:default;background:transparent;}
 .calendar{display:grid;}
 .calendar .cell{border-right:1px solid #f0eeeb;border-bottom:1px solid #f0eeeb;padding:5px;min-height:52px;font-size:11px;box-sizing:border-box;}
 .calendar .cell.corner{background:var(--bg2);font-weight:700;font-size:11.5px;position:relative;z-index:4;display:flex;align-items:center;box-shadow:2px 0 5px -2px rgba(0,0,0,.18);}
@@ -143,19 +148,29 @@ td{padding:8px 10px;border-bottom:1px solid #f0eeeb;font-size:12.5px;vertical-al
 .calendar .cell.row-label{background:#fbfaf9;font-size:11px;position:relative;z-index:2;line-height:1.3;box-shadow:2px 0 5px -2px rgba(0,0,0,.18);}
 .calendar .cell.shift-cell.is-today{background:#fff7f0;}
 .calendar .cell.shift-cell.drag-over{background:#fff0ef;outline:2px dashed var(--red);outline-offset:-2px;}
-.shift-chip{background:#fff;border:1px solid var(--border2);border-left:3px solid var(--text3);border-radius:6px;padding:3px 5px;font-size:10.5px;margin-bottom:3px;cursor:grab;line-height:1.25;}
-.shift-chip:hover{box-shadow:var(--shadow);}
+.shift-chip{background:#eef1f5;color:#334155;border:1px solid transparent;border-radius:6px;padding:3px 5px;font-size:10.5px;margin-bottom:3px;cursor:grab;line-height:1.25;}
+.shift-chip:hover{box-shadow:var(--shadow);filter:brightness(.96);}
 .shift-chip:active{cursor:grabbing;}
-.shift-chip .sc-time{font-family:'DM Mono';color:var(--text2);}
+.shift-chip .sc-time{font-family:'DM Mono';opacity:.85;}
 .shift-chip .sc-agent{font-weight:600;}
-.shift-chip .sc-desc{color:var(--text3);font-size:9.5px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.shift-chip.no-agent{border-left-color:var(--red);}
-.shift-chip.no-agent .sc-agent{color:var(--red);}
-.shift-chip.status-publiee{border-left-color:var(--blue);}
-.shift-chip.status-vue{border-left-color:#7c3aed;}
-.shift-chip.status-validee{border-left-color:var(--green);}
-.shift-chip.status-effectuee{border-left-color:var(--orange);}
-.shift-chip.status-controlee{border-left-color:#15803d;background:#f7fdf9;}
+.shift-chip .sc-desc{opacity:.8;font-size:9.5px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.shift-chip.status-publiee{background:#2563eb;color:#fff;}
+/* Pilote planning agent : service refusé par l'agent */
+.shift-chip.refused{box-shadow:inset 0 0 0 2px #dc2626;background:#fef2f2!important;color:#991b1b!important;}
+.shift-chip .sc-refused{font-weight:700;font-size:9.5px;letter-spacing:.02em;}
+.refusal-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid #f0eeeb;font-size:12.5px;flex-wrap:wrap;}
+.refusal-row:first-of-type{border-top:none;}
+.refusal-row .rr-main{flex:1;min-width:220px;}
+.refusal-row .rr-reason{color:#991b1b;margin-top:2px;}
+.refusal-row .rr-meta{color:#9ca3af;font-size:11.5px;}
+.shift-chip.status-vue{background:#7c3aed;color:#fff;}
+.shift-chip.status-validee{background:#16a34a;color:#fff;}
+.shift-chip.status-effectuee{background:#d97706;color:#fff;}
+.shift-chip.status-controlee{background:#15803d;color:#fff;}
+/* "À affecter" (no agent yet) needs to jump out regardless of status, so it's
+   declared after the status-* rules to win the cascade when both apply. */
+.shift-chip.no-agent{background:#fee2e2;color:#b91c1c;}
+.shift-chip.no-agent .sc-agent{color:#b91c1c;}
 .cell-add{font-size:15px;color:var(--border2);text-align:center;cursor:pointer;line-height:1.4;}
 .cell-add:hover{color:var(--red);}
 
@@ -237,7 +252,7 @@ a{color:var(--red)}
 .btn{border-radius:9px}.btn-primary{background:var(--red)}.btn-primary:hover{background:var(--accent-hover)}.btn-ghost{background:#f1f5f9;color:#526176}.btn-ghost:hover{background:#e7edf4;}
 .badge{border-radius:999px;}
 .tbl-wrap{border-radius:10px;}th{color:#718096;background:#f8fafc;border-bottom-color:var(--border);}td{border-bottom-color:#edf1f5;}
-.calendar-scroll{border-color:var(--border);border-radius:12px;box-shadow:var(--shadow);}.calendar .cell.corner,.calendar .cell.day-header{background:#f1f5f9}.calendar .cell.row-label{background:#fbfcfe}.calendar .cell.shift-cell.is-today{background:#fff8f8}.shift-chip{border-color:#d7dee8;border-radius:7px;}
+.calendar-scroll{border-color:var(--border);border-radius:12px;box-shadow:var(--shadow);}.calendar .cell.corner,.calendar .cell.day-header{background:#f1f5f9}.calendar .cell.row-label{background:#fbfcfe}.calendar .cell.shift-cell.is-today{background:#fff8f8}
 .modal-overlay{background:rgba(15,23,42,.52);backdrop-filter:blur(4px)}.modal{border-radius:14px;border:1px solid rgba(226,232,240,.85);box-shadow:var(--shadow-lg)}.modal-head{border-top:3px solid var(--red);border-radius:14px 14px 0 0}.modal-title{font-family:'DM Sans',sans-serif;font-weight:750;letter-spacing:-.02em;}
 .toast{background:#111c2e;}
 @media(max-width:880px){.content{padding:66px 16px 48px}.sidebar{width:240px}.sidebar-brand{padding-top:15px}.ph-title{font-size:24px}}
@@ -478,13 +493,44 @@ function setSimulate(id){ UI.simulate = id||''; closeModal(); fetchState(); }
 function authHeaders(extra){
   return Object.assign({ apikey:SUPA_ANON, Authorization:'Bearer '+currentToken }, extra||{});
 }
+// Supabase access tokens are short-lived (about 1h). Every write used to keep
+// using the token from login until it expired, then fail with "JWT expired"
+// until the person logged out and back in. This refreshes it transparently,
+// right before it's needed, using the long-lived refresh_token saved at login
+// — so a shift can be created hours into a session without any manual step.
+async function ensureFreshSession(){
+  if(!currentSession) return;
+  if(currentSession.expires_at > Math.floor(Date.now()/1000)+30) return;
+  try{
+    const r = await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPA_ANON},
+      body: JSON.stringify({ refresh_token: currentSession.refresh })
+    });
+    const auth = await r.json().catch(()=>null);
+    if(!r.ok || !auth || !auth.access_token) throw new Error('refresh failed');
+    const session = {
+      token: auth.access_token, refresh: auth.refresh_token, expires_at: auth.expires_at,
+      user_id: auth.user? auth.user.id : currentSession.user_id, email: auth.user? auth.user.email : currentSession.email
+    };
+    currentToken = session.token; currentSession = session;
+    localStorage.setItem(SK, JSON.stringify(session));
+  }catch(e){
+    // The refresh_token itself is gone or invalid (very old session, revoked
+    // access...) — nothing left to try, send the person back to login rather
+    // than let every subsequent request fail silently.
+    doLogout();
+    throw new Error('Votre session a expiré, merci de vous reconnecter.');
+  }
+}
 async function restSelect(table, query){
+  await ensureFreshSession();
   const r = await fetch(SUPA_URL+'/rest/v1/'+table+(query?('?'+query):''), { headers: authHeaders() });
   const data = await r.json().catch(()=>null);
   if(!r.ok) throw new Error((data&&(data.message||data.error))||('Lecture impossible : '+table));
   return data||[];
 }
 async function restInsert(table, rows){
+  await ensureFreshSession();
   const r = await fetch(SUPA_URL+'/rest/v1/'+table, {
     method:'POST',
     headers: authHeaders({ 'content-type':'application/json', Prefer:'return=representation' }),
@@ -495,6 +541,7 @@ async function restInsert(table, rows){
   return data;
 }
 async function restUpdate(table, filterQuery, patch){
+  await ensureFreshSession();
   const r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filterQuery, {
     method:'PATCH',
     headers: authHeaders({ 'content-type':'application/json', Prefer:'return=representation' }),
@@ -505,10 +552,12 @@ async function restUpdate(table, filterQuery, patch){
   return data;
 }
 async function restDelete(table, filterQuery){
+  await ensureFreshSession();
   const r = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filterQuery, { method:'DELETE', headers: authHeaders() });
   if(!r.ok){ const data = await r.json().catch(()=>null); throw new Error((data&&(data.message||data.error))||('Suppression impossible : '+table)); }
 }
 async function rpc(name, args){
+  await ensureFreshSession();
   const r = await fetch(SUPA_URL+'/rest/v1/rpc/'+name, {
     method:'POST',
     headers: authHeaders({ 'content-type':'application/json' }),
@@ -627,6 +676,10 @@ async function apiGet(){
       planningViews: (viewRows||[]).map(mapView),
       events: []
     };
+    // Pilote planning agent : services refusés par les agents (non bloquant)
+    state.refusals = (member.role==='direction'||member.role==='planning')
+      ? await rpc('rdz_planning_pilot_admin_refusals', {}).then(r=>Array.isArray(r)?r:[]).catch(()=>[])
+      : [];
 
     ACTOR = { role: member.role, agent: member.agent_id||'', sites: member.sites||[], email: currentSession.email, name: currentSession.email, owner: member.role==='direction', simulation:'' };
     RH_CONFIGURED = (member.role==='direction'||member.role==='planning');
@@ -699,6 +752,8 @@ async function apiAction(action, params){
       case 'absence': await rpc('rdz_planning_request_absence', { p_agent: params.agent||null, p_kind: params.kind||'unavailable', p_from: params.from, p_to: params.to, p_reason: params.reason||'' }); break;
       case 'editAbsence': await rpc('rdz_planning_edit_absence', { p_id: params.id, p_kind: params.kind||null, p_from: params.from, p_to: params.to, p_reason: params.reason||'' }); break;
       case 'deleteAbsence': await rpc('rdz_planning_delete_absence', { p_id: params.id, p_confirm: !!params.confirm }); break;
+      case 'rejectHours': await rpc('rdz_planning_pilot_admin_reject_hours', { p_shift_id: params.id, p_note: params.note||'' }); break;
+      case 'dismissRefusal': await rpc('rdz_planning_pilot_admin_dismiss_refusal', { p_shift_id: params.id }); break;
       case 'approveAbsence': await rpc('rdz_planning_approve_absence', { p_id: params.id, p_accept: !!params.accept }); break;
 
       case 'saveLeaveAccount': await rpc('rdz_planning_save_leave_account', { p_agent: params.agent, p_year: params.year, p_opening: params.opening, p_method: params.method }); break;
@@ -792,6 +847,8 @@ function renderOverview(el){
     {label:'Écarts à contrôler', val:toControl, sub:'Heures déclarées, en attente de contrôle RDZ', cls:'orange', tab:'heures'},
     {label:'Demandes de congé', val:pendingAbsences, sub:'En attente de décision', cls:'blue', tab:'heures'}
   ];
+  const refusedCount = (STATE.refusals||[]).length;
+  if(refusedCount) kpis.splice(3, 0, {label:'Services refusés', val:refusedCount, sub:'Refusés par l’agent, à réorganiser', cls:'red', tab:'heures'});
   el.innerHTML = `
     <div class="ph"><div><div class="ph-title">Vue d’ensemble</div><div class="ph-sub">${esc(fmtDate(today))}</div></div></div>
     <div class="kpi-grid">${kpis.map(k=>`
@@ -1225,7 +1282,7 @@ function jsStr(v){ return String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 const BREAK_OPTIONS = [ {min:0,label:'Aucune'}, {min:30,label:'30 min'}, {min:60,label:'1 h'}, {min:90,label:'1 h 30'}, {min:120,label:'2 h'} ];
 function breakLabel(min){ return (BREAK_OPTIONS.find(o=>o.min===min)||BREAK_OPTIONS[0]).label; }
 function renderStatusLegendItem(color, label){
-  return `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:2px;background:${color};display:inline-block;"></span>${esc(label)}</span>`;
+  return `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:2px;background:${color};border:1px solid rgba(0,0,0,.12);display:inline-block;"></span>${esc(label)}</span>`;
 }
 function shiftTooltip(s){
   const parts = [siteLabel(s.site)+' / '+s.post, s.start+'–'+s.end];
@@ -1248,17 +1305,20 @@ function shiftStatusDetail(s){
 // second line shows the agent's name. context 'agent': the row already identifies
 // the agent, so the chip shows the site + post instead — repeating the agent's own
 // name on every one of their chips is redundant.
+function refusalFor(shiftId){ return ((STATE&&STATE.refusals)||[]).find(r=>String(r.shift_id)===String(shiftId)) || null; }
 function renderShiftChip(s, canManage, context){
   const desc = s.description? esc(s.description) : '';
   const secondLine = context==='agent'
     ? esc(s.site? (siteLabel(s.site)+' / '+s.post) : s.post)
     : (s.agent? esc(agentLabel(s.agent)) : 'À affecter');
   const breakLine = s.breakMinutes? `<div class="sc-desc">Pause ${breakLabel(s.breakMinutes)}${s.breakPaid?'':' (non payée)'}</div>` : '';
+  const refusal = refusalFor(s.id);
   return `
-    <div class="shift-chip status-${STATUS_CLASS[s.status]||'planifiee'} ${!s.agent?'no-agent':''}" draggable="${canManage?'true':'false'}"
-      title="${esc(shiftTooltip(s))}"
+    <div class="shift-chip status-${STATUS_CLASS[s.status]||'planifiee'} ${!s.agent?'no-agent':''} ${refusal?'refused':''}" draggable="${canManage?'true':'false'}"
+      title="${esc(refusal? 'REFUSÉ par l’agent : '+refusal.reason+'\n\n' : '')}${esc(shiftTooltip(s))}"
       ondragstart="handleChipDragStart(event,'${s.id}')"
       onclick="event.stopPropagation();openShiftModal('${s.id}')">
+      ${refusal? '<div class="sc-refused">⛔ REFUSÉ</div>' : ''}
       <div class="sc-time">${s.start}–${s.end}</div>
       <div class="sc-agent">${secondLine}</div>
       ${breakLine}
@@ -1461,11 +1521,6 @@ function bindCalendarFreeze(){
 function renderPlanning(el){
   planInitRange();
   const canManage = ['direction','planning','site'].includes(ACTOR.role);
-  // An agent only ever sees their own schedule here: no site scoping, no
-  // "vue par site/agent" toggle, no bulk-management tools — just their shifts,
-  // always in "vue par agent" restricted to themselves (see renderAgentCalendar).
-  const isOwnPlanningOnly = ACTOR.role==='agent';
-  if(isOwnPlanningOnly) PLAN_FILTER.view = 'agent';
   const days = planDays();
   const today = todayISO();
   const allSites = sortSitesByName(STATE.sites.filter(s=>!s.archived));
@@ -1478,7 +1533,7 @@ function renderPlanning(el){
 
   el.innerHTML = `
     <div class="ph">
-      <div><div class="ph-title">${isOwnPlanningOnly? 'Mon planning' : 'Planning'}</div><div class="ph-sub">${esc(planLabel())}</div></div>
+      <div><div class="ph-title">Planning</div><div class="ph-sub">${esc(planLabel())}</div></div>
       <div class="ph-right">${canManage? `<button class="btn btn-ghost btn-sm" onclick="openExportModal()">📊 Exporter Excel</button> <button class="btn btn-primary btn-sm" onclick="openShiftModal()">+ Nouveau service</button>` : ''}</div>
     </div>
     <div class="plan-toolbar">
@@ -1495,7 +1550,6 @@ function renderPlanning(el){
       <button class="btn btn-ghost btn-sm" onclick="planToday()">Aujourd’hui</button>
       <button class="btn btn-ghost btn-sm" onclick="planNav(1)">›</button>
       <input type="date" class="sel" style="max-width:150px;" value="${PLAN_FILTER.anchor}" onchange="planGoTo(this.value)" title="Aller à une date précise">
-      ${isOwnPlanningOnly? '' : `
       <select class="sel" onchange="planSetScope(this.value)">
         <option value="all" ${PLAN_FILTER.scope==='all'?'selected':''}>Tous les sites</option>
         <option value="site" ${PLAN_FILTER.scope==='site'?'selected':''}>Par site</option>
@@ -1505,18 +1559,18 @@ function renderPlanning(el){
       <div style="display:flex;gap:0;border:1.5px solid var(--border2);border-radius:9px;overflow:hidden;">
         <button class="btn btn-sm ${PLAN_FILTER.view==='site'?'btn-primary':'btn-ghost'}" style="border-radius:0;" onclick="planSetView('site')">Vue par site</button>
         <button class="btn btn-sm ${PLAN_FILTER.view==='agent'?'btn-primary':'btn-ghost'}" style="border-radius:0;" onclick="planSetView('agent')">Vue par agent</button>
-      </div>`}
+      </div>
       ${canManage? (PLAN_FILTER.mode==='week'
         ? `<button class="btn btn-ghost btn-sm" onclick="openCopyWeekModal()">⧉ Copier la semaine</button>`
         : `<button class="btn btn-ghost btn-sm" onclick="openCopyMonthModal()">⧉ Copier le mois</button>`) : ''}
-      ${isOwnPlanningOnly? '' : `<label class="checkline"><input type="checkbox" ${PLAN_FILTER.onlyActive?'checked':''} onchange="PLAN_FILTER.onlyActive=this.checked;renderCurrentPanel()"> Uniquement ${PLAN_FILTER.view==='agent'?'les agents':'les postes'} avec service</label>`}
+      <label class="checkline"><input type="checkbox" ${PLAN_FILTER.onlyActive?'checked':''} onchange="PLAN_FILTER.onlyActive=this.checked;renderCurrentPanel()"> Uniquement ${PLAN_FILTER.view==='agent'?'les agents':'les postes'} avec service</label>
     </div>
     <div class="plan-legend" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:11px;color:var(--text2);margin:-6px 0 10px;">
-      ${renderStatusLegendItem('var(--text3)','Brouillon (non publié)')}
-      ${renderStatusLegendItem('var(--blue)','Publié (agent pas encore ouvert)')}
+      ${renderStatusLegendItem('#eef1f5','Brouillon (non publié)')}
+      ${renderStatusLegendItem('#2563eb','Publié (agent pas encore ouvert)')}
       ${renderStatusLegendItem('#7c3aed','Vu par l’agent')}
-      ${renderStatusLegendItem('var(--green)','Validé par l’agent')}
-      ${renderStatusLegendItem('var(--orange)','Effectué')}
+      ${renderStatusLegendItem('#16a34a','Validé par l’agent')}
+      ${renderStatusLegendItem('#d97706','Effectué')}
       ${renderStatusLegendItem('#15803d','Contrôlé')}
     </div>
     <div class="calendar-scroll" id="calendar-scroll">
@@ -1551,22 +1605,6 @@ function agentHasShiftInRange(agent, days){ return STATE.shifts.some(s=>s.agent=
 function renderAgentCalendar(days, today, canManage, activeView){
   let agents = sortAgentsByNom(STATE.agents.filter(a=>!a.deletedAt));
   let emptyReason = '';
-  // An agent's session only ever shows their own row here, regardless of any
-  // site/view scoping left over in PLAN_FILTER — this is their planning, not
-  // a management view they could widen back out.
-  if(ACTOR.role==='agent'){
-    agents = agents.filter(a=>a.id===ACTOR.agent);
-    return `
-    <div class="calendar" style="grid-template-columns:190px repeat(${days.length}, minmax(${PLAN_FILTER.mode==='month'?100:150}px,1fr));">
-      <div class="cell corner">Mes services</div>
-      ${days.map(d=>`<div class="cell day-header ${d===today?'is-today':''}">${dayHeaderLabel(d)}</div>`).join('')}
-      ${agents.length? agents.map(a=>`
-        <div class="cell row-label">${esc(displayNomPrenom(a))}</div>
-        ${days.map(d=>renderAgentPlanningCell(a,d,today,canManage)).join('')}
-      `).join('') : `<div class="cell" style="grid-column:1/-1;color:var(--text3);">Votre compte n’est rattaché à aucun agent — contactez la direction.</div>`}
-    </div>
-  `;
-  }
   if(PLAN_FILTER.scope==='site' && PLAN_FILTER.site){
     // When a specific site is selected, agent view shows agents assigned to it either
     // as their primary site OR as one of their secondary sites — "tous les sites" shows
@@ -1649,8 +1687,27 @@ async function saveShiftForm(idVersion){
   if(!values.date||!values.start||!values.end){ modalError('Renseignez la date et les horaires.'); return; }
   const params = { values };
   if(id){ params.id=id; params.version=Number(version); params.reason=modalVal('sh-reason'); }
+  // Best-effort preview of non-blocking warnings (qualification/formation
+  // manquante, etc.) so the person still sees them even though nothing stops
+  // the save anymore. A failure here must never prevent saving — it only
+  // feeds the toast shown after a successful save.
+  let warnings = [];
+  if(values.agent){
+    try{
+      const check = await rpc('rdz_planning_check_agent_shift', {
+        p_agent_id: values.agent, p_site_id: values.site, p_post_name: values.post,
+        p_date: values.date, p_start: values.start, p_end: values.end,
+        p_exclude_shift_id: id||null, p_break_minutes: values.breakMinutes, p_break_paid: values.breakPaid
+      });
+      warnings = (check && check.warn) || [];
+    }catch(e){ /* ignore — non-blocking preview only */ }
+  }
   const ok = await apiAction(id?'edit':'create', params);
-  if(ok){ closeModal(); toast(id? 'Service modifié' : 'Service créé'); }
+  if(ok){
+    closeModal();
+    const base = id? 'Service modifié' : 'Service créé';
+    toast(warnings.length? `${base} — ⚠️ ${warnings.join(' · ')}` : base);
+  }
 }
 async function publishShift(id){
   const ok = await apiAction('publish', { ids:[id] });
@@ -1661,22 +1718,67 @@ async function deleteShiftAction(id, version){
   const ok = await apiAction('deleteShift', { id, version:Number(version), confirm:true });
   if(ok){ closeModal(); toast('Service supprimé'); }
 }
+let CS_SELECTED = new Set();
+let CS_MONTH = '';
 function openCopyShiftModal(id, version){
   const s = STATE.shifts.find(x=>x.id===id);
   const agents = sortAgentsByNom(STATE.agents.filter(a=>!a.deletedAt));
+  CS_SELECTED = new Set([s.date]);
+  CS_MONTH = s.date.slice(0,7);
   openModal('copy-shift-modal', 'Copier le service', `
     <div class="hint" style="margin-bottom:10px;">${esc(siteLabel(s.site))} / ${esc(s.post)} · ${s.start}–${s.end}</div>
-    <div class="fgrid">
-      <div class="fg"><div class="flabel">Nouvelle date *</div><input class="finp" type="date" id="cs-date" value="${s.date}"></div>
-      <div class="fg"><div class="flabel">Agent</div><select class="fsel" id="cs-agent"><option value="">— À affecter —</option>${agents.map(a=>`<option value="${a.id}" ${s.agent===a.id?'selected':''}>${esc(displayNomPrenom(a))}</option>`).join('')}</select></div>
+    <div class="fg full"><div class="flabel">Agent (appliqué à toutes les dates choisies)</div>
+      <select class="fsel" id="cs-agent"><option value="">— À affecter —</option>${agents.map(a=>`<option value="${a.id}" ${s.agent===a.id?'selected':''}>${esc(displayNomPrenom(a))}</option>`).join('')}</select>
     </div>
+    <div class="flabel" style="margin-top:12px;">Dates *</div>
+    <div id="cs-calendar">${renderCopyShiftCalendar()}</div>
+    <div class="hint" id="cs-count" style="margin-top:6px;">1 date sélectionnée.</div>
   `, `<button class="btn btn-ghost" onclick="closeModal()">Annuler</button><button class="btn btn-primary" onclick="doCopyShift('${id}','${version}')">Copier</button>`);
 }
+function renderCopyShiftCalendar(){
+  const [y,m] = CS_MONTH.split('-').map(Number);
+  const first = new Date(Date.UTC(y, m-1, 1));
+  const startWeekday = (first.getUTCDay()+6)%7; // Monday-first grid
+  const nbDays = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const monthLabel = first.toLocaleDateString('fr-CH', {month:'long', year:'numeric', timeZone:'UTC'});
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cs-day cs-empty"></div>`;
+  for(let d=1; d<=nbDays; d++){
+    const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells += `<div class="cs-day ${CS_SELECTED.has(dateStr)?'cs-selected':''}" onclick="toggleCsDate('${dateStr}')">${d}</div>`;
+  }
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="csNavMonth(-1)">‹</button>
+      <div style="font-weight:600;text-transform:capitalize;">${esc(monthLabel)}</div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="csNavMonth(1)">›</button>
+    </div>
+    <div class="cs-grid">
+      ${['L','M','M','J','V','S','D'].map(d=>`<div class="cs-dow">${d}</div>`).join('')}
+      ${cells}
+    </div>
+  `;
+}
+function csNavMonth(dir){
+  const [y,m] = CS_MONTH.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m-1+dir, 1));
+  CS_MONTH = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+  const cal = document.getElementById('cs-calendar');
+  if(cal) cal.innerHTML = renderCopyShiftCalendar();
+}
+function toggleCsDate(dateStr){
+  if(CS_SELECTED.has(dateStr)) CS_SELECTED.delete(dateStr); else CS_SELECTED.add(dateStr);
+  const cal = document.getElementById('cs-calendar');
+  if(cal) cal.innerHTML = renderCopyShiftCalendar();
+  const count = document.getElementById('cs-count');
+  if(count) count.textContent = CS_SELECTED.size? `${CS_SELECTED.size} date${CS_SELECTED.size>1?'s':''} sélectionnée${CS_SELECTED.size>1?'s':''}.` : 'Aucune date sélectionnée.';
+}
 async function doCopyShift(id, version){
-  const date = modalVal('cs-date'), agent = modalVal('cs-agent');
-  if(!date){ modalError('Choisissez une date.'); return; }
-  const ok = await apiAction('duplicateShift', { id, version:Number(version), targets:[{date, agent}] });
-  if(ok){ closeModal(); toast('Service copié'); }
+  const agent = modalVal('cs-agent');
+  if(!CS_SELECTED.size){ modalError('Choisissez au moins une date dans le calendrier.'); return; }
+  const targets = Array.from(CS_SELECTED).sort().map(date=>({date, agent}));
+  const ok = await apiAction('duplicateShift', { id, version:Number(version), targets });
+  if(ok){ closeModal(); toast(targets.length>1? `${targets.length} copies créées` : 'Service copié'); }
 }
 function openCopyWeekModal(){
   const allSites = sortSitesByName(STATE.sites.filter(s=>!s.archived));
@@ -1729,6 +1831,10 @@ function renderHeures(el){
       <div class="ph-right"><button class="btn btn-primary btn-sm" onclick="openAbsenceModal()">+ Demande de congé / indisponibilité</button></div>
     </div>
 
+    ${canManage && (STATE.refusals||[]).length? `<div class="card" style="margin-bottom:14px;border:1.5px solid #fecaca;"><div style="font-weight:700;margin-bottom:8px;color:#b91c1c;">⛔ Services refusés par l’agent (${STATE.refusals.length})</div>
+      ${STATE.refusals.map(renderRefusalRow).join('')}
+      <div class="hint" style="margin-top:8px;">Modifier ou réaffecter le service annule le refus. « Marquer traité » le renvoie à l’agent pour validation.</div></div>` : ''}
+
     ${toValidate.length? `<div class="card" style="margin-bottom:14px;"><div style="font-weight:700;margin-bottom:8px;">À valider par l’agent (${toValidate.length})</div>
       ${toValidate.map(s=>renderHeureRow(s,'accept')).join('')}</div>` : ''}
 
@@ -1750,9 +1856,33 @@ function renderHeures(el){
 function _shiftEndPassed(s){
   try{ const end=new Date(s.date+'T'+s.end+':00Z').getTime(); return end<=Date.now(); }catch(e){ return true; }
 }
+function renderRefusalRow(r){
+  const when = r.refused_at? new Date(r.refused_at).toLocaleString('fr-CH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+  return `<div class="refusal-row">
+    <div class="rr-main">
+      <div><b>${esc(fmtDate(String(r.date).slice(0,10)))} · ${esc(r.start_time||'')}–${esc(r.end_time||'')}</b> · ${esc(r.site_name||'')}${r.post_name?' / '+esc(r.post_name):''} · ${esc(r.agent_name||'')}</div>
+      <div class="rr-reason">Motif : « ${esc(r.reason||'')} »</div>
+      <div class="rr-meta">Refusé le ${esc(when)}</div>
+    </div>
+    <button class="btn btn-sm btn-ghost" onclick="openShiftModal('${jsStr(String(r.shift_id))}')">Ouvrir le service</button>
+    <button class="btn btn-sm btn-primary" onclick="dismissRefusal('${jsStr(String(r.shift_id))}')">Marquer traité</button>
+  </div>`;
+}
+async function dismissRefusal(id){
+  if(!confirm('Marquer ce refus comme traité ? Le service sera de nouveau proposé à l’agent pour validation.')) return;
+  const ok = await apiAction('dismissRefusal', { id });
+  if(ok) toast('Refus marqué comme traité');
+}
+function _spanMin(a,b){ if(!a||!b) return 0; const [ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number); let d=(bh*60+bm)-(ah*60+am); if(d<=0) d+=1440; return d; }
+function _fmtDiff(m){ const n=m<0; m=Math.abs(m); const h=Math.floor(m/60), r=m%60; return (n?'−':'+')+(h? h+'h'+(r?String(r).padStart(2,'0'):'') : r+' min'); }
+function _hoursChanged(s){ return !!s.actualStart && (s.actualStart!==s.start || s.actualEnd!==s.end); }
 function renderHeureRow(s, kind){
+  const declared = kind==='check' && s.actualStart
+    ? `<span class="shift-site" style="flex:none;">Déclaré <b>${esc(s.actualStart)}–${esc(s.actualEnd||'—')}</b>${_hoursChanged(s)? ' <span class="badge badge-orange">Modifié '+_fmtDiff(_spanMin(s.actualStart,s.actualEnd)-_spanMin(s.start,s.end))+'</span>' : ' <span class="badge badge-green">Conforme</span>'}</span>`
+    : '';
   return `<div class="shift-row" onclick="${kind==='accept'?`openAcceptModal('${s.id}')`:kind==='declare'?`openDeclareModal('${s.id}')`:`openControlModal('${s.id}')`}">
     <span class="shift-time">${esc(fmtDate(s.date))} · ${s.start}–${s.end}</span>
+    ${declared}
     <span class="shift-site">${esc(siteLabel(s.site))} · ${esc(s.post)}</span>
     <span class="shift-agent">${esc(agentLabel(s.agent))}</span>
     <span class="badge ${statusBadgeClass(s.status)}">${esc(s.status)}</span>
@@ -1779,12 +1909,36 @@ async function declareShift(id){
 }
 function openControlModal(id){
   const s = STATE.shifts.find(x=>x.id===id);
-  openModal('control-modal','Contrôler le service', `
+  const changed = _hoursChanged(s);
+  const diff = s.actualStart? _spanMin(s.actualStart,s.actualEnd)-_spanMin(s.start,s.end) : 0;
+  openModal('control-modal','Contrôler les heures', `
     <div>${esc(fmtDate(s.date))} · ${esc(siteLabel(s.site))} / ${esc(s.post)} · ${esc(agentLabel(s.agent))}</div>
-    <div class="hint">Prévu ${s.start}–${s.end} · Réel ${s.actualStart||'—'}–${s.actualEnd||'—'}${s.reason?' · '+esc(s.reason):''}</div>
-  `, `<button class="btn btn-ghost" onclick="closeModal()">Fermer</button><button class="btn btn-primary" onclick="controlShift('${s.id}')">Marquer contrôlé</button>`);
+    <div class="fgrid" style="margin-top:10px;">
+      <div class="fg"><div class="flabel">Prévu</div><div><b>${s.start} – ${s.end}</b></div></div>
+      <div class="fg"><div class="flabel">Déclaré par l’agent</div><div><b>${s.actualStart||'—'} – ${s.actualEnd||'—'}</b> ${changed? '<span class="badge badge-orange">'+_fmtDiff(diff)+'</span>' : '<span class="badge badge-green">Conforme</span>'}</div></div>
+      ${s.reason? `<div class="fg full"><div class="flabel">Motif de l’agent</div><div>« ${esc(s.reason)} »</div></div>` : ''}
+      <div class="fg"><div class="flabel">Début retenu</div><input class="finp" type="time" id="ct-start" value="${s.actualStart||s.start}"></div>
+      <div class="fg"><div class="flabel">Fin retenue</div><input class="finp" type="time" id="ct-end" value="${s.actualEnd||s.end}"></div>
+      <div class="fg full"><div class="flabel">Motif en cas de refus (envoyé à l’agent)</div><input class="finp" id="ct-note" placeholder="Ex. heure de sortie non conforme au badge"></div>
+    </div>
+    <div class="hint">« Valider » enregistre les heures retenues (tu peux les corriger ci-dessus). « Refuser » renvoie le service à l’agent pour qu’il redéclare.</div>
+  `, `<button class="btn btn-ghost" onclick="closeModal()">Fermer</button><button class="btn btn-danger" onclick="rejectHours('${s.id}')">Refuser</button><button class="btn btn-primary" onclick="controlShift('${s.id}')">Valider les heures</button>`);
 }
-async function controlShift(id){ const ok=await apiAction('check',{id}); if(ok){closeModal();toast('Heures contrôlées');} }
+async function controlShift(id){
+  const s = STATE.shifts.find(x=>x.id===id);
+  const start = modalVal('ct-start'), end = modalVal('ct-end');
+  if(s && start && end && s.status==='Effectuée' && (start!==(s.actualStart||'') || end!==(s.actualEnd||''))){
+    try{ await rpc('rdz_planning_pilot_admin_set_actual', { p_shift_id:id, p_start:start, p_end:end }); }
+    catch(e){ toast(e.message||'Correction impossible', true); return; }
+  }
+  const ok=await apiAction('check',{id}); if(ok){closeModal();toast('Heures validées');}
+}
+async function rejectHours(id){
+  const note = (modalVal('ct-note')||'').trim();
+  if(note.length<3){ toast('Indique le motif du refus pour l’agent', true); document.getElementById('ct-note')?.focus(); return; }
+  const ok = await apiAction('rejectHours', { id, note });
+  if(ok){ closeModal(); toast('Déclaration refusée, renvoyée à l’agent'); }
+}
 
 // ── ABSENCES ────────────────────────────────────────────────
 function renderAbsenceRow(a, forApproval){
