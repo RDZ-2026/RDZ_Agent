@@ -76,11 +76,14 @@ main{flex:1;padding:16px}
 .group-btn:active{border-color:var(--red)}
 .group-btn.tool{border-left:4px solid var(--report-red)}
 .group-btn.fix{border-left:4px solid var(--warn)}
+.group-btn.disabled{cursor:default;opacity:.55;pointer-events:none}
 .group-btn .ic{font-size:27px;width:38px;text-align:center;flex-shrink:0}
 .group-btn .txt{min-width:0;flex:1}
 .group-btn .txt .t{font-weight:bold;font-size:15.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .group-btn .txt .t-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .warn-badge{background:#fde8e8;color:#b02020;border:1px solid #eaa8a8;border-radius:20px;font-size:10.5px;font-weight:bold;
+  padding:3px 10px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.badge-soon{background:#eee;color:#888;border:1px solid #ddd;border-radius:20px;font-size:10.5px;font-weight:bold;
   padding:3px 10px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
 .group-btn .txt .d{font-size:12.5px;color:#666;margin-top:3px;line-height:1.4;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -107,7 +110,7 @@ body{background:#dfe7ee;color:var(--ink)}
 .group-btn:nth-of-type(2) .ic{background:linear-gradient(145deg,#dff1ff,#cbe7ff)}.group-btn:nth-of-type(3) .ic{background:linear-gradient(145deg,#ddf8ed,#c9f0e0)}
 .group-btn .txt{position:relative;z-index:2}.group-btn .txt .t{font-size:16px;font-weight:800;color:#112034;letter-spacing:-.015em}.group-btn .txt .d{font-size:12.5px;color:#63758f;margin-top:4px;line-height:1.42}.group-btn .chev{position:relative;z-index:2;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#fff0f3;color:var(--red);font-size:26px;font-weight:400}.group-btn:after{content:'';position:absolute;right:-20px;bottom:-38px;width:125px;height:125px;border-radius:38px;background:radial-gradient(circle,rgba(227,6,44,.07),rgba(227,6,44,0) 68%);transform:rotate(20deg)}
 #outil-terrain-list .group-btn:nth-child(2) .ic{background:linear-gradient(145deg,#eee5ff,#dfd1ff);color:#5b35b5}#outil-terrain-list .group-btn:nth-child(2) .chev{background:#f0eaff;color:#5b35b5}
-.group-btn.fix .ic{background:linear-gradient(145deg,#fff0d4,#ffe2af);color:#d46c00}.group-btn.fix .chev{background:#fff2dc;color:#d46c00}.warn-badge{background:#fff6e6;color:#c75e00;border-color:#ffd18b;padding:4px 8px;font-size:9px}
+.group-btn.fix .ic{background:linear-gradient(145deg,#fff0d4,#ffe2af);color:#d46c00}.group-btn.fix .chev{background:#fff2dc;color:#d46c00}.warn-badge{background:#fff6e6;color:#c75e00;border-color:#ffd18b;padding:4px 8px;font-size:9px}.badge-soon{padding:4px 8px;font-size:9px}
 .foot{color:#8391a5;padding:18px 0 6px}.back-btn{background:#fff;border:1px solid var(--line);border-radius:10px;color:#26384b;padding:9px 12px;margin-bottom:16px;box-shadow:0 3px 10px rgba(34,50,65,.05)}
 /* Auth screens harmonisés */
 #screen-loading{background:linear-gradient(145deg,#142130,#263746)}#screen-ident header,#screen-pin header,#screen-create-pin header{background:linear-gradient(135deg,#172431,#263746);border-bottom:4px solid var(--red)}.agent-pick-btn{border-radius:12px;border-left:4px solid var(--red);box-shadow:0 5px 15px rgba(34,50,65,.06)}.key{box-shadow:0 4px 12px rgba(34,50,65,.07)}
@@ -455,9 +458,12 @@ init();
 // menu principal (mobile.html) — rien n'est dupliqué, on ne fait que les rendre
 // accessibles ici en avant-première pendant leur période de validation.
 // Pour ajouter un module ici plus tard : ajouter une entrée à ce tableau.
+// "MEMO SITES" : module pas encore construit — carte visible mais désactivée
+// (disabled:true, pas de lien actif) en attendant que memo-sites.html soit prêt.
+// Pour l'activer : passer disabled à false et renseigner href: 'memo-sites.html'.
 const OUTIL_TERRAIN_ITEMS = [
-  { icon: '🚨', name: 'Alarme', desc: "Intervenir sur une alarme. Que faire et comment le faire ?", href: 'alarme-agent.html' },
-  { icon: '📓', name: 'Journal de bord', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' }
+  { icon: '📓', name: 'Journal de bord', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' },
+  { icon: '📇', name: 'MEMO SITES', desc: "Fiches Mémo des sites RDZ", disabled: true }
 ];
 
 // Sous-menu "Prise de poste" : mêmes 3 destinations et mêmes fichiers que
@@ -471,14 +477,21 @@ const POSTE_ITEMS = [
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function cardHtml(item, extraClass){
-  return `<a class="group-btn ${extraClass||''}" href="${esc(item.href)}">
+  const tag = item.disabled ? 'div' : 'a';
+  const hrefAttr = item.disabled ? '' : ` href="${esc(item.href)}"`;
+  const cls = `group-btn ${extraClass||''}${item.disabled ? ' disabled' : ''}`.trim();
+  const titleRow = item.disabled
+    ? `<span class="t-row"><span class="t">${esc(item.name)}</span><span class="badge-soon">🔜 Bientôt disponible</span></span>`
+    : `<span class="t">${esc(item.name)}</span>`;
+  const chev = item.disabled ? '' : `<span class="chev">›</span>`;
+  return `<${tag} class="${cls}"${hrefAttr}>
       <span class="ic">${item.icon}</span>
       <span class="txt">
-        <span class="t">${esc(item.name)}</span>
+        ${titleRow}
         <span class="d">${esc(item.desc)}</span>
       </span>
-      <span class="chev">›</span>
-    </a>`;
+      ${chev}
+    </${tag}>`;
 }
 
 function renderOutilTerrain(){
