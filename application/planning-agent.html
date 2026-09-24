@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v2 · 2026-09-24 -->
+<!-- RDZ · planning-agent (pilote) · v3 · 2026-09-24 · stats + journal + validation -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -22,7 +22,8 @@
     inversement. Aucun lien depuis mobile.html.
   - Seuls les agents inscrits dans rdz_planning_pilot_agents (routeops)
     apparaissent, et seuls les services publiés (≠ "Planifiée") sont lus.
-  Prérequis : claude_migration-planning-pilote-agents.sql exécuté sur routeops.
+  Prérequis (routeops) : claude_migration-planning-pilote-agents.sql,
+  puis -correctif-id.sql, puis -modifications.sql.
 -->
 <style>
 :root{
@@ -143,6 +144,61 @@ main{flex:1;padding:18px 16px 96px;max-width:560px;width:100%;margin:0 auto;}
 .chip.ok{background:var(--ok-bg);color:var(--ok);}
 .chip.info{background:var(--info-bg);color:var(--info);}
 .chip.muted{background:var(--muted-bg);color:var(--text2);}
+.chip.warn{background:var(--warn-bg);color:var(--warn);}
+
+/* ── Carte chiffres ── */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:22px;overflow:hidden;}
+.stat{padding:14px 8px 13px;text-align:center;border-left:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;}
+.stat:first-child{border-left:none;}
+.stat .n{font-size:25px;font-weight:800;line-height:1;letter-spacing:-.02em;}
+.stat .l{font-size:11.5px;color:var(--text2);font-weight:600;}
+.stat.alert{background:var(--warn-bg);}
+.stat.alert .n,.stat.alert .l{color:var(--warn);}
+button.stat{font-family:inherit;}
+
+/* ── Journal des modifications ── */
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.sec-head .sec-title{margin:0;}
+.sec-link{font-size:13px;font-weight:700;color:var(--red);}
+.changes{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:22px;}
+.chg{display:flex;gap:12px;padding:13px 14px;border-top:1px solid var(--line);width:100%;text-align:left;align-items:flex-start;}
+.chg:first-child{border-top:none;}
+button.chg:active{background:#fafafa;}
+.chg-ic{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;}
+.chg-ic svg{width:16px;height:16px;}
+.chg-ic.add{background:var(--ok-bg);color:var(--ok);}
+.chg-ic.mod{background:var(--info-bg);color:var(--info);}
+.chg-ic.del{background:#fee2e2;color:#b91c1c;}
+.chg-body{flex:1;min-width:0;}
+.chg-top{display:flex;justify-content:space-between;gap:8px;}
+.chg-t{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;}
+.chg-new{width:8px;height:8px;border-radius:50%;background:var(--red);flex:none;}
+.chg-at{font-size:11.5px;color:var(--text3);white-space:nowrap;padding-top:2px;}
+.chg-s{font-size:13px;color:var(--text2);margin-top:2px;}
+.chg.del .chg-s{text-decoration:line-through;}
+.chg-d{font-size:12.5px;color:var(--text2);margin-top:6px;line-height:1.55;background:var(--bg);border-radius:8px;padding:6px 9px;}
+.chg-d b{color:var(--text);font-weight:600;}
+.chg-empty{padding:18px 14px;text-align:center;font-size:13.5px;color:var(--text2);line-height:1.5;}
+
+/* ── Validation ── */
+.validate-bar{display:flex;align-items:center;gap:10px;background:var(--warn-bg);color:#78350f;border-radius:12px;padding:10px 10px 10px 14px;margin-bottom:14px;font-size:13.5px;font-weight:600;}
+.validate-bar span{flex:1;}
+.validate-bar .btn{height:36px;}
+.done-banner{display:flex;align-items:center;gap:10px;background:var(--ok-bg);color:var(--ok);border-radius:12px;padding:14px;font-weight:700;font-size:14.5px;margin-top:12px;}
+.done-banner svg{width:20px;height:20px;flex:none;}
+.d-note{font-size:12.5px;color:var(--text2);margin-top:10px;line-height:1.45;text-align:center;}
+.tab{position:relative;}
+.tab-dot{position:absolute;top:1px;left:calc(50% + 7px);min-width:17px;height:17px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.sheet-bg{position:fixed;inset:0;background:rgba(17,28,46,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:#fff;width:100%;max-width:560px;border-radius:20px 20px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom,0px));animation:up .2s ease-out;max-height:85vh;overflow:auto;}
+@keyframes up{from{transform:translateY(40px);opacity:0;}}
+.sheet h2{text-align:center;font-size:19px;margin-bottom:6px;}
+.sheet .sub{text-align:center;font-size:13.5px;color:var(--text2);margin-bottom:14px;line-height:1.45;}
+.sheet-list{background:var(--bg);border-radius:12px;padding:4px 12px;margin-bottom:16px;}
+.sheet-list div{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line);}
+.sheet-list div:first-child{border-top:none;}
+.sheet-list b{font-weight:700;}
+.sheet .btn + .btn{margin-top:10px;}
 .chip svg{width:12px;height:12px;}
 
 .seg{display:grid;grid-template-columns:1fr 1fr;background:#e5e7eb;border-radius:11px;padding:3px;margin-bottom:14px;}
@@ -225,6 +281,7 @@ main{flex:1;padding:18px 16px 96px;max-width:560px;width:100%;margin:0 auto;}
   </nav>
 </div>
 
+<div id="sheet-root"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -246,10 +303,14 @@ const LS_HASH = 'rdz_planning_pilot_pin_hash';
 const ARRIVAL_ADVANCE_MIN = 10;
 const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
+const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
+const HOME_CHANGES = 5;
 
 let AGENT = null;        // fiche agents (RDZ_Agent)
 let SHIFTS = [];
-let VIEW = { tab:'home', detail:null, planMode:'upcoming' };
+let CHANGES = [];        // journal des modifications (serveur)
+let UNREAD = new Set();  // ids de modifications non encore vues sur cet appareil
+let VIEW = { tab:'home', detail:null, planMode:'upcoming', allChanges:false };
 let LAST_LOAD = 0, LOADING = false;
 
 // ── Icônes ───────────────────────────────────────────────────
@@ -267,6 +328,10 @@ const I = {
   doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3.5V6h6V3.5M9 11h6M9 15h4"/></svg>',
   run:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5h4"/></svg>',
   coffee:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>',
+  checkC:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.4-5.4 1.4 1.4z"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
 };
 
@@ -369,12 +434,12 @@ async function pinDigit(d){
     setTimeout(()=>{ el.classList.remove('shake'); pinBuf=''; dots(0); },400);
   }
 }
-function logout(){ clearLocal(); AGENT=null; SHIFTS=[]; VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
+function logout(){ clearLocal(); AGENT=null; SHIFTS=[]; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
 
 // ── Données planning ─────────────────────────────────────────
 function mapShift(r){
   return {
-    id:String(r.id), date:String(r.date).slice(0,10), start:hhmm(r.start_time), end:hhmm(r.end_time),
+    id:String(r.id), version:Number(r.version), date:String(r.date).slice(0,10), start:hhmm(r.start_time), end:hhmm(r.end_time),
     status:r.status, post:r.post_name||'', description:r.description||'',
     breakMinutes:Number(r.break_minutes)||0, breakPaid:!!r.break_paid,
     actualStart:r.actual_start?hhmm(r.actual_start):'', actualEnd:r.actual_end?hhmm(r.actual_end):'',
@@ -392,8 +457,12 @@ async function reload(manual){
   if(LOADING||!AGENT) return;
   LOADING=true; $('btn-refresh').classList.add('spin');
   try{
-    const rows = await opsRpc('rdz_planning_pilot_shifts', { p_agent_id:String(AGENT.id) });
+    const [rows, chg] = await Promise.all([
+      opsRpc('rdz_planning_pilot_shifts', { p_agent_id:String(AGENT.id) }),
+      opsRpc('rdz_planning_pilot_changes', { p_agent_id:String(AGENT.id) }).catch(()=>null)
+    ]);
     SHIFTS = (rows||[]).map(mapShift).filter(s=>s.status && s.status!==HIDDEN_STATUS);
+    if(chg) setChanges(chg);
     LAST_LOAD=Date.now();
     if(VIEW.detail && !SHIFTS.some(s=>s.id===VIEW.detail)) VIEW.detail=null;
     render();
@@ -404,6 +473,19 @@ async function reload(manual){
     if(!SHIFTS.length) $('main').innerHTML=`<div class="empty"><b>Impossible de charger le planning</b>${esc(e.message||'')}<br><br><button class="btn btn-outline btn-sm" onclick="reload(true)">Réessayer</button></div>`;
   }finally{ LOADING=false; $('btn-refresh').classList.remove('spin'); }
 }
+// Journal : on retient les modifications arrivées depuis la dernière visite
+// sur cet appareil (pastille rouge), puis on mémorise la plus récente.
+function setChanges(list){
+  CHANGES = (list||[]).map(c=>({ id:Number(c.id), kind:c.kind, shiftId:String(c.shift_id||''), date:String(c.date||'').slice(0,10),
+    start:hhmm(c.start), end:hhmm(c.end), site:c.site||'Site', post:c.post||'', details:c.details||{}, at:c.at }));
+  const key = LS_CHG_SEEN+AGENT.id;
+  const raw = localStorage.getItem(key);
+  const maxId = CHANGES.reduce((m,c)=>Math.max(m,c.id),0);
+  if(raw===null){ UNREAD = new Set(); }                // 1re visite : rien n'est « nouveau »
+  else { const seen=Number(raw)||0; CHANGES.forEach(c=>{ if(c.id>seen) UNREAD.add(c.id); }); }
+  try{ localStorage.setItem(key, String(Math.max(maxId, Number(raw)||0))); }catch(e){}
+}
+
 // Renseigne seen_at côté admin pour les services à venir encore jamais vus.
 function markSeen(){
   const now=new Date();
@@ -431,12 +513,13 @@ function mapsUrl(a){ return 'https://www.google.com/maps/dir/?api=1&destination=
 function mondayOf(iso){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return isoDate(d); }
 
 const STATUS = {
-  'Publiée':  { label:'Publié',          cls:'info' },
-  'Vue':      { label:'Publié',          cls:'info' },
+  'Publiée':  { label:'À valider',       cls:'warn' },
+  'Vue':      { label:'À valider',       cls:'warn' },
   'Validée':  { label:'Confirmé',        cls:'ok' },
   'Effectuée':{ label:'Heures déclarées',cls:'info' },
   'Contrôlée':{ label:'Clôturé',         cls:'muted' }
 };
+function needsConfirm(s){ return (s.status==='Publiée'||s.status==='Vue') && sEnd(s)>new Date(); }
 function chip(s){ const st=STATUS[s.status]||{label:s.status,cls:'muted'}; return `<span class="chip ${st.cls}">${st.cls==='ok'?I.check:''}${esc(st.label)}</span>`; }
 
 // ── Navigation / rendu ───────────────────────────────────────
@@ -446,7 +529,12 @@ function closeDetail(){ VIEW.detail=null; render(); window.scrollTo(0,0); }
 function setPlanMode(m){ VIEW.planMode=m; render(); }
 
 function render(){
-  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===VIEW.tab));
+  const pending = SHIFTS.filter(needsConfirm).length;
+  document.querySelectorAll('.tab').forEach(b=>{
+    b.classList.toggle('on', b.dataset.tab===VIEW.tab);
+    const old=b.querySelector('.tab-dot'); if(old) old.remove();
+    if(b.dataset.tab==='planning' && pending){ const d=document.createElement('span'); d.className='tab-dot'; d.textContent=pending; b.appendChild(d); }
+  });
   const left=$('tb-left'), center=$('tb-center');
   if(VIEW.detail){
     left.innerHTML=`<button class="icon-btn" onclick="closeDetail()" aria-label="Retour">${I.back}</button>`;
@@ -468,10 +556,12 @@ function renderHome(){
   const next = up[0];
   let h = `<div class="hello">Bonjour${AGENT.prenom?' '+esc(AGENT.prenom):''}</div>
     <div class="hello-sub">${up.length?'Voici vos prochains services':'Votre planning publié apparaîtra ici'}</div>`;
-  if(!next) return h+`<div class="empty"><b>Aucun service à venir</b>Dès que votre responsable publie votre planning, vos services s’affichent ici et vous recevez un e-mail.</div>`;
-  const live = sStart(next)<=now, t=todayISO();
-  const pill = next.date===t? '' : next.date===addDaysISO(t,1)? 'tmw' : null;
-  h += `<div class="next">
+  if(!next){
+    h += `<div class="empty" style="margin-bottom:22px"><b>Aucun service à venir</b>Dès que votre responsable publie votre planning, vos services s’affichent ici et vous recevez un e-mail.</div>`;
+  } else {
+    const live = sStart(next)<=now, t=todayISO();
+    const pill = next.date===t? '' : next.date===addDaysISO(t,1)? 'tmw' : null;
+    h += `<div class="next">
     <div class="next-kicker">${live?'<span class="live">EN COURS</span>':'PROCHAIN SERVICE'}</div>
     <div class="next-body" onclick="openShift('${esc(next.id)}')">
       <div class="next-lines">
@@ -487,11 +577,80 @@ function renderHome(){
       ${next.siteAddress?`<a class="btn btn-white btn-sm" href="${esc(mapsUrl(next.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}
     </div>
   </div>`;
+  }
+  h += renderStats(up);
+  h += renderChangesBlock();
   const rest = up.slice(1,4);
   if(rest.length){
     h += '<div class="sec-title">Ensuite</div>'+rest.map(shiftRow).join('');
     if(up.length>4) h += `<button class="btn btn-ghost btn-block btn-sm" onclick="setPlanMode('upcoming');go('planning')">Voir tout le planning (${up.length} services)</button>`;
   }
+  return h;
+}
+
+// ── Carte chiffres : à venir / à valider / heures du mois ────
+function renderStats(up){
+  const pending = up.filter(needsConfirm).length;
+  const ym = todayISO().slice(0,7);
+  const mins = SHIFTS.filter(s=>s.date.slice(0,7)===ym).reduce((n,s)=>n+paidMinutes(s),0);
+  const month = new Date().toLocaleDateString('fr-CH',{month:'long'});
+  return `<div class="stats">
+    <button class="stat" onclick="setPlanMode('upcoming');go('planning')"><span class="n">${up.length}</span><span class="l">Service${up.length>1?'s':''} à venir</span></button>
+    <button class="stat ${pending?'alert':''}" onclick="setPlanMode('upcoming');go('planning')"><span class="n">${pending}</span><span class="l">À valider</span></button>
+    <div class="stat"><span class="n">${Math.floor(mins/60)}h${mins%60?pad(mins%60):''}</span><span class="l">En ${esc(month)}</span></div>
+  </div>`;
+}
+
+// ── Journal des modifications ────────────────────────────────
+function shortDate(iso){ return iso? new Date(iso+'T12:00:00').toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'') : ''; }
+function relTime(ts){
+  const d=new Date(ts), diff=(Date.now()-d.getTime())/60000;
+  const hm=d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+  if(diff<1) return 'à l’instant';
+  if(diff<60) return 'il y a '+Math.floor(diff)+' min';
+  if(isoDate(d)===todayISO()) return 'auj. '+hm;
+  if(isoDate(d)===addDaysISO(todayISO(),-1)) return 'hier '+hm;
+  return d.toLocaleDateString('fr-CH',{day:'numeric',month:'short'}).replace('.','');
+}
+const CHG_META = {
+  ajout:        { t:'Nouveau service', ic:'plus',  cls:'add' },
+  modification: { t:'Service modifié', ic:'edit',  cls:'mod' },
+  suppression:  { t:'Service retiré',  ic:'minus', cls:'del' }
+};
+function changeDetails(d){
+  const L=[];
+  const pair=(k,x,f)=>{ if(d[k]) L.push(`${k==='horaires'?'Horaires':k==='date'?'Date':k==='site'?'Site':k==='poste'?'Poste':'Pause'} : ${esc(f(d[k].avant))} → <b>${esc(f(d[k].apres))}</b>`); };
+  const id=v=>v||'—';
+  pair('date',0,v=>shortDate(v));
+  pair('horaires',0,id);
+  pair('site',0,id);
+  pair('poste',0,id);
+  pair('pause',0,v=>(Number(v)||0)+' min');
+  if(d.consignes) L.push('Consignes mises à jour');
+  return L.length? `<div class="chg-d">${L.join('<br>')}</div>` : '';
+}
+function changeRow(c){
+  const m=CHG_META[c.kind]||CHG_META.modification;
+  const exists = c.kind!=='suppression' && SHIFTS.some(s=>s.id===c.shiftId);
+  const tag = exists? 'button' : 'div';
+  const sub = `${esc(c.site)} · ${esc(shortDate(c.date))} · ${esc(c.start)}–${esc(c.end)}`;
+  return `<${tag} class="chg ${m.cls}" ${exists?`onclick="openShift('${esc(c.shiftId)}')"`:''}>
+    <span class="chg-ic ${m.cls}">${I[m.ic]}</span>
+    <div class="chg-body">
+      <div class="chg-top"><span class="chg-t">${UNREAD.has(c.id)?'<span class="chg-new"></span>':''}${m.t}</span><span class="chg-at">${esc(relTime(c.at))}</span></div>
+      <div class="chg-s">${sub}</div>
+      ${c.kind==='modification'? changeDetails(c.details) : ''}
+    </div>
+  </${tag}>`;
+}
+function renderChangesBlock(){
+  const all = VIEW.allChanges;
+  const list = all? CHANGES : CHANGES.slice(0,HOME_CHANGES);
+  const unread = CHANGES.filter(c=>UNREAD.has(c.id)).length;
+  let h = `<div class="sec-head"><div class="sec-title">Dernières modifications${unread?` <span class="chip warn">${unread} nouvelle${unread>1?'s':''}</span>`:''}</div>
+    ${CHANGES.length>HOME_CHANGES? `<button class="sec-link" onclick="VIEW.allChanges=!VIEW.allChanges;render()">${all?'Réduire':'Tout voir ('+CHANGES.length+')'}</button>` : ''}</div>`;
+  h += `<div class="changes">${list.length? list.map(changeRow).join('')
+    : '<div class="chg-empty">Aucune modification récente.<br>Les ajouts, changements et retraits de services apparaîtront ici.</div>'}</div>`;
   return h;
 }
 function shiftRow(s){
@@ -519,6 +678,8 @@ function renderPlanning(){
       <button class="${up?'':'on'}" onclick="setPlanMode('past')">Passés</button>
     </div>
     <div class="month-sum">${cap(new Date(t+'T12:00:00').toLocaleDateString('fr-CH',{month:'long'}))} : ${month.length} service${month.length>1?'s':''} · ${Math.floor(mins/60)}h${pad(mins%60)}</div>`;
+  const pending = SHIFTS.filter(needsConfirm);
+  if(up && pending.length) h += `<div class="validate-bar"><span>${pending.length} service${pending.length>1?'s':''} à valider</span><button class="btn btn-red btn-sm" onclick="askConfirm(null)">Tout valider</button></div>`;
   if(!list.length) return h+`<div class="empty"><b>${up?'Aucun service à venir':'Aucun service passé'}</b>${up?'Votre planning n’a pas encore été publié pour la période à venir.':'Les services des '+HISTORY_DAYS+' derniers jours s’affichent ici.'}</div>`;
   const thisWk=mondayOf(t); let last='';
   list.forEach(s=>{
@@ -549,7 +710,38 @@ function renderDetail(s){
       <div class="d-item">${I.doc}<div><div class="k">Consignes</div><div class="v">${s.description?esc(s.description):'Aucune consigne particulière pour ce service.'}</div></div></div>
       ${s.actualStart?`<div class="d-item">${I.clock}<div><div class="k">Heures déclarées</div><div class="v">${esc(s.actualStart)} – ${esc(s.actualEnd||'—')}</div></div></div>`:''}
     </div>
-    ${s.siteAddress?`<a class="btn btn-outline btn-block" href="${esc(mapsUrl(s.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}`;
+    ${s.siteAddress?`<a class="btn btn-outline btn-block" href="${esc(mapsUrl(s.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}
+    ${needsConfirm(s)
+      ? `<button class="btn btn-red btn-block" style="margin-top:10px" onclick="askConfirm('${esc(s.id)}')">Valider ce service</button>
+         <div class="d-note">En validant, vous confirmez à votre responsable que vous avez pris connaissance de ce service.</div>`
+      : (s.status==='Validée' && !ended? `<div class="done-banner">${I.checkC}<span>Vous avez validé ce service</span></div>` : '')}`;
+}
+
+// ── Validation (un service ou tous ceux en attente) ──────────
+function askConfirm(id){
+  const items = id? SHIFTS.filter(s=>s.id===id && needsConfirm(s)) : SHIFTS.filter(needsConfirm).sort((a,b)=>sStart(a)-sStart(b));
+  if(!items.length) return;
+  const one = items.length===1;
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>${one?'Valider ce service ?':'Valider '+items.length+' services ?'}</h2>
+    <div class="sub">Votre responsable verra que vous avez pris connaissance ${one?'de ce service':'de ces services'}.</div>
+    <div class="sheet-list">${items.map(s=>`<div><span>${esc(shortDate(s.date))} · <b>${esc(s.siteName)}</b></span><span>${esc(s.start)}–${esc(s.end)}</span></div>`).join('')}</div>
+    <button class="btn btn-red btn-block" id="cf-btn" onclick="doConfirm(${id?`'${esc(id)}'`:'null'})">Oui, je valide</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+function closeSheet(){ $('sheet-root').innerHTML=''; }
+async function doConfirm(id){
+  const items = (id? SHIFTS.filter(s=>s.id===id && needsConfirm(s)) : SHIFTS.filter(needsConfirm)).map(s=>({ id:s.id, version:s.version }));
+  const btn=$('cf-btn'); if(!items.length||!btn) return;
+  btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    const n = Number(await opsRpc('rdz_planning_pilot_accept_shifts', { p_agent_id:String(AGENT.id), p_items:items }))||0;
+    closeSheet();
+    if(n===items.length) toast(n>1? n+' services validés' : 'Service validé');
+    else toast((n? n+' validé(s). ' : '')+'Un service a été modifié entre-temps, vérifiez-le à nouveau.', true);
+  }catch(e){ closeSheet(); toast(e.message||'Validation impossible', true); }
+  await reload(false);
 }
 function renderAccount(){
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
