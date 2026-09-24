@@ -1,4 +1,4 @@
-<!-- RDZ · parkguard-rdz · v7 · 2026-09-24 (RDZSync v5 : photos en grande mémoire, progression, interruption/reprise) -->
+<!-- RDZ · parkguard-rdz · v7 · 2026-09-24 (RDZSync v5 : photos en grande mémoire, progression, interruption/reprise ; lancement depuis le journal de bord sans redemander site/agent) -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -368,7 +368,7 @@ input[type="file"]{display:none}
   <div class="topbar">
     <div class="topbar-logo">PARK<span>GUARD</span></div>
     <div class="badge badge-gray" id="end-round-site">—</div>
-    <button class="topbar-btn" style="margin-left:auto;background:var(--green)" onclick="closeRound()">Nouvelle ronde ›</button>
+    <button class="topbar-btn" id="btn-new-round" style="margin-left:auto;background:var(--green)" onclick="closeRound()">Nouvelle ronde ›</button>
   </div>
   <div class="content">
     <div style="text-align:center;padding:16px 0 20px">
@@ -691,6 +691,8 @@ initDB();
 let currentAgent = null;
 let currentSite = null;
 let currentSiteType = 'standard'; // 'standard' ou 'guidage'
+var cameFromJournal = false;   // vrai si ParkGuard a été ouvert depuis le journal de bord
+var _autoStartTried = false;   // l'auto-démarrage ne doit être tenté qu'une seule fois
 let currentRoundId = null;
 let roundVehicles = [];
 let isOnline = navigator.onLine;
@@ -982,6 +984,8 @@ async function showEndRound() {
   if (iaR) iaR.style.display = 'none';
   var jei = document.getElementById('json-export-info');
   if (jei) jei.style.display = 'none';
+  var nb = document.getElementById('btn-new-round');
+  if (nb) nb.textContent = cameFromJournal ? '✓ Retour au journal' : 'Nouvelle ronde ›';
   showScreen('s-end-round');
   await confirmSupabaseSync();
 }
@@ -1187,6 +1191,8 @@ function updateRoundStats() {
 }
 
 function closeRound() {
+  // Venu du journal de bord : on y retourne (l'agent y rechoisira un site/une activité).
+  if (cameFromJournal) { window.location.href = 'journal-de-bord.html'; return; }
   currentSite = null; currentRoundId = null; roundVehicles = [];
   document.getElementById('active-round-wrap').style.display = 'none';
   showScreen('s-home');
@@ -1724,6 +1730,58 @@ async function saveEntry() {
 }
 
 // ═══ CHARGEMENT SITES & AGENTS DEPUIS SUPABASE ═══
+// ═══ AUTO-DÉMARRAGE DEPUIS LE JOURNAL DE BORD ═══
+// Quand ParkGuard est ouvert par le journal de bord, le site est transmis dans l'adresse
+// (site_id + nom) et l'agent est déjà connu (connexion à l'application). On récupère les deux
+// et on lance la ronde directement, sans redemander site ni agent. Si l'une des deux infos
+// manque (ouverture directe de ParkGuard, ou personne de connecté), on ne fait rien : les
+// écrans de choix manuels s'affichent comme avant. Appelée une seule fois, après le chargement
+// des sites/agents (pour disposer du type de site et de la fiche agent complète).
+async function maybeAutoStartFromJournal() {
+  if (_autoStartTried) return;
+  _autoStartTried = true;
+  var params = new URLSearchParams(location.search);
+  var siteId  = params.get('site_id');
+  var siteNom = params.get('site');
+  var agentNom = localStorage.getItem('rdz_agent_nom');
+  var agentId  = localStorage.getItem('rdz_agent_id');
+  // Conditions minimales : un site transmis par le journal ET un agent connecté.
+  if ((!siteId && !siteNom) || !agentNom) return;
+
+  // 1) Résoudre le site (par identifiant de préférence, sinon par nom ; sinon lecture directe
+  //    Supabase ; sinon dernier recours avec le nom transmis et le type par défaut).
+  var sites = window._sitesCache || [];
+  var site = null;
+  if (siteId)  site = sites.find(function (s) { return String(s.id) === String(siteId); });
+  if (!site && siteNom) site = sites.find(function (s) { return s.nom === siteNom; });
+  if (!site && window.db) {
+    try {
+      var q = db.from('sites').select('id,nom,type,adresse,codes_infraction,heure_jour_debut,heure_jour_fin,parking_actif');
+      q = siteId ? q.eq('id', siteId) : q.eq('nom', siteNom);
+      var r = await q.limit(1);
+      if (r && r.data && r.data.length) { site = r.data[0]; sites.push(site); window._sitesCache = sites; }
+    } catch (e) {}
+  }
+  if (!site) site = { nom: siteNom || 'Site', type: 'standard' };
+
+  // 2) Résoudre l'agent connecté (par identifiant de préférence, sinon par nom). À défaut, on
+  //    garde au moins son nom (sans le matricule).
+  var agents = window._agentsCache || [];
+  var agent = null;
+  if (agentId)  agent = agents.find(function (a) { return String(a.id) === String(agentId); });
+  if (!agent && agentNom) agent = agents.find(function (a) { return a.nom === agentNom; });
+
+  // 3) Appliquer et lancer la ronde.
+  currentSite = site.nom;
+  currentSiteType = site.type || 'standard';
+  if (agent) { currentAgent = ((agent.prenom || '').trim() + ' ' + (agent.nom || '').trim()).trim() || agent.nom; window._currentAgentData = agent; }
+  else { currentAgent = agentNom; window._currentAgentData = { nom: agentNom }; }
+  var agentBadge = document.getElementById('agent-badge');
+  if (agentBadge) agentBadge.textContent = '👤 ' + currentAgent;
+  cameFromJournal = true;
+  startRonde();
+}
+
 async function loadSitesAndAgents() {
   try {
     const [{ data: sites }, { data: agents }] = await Promise.all([
@@ -1737,6 +1795,7 @@ async function loadSitesAndAgents() {
 
     renderAgentsList(agents || []);
     renderSitesList(sites || []);
+    maybeAutoStartFromJournal();
 
   } catch(e) {
     console.warn('Supabase inaccessible — lecture du cache local:', e);
@@ -1753,6 +1812,7 @@ async function loadSitesAndAgents() {
 
     renderAgentsList(agents);
     renderSitesList(sitesFinaux);
+    maybeAutoStartFromJournal();
 
     // Bannière hors ligne
     const banner = document.getElementById('home-sync-banner');
