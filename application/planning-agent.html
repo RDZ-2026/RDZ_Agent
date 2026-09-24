@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v4 · 2026-09-24 · stats + journal + validation + congés -->
+<!-- RDZ · planning-agent (pilote) · v5 · 2026-09-24 · + refus de service, journal complet -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -23,7 +23,8 @@
   - Seuls les agents inscrits dans rdz_planning_pilot_agents (routeops)
     apparaissent, et seuls les services publiés (≠ "Planifiée") sont lus.
   Prérequis (routeops) : claude_migration-planning-pilote-agents.sql,
-  puis -correctif-id.sql, -modifications.sql, -conges.sql.
+  puis -correctif-id.sql, -modifications.sql, -conges.sql,
+  -refus-journal.sql.
 -->
 <style>
 :root{
@@ -222,6 +223,19 @@ button.chg:active{background:#fafafa;}
 .lv-main span{font-size:12.5px;color:var(--text2);}
 .lv-x{font-size:12px;font-weight:700;color:#b91c1c;padding:6px 4px;}
 .chip.bad{background:#fee2e2;color:#b91c1c;}
+.d-btns2{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:10px;}
+.btn-danger-o{background:#fff;color:#b91c1c;border:1.5px solid #fecaca;}
+.refused-banner{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d;border-radius:12px;padding:14px;margin-top:12px;font-size:13.5px;line-height:1.5;}
+.refused-banner b{display:block;font-size:14.5px;color:#b91c1c;margin-bottom:4px;}
+.refused-banner .btn{margin-top:10px;}
+.presets{display:flex;flex-wrap:wrap;gap:8px;}
+.presets button{border:1.5px solid var(--line);border-radius:20px;padding:8px 12px;font-size:13px;font-weight:600;background:#fff;}
+.presets button.on{border-color:var(--ink);background:var(--ink);color:#fff;}
+.chg-ic.ok{background:var(--ok-bg);color:var(--ok);}
+.chg-ic.bad{background:#fee2e2;color:#b91c1c;}
+.chg-ic.neutral{background:var(--muted-bg);color:var(--text2);}
+.chg-ic.leave{background:#ede9fe;color:#6d28d9;}
+.chg-note{font-size:12.5px;color:var(--text2);margin-top:5px;font-style:italic;}
 .srow.absence{cursor:default;background:#f8fafc;border-style:dashed;}
 .fl{display:block;font-size:12.5px;font-weight:700;color:var(--text2);margin:14px 0 6px;}
 .kind-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
@@ -373,6 +387,8 @@ const I = {
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>',
+  xmark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>',
   checkC:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.4-5.4 1.4 1.4z"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
 };
@@ -485,7 +501,8 @@ function mapShift(r){
     status:r.status, post:r.post_name||'', description:r.description||'',
     breakMinutes:Number(r.break_minutes)||0, breakPaid:!!r.break_paid,
     actualStart:r.actual_start?hhmm(r.actual_start):'', actualEnd:r.actual_end?hhmm(r.actual_end):'',
-    seen:r.seen_at||'', siteName:r.site_name||'Site', siteAddress:r.site_address||''
+    seen:r.seen_at||'', siteName:r.site_name||'Site', siteAddress:r.site_address||'',
+    refusal: r.refusal? { reason:r.refusal.reason||'', at:r.refusal.at } : null
   };
 }
 function enterApp(agent){
@@ -527,12 +544,13 @@ async function reload(manual){
 // sur cet appareil (pastille rouge), puis on mémorise la plus récente.
 function setChanges(list){
   CHANGES = (list||[]).map(c=>({ id:Number(c.id), kind:c.kind, shiftId:String(c.shift_id||''), date:String(c.date||'').slice(0,10),
-    start:hhmm(c.start), end:hhmm(c.end), site:c.site||'Site', post:c.post||'', details:c.details||{}, at:c.at }));
+    start:hhmm(c.start), end:hhmm(c.end), site:c.site||'Site', post:c.post||'', details:c.details||{}, at:c.at,
+    refType:c.ref_type||'shift', dateTo:String(c.date_to||'').slice(0,10), absKind:c.abs_kind||'', note:c.note||'' }));
   const key = LS_CHG_SEEN+AGENT.id;
   const raw = localStorage.getItem(key);
   const maxId = CHANGES.reduce((m,c)=>Math.max(m,c.id),0);
   if(raw===null){ UNREAD = new Set(); }                // 1re visite : rien n'est « nouveau »
-  else { const seen=Number(raw)||0; CHANGES.forEach(c=>{ if(c.id>seen) UNREAD.add(c.id); }); }
+  else { const seen=Number(raw)||0; CHANGES.forEach(c=>{ if(c.id>seen && !OWN_ACTIONS.has(c.kind)) UNREAD.add(c.id); }); }
   try{ localStorage.setItem(key, String(Math.max(maxId, Number(raw)||0))); }catch(e){}
 }
 
@@ -569,8 +587,9 @@ const STATUS = {
   'Effectuée':{ label:'Heures déclarées',cls:'info' },
   'Contrôlée':{ label:'Clôturé',         cls:'muted' }
 };
-function needsConfirm(s){ return (s.status==='Publiée'||s.status==='Vue') && sEnd(s)>new Date(); }
-function chip(s){ const st=STATUS[s.status]||{label:s.status,cls:'muted'}; return `<span class="chip ${st.cls}">${st.cls==='ok'?I.check:''}${esc(st.label)}</span>`; }
+function isOpen(s){ return (s.status==='Publiée'||s.status==='Vue') && sEnd(s)>new Date(); }
+function needsConfirm(s){ return isOpen(s) && !s.refusal; }
+function chip(s){ if(s.refusal && isOpen(s)) return `<span class="chip bad">${I.xmark}Refusé</span>`; const st=STATUS[s.status]||{label:s.status,cls:'muted'}; return `<span class="chip ${st.cls}">${st.cls==='ok'?I.check:''}${esc(st.label)}</span>`; }
 
 // ── Navigation / rendu ───────────────────────────────────────
 function go(tab){ VIEW.tab=tab; VIEW.detail=null; render(); window.scrollTo(0,0); }
@@ -784,10 +803,20 @@ function relTime(ts){
   return d.toLocaleDateString('fr-CH',{day:'numeric',month:'short'}).replace('.','');
 }
 const CHG_META = {
-  ajout:        { t:'Nouveau service', ic:'plus',  cls:'add' },
-  modification: { t:'Service modifié', ic:'edit',  cls:'mod' },
-  suppression:  { t:'Service retiré',  ic:'minus', cls:'del' }
+  ajout:         { t:'Nouveau service',             ic:'plus',  cls:'add' },
+  modification:  { t:'Service modifié',             ic:'edit',  cls:'mod' },
+  suppression:   { t:'Service retiré',              ic:'minus', cls:'del' },
+  validation:    { t:'Vous avez validé ce service', ic:'check', cls:'ok' },
+  refus:         { t:'Vous avez refusé ce service', ic:'xmark', cls:'bad' },
+  refus_traite:  { t:'Refus pris en compte',        ic:'check', cls:'neutral', sub:'Votre responsable a traité votre refus : merci de revoir ce service.' },
+  conge_demande: { t:'Demande envoyée',             ic:'send',  cls:'leave' },
+  conge_accepte: { t:'Demande acceptée',            ic:'check', cls:'ok' },
+  conge_refuse:  { t:'Demande refusée',             ic:'xmark', cls:'bad' },
+  conge_annule:  { t:'Demande annulée',             ic:'minus', cls:'neutral' },
+  conge_retire:  { t:'Congé retiré',                ic:'minus', cls:'del' }
 };
+// Actions faites par l'agent lui-même : jamais signalées comme « nouvelles »
+const OWN_ACTIONS = new Set(['validation','refus','conge_demande','conge_annule']);
 function changeDetails(d){
   const L=[];
   const pair=(k,x,f)=>{ if(d[k]) L.push(`${k==='horaires'?'Horaires':k==='date'?'Date':k==='site'?'Site':k==='poste'?'Poste':'Pause'} : ${esc(f(d[k].avant))} → <b>${esc(f(d[k].apres))}</b>`); };
@@ -802,15 +831,20 @@ function changeDetails(d){
 }
 function changeRow(c){
   const m=CHG_META[c.kind]||CHG_META.modification;
-  const exists = c.kind!=='suppression' && SHIFTS.some(s=>s.id===c.shiftId);
+  const isAbs = c.refType==='absence';
+  const exists = !isAbs && c.kind!=='suppression' && SHIFTS.some(s=>s.id===c.shiftId);
   const tag = exists? 'button' : 'div';
-  const sub = `${esc(c.site)} · ${esc(shortDate(c.date))} · ${esc(c.start)}–${esc(c.end)}`;
+  const sub = isAbs
+    ? `${esc(ABS_KIND[c.absKind]||'Absence')} · ${esc(c.date && c.dateTo && c.date!==c.dateTo ? 'du '+shortDate(c.date)+' au '+shortDate(c.dateTo) : shortDate(c.date))}`
+    : `${esc(c.site)} · ${esc(shortDate(c.date))} · ${esc(c.start)}–${esc(c.end)}`;
   return `<${tag} class="chg ${m.cls}" ${exists?`onclick="openShift('${esc(c.shiftId)}')"`:''}>
     <span class="chg-ic ${m.cls}">${I[m.ic]}</span>
     <div class="chg-body">
       <div class="chg-top"><span class="chg-t">${UNREAD.has(c.id)?'<span class="chg-new"></span>':''}${m.t}</span><span class="chg-at">${esc(relTime(c.at))}</span></div>
       <div class="chg-s">${sub}</div>
       ${c.kind==='modification'? changeDetails(c.details) : ''}
+      ${m.sub? `<div class="chg-note">${esc(m.sub)}</div>` : ''}
+      ${c.note? `<div class="chg-note">« ${esc(c.note)} »</div>` : ''}
     </div>
   </${tag}>`;
 }
@@ -818,10 +852,10 @@ function renderChangesBlock(){
   const all = VIEW.allChanges;
   const list = all? CHANGES : CHANGES.slice(0,HOME_CHANGES);
   const unread = CHANGES.filter(c=>UNREAD.has(c.id)).length;
-  let h = `<div class="sec-head"><div class="sec-title">Dernières modifications${unread?` <span class="chip warn">${unread} nouvelle${unread>1?'s':''}</span>`:''}</div>
+  let h = `<div class="sec-head"><div class="sec-title">Journal${unread?` <span class="chip warn">${unread} nouvelle${unread>1?'s':''}</span>`:''}</div>
     ${CHANGES.length>HOME_CHANGES? `<button class="sec-link" onclick="VIEW.allChanges=!VIEW.allChanges;render()">${all?'Réduire':'Tout voir ('+CHANGES.length+')'}</button>` : ''}</div>`;
   h += `<div class="changes">${list.length? list.map(changeRow).join('')
-    : '<div class="chg-empty">Aucune modification récente.<br>Les ajouts, changements et retraits de services apparaîtront ici.</div>'}</div>`;
+    : '<div class="chg-empty">Rien de nouveau pour le moment.<br>Vos services, validations et demandes de congé apparaîtront ici.</div>'}</div>`;
   return h;
 }
 function shiftRow(s){
@@ -885,14 +919,20 @@ function renderDetail(s){
     </div>
     ${s.siteAddress?`<a class="btn btn-outline btn-block" href="${esc(mapsUrl(s.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}
     ${needsConfirm(s)
-      ? `<button class="btn btn-red btn-block" style="margin-top:10px" onclick="askConfirm('${esc(s.id)}')">Valider ce service</button>
-         <div class="d-note">En validant, vous confirmez à votre responsable que vous avez pris connaissance de ce service.</div>`
-      : (s.status==='Validée' && !ended? `<div class="done-banner">${I.checkC}<span>Vous avez validé ce service</span></div>` : '')}`;
+      ? `<div class="d-btns2">
+           <button class="btn btn-danger-o" onclick="openRefuse('${esc(s.id)}')">Refuser</button>
+           <button class="btn btn-red" onclick="askConfirm('${esc(s.id)}')">Valider</button>
+         </div>
+         <div class="d-note">Validez pour confirmer à votre responsable que vous assurerez ce service, ou refusez en indiquant le motif.</div>`
+      : (s.refusal && isOpen(s))
+        ? `<div class="refused-banner"><b>Vous avez refusé ce service</b>Motif : « ${esc(s.refusal.reason)} »<br>Votre responsable a été prévenu et va revenir vers vous.
+             <button class="btn btn-outline btn-block btn-sm" onclick="askConfirm('${esc(s.id)}')">Finalement, je peux l’assurer</button></div>`
+        : (s.status==='Validée' && !ended? `<div class="done-banner">${I.checkC}<span>Vous avez validé ce service</span></div>` : '')}`;
 }
 
 // ── Validation (un service ou tous ceux en attente) ──────────
 function askConfirm(id){
-  const items = id? SHIFTS.filter(s=>s.id===id && needsConfirm(s)) : SHIFTS.filter(needsConfirm).sort((a,b)=>sStart(a)-sStart(b));
+  const items = id? SHIFTS.filter(s=>s.id===id && isOpen(s)) : SHIFTS.filter(needsConfirm).sort((a,b)=>sStart(a)-sStart(b));
   if(!items.length) return;
   const one = items.length===1;
   $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
@@ -904,8 +944,40 @@ function askConfirm(id){
   </div></div>`;
 }
 function closeSheet(){ $('sheet-root').innerHTML=''; }
+
+// ── Refus d'un service (motif obligatoire) ───────────────────
+const REFUSE_PRESETS = ['Indisponible ce jour-là','Horaires incompatibles','Déjà engagé ailleurs','Raison médicale','Autre'];
+let RF = { id:null, preset:'', text:'' };
+function openRefuse(id){ RF = { id, preset:'', text:'' }; renderRefuse(); }
+function rfPreset(p){ RF.preset = RF.preset===p? '' : p; renderRefuse(); }
+function renderRefuse(err){
+  const s=SHIFTS.find(x=>x.id===RF.id); if(!s) return;
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Refuser ce service ?</h2>
+    <div class="sub">${esc(shortDate(s.date))} · <b>${esc(s.siteName)}</b> · ${esc(s.start)}–${esc(s.end)}<br>Votre responsable sera prévenu et pourra réorganiser le planning.</div>
+    <label class="fl">Motif</label>
+    <div class="presets">${REFUSE_PRESETS.map((p,i)=>`<button class="${RF.preset===p?'on':''}" onclick="rfPreset(REFUSE_PRESETS[${i}])">${esc(p)}</button>`).join('')}</div>
+    <label class="fl" for="rf-text">Précisions ${RF.preset && RF.preset!=='Autre'?'(facultatif)':''}</label>
+    <textarea class="finp" id="rf-text" maxlength="250" placeholder="Expliquez en quelques mots…" oninput="RF.text=this.value">${esc(RF.text)}</textarea>
+    ${err? `<div class="req-err">${esc(err)}</div>` : ''}
+    <button class="btn btn-red btn-block" id="rf-btn" style="margin-top:16px" onclick="submitRefuse()">Confirmer le refus</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+async function submitRefuse(){
+  const s=SHIFTS.find(x=>x.id===RF.id); if(!s) return closeSheet();
+  const txt=(RF.text||'').trim();
+  const reason = RF.preset && RF.preset!=='Autre' ? (txt? RF.preset+' — '+txt : RF.preset) : txt;
+  if(reason.length<3) return renderRefuse(RF.preset==='Autre'? 'Précisez le motif du refus.' : 'Choisissez un motif ou expliquez en quelques mots.');
+  const btn=$('rf-btn'); btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    await opsRpc('rdz_planning_pilot_refuse_shift', { p_agent_id:String(AGENT.id), p_shift_id:s.id, p_version:s.version, p_reason:reason });
+    closeSheet(); toast('Refus envoyé à votre responsable');
+  }catch(e){ return renderRefuse(e.message||'Envoi impossible'); }
+  await reload(false);
+}
 async function doConfirm(id){
-  const items = (id? SHIFTS.filter(s=>s.id===id && needsConfirm(s)) : SHIFTS.filter(needsConfirm)).map(s=>({ id:s.id, version:s.version }));
+  const items = (id? SHIFTS.filter(s=>s.id===id && isOpen(s)) : SHIFTS.filter(needsConfirm)).map(s=>({ id:s.id, version:s.version }));
   const btn=$('cf-btn'); if(!items.length||!btn) return;
   btn.disabled=true; btn.textContent='Envoi…';
   try{
