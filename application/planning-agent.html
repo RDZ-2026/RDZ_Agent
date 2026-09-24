@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v3 · 2026-09-24 · stats + journal + validation -->
+<!-- RDZ · planning-agent (pilote) · v4 · 2026-09-24 · stats + journal + validation + congés -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -23,7 +23,7 @@
   - Seuls les agents inscrits dans rdz_planning_pilot_agents (routeops)
     apparaissent, et seuls les services publiés (≠ "Planifiée") sont lus.
   Prérequis (routeops) : claude_migration-planning-pilote-agents.sql,
-  puis -correctif-id.sql, puis -modifications.sql.
+  puis -correctif-id.sql, -modifications.sql, -conges.sql.
 -->
 <style>
 :root{
@@ -199,6 +199,45 @@ button.chg:active{background:#fafafa;}
 .sheet-list div:first-child{border-top:none;}
 .sheet-list b{font-weight:700;}
 .sheet .btn + .btn{margin-top:10px;}
+
+/* ── Congés ── */
+.leave{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:22px;}
+.leave-top{display:flex;align-items:center;gap:14px;}
+.leave-ring{width:62px;height:62px;flex:none;position:relative;}
+.leave-ring svg{width:62px;height:62px;transform:rotate(-90deg);}
+.leave-ring .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
+.leave-ring .v b{font-size:19px;font-weight:800;}
+.leave-ring .v small{font-size:9.5px;color:var(--text2);font-weight:600;margin-top:2px;}
+.leave-txt{flex:1;min-width:0;}
+.leave-txt .t{font-weight:800;font-size:16px;}
+.leave-txt .s{font-size:13px;color:var(--text2);margin-top:3px;line-height:1.45;}
+.leave .btn{margin-top:14px;}
+.leave-list{margin-top:12px;border-top:1px solid var(--line);}
+.lv{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+.lv:last-child{border-bottom:none;}
+.lv-main{flex:1;min-width:0;}
+.lv-main b{display:block;font-size:13.5px;}
+.lv-main span{font-size:12.5px;color:var(--text2);}
+.lv-x{font-size:12px;font-weight:700;color:#b91c1c;padding:6px 4px;}
+.chip.bad{background:#fee2e2;color:#b91c1c;}
+.srow.absence{cursor:default;background:#f8fafc;border-style:dashed;}
+.fl{display:block;font-size:12.5px;font-weight:700;color:var(--text2);margin:14px 0 6px;}
+.kind-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.kind-seg button{border:1.5px solid var(--line);border-radius:11px;padding:11px 8px;font-weight:700;font-size:14px;background:#fff;}
+.kind-seg button.on{border-color:var(--ink);background:var(--ink);color:#fff;}
+.one-day{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:14px;font-weight:600;}
+.switch{width:46px;height:28px;border-radius:14px;background:#d1d5db;position:relative;transition:.15s;flex:none;}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.15s;}
+.switch.on{background:var(--ink);}
+.switch.on::after{left:21px;}
+.dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dates.one{grid-template-columns:1fr;}
+.finp{width:100%;height:46px;border:1.5px solid var(--line);border-radius:10px;padding:0 12px;font-size:16px;font-family:inherit;background:#fff;color:var(--text);}
+textarea.finp{height:70px;padding:10px 12px;resize:none;}
+.finp:focus{outline:none;border-color:var(--ink);}
+.req-sum{margin-top:14px;border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.45;background:var(--bg);color:var(--text2);}
+.req-sum.warn{background:var(--warn-bg);color:#78350f;}
+.req-err{margin-top:12px;font-size:13px;color:#b91c1c;font-weight:600;min-height:0;}
 .chip svg{width:12px;height:12px;}
 
 .seg{display:grid;grid-template-columns:1fr 1fr;background:#e5e7eb;border-radius:11px;padding:3px;margin-bottom:14px;}
@@ -308,6 +347,7 @@ const HOME_CHANGES = 5;
 
 let AGENT = null;        // fiche agents (RDZ_Agent)
 let SHIFTS = [];
+let ABS = { list:[], balance:null, loaded:false };
 let CHANGES = [];        // journal des modifications (serveur)
 let UNREAD = new Set();  // ids de modifications non encore vues sur cet appareil
 let VIEW = { tab:'home', detail:null, planMode:'upcoming', allChanges:false };
@@ -434,7 +474,7 @@ async function pinDigit(d){
     setTimeout(()=>{ el.classList.remove('shake'); pinBuf=''; dots(0); },400);
   }
 }
-function logout(){ clearLocal(); AGENT=null; SHIFTS=[]; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
+function logout(){ closeSheet(); clearLocal(); AGENT=null; SHIFTS=[]; ABS={list:[],balance:null,loaded:false}; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
 
 // ── Données planning ─────────────────────────────────────────
 function mapShift(r){
@@ -457,12 +497,20 @@ async function reload(manual){
   if(LOADING||!AGENT) return;
   LOADING=true; $('btn-refresh').classList.add('spin');
   try{
-    const [rows, chg] = await Promise.all([
+    const [rows, chg, abs] = await Promise.all([
       opsRpc('rdz_planning_pilot_shifts', { p_agent_id:String(AGENT.id) }),
-      opsRpc('rdz_planning_pilot_changes', { p_agent_id:String(AGENT.id) }).catch(()=>null)
+      opsRpc('rdz_planning_pilot_changes', { p_agent_id:String(AGENT.id) }).catch(()=>null),
+      opsRpc('rdz_planning_pilot_absences', { p_agent_id:String(AGENT.id) }).catch(()=>null)
     ]);
     SHIFTS = (rows||[]).map(mapShift).filter(s=>s.status && s.status!==HIDDEN_STATUS);
     if(chg) setChanges(chg);
+    if(abs){
+      ABS.list = (abs.absences||[]).map(a=>({ id:String(a.id), kind:a.kind, from:String(a.from).slice(0,10), to:String(a.to).slice(0,10),
+        status:a.status, reason:a.reason||'', days:a.days==null?null:Number(a.days) }));
+      ABS.balance = abs.balance ? { year:abs.balance.year, opening:Number(abs.balance.opening)||0, taken:Number(abs.balance.taken)||0,
+        pending:Number(abs.balance.pending)||0, remaining:Number(abs.balance.remaining)||0 } : null;
+      ABS.loaded = true;
+    }
     LAST_LOAD=Date.now();
     if(VIEW.detail && !SHIFTS.some(s=>s.id===VIEW.detail)) VIEW.detail=null;
     render();
@@ -579,6 +627,7 @@ function renderHome(){
   </div>`;
   }
   h += renderStats(up);
+  h += renderLeaveCard();
   h += renderChangesBlock();
   const rest = up.slice(1,4);
   if(rest.length){
@@ -599,6 +648,126 @@ function renderStats(up){
     <button class="stat ${pending?'alert':''}" onclick="setPlanMode('upcoming');go('planning')"><span class="n">${pending}</span><span class="l">À valider</span></button>
     <div class="stat"><span class="n">${Math.floor(mins/60)}h${mins%60?pad(mins%60):''}</span><span class="l">En ${esc(month)}</span></div>
   </div>`;
+}
+
+// ── Congés : carte d'accueil ─────────────────────────────────
+const ABS_KIND = { paid:'Congé payé', unavailable:'Indisponibilité' };
+function fmtDay(iso){ return new Date(iso+'T12:00:00').toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,''); }
+function absPeriod(a){ return a.from===a.to? fmtDay(a.from) : 'Du '+fmtDay(a.from)+' au '+fmtDay(a.to); }
+function absChip(a){
+  const c = a.status==='Acceptée'? 'ok' : a.status==='Refusée'? 'bad' : 'warn';
+  const l = a.status==='Demandée'? 'En attente' : a.status;
+  return `<span class="chip ${c}">${esc(l)}</span>`;
+}
+function jours(n){ n=Number(n)||0; const v=Number.isInteger(n)? n : n.toFixed(1).replace('.',','); return v+' jour'+(Math.abs(n)>1?'s':''); }
+function renderLeaveCard(){
+  const b = ABS.balance, t = todayISO();
+  // Demandes à afficher : en attente + à venir/en cours, puis dernières traitées
+  const shown = ABS.list.filter(a=>a.status==='Demandée' || a.to>=t).sort((x,y)=>x.from.localeCompare(y.from)).slice(0,4);
+  let top;
+  if(b){
+    const pct = b.opening>0? Math.max(0,Math.min(1,b.remaining/b.opening)) : 0;
+    const C = 2*Math.PI*26;
+    top = `<div class="leave-top">
+      <div class="leave-ring"><svg viewBox="0 0 62 62"><circle cx="31" cy="31" r="26" fill="none" stroke="#e5e7eb" stroke-width="6"/><circle cx="31" cy="31" r="26" fill="none" stroke="${b.remaining<0?'#b91c1c':'#16a34a'}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*pct).toFixed(1)} ${C.toFixed(1)}"/></svg>
+        <div class="v"><b>${esc(String(Number.isInteger(b.remaining)?b.remaining:b.remaining.toFixed(1)).replace('.',','))}</b><small>jours</small></div></div>
+      <div class="leave-txt"><div class="t">Congés ${esc(b.year)}</div>
+        <div class="s">${jours(b.remaining)} restant${Math.abs(b.remaining)>1?'s':''} sur ${jours(b.opening)}${b.taken? ' · '+jours(b.taken)+' pris':''}${b.pending? '<br>'+jours(b.pending)+' en attente de réponse':''}</div></div>
+    </div>`;
+  } else {
+    top = `<div class="leave-top"><div class="leave-txt"><div class="t">Mes congés</div><div class="s">Votre solde de congés n’a pas encore été renseigné. Vous pouvez tout de même faire une demande.</div></div></div>`;
+  }
+  const list = shown.length? `<div class="leave-list">${shown.map(a=>`<div class="lv">
+      <div class="lv-main"><b>${ABS_KIND[a.kind]||'Absence'}${a.days&&a.kind==='paid'?' · '+jours(a.days):''}</b><span>${esc(absPeriod(a))}</span></div>
+      ${absChip(a)}
+      ${a.status==='Demandée'? `<button class="lv-x" onclick="askCancelAbsence('${esc(a.id)}')">Annuler</button>` : ''}
+    </div>`).join('')}</div>` : '';
+  return `<div class="sec-title">Congés &amp; absences</div><div class="leave">${top}${list}
+    <button class="btn btn-red btn-block" onclick="openLeaveForm()">Faire une demande</button></div>`;
+}
+function absenceRow(a){
+  const f=new Date(a.from+'T12:00:00');
+  return `<div class="srow absence">
+    <div class="dblock"><div class="dw">${esc(f.toLocaleDateString('fr-CH',{weekday:'short'}).replace('.',''))}</div><div class="dn">${f.getDate()}</div><div class="dm">${esc(f.toLocaleDateString('fr-CH',{month:'short'}).replace('.',''))}</div></div>
+    <div class="sinfo"><div class="s1">${ABS_KIND[a.kind]||'Absence'}</div><div class="s2">${esc(absPeriod(a))}</div></div>
+  </div>`;
+}
+
+// ── Formulaire de demande ────────────────────────────────────
+let LF = { kind:'paid', oneDay:false, from:'', to:'', reason:'' };
+function weekdaysBetween(a,b){ let n=0; const d=new Date(a+'T12:00:00'), e=new Date(b+'T12:00:00'); while(d<=e){ const w=d.getDay(); if(w!==0&&w!==6) n++; d.setDate(d.getDate()+1); } return n; }
+function openLeaveForm(){
+  LF = { kind:'paid', oneDay:false, from:addDaysISO(todayISO(),1), to:addDaysISO(todayISO(),1), reason:'' };
+  renderLeaveForm();
+}
+function lfSet(k,v){
+  LF[k]=v;
+  if(k==='oneDay' && v) LF.to=LF.from;
+  if(k==='from' && (LF.oneDay || !LF.to || LF.to<v)) LF.to=v;
+  renderLeaveForm();
+}
+function lfSummary(){
+  if(!LF.from || !LF.to) return '';
+  if(LF.to<LF.from) return '<div class="req-sum warn">La date de fin est avant la date de début.</div>';
+  const cal = Math.round((new Date(LF.to+'T12:00:00')-new Date(LF.from+'T12:00:00'))/864e5)+1;
+  if(LF.kind!=='paid') return `<div class="req-sum">Indisponibilité de ${jours(cal)} (${esc(absPeriod(LF))}).</div>`;
+  const n = weekdaysBetween(LF.from, LF.to), b = ABS.balance;
+  if(!n) return '<div class="req-sum warn">Cette période ne contient aucun jour ouvré (lundi → vendredi).</div>';
+  if(!b) return `<div class="req-sum">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''}.</div>`;
+  const after = b.remaining - b.pending - n;
+  return `<div class="req-sum ${after<0?'warn':''}">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''}. ${after<0? 'Attention : cela dépasse votre solde disponible ('+jours(b.remaining-b.pending)+').' : 'Il vous resterait '+jours(after)+' si la demande est acceptée.'}</div>`;
+}
+function renderLeaveForm(errMsg){
+  const t=todayISO();
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Nouvelle demande</h2>
+    <div class="sub">Votre responsable reçoit la demande et vous répond ici.</div>
+    <div class="kind-seg">
+      <button class="${LF.kind==='paid'?'on':''}" onclick="lfSet('kind','paid')">Congé payé</button>
+      <button class="${LF.kind==='unavailable'?'on':''}" onclick="lfSet('kind','unavailable')">Indisponibilité</button>
+    </div>
+    <div class="one-day"><span>Une seule journée</span><button class="switch ${LF.oneDay?'on':''}" aria-pressed="${LF.oneDay}" onclick="lfSet('oneDay',${!LF.oneDay})"></button></div>
+    <div class="dates ${LF.oneDay?'one':''}">
+      <div><label class="fl" for="lf-from">${LF.oneDay?'Date':'Du'}</label><input class="finp" type="date" id="lf-from" min="${t}" value="${esc(LF.from)}" onchange="lfSet('from',this.value)"></div>
+      ${LF.oneDay? '' : `<div><label class="fl" for="lf-to">Au (inclus)</label><input class="finp" type="date" id="lf-to" min="${esc(LF.from||t)}" value="${esc(LF.to)}" onchange="lfSet('to',this.value)"></div>`}
+    </div>
+    <label class="fl" for="lf-reason">Motif ${LF.kind==='paid'?'(facultatif)':'(conseillé)'}</label>
+    <textarea class="finp" id="lf-reason" maxlength="300" placeholder="${LF.kind==='paid'?'Ex. vacances en famille':'Ex. rendez-vous médical, formation…'}" oninput="LF.reason=this.value">${esc(LF.reason)}</textarea>
+    ${lfSummary()}
+    ${errMsg? `<div class="req-err">${esc(errMsg)}</div>` : ''}
+    <button class="btn btn-red btn-block" id="lf-btn" style="margin-top:16px" onclick="submitLeave()">Envoyer la demande</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+async function submitLeave(){
+  const t=todayISO();
+  if(!LF.from || !LF.to) return renderLeaveForm('Choisissez la date'+(LF.oneDay?'':'s')+' de votre demande.');
+  if(LF.from<t) return renderLeaveForm('La date de début ne peut pas être dans le passé.');
+  if(LF.to<LF.from) return renderLeaveForm('La date de fin doit être après la date de début.');
+  if(LF.kind==='paid' && !weekdaysBetween(LF.from,LF.to)) return renderLeaveForm('Un congé payé doit contenir au moins un jour ouvré.');
+  const btn=$('lf-btn'); btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    await opsRpc('rdz_planning_pilot_request_absence', { p_agent_id:String(AGENT.id), p_kind:LF.kind, p_from:LF.from, p_to:LF.to, p_reason:(LF.reason||'').trim() });
+    closeSheet(); toast('Demande envoyée à votre responsable');
+    await reload(false);
+  }catch(e){ renderLeaveForm(e.message||'Envoi impossible'); }
+}
+function askCancelAbsence(id){
+  const a=ABS.list.find(x=>x.id===id); if(!a) return;
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Annuler cette demande ?</h2>
+    <div class="sub">${esc(ABS_KIND[a.kind]||'Absence')} · ${esc(absPeriod(a))}</div>
+    <button class="btn btn-red btn-block" id="ca-btn" onclick="doCancelAbsence('${esc(id)}')">Oui, annuler la demande</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Garder la demande</button>
+  </div></div>`;
+}
+async function doCancelAbsence(id){
+  const btn=$('ca-btn'); btn.disabled=true; btn.textContent='Annulation…';
+  try{
+    const ok = await opsRpc('rdz_planning_pilot_cancel_absence', { p_agent_id:String(AGENT.id), p_id:id });
+    closeSheet(); toast(ok? 'Demande annulée' : 'Cette demande a déjà été traitée', !ok);
+  }catch(e){ closeSheet(); toast(e.message||'Annulation impossible', true); }
+  await reload(false);
 }
 
 // ── Journal des modifications ────────────────────────────────
@@ -671,7 +840,9 @@ function shiftRow(s){
 }
 function renderPlanning(){
   const now=new Date(), up=VIEW.planMode==='upcoming', t=todayISO();
-  const list = SHIFTS.filter(s=> up? sEnd(s)>now : sEnd(s)<=now).sort((a,b)=> up? sStart(a)-sStart(b) : sStart(b)-sStart(a));
+  const shiftItems = SHIFTS.filter(s=> up? sEnd(s)>now : sEnd(s)<=now).map(s=>({ date:s.date, key:sStart(s).getTime(), html:shiftRow(s) }));
+  const absItems = ABS.list.filter(a=>a.status==='Acceptée' && (up? a.to>=t : a.to<t)).map(a=>({ date:a.from, key:new Date(a.from+'T00:00:00').getTime(), html:absenceRow(a) }));
+  const list = shiftItems.concat(absItems).sort((a,b)=> up? a.key-b.key : b.key-a.key);
   const ym=t.slice(0,7), month=SHIFTS.filter(s=>s.date.slice(0,7)===ym), mins=month.reduce((n,s)=>n+paidMinutes(s),0);
   let h = `<div class="seg">
       <button class="${up?'on':''}" onclick="setPlanMode('upcoming')">À venir</button>
@@ -690,7 +861,7 @@ function renderPlanning(){
         : 'Semaine du '+new Date(wk+'T12:00:00').toLocaleDateString('fr-CH',{day:'numeric',month:'long'});
       h += `<div class="wk">${esc(lbl)}</div>`;
     }
-    h += shiftRow(s);
+    h += s.html;
   });
   return h;
 }
