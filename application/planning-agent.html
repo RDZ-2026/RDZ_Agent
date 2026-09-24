@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v7 · 2026-09-24 · + heures pré-remplies automatiquement -->
+<!-- RDZ · planning-agent (pilote) · v8 · 2026-09-24 · + heures validées reportées au planning -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -381,7 +381,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v7 · 24.09.2026';
+const APP_VERSION = 'v8 · 24.09.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -528,6 +528,7 @@ function mapShift(r){
     seen:r.seen_at||'', siteName:r.site_name||'Site', siteAddress:r.site_address||'',
     refusal: r.refusal? { reason:r.refusal.reason||'', at:r.refusal.at } : null,
     reason:r.reason||'', checked:r.checked_at||'',
+    plannedStart:r.planned_start||'', plannedEnd:r.planned_end||'',
     hoursRejection: r.hours_rejection? { note:r.hours_rejection.note||'', at:r.hours_rejection.at } : null
   };
 }
@@ -950,6 +951,7 @@ function renderDetail(s){
       <div class="d-date">${esc(fullDate(s.date))}</div>
       <div class="d-site">${I.pin}<span>${esc(s.siteName)}</span></div>
       <div class="d-line">${I.clock}<span>${esc(s.start)} – ${esc(s.end)} (${durLabel(s)})</span>${chip(s)}</div>
+      ${s.plannedStart? `<div class="d-line" style="font-size:13px;color:var(--text2);">Heures réelles validées · prévu initialement ${esc(s.plannedStart)} – ${esc(s.plannedEnd)}</div>` : ''}
       ${s.post?`<div class="d-line">${I.people}<span>${esc(s.post)}</span></div>`:''}
     </div>
     <div class="d-card">
@@ -1041,11 +1043,11 @@ function isAuto(s){ return s.status==='Effectuée' && s.reason===AUTO_REASON; }
 function toCheck(s){ return canDeclare(s) || isAuto(s); }
 function spanMin(a,b){ const [ah,am]=a.split(':').map(Number), [bh,bm]=b.split(':').map(Number); let d=(bh*60+bm)-(ah*60+am); if(d<=0) d+=1440; return d; }
 function fmtMin(m){ const neg=m<0; m=Math.abs(m); const h=Math.floor(m/60), r=m%60; return (neg?'−':'+')+(h? h+'h'+(r?pad(r):'') : r+' min'); }
-function hoursDiff(s){ if(!s.actualStart||!s.actualEnd) return 0; return spanMin(s.actualStart,s.actualEnd) - spanMin(s.start,s.end); }
+function hoursDiff(s){ if(!s.actualStart||!s.actualEnd) return 0; return spanMin(s.actualStart,s.actualEnd) - spanMin(s.plannedStart||s.start, s.plannedEnd||s.end); }
 function diffTag(m){ return m? `<span class="tp-diff ${m>0?'plus':'minus'}">${fmtMin(m)}</span>` : ''; }
 function tpRow(s, mode){
   const d=new Date(s.date+'T12:00:00');
-  const changed = s.actualStart && (s.actualStart!==s.start || s.actualEnd!==s.end);
+  const changed = s.actualStart && (s.actualStart!==(s.plannedStart||s.start) || s.actualEnd!==(s.plannedEnd||s.end));
   const real = s.actualStart? `<div class="tp-l">Réel <b>${esc(s.actualStart)}–${esc(s.actualEnd||'—')}</b> ${diffTag(hoursDiff(s))}${changed&&!hoursDiff(s)?'<span class="tp-diff plus">décalé</span>':''}</div>` : '';
   const auto = isAuto(s);
   const btn = mode==='declare'? '<span class="tp-cta">Déclarer</span>' : auto? '<span class="tp-cta">Vérifier</span>' : mode==='pending'? '<span class="tp-edit">Modifier</span>' : '';
@@ -1054,7 +1056,7 @@ function tpRow(s, mode){
     <div class="dblock"><div class="dw">${esc(d.toLocaleDateString('fr-CH',{weekday:'short'}).replace('.',''))}</div><div class="dn">${d.getDate()}</div><div class="dm">${esc(d.toLocaleDateString('fr-CH',{month:'short'}).replace('.',''))}</div></div>
     <div class="tp-lines">
       <div class="s1">${esc(s.siteName)}</div>
-      <div class="tp-l">Prévu ${esc(s.start)}–${esc(s.end)}${s.post?' · '+esc(s.post):''}</div>
+      <div class="tp-l">Prévu ${esc(s.plannedStart||s.start)}–${esc(s.plannedEnd||s.end)}${s.post?' · '+esc(s.post):''}</div>
       ${real}
       ${mode==='declare' && s.hoursRejection? `<div class="tp-rej">Refusé : « ${esc(s.hoursRejection.note)} »</div>` : ''}
       ${auto? '<div class="tp-l"><span class="chip info">Pré-rempli automatiquement</span></div>' : mode==='pending'? '<div class="tp-l"><span class="chip warn">En attente de validation</span></div>' : mode==='done'? '<div class="tp-l"><span class="chip ok">'+I.check+'Validé</span></div>' : ''}
