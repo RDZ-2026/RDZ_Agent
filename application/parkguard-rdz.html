@@ -383,9 +383,6 @@ input[type="file"]{display:none}
     <div id="db-confirm-box" style="margin-bottom:8px">
       <div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification en cours...</div></div></div>
     </div>
-    <button class="outline-btn" id="btn-force-sync" onclick="forceSync()">
-      🔄 Forcer la synchronisation
-    </button>
     <div id="rdz-photo-progress" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--gray-line,#e5e7eb);border-radius:10px"></div>
 
 
@@ -990,23 +987,14 @@ async function showEndRound() {
 }
 
 // ═══ SYNC FORCÉE ═══
-async function forceSync() {
-  const btn = document.getElementById('btn-force-sync');
-  btn.disabled = true;
-  btn.textContent = '⏳ Synchronisation en cours...';
-  if (!navigator.onLine) {
-    toast('❌ Pas de réseau disponible');
-    btn.disabled = false;
-    btn.textContent = '🔄 Forcer la synchronisation';
-    return;
-  }
+// Réessai ciblé sur les RAPPORTS (données texte de la ronde) — les photos ont leur propre
+// suivi et leurs propres boutons dans le panneau « 📷 Photos » juste en dessous.
+async function retryReports() {
+  if (!navigator.onLine) { toast('❌ Pas de réseau disponible'); return; }
   isOnline = true;
   RDZSync.flushText();
-  RDZSync.flushPhotos(true); // bouton manuel : on force aussi les photos, pas seulement le texte
   await syncPending(); // ancienne file véhicules pg_pending, laissée par précaution (voir syncPending)
   await confirmSupabaseSync();
-  btn.disabled = false;
-  btn.textContent = '🔄 Forcer la synchronisation';
 }
 
 // ═══ CONFIRMATION SUPABASE ═══
@@ -1015,7 +1003,7 @@ async function confirmSupabaseSync() {
   box.innerHTML = '<div class="db-warn"><div class="db-icon">⏳</div><div><div class="db-label" style="color:var(--amber)">Vérification dans Supabase...</div></div></div>';
 
   if (!navigator.onLine) {
-    box.innerHTML = '<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Sync impossible — retentez avec le réseau.</div></div></div>';
+    box.innerHTML = '<div class="db-err"><div class="db-icon">📵</div><div><div class="db-label" style="color:var(--red-dark)">Hors ligne</div><div class="db-sub" style="color:var(--red-dark)">Impossible de vérifier — reconnectez-vous au réseau.</div></div></div>';
     return;
   }
 
@@ -1034,13 +1022,15 @@ async function confirmSupabaseSync() {
     const expected = roundVehicles.length;
 
     if (found >= expected) {
-      box.innerHTML = '<div class="db-ok"><div class="db-icon">✅</div><div><div class="db-label" style="color:var(--green)">' + found + ' / ' + expected + ' entrées confirmées</div><div class="db-sub" style="color:var(--green)">Toutes les données sont dans Supabase.</div></div></div>';
+      box.innerHTML = '<div class="db-ok"><div class="db-icon">✅</div><div><div class="db-label" style="color:var(--green)">' + found + ' / ' + expected + ' rapport(s) enregistré(s)</div><div class="db-sub" style="color:var(--green)">Les données de la ronde sont bien sur le serveur. (Les photos ont leur propre suivi ci-dessous.)</div></div></div>';
       await runIAPipeline();
     } else {
-      box.innerHTML = '<div class="db-err"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--red-dark)">' + found + ' / ' + expected + ' entrées trouvées</div><div class="db-sub" style="color:var(--red-dark)">' + (expected - found) + ' manquante(s) — forcez la sync.</div></div></div>';
+      box.innerHTML = '<div class="db-err"><div class="db-icon">⚠️</div><div><div class="db-label" style="color:var(--red-dark)">' + found + ' / ' + expected + ' rapport(s) enregistré(s)</div><div class="db-sub" style="color:var(--red-dark)">' + (expected - found) + ' manquant(s).</div></div></div>' +
+        '<button class="outline-btn" style="margin-top:8px" onclick="retryReports()">🔄 Réessayer l\'envoi des rapports</button>';
     }
   } catch(e) {
-    box.innerHTML = '<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur</div><div class="db-sub" style="color:var(--red-dark)">' + e.message + '</div></div></div>';
+    box.innerHTML = '<div class="db-err"><div class="db-icon">❌</div><div><div class="db-label" style="color:var(--red-dark)">Erreur de vérification</div><div class="db-sub" style="color:var(--red-dark)">' + e.message + '</div></div></div>' +
+      '<button class="outline-btn" style="margin-top:8px" onclick="retryReports()">🔄 Réessayer</button>';
   }
 }
 
