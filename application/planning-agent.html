@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v5 · 2026-09-24 · + refus de service, journal complet -->
+<!-- RDZ · planning-agent (pilote) · v7 · 2026-09-24 · + heures pré-remplies automatiquement -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -24,7 +24,8 @@
     apparaissent, et seuls les services publiés (≠ "Planifiée") sont lus.
   Prérequis (routeops) : claude_migration-planning-pilote-agents.sql,
   puis -correctif-id.sql, -modifications.sql, -conges.sql,
-  -refus-journal.sql.
+  -refus-journal.sql, -temps-presence.sql,
+  -heures-auto.sql.
 -->
 <style>
 :root{
@@ -235,6 +236,25 @@ button.chg:active{background:#fafafa;}
 .chg-ic.bad{background:#fee2e2;color:#b91c1c;}
 .chg-ic.neutral{background:var(--muted-bg);color:var(--text2);}
 .chg-ic.leave{background:#ede9fe;color:#6d28d9;}
+.tp-row{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px;width:100%;text-align:left;display:flex;gap:12px;align-items:center;}
+.tp-row:active{background:#fafafa;}
+.tp-row .dblock{align-self:flex-start;}
+.tp-lines{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.tp-lines .s1{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tp-l{font-size:13px;color:var(--text2);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.tp-l b{color:var(--text);}
+.tp-diff{font-size:11.5px;font-weight:700;border-radius:6px;padding:1px 6px;}
+.tp-diff.plus{background:var(--warn-bg);color:var(--warn);}
+.tp-diff.minus{background:var(--info-bg);color:var(--info);}
+.tp-rej{font-size:12.5px;color:#b91c1c;margin-top:3px;}
+.tp-cta{font-size:12.5px;font-weight:700;color:#fff;background:var(--red);border-radius:8px;padding:7px 10px;flex:none;}
+.tp-edit{font-size:12.5px;font-weight:700;color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;flex:none;background:#fff;}
+.tp-sec{font-size:13px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:20px 2px 9px;}
+.tp-intro{font-size:13.5px;color:var(--text2);line-height:1.5;margin:-4px 2px 16px;}
+.times{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dc-plan{background:var(--bg);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.6;margin-bottom:4px;}
+.dc-plan b{font-weight:700;}
+.dc-rej{background:#fef2f2;color:#7f1d1d;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;margin-top:10px;}
 .chg-note{font-size:12.5px;color:var(--text2);margin-top:5px;font-style:italic;}
 .srow.absence{cursor:default;background:#f8fafc;border-style:dashed;}
 .fl{display:block;font-size:12.5px;font-weight:700;color:var(--text2);margin:14px 0 6px;}
@@ -332,6 +352,7 @@ textarea.finp{height:70px;padding:10px 12px;resize:none;}
   <nav class="tabbar">
     <button class="tab" data-tab="home" onclick="go('home')"></button>
     <button class="tab" data-tab="planning" onclick="go('planning')"></button>
+    <button class="tab" data-tab="temps" onclick="go('temps')"></button>
     <button class="tab" data-tab="account" onclick="go('account')"></button>
   </nav>
 </div>
@@ -360,6 +381,9 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
+const APP_VERSION = 'v7 · 24.09.2026';
+// Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
+const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
 let AGENT = null;        // fiche agents (RDZ_Agent)
 let SHIFTS = [];
@@ -502,13 +526,15 @@ function mapShift(r){
     breakMinutes:Number(r.break_minutes)||0, breakPaid:!!r.break_paid,
     actualStart:r.actual_start?hhmm(r.actual_start):'', actualEnd:r.actual_end?hhmm(r.actual_end):'',
     seen:r.seen_at||'', siteName:r.site_name||'Site', siteAddress:r.site_address||'',
-    refusal: r.refusal? { reason:r.refusal.reason||'', at:r.refusal.at } : null
+    refusal: r.refusal? { reason:r.refusal.reason||'', at:r.refusal.at } : null,
+    reason:r.reason||'', checked:r.checked_at||'',
+    hoursRejection: r.hours_rejection? { note:r.hours_rejection.note||'', at:r.hours_rejection.at } : null
   };
 }
 function enterApp(agent){
   AGENT=agent; showScreen('app');
   $('btn-refresh').innerHTML=I.refresh;
-  const tabs={ home:[I.home,'Accueil'], planning:[I.cal,'Planning'], account:[I.user,'Compte'] };
+  const tabs={ home:[I.home,'Accueil'], planning:[I.cal,'Planning'], temps:[I.clock,'Temps'], account:[I.user,'Compte'] };
   document.querySelectorAll('.tab').forEach(b=>{ const t=tabs[b.dataset.tab]; b.innerHTML=t[0]+'<span>'+t[1]+'</span>'; });
   render(); reload(false);
 }
@@ -516,6 +542,8 @@ async function reload(manual){
   if(LOADING||!AGENT) return;
   LOADING=true; $('btn-refresh').classList.add('spin');
   try{
+    // Services terminés : heures prévues reportées d'office (modifiables ensuite)
+    await opsRpc('rdz_planning_pilot_autofill', { p_agent_id:String(AGENT.id) }).catch(()=>0);
     const [rows, chg, abs] = await Promise.all([
       opsRpc('rdz_planning_pilot_shifts', { p_agent_id:String(AGENT.id) }),
       opsRpc('rdz_planning_pilot_changes', { p_agent_id:String(AGENT.id) }).catch(()=>null),
@@ -602,7 +630,8 @@ function render(){
   document.querySelectorAll('.tab').forEach(b=>{
     b.classList.toggle('on', b.dataset.tab===VIEW.tab);
     const old=b.querySelector('.tab-dot'); if(old) old.remove();
-    if(b.dataset.tab==='planning' && pending){ const d=document.createElement('span'); d.className='tab-dot'; d.textContent=pending; b.appendChild(d); }
+    const n = b.dataset.tab==='planning'? pending : b.dataset.tab==='temps'? SHIFTS.filter(toCheck).length : 0;
+    if(n){ const d=document.createElement('span'); d.className='tab-dot'; d.textContent=n; b.appendChild(d); }
   });
   const left=$('tb-left'), center=$('tb-center');
   if(VIEW.detail){
@@ -614,9 +643,9 @@ function render(){
   left.innerHTML='';
   center.innerHTML = VIEW.tab==='home'
     ? '<div class="logo" role="img" aria-label="RDZ Security Management"></div>'
-    : `<span class="tb-title">${VIEW.tab==='planning'?'Mon planning':'Mon compte'}</span>`;
+    : `<span class="tb-title">${VIEW.tab==='planning'?'Mon planning':VIEW.tab==='temps'?'Temps &amp; présence':'Mon compte'}</span>`;
   if(!LAST_LOAD && VIEW.tab!=='account'){ $('main').innerHTML='<div class="loader">Chargement de votre planning…</div>'; return; }
-  $('main').innerHTML = VIEW.tab==='home'? renderHome() : VIEW.tab==='planning'? renderPlanning() : renderAccount();
+  $('main').innerHTML = VIEW.tab==='home'? renderHome() : VIEW.tab==='planning'? renderPlanning() : VIEW.tab==='temps'? renderTemps() : renderAccount();
 }
 
 function renderHome(){
@@ -647,6 +676,8 @@ function renderHome(){
     </div>
   </div>`;
   }
+  const toDecl = SHIFTS.filter(toCheck).length;
+  if(toDecl) h += `<div class="validate-bar"><span>${toDecl} service${toDecl>1?'s':''} terminé${toDecl>1?'s':''} : vérifiez vos heures</span><button class="btn btn-red btn-sm" onclick="go('temps')">Vérifier</button></div>`;
   h += renderStats(up);
   h += renderLeaveCard();
   h += renderChangesBlock();
@@ -813,10 +844,15 @@ const CHG_META = {
   conge_accepte: { t:'Demande acceptée',            ic:'check', cls:'ok' },
   conge_refuse:  { t:'Demande refusée',             ic:'xmark', cls:'bad' },
   conge_annule:  { t:'Demande annulée',             ic:'minus', cls:'neutral' },
-  conge_retire:  { t:'Congé retiré',                ic:'minus', cls:'del' }
+  conge_retire:  { t:'Congé retiré',                ic:'minus', cls:'del' },
+  heures_declarees:{ t:'Heures déclarées',          ic:'clock', cls:'leave' },
+  heures_auto:     { t:'Heures enregistrées automatiquement', ic:'clock', cls:'neutral', sub:'Vérifiez-les dans Temps & présence et corrigez-les si besoin.' },
+  heures_validees: { t:'Heures validées',           ic:'check', cls:'ok' },
+  heures_refusees: { t:'Heures refusées',           ic:'xmark', cls:'bad', sub:'Merci de déclarer à nouveau vos heures.' },
+  heures_corrigees:{ t:'Heures corrigées par votre responsable', ic:'edit', cls:'mod' }
 };
 // Actions faites par l'agent lui-même : jamais signalées comme « nouvelles »
-const OWN_ACTIONS = new Set(['validation','refus','conge_demande','conge_annule']);
+const OWN_ACTIONS = new Set(['validation','refus','conge_demande','conge_annule','heures_declarees','heures_auto']);
 function changeDetails(d){
   const L=[];
   const pair=(k,x,f)=>{ if(d[k]) L.push(`${k==='horaires'?'Horaires':k==='date'?'Date':k==='site'?'Site':k==='poste'?'Poste':'Pause'} : ${esc(f(d[k].avant))} → <b>${esc(f(d[k].apres))}</b>`); };
@@ -828,6 +864,12 @@ function changeDetails(d){
   pair('pause',0,v=>(Number(v)||0)+' min');
   if(d.consignes) L.push('Consignes mises à jour');
   return L.length? `<div class="chg-d">${L.join('<br>')}</div>` : '';
+}
+function hoursDetails(c){
+  const d=c.details||{};
+  if(c.kind==='heures_corrigees' && d.avant) return `<div class="chg-d">Déclaré : ${esc(d.avant)} → <b>${esc(d.apres||'')}</b></div>`;
+  if(d.reel && String(c.kind).startsWith('heures_') && c.kind!=='heures_auto') return `<div class="chg-d">${d.correction?'Déclaration corrigée · ':''}Réel : <b>${esc(d.reel)}</b> (prévu ${esc(c.start)}–${esc(c.end)})</div>`;
+  return '';
 }
 function changeRow(c){
   const m=CHG_META[c.kind]||CHG_META.modification;
@@ -842,7 +884,7 @@ function changeRow(c){
     <div class="chg-body">
       <div class="chg-top"><span class="chg-t">${UNREAD.has(c.id)?'<span class="chg-new"></span>':''}${m.t}</span><span class="chg-at">${esc(relTime(c.at))}</span></div>
       <div class="chg-s">${sub}</div>
-      ${c.kind==='modification'? changeDetails(c.details) : ''}
+      ${c.kind==='modification'? changeDetails(c.details) : hoursDetails(c)}
       ${m.sub? `<div class="chg-note">${esc(m.sub)}</div>` : ''}
       ${c.note? `<div class="chg-note">« ${esc(c.note)} »</div>` : ''}
     </div>
@@ -915,7 +957,7 @@ function renderDetail(s){
       ${!ended?`<div class="d-item">${I.run}<div><div class="k">Arrivée conseillée</div><div class="v">${esc(minusMinutes(s.start,ARRIVAL_ADVANCE_MIN))}</div></div></div>`:''}
       ${s.breakMinutes?`<div class="d-item">${I.coffee}<div><div class="k">Pause</div><div class="v">${s.breakMinutes} min${s.breakPaid?' (payée)':' (non payée)'}</div></div></div>`:''}
       <div class="d-item">${I.doc}<div><div class="k">Consignes</div><div class="v">${s.description?esc(s.description):'Aucune consigne particulière pour ce service.'}</div></div></div>
-      ${s.actualStart?`<div class="d-item">${I.clock}<div><div class="k">Heures déclarées</div><div class="v">${esc(s.actualStart)} – ${esc(s.actualEnd||'—')}</div></div></div>`:''}
+      ${s.actualStart?`<div class="d-item">${I.clock}<div><div class="k">Heures déclarées</div><div class="v">${esc(s.actualStart)} – ${esc(s.actualEnd||'—')}${s.reason===AUTO_REASON? '\n(pré-remplies automatiquement)' : s.reason? '\nMotif : '+esc(s.reason) : ''}</div></div></div>`:''}
     </div>
     ${s.siteAddress?`<a class="btn btn-outline btn-block" href="${esc(mapsUrl(s.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}
     ${needsConfirm(s)
@@ -927,7 +969,10 @@ function renderDetail(s){
       : (s.refusal && isOpen(s))
         ? `<div class="refused-banner"><b>Vous avez refusé ce service</b>Motif : « ${esc(s.refusal.reason)} »<br>Votre responsable a été prévenu et va revenir vers vous.
              <button class="btn btn-outline btn-block btn-sm" onclick="askConfirm('${esc(s.id)}')">Finalement, je peux l’assurer</button></div>`
-        : (s.status==='Validée' && !ended? `<div class="done-banner">${I.checkC}<span>Vous avez validé ce service</span></div>` : '')}`;
+        : (s.status==='Validée' && !ended? `<div class="done-banner">${I.checkC}<span>Vous avez validé ce service</span></div>` : '')}
+    ${canDeclare(s)? `<button class="btn btn-red btn-block" style="margin-top:10px" onclick="openDeclare('${esc(s.id)}')">Déclarer mes heures</button>` : ''}
+    ${isAuto(s)? `<button class="btn btn-red btn-block" style="margin-top:10px" onclick="openDeclare('${esc(s.id)}')">Vérifier mes heures</button><div class="d-note">Heures prévues enregistrées automatiquement : confirmez-les ou corrigez-les.</div>`
+      : isPendingHours(s)? `<button class="btn btn-outline btn-block" style="margin-top:10px" onclick="openDeclare('${esc(s.id)}')">Modifier mes heures</button><div class="d-note">Heures en attente de validation par votre responsable.</div>` : ''}`;
 }
 
 // ── Validation (un service ou tous ceux en attente) ──────────
@@ -988,6 +1033,108 @@ async function doConfirm(id){
   }catch(e){ closeSheet(); toast(e.message||'Validation impossible', true); }
   await reload(false);
 }
+// ── Temps & présence ─────────────────────────────────────────
+// À déclarer : service terminé, pas encore déclaré, non refusé par l'agent.
+function canDeclare(s){ return ['Publiée','Vue','Validée'].includes(s.status) && !s.refusal && sEnd(s)<=new Date(); }
+function isPendingHours(s){ return s.status==='Effectuée'; }
+function isAuto(s){ return s.status==='Effectuée' && s.reason===AUTO_REASON; }
+function toCheck(s){ return canDeclare(s) || isAuto(s); }
+function spanMin(a,b){ const [ah,am]=a.split(':').map(Number), [bh,bm]=b.split(':').map(Number); let d=(bh*60+bm)-(ah*60+am); if(d<=0) d+=1440; return d; }
+function fmtMin(m){ const neg=m<0; m=Math.abs(m); const h=Math.floor(m/60), r=m%60; return (neg?'−':'+')+(h? h+'h'+(r?pad(r):'') : r+' min'); }
+function hoursDiff(s){ if(!s.actualStart||!s.actualEnd) return 0; return spanMin(s.actualStart,s.actualEnd) - spanMin(s.start,s.end); }
+function diffTag(m){ return m? `<span class="tp-diff ${m>0?'plus':'minus'}">${fmtMin(m)}</span>` : ''; }
+function tpRow(s, mode){
+  const d=new Date(s.date+'T12:00:00');
+  const changed = s.actualStart && (s.actualStart!==s.start || s.actualEnd!==s.end);
+  const real = s.actualStart? `<div class="tp-l">Réel <b>${esc(s.actualStart)}–${esc(s.actualEnd||'—')}</b> ${diffTag(hoursDiff(s))}${changed&&!hoursDiff(s)?'<span class="tp-diff plus">décalé</span>':''}</div>` : '';
+  const auto = isAuto(s);
+  const btn = mode==='declare'? '<span class="tp-cta">Déclarer</span>' : auto? '<span class="tp-cta">Vérifier</span>' : mode==='pending'? '<span class="tp-edit">Modifier</span>' : '';
+  const click = mode==='done'? `openShift('${esc(s.id)}')` : `openDeclare('${esc(s.id)}')`;
+  return `<button class="tp-row" onclick="${click}">
+    <div class="dblock"><div class="dw">${esc(d.toLocaleDateString('fr-CH',{weekday:'short'}).replace('.',''))}</div><div class="dn">${d.getDate()}</div><div class="dm">${esc(d.toLocaleDateString('fr-CH',{month:'short'}).replace('.',''))}</div></div>
+    <div class="tp-lines">
+      <div class="s1">${esc(s.siteName)}</div>
+      <div class="tp-l">Prévu ${esc(s.start)}–${esc(s.end)}${s.post?' · '+esc(s.post):''}</div>
+      ${real}
+      ${mode==='declare' && s.hoursRejection? `<div class="tp-rej">Refusé : « ${esc(s.hoursRejection.note)} »</div>` : ''}
+      ${auto? '<div class="tp-l"><span class="chip info">Pré-rempli automatiquement</span></div>' : mode==='pending'? '<div class="tp-l"><span class="chip warn">En attente de validation</span></div>' : mode==='done'? '<div class="tp-l"><span class="chip ok">'+I.check+'Validé</span></div>' : ''}
+    </div>
+    ${btn}
+  </button>`;
+}
+function renderTemps(){
+  const byDateDesc=(a,b)=>sStart(b)-sStart(a);
+  const toDecl = SHIFTS.filter(toCheck).sort((a,b)=>sStart(a)-sStart(b));
+  const pending = SHIFTS.filter(s=>isPendingHours(s) && !isAuto(s)).sort(byDateDesc);
+  const done = SHIFTS.filter(s=>s.status==='Contrôlée').sort(byDateDesc);
+  const ym=todayISO().slice(0,7);
+  const monthMin = done.filter(s=>s.date.slice(0,7)===ym).reduce((n,s)=>n+(s.actualStart&&s.actualEnd? spanMin(s.actualStart,s.actualEnd) : spanMin(s.start,s.end)) - ((s.breakMinutes&&!s.breakPaid)?s.breakMinutes:0),0);
+  let h = `<div class="tp-intro">À la fin de chaque service, vos heures prévues sont enregistrées automatiquement. Vérifiez-les et modifiez-les si besoin : votre responsable les valide ensuite.</div>
+    <div class="stats">
+      <div class="stat ${toDecl.length?'alert':''}"><span class="n">${toDecl.length}</span><span class="l">À vérifier</span></div>
+      <div class="stat"><span class="n">${pending.length}</span><span class="l">En attente</span></div>
+      <div class="stat"><span class="n">${Math.floor(monthMin/60)}h${monthMin%60?pad(monthMin%60):''}</span><span class="l">Validées ce mois</span></div>
+    </div>`;
+  if(toDecl.length) h += '<div class="tp-sec">À vérifier</div>'+toDecl.map(s=>tpRow(s, isAuto(s)?'pending':'declare')).join('');
+  if(pending.length) h += '<div class="tp-sec">En attente de validation</div>'+pending.map(s=>tpRow(s,'pending')).join('');
+  if(done.length) h += '<div class="tp-sec">Validées</div>'+done.slice(0,30).map(s=>tpRow(s,'done')).join('');
+  if(!toDecl.length && !pending.length && !done.length) h += '<div class="empty"><b>Aucun service effectué</b>Vos services terminés apparaîtront ici pour que vous puissiez déclarer vos heures.</div>';
+  return h;
+}
+
+// Déclaration des heures
+let DC = { id:null, mode:'conforme', start:'', end:'', reason:'' };
+function openDeclare(id){
+  const s=SHIFTS.find(x=>x.id===id); if(!s) return;
+  const edited = s.actualStart && (s.actualStart!==s.start || s.actualEnd!==s.end);
+  DC = { id, mode: edited? 'autre':'conforme', start:s.actualStart||s.start, end:s.actualEnd||s.end, reason: edited? (s.reason||'') : '' };
+  renderDeclare();
+}
+function dcSet(k,v){ DC[k]=v; renderDeclare(); }
+function renderDeclare(err){
+  const s=SHIFTS.find(x=>x.id===DC.id); if(!s) return closeSheet();
+  const other = DC.mode==='autre';
+  const diff = other && DC.start && DC.end ? spanMin(DC.start,DC.end)-spanMin(s.start,s.end) : 0;
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>${isAuto(s)?'Vérifier mes heures':s.status==='Effectuée'?'Modifier ma déclaration':'Déclarer mes heures'}</h2>
+    ${isAuto(s)? '<div class="sub">Vos heures prévues ont été enregistrées automatiquement à la fin du service. Confirmez-les ou corrigez-les.</div>' : ''}
+    <div class="dc-plan"><b>${esc(s.siteName)}</b>${s.post?' · '+esc(s.post):''}<br>${esc(cap(fullDate(s.date)))}<br>Prévu : <b>${esc(s.start)} – ${esc(s.end)}</b> (${durLabel(s)})</div>
+    ${s.hoursRejection? `<div class="dc-rej"><b>Déclaration refusée par votre responsable</b><br>« ${esc(s.hoursRejection.note)} »</div>` : ''}
+    <label class="fl">Mes heures réelles</label>
+    <div class="kind-seg">
+      <button class="${other?'':'on'}" onclick="dcSet('mode','conforme')">${isAuto(s)?'Oui, c’est correct':'Conformes au planning'}</button>
+      <button class="${other?'on':''}" onclick="dcSet('mode','autre')">Différentes</button>
+    </div>
+    ${other? `<div class="times">
+        <div><label class="fl" for="dc-s">Début réel</label><input class="finp" type="time" id="dc-s" value="${esc(DC.start)}" onchange="dcSet('start',this.value)"></div>
+        <div><label class="fl" for="dc-e">Fin réelle</label><input class="finp" type="time" id="dc-e" value="${esc(DC.end)}" onchange="dcSet('end',this.value)"></div>
+      </div>
+      <div class="req-sum ${diff?'warn':''}">Durée réelle : <b>${DC.start&&DC.end? (()=>{const m=spanMin(DC.start,DC.end);return Math.floor(m/60)+'h'+(m%60?pad(m%60):'');})() : '—'}</b>${diff? ' · écart '+fmtMin(diff)+' par rapport au planning' : ''}</div>
+      <label class="fl" for="dc-r">Motif (obligatoire)</label>
+      <textarea class="finp" id="dc-r" maxlength="250" placeholder="Ex. relève arrivée en retard, intervention en fin de service…" oninput="DC.reason=this.value">${esc(DC.reason)}</textarea>` : ''}
+    <div class="req-sum">${other? 'Votre responsable devra valider ces heures.' : 'Vous confirmez avoir effectué ce service aux horaires prévus.'}</div>
+    ${err? `<div class="req-err">${esc(err)}</div>` : ''}
+    <button class="btn btn-red btn-block" id="dc-btn" style="margin-top:16px" onclick="submitDeclare()">Envoyer</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+async function submitDeclare(){
+  const s=SHIFTS.find(x=>x.id===DC.id); if(!s) return closeSheet();
+  let start=s.start, end=s.end, reason='';
+  if(DC.mode==='autre'){
+    start=DC.start; end=DC.end; reason=(DC.reason||'').trim();
+    if(!/^\d{2}:\d{2}$/.test(start||'') || !/^\d{2}:\d{2}$/.test(end||'')) return renderDeclare('Renseignez l’heure de début et de fin.');
+    if(start===s.start && end===s.end) return renderDeclare('Ces heures sont identiques au planning : choisissez « Conformes au planning ».');
+    if(reason.length<3) return renderDeclare('Indiquez pourquoi vos heures diffèrent du planning.');
+  }
+  const btn=$('dc-btn'); btn.disabled=true; btn.textContent='Envoi…';
+  try{
+    await opsRpc('rdz_planning_pilot_declare_hours', { p_agent_id:String(AGENT.id), p_shift_id:s.id, p_start:start, p_end:end, p_reason:reason });
+    closeSheet(); toast(DC.mode==='autre'? 'Heures envoyées à votre responsable' : 'Heures confirmées');
+  }catch(e){ return renderDeclare(e.message||'Envoi impossible'); }
+  await reload(false);
+}
+
 function renderAccount(){
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
   return `<div class="acc-card"><div class="acc-name">${esc(fullName(AGENT))}</div><span class="badge-test">Pilote planning agent</span></div>
@@ -995,7 +1142,8 @@ function renderAccount(){
       ? '<ol><li>Ouvrez cette page dans Safari.</li><li>Touchez le bouton Partager.</li><li>Choisissez « Sur l’écran d’accueil ».</li></ol>'
       : '<ol><li>Ouvrez cette page dans Chrome.</li><li>Touchez le menu ⋮ en haut à droite.</li><li>Choisissez « Ajouter à l’écran d’accueil ».</li></ol>'}</div>
     <div class="acc-card"><h3>À savoir</h3><p>Seuls les services publiés par votre responsable apparaissent ici. Votre code PIN est le même que dans l’application RDZ Agent.</p></div>
-    <button class="btn btn-outline btn-block" onclick="logout()">Changer d’agent</button>`;
+    <button class="btn btn-outline btn-block" onclick="logout()">Changer d’agent</button>
+    <div style="text-align:center;font-size:11.5px;color:var(--text3);margin-top:14px;">Version ${APP_VERSION}</div>`;
 }
 
 // ── Démarrage (même logique que mobile.html) ─────────────────
