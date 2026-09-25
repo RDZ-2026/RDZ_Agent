@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v8 · 2026-09-24 · + heures validées reportées au planning -->
+<!-- RDZ · planning-agent (pilote) · v9 · 2026-09-24 · + export PDF du planning mensuel -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -236,6 +236,15 @@ button.chg:active{background:#fafafa;}
 .chg-ic.bad{background:#fee2e2;color:#b91c1c;}
 .chg-ic.neutral{background:var(--muted-bg);color:var(--text2);}
 .chg-ic.leave{background:#ede9fe;color:#6d28d9;}
+.pdf-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-4px 2px 14px;}
+.pdf-bar .month-sum{margin:0;}
+.btn-pdf{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:9px;border:1.5px solid var(--line);background:#fff;font-size:13px;font-weight:700;color:var(--ink);flex:none;}
+.btn-pdf svg{width:16px;height:16px;}
+.months{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.months button{border:1.5px solid var(--line);border-radius:11px;padding:10px 6px;font-weight:700;font-size:13.5px;background:#fff;text-transform:capitalize;}
+.months button small{display:block;font-weight:500;font-size:11.5px;color:var(--text2);margin-top:2px;text-transform:none;}
+.months button.on{border-color:var(--ink);background:var(--ink);color:#fff;}
+.months button.on small{color:rgba(255,255,255,.75);}
 .tp-row{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px;width:100%;text-align:left;display:flex;gap:12px;align-items:center;}
 .tp-row:active{background:#fafafa;}
 .tp-row .dblock{align-self:flex-start;}
@@ -381,7 +390,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v8 · 24.09.2026';
+const APP_VERSION = 'v9 · 24.09.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -412,6 +421,7 @@ const I = {
   minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/></svg>',
   xmark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  pdf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5 12 17l2.5-2.5"/></svg>',
   send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>',
   checkC:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.4-5.4 1.4 1.4z"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
@@ -927,7 +937,8 @@ function renderPlanning(){
       <button class="${up?'on':''}" onclick="setPlanMode('upcoming')">À venir</button>
       <button class="${up?'':'on'}" onclick="setPlanMode('past')">Passés</button>
     </div>
-    <div class="month-sum">${cap(new Date(t+'T12:00:00').toLocaleDateString('fr-CH',{month:'long'}))} : ${month.length} service${month.length>1?'s':''} · ${Math.floor(mins/60)}h${pad(mins%60)}</div>`;
+    <div class="pdf-bar"><div class="month-sum">${cap(new Date(t+'T12:00:00').toLocaleDateString('fr-CH',{month:'long'}))} : ${month.length} service${month.length>1?'s':''} · ${Math.floor(mins/60)}h${pad(mins%60)}</div>
+      <button class="btn-pdf" onclick="openPdfExport()">${I.pdf}PDF</button></div>`;
   const pending = SHIFTS.filter(needsConfirm);
   if(up && pending.length) h += `<div class="validate-bar"><span>${pending.length} service${pending.length>1?'s':''} à valider</span><button class="btn btn-red btn-sm" onclick="askConfirm(null)">Tout valider</button></div>`;
   if(!list.length) return h+`<div class="empty"><b>${up?'Aucun service à venir':'Aucun service passé'}</b>${up?'Votre planning n’a pas encore été publié pour la période à venir.':'Les services des '+HISTORY_DAYS+' derniers jours s’affichent ici.'}</div>`;
@@ -1135,6 +1146,182 @@ async function submitDeclare(){
     closeSheet(); toast(DC.mode==='autre'? 'Heures envoyées à votre responsable' : 'Heures confirmées');
   }catch(e){ return renderDeclare(e.message||'Envoi impossible'); }
   await reload(false);
+}
+
+// ── Export PDF du planning mensuel ───────────────────────────
+// jsPDF est chargé à la demande (uniquement au premier export).
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+let PDF = { ym:'' };
+function loadJsPdf(){
+  if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  if(loadJsPdf._p) return loadJsPdf._p;
+  loadJsPdf._p = new Promise((res,rej)=>{
+    const sc=document.createElement('script'); sc.src=JSPDF_URL; sc.async=true;
+    sc.onload=()=> window.jspdf&&window.jspdf.jsPDF? res(window.jspdf.jsPDF) : rej(new Error('PDF indisponible'));
+    sc.onerror=()=>{ loadJsPdf._p=null; rej(new Error('Impossible de charger le module PDF, vérifiez votre connexion.')); };
+    document.head.appendChild(sc);
+  });
+  return loadJsPdf._p;
+}
+function monthShifts(ym){ return SHIFTS.filter(s=>s.date.slice(0,7)===ym).sort((a,b)=>sStart(a)-sStart(b)); }
+function monthLabel(ym){ return new Date(ym+'-15T12:00:00').toLocaleDateString('fr-CH',{month:'long',year:'numeric'}); }
+function openPdfExport(){
+  const t=todayISO(); PDF.ym = PDF.ym || t.slice(0,7);
+  renderPdfSheet();
+  loadJsPdf().catch(()=>{}); // préchargement
+}
+function renderPdfSheet(err){
+  const base=new Date(todayISO().slice(0,7)+'-15T12:00:00');
+  const opts=[-1,0,1].map(k=>{ const d=new Date(base); d.setMonth(d.getMonth()+k); return isoDate(d).slice(0,7); });
+  const list=monthShifts(PDF.ym), toVal=list.filter(needsConfirm).length;
+  const canShare = !!(navigator.share && navigator.canShare);
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Exporter mon planning</h2>
+    <div class="sub">Un PDF à garder sur votre téléphone ou à imprimer.</div>
+    <div class="months">${opts.map(ym=>{ const n=monthShifts(ym).length; return `<button class="${ym===PDF.ym?'on':''}" onclick="PDF.ym='${ym}';renderPdfSheet()">${esc(new Date(ym+'-15T12:00:00').toLocaleDateString('fr-CH',{month:'long'}))}<small>${n} service${n>1?'s':''}</small></button>`; }).join('')}</div>
+    ${!list.length? '<div class="req-sum warn">Aucun service publié sur ce mois.</div>'
+      : toVal? `<div class="req-sum warn">${toVal} service${toVal>1?'s':''} de ce mois ${toVal>1?'ne sont':'n’est'} pas encore validé${toVal>1?'s':''}. ${toVal>1?'Ils figureront':'Il figurera'} sur le PDF avec la mention « À valider ».</div>`
+      : '<div class="req-sum">Tous les services de ce mois sont validés.</div>'}
+    ${err? `<div class="req-err">${esc(err)}</div>` : ''}
+    <button class="btn btn-red btn-block" id="pdf-dl" style="margin-top:16px" onclick="exportPdf('download')" ${list.length?'':'disabled'}>${I.pdf}Télécharger le PDF</button>
+    ${canShare? `<button class="btn btn-outline btn-block" id="pdf-sh" onclick="exportPdf('share')" ${list.length?'':'disabled'}>${I.send}Partager / enregistrer</button>` : ''}
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Fermer</button>
+  </div></div>`;
+}
+function logoDataUrl(){
+  const el=document.querySelector('.logo'); if(!el) return '';
+  const re=/url\(["']?(data:image\/png;base64,[^"')]+)["']?\)/;
+  let m=re.exec(getComputedStyle(el).backgroundImage||'');
+  if(!m){ const css=[...document.querySelectorAll('style')].map(x=>x.textContent).join(''); m=re.exec(css); }
+  return m? m[1] : '';
+}
+function pdfStatus(s){
+  if(s.refusal && isOpen(s)) return ['Refusé',[185,28,28]];
+  return ({ 'Publiée':['À valider',[180,83,9]], 'Vue':['À valider',[180,83,9]], 'Validée':['Validé',[21,128,61]],
+            'Effectuée':['Heures déclarées',[29,78,216]], 'Contrôlée':['Heures validées',[21,128,61]] })[s.status] || [s.status||'',[75,85,99]];
+}
+function pdfTxt(v){ return String(v==null?'':v).replace(/[’‘]/g,"'").replace(/[“”«»]/g,'"').replace(/\u202f|\u00a0/g,' '); }
+async function buildPlanningPdf(ym){
+  const jsPDF = await loadJsPdf();
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const W=210, H=297, M=12, name=fullName(AGENT);
+  const list = monthShifts(ym);
+  const abs = ABS.list.filter(a=>a.status==='Acceptée' && a.from.slice(0,7)<=ym && a.to.slice(0,7)>=ym);
+  const logo = logoDataUrl();
+  const gen = new Date().toLocaleString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const cols=[ {k:'date',t:'Date',w:24}, {k:'site',t:'Site',w:48}, {k:'post',t:'Poste',w:32}, {k:'time',t:'Horaire',w:30}, {k:'dur',t:'Durée',w:15}, {k:'st',t:'Statut',w:37} ];
+  const WD=['Dim.','Lun.','Mar.','Mer.','Jeu.','Ven.','Sam.'];
+  const dmy=iso=>iso.slice(8,10)+'.'+iso.slice(5,7);
+  const dLabel=iso=>WD[new Date(iso+'T12:00:00').getDay()]+' '+dmy(iso);
+  let y=0, page=1;
+
+  const header = (first)=>{
+    doc.setFillColor(17,28,46); doc.rect(0,0,W, first?34:18,'F');
+    if(logo){ try{ doc.addImage(logo,'PNG',M, first?8:4, first?58:32, first?18:10); }catch(e){} }
+    doc.setTextColor(255,255,255);
+    if(first){
+      doc.setFont('helvetica','bold'); doc.setFontSize(15);
+      doc.text(pdfTxt('Planning · '+cap(monthLabel(ym))), W-M, 15, {align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+      doc.text(pdfTxt(name), W-M, 22, {align:'right'});
+      y=44;
+    } else {
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+      doc.text(pdfTxt(name+' · '+cap(monthLabel(ym))), W-M, 11, {align:'right'});
+      y=26;
+    }
+    // en-têtes de colonnes
+    doc.setFillColor(243,244,246); doc.rect(M,y-5,W-2*M,7,'F');
+    doc.setTextColor(75,85,99); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    let x=M+2; cols.forEach(c=>{ doc.text(c.t, x, y); x+=c.w; });
+    y+=6;
+  };
+  const footer = ()=>{
+    doc.setDrawColor(229,231,235); doc.line(M,H-14,W-M,H-14);
+    doc.setTextColor(156,163,175); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    doc.text(pdfTxt('RDZ Security Management · document généré le '+gen+' · seuls les services publiés figurent sur ce document'), M, H-9);
+    doc.text('Page '+page, W-M, H-9, {align:'right'});
+  };
+  const ensure = (need)=>{ if(y+need > H-20){ footer(); doc.addPage(); page++; header(false); } };
+  const clip = (txt,w)=>{ txt=pdfTxt(txt); if(doc.getTextWidth(txt)<=w-2) return txt; while(txt.length>1 && doc.getTextWidth(txt+'…')>w-2) txt=txt.slice(0,-1); return txt+'…'; };
+
+  header(true);
+  // lignes : services + congés, groupés par semaine
+  const items = list.map(s=>({ kind:'shift', date:s.date, key:sStart(s).getTime(), s }))
+    .concat(abs.map(a=>({ kind:'abs', date:a.from<ym+'-01'? ym+'-01' : a.from, key:new Date((a.from<ym+'-01'? ym+'-01':a.from)+'T00:00:00').getTime(), a })))
+    .sort((p,q)=>p.key-q.key);
+  let lastWk='', zebra=false;
+  if(!items.length){ doc.setTextColor(107,114,128); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text('Aucun service publié sur ce mois.', M+2, y+4); y+=10; }
+  items.forEach(it=>{
+    const wk=mondayOf(it.date);
+    if(wk!==lastWk){
+      ensure(15); lastWk=wk; zebra=false;
+      doc.setTextColor(17,28,46); doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+      doc.text(pdfTxt('Semaine du '+new Date(wk+'T12:00:00').toLocaleDateString('fr-CH',{day:'numeric',month:'long'})), M+1, y+3.5);
+      y+=6;
+    }
+    ensure(8);
+    if(zebra){ doc.setFillColor(249,250,251); doc.rect(M,y-1,W-2*M,7,'F'); }
+    zebra=!zebra;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(17,24,39);
+    let x=M+2; const ty=y+3.6;
+    const put=(txt,c,opt)=>{ doc.text(clip(txt,c.w), x, ty, opt); x+=c.w; };
+    if(it.kind==='shift'){
+      const s=it.s, [stl,stc]=pdfStatus(s);
+      const overnight = sEnd(s).getDate()!==sStart(s).getDate();
+      put(dLabel(s.date), cols[0]);
+      doc.setFont('helvetica','bold'); put(s.siteName, cols[1]); doc.setFont('helvetica','normal');
+      put(s.post||'—', cols[2]);
+      put(s.start+' – '+s.end+(overnight?' (+1)':''), cols[3]);
+      const m=paidMinutes(s); put(Math.floor(m/60)+'h'+pad(m%60), cols[4]);
+      doc.setTextColor(...stc); doc.setFont('helvetica','bold'); put(stl, cols[5]);
+    } else {
+      const a=it.a;
+      put(a.from===a.to? dLabel(a.from) : dmy(a.from)+' au '+dmy(a.to), cols[0]);
+      doc.setTextColor(109,40,217); doc.setFont('helvetica','bold'); put(ABS_KIND[a.kind]||'Absence', cols[1]);
+      doc.setTextColor(107,114,128); doc.setFont('helvetica','normal'); put('—', cols[2]); put('—', cols[3]); put('—', cols[4]);
+      doc.setTextColor(21,128,61); doc.setFont('helvetica','bold'); put('Accepté', cols[5]);
+    }
+    y+=7;
+  });
+
+  // Récapitulatif
+  const planned=list.reduce((n,s)=>n+paidMinutes(s),0);
+  const validated=list.filter(s=>s.status==='Contrôlée').reduce((n,s)=>n+paidMinutes(s),0);
+  const toVal=list.filter(needsConfirm).length;
+  ensure(30); y+=4;
+  doc.setDrawColor(229,231,235); doc.setFillColor(243,244,246); doc.roundedRect(M,y,W-2*M,toVal?22:16,2,2,'F');
+  doc.setTextColor(17,28,46); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('Récapitulatif du mois', M+4, y+6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(55,65,81);
+  const hm=m=>Math.floor(m/60)+'h'+pad(m%60);
+  doc.text(pdfTxt(list.length+' service'+(list.length>1?'s':'')+' · '+hm(planned)+' planifiées (pauses non payées déduites) · dont '+hm(validated)+' validées'+(abs.length? ' · '+abs.length+' congé'+(abs.length>1?'s':'')+'/absence'+(abs.length>1?'s':''):'')), M+4, y+12);
+  if(toVal){ doc.setTextColor(180,83,9); doc.text(pdfTxt(toVal+' service'+(toVal>1?'s':'')+' encore à valider dans l\'application.'), M+4, y+18); }
+  y+= toVal?26:20;
+  doc.setTextColor(156,163,175); doc.setFontSize(8);
+  doc.text(pdfTxt('Le planning peut évoluer : en cas de modification, vous êtes prévenu par e-mail et dans l\'application.'), M, y+2);
+  footer();
+  const safe=pdfTxt(name).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  return { doc, filename:'Planning_RDZ_'+safe+'_'+ym+'.pdf' };
+}
+async function exportPdf(mode){
+  const btn=$(mode==='share'?'pdf-sh':'pdf-dl'); const label=btn? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.textContent='Création du PDF…'; }
+  try{
+    const { doc, filename } = await buildPlanningPdf(PDF.ym);
+    if(mode==='share'){
+      const file = new File([doc.output('blob')], filename, { type:'application/pdf' });
+      if(navigator.canShare && navigator.canShare({ files:[file] })){
+        try{ await navigator.share({ files:[file], title:'Mon planning RDZ' }); }
+        catch(e){ if(e && e.name==='AbortError'){ if(btn){ btn.disabled=false; btn.innerHTML=label; } return; } throw e; }
+      } else doc.save(filename);
+    } else {
+      doc.save(filename);
+    }
+    closeSheet(); toast('PDF prêt : '+filename);
+  }catch(e){
+    renderPdfSheet(e.message||'Création du PDF impossible');
+  }
 }
 
 function renderAccount(){
