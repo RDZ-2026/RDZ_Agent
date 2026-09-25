@@ -200,18 +200,19 @@ body{background:#dfe7ee;color:var(--ink)}
 
       <!-- Vue principale -->
       <div id="main-list">
-        <!-- Planning : lien vers le planning Agendrix (centraliste/planning-agendrix.html),
-             pas encore filtré sur l'agent connecté (vue équipe complète). -->
+        <!-- Planning : module pas encore prêt (pas de vue "mon planning" filtrée par
+             agent) — carte visible mais désactivée (même traitement que MEMO SITES
+             ci-dessous). Pour l'activer : repasser en <a href="../centraliste/planning-agendrix.html">
+             (ou vers la future page dédiée) et retirer la classe "disabled" + le badge-soon. -->
         <div class="section-h">Planning</div>
 
-        <a class="group-btn" href="../centraliste/planning-agendrix.html">
+        <div class="group-btn disabled">
           <span class="ic">📅</span>
           <span class="txt">
-            <span class="t">Mon planning</span>
+            <span class="t-row"><span class="t">Mon planning</span><span class="badge-soon">🔜 Bientôt disponible</span></span>
             <span class="d">Consultez vos services planifiés.</span>
           </span>
-          <span class="chev">›</span>
-        </a>
+        </div>
 
         <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
         <div class="section-h spaced">Vacation</div>
