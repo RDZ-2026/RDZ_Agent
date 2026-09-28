@@ -78,18 +78,51 @@ body{font-family:Arial,Helvetica,sans-serif;color:var(--black);}
 }
 .print-doc{display:none;}
 </style>
-<style id="rdz-harmonisation-2026">@media screen{
-:root{--red:#d71920;--red-d:#a90f16;--black:#172033;--anth:#111c2e;--bg:#f4f7fb;--border:#e2e8f0;--border2:#cbd5e1;--gray:#64748b;--gray3:#94a3b8;--green:#16834a;--green-l:#eaf8f0}
-html,body,.screen{background:#f4f7fb}body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#172033}
-.topbar{min-height:66px;height:auto;background:linear-gradient(135deg,#111c2e,#17263b);padding:8px 14px;gap:11px;border-bottom:3px solid #d71920;box-shadow:0 4px 18px rgba(15,23,42,.16)}
-.tb-back{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);font-size:20px}.tb-title{font-size:14px}.tb-sub{font-size:10.5px;color:#cbd5e1;margin-top:2px}
-.body{padding:15px}.ev-card{border:1px solid #e2e8f0;border-left:4px solid #d71920;border-radius:12px;padding:15px;margin-bottom:11px;box-shadow:0 5px 18px rgba(15,23,42,.055)}.ev-card:active{background:#f8fafc}.ev-day{color:#64748b;font-size:10px}.ev-title{font-size:15px}.ev-meta{color:#64748b;margin-top:5px}.state-msg{color:#94a3b8}
-.fiche-hero{background:linear-gradient(145deg,#111c2e,#1b2d46);border-radius:14px;padding:19px 17px;margin-bottom:14px;box-shadow:0 8px 22px rgba(15,23,42,.14)}.fiche-title{font-size:17px}.fiche-meta{color:#cbd5e1;margin-top:6px}
-.action-row{padding:0;gap:11px}.action-btn{border:1px solid #e2e8f0;border-radius:13px;padding:15px;box-shadow:0 5px 18px rgba(15,23,42,.05);min-height:70px}.action-btn:active{background:#f8fafc}.action-ico{width:43px;height:43px;flex:0 0 43px;border-radius:11px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:21px}.action-desc{color:#64748b}.action-progress{color:#16834a;background:#eaf8f0;border:1px solid #ccebd8;border-radius:999px;padding:5px 8px}
-.sec-title{background:#e9eef5;color:#334155;border-left:4px solid #d71920;padding:10px 14px;margin-top:14px}.chk-row{padding:13px 14px;border-bottom:1px solid #e2e8f0;gap:12px}.chk-box{width:24px;height:24px;border-color:#cbd5e1;border-radius:7px}.chk-box.on{background:#16834a;border-color:#16834a}.chk-txt{font-size:13.5px}.chk-tag{border-radius:999px;padding:2px 7px;background:#64748b}.chk-meta{color:#64748b}
-.fg{padding:0 15px;margin-top:16px}.fl{color:#64748b;margin-bottom:6px}.fi{border:1px solid #cbd5e1;border-radius:10px;padding:12px 13px;font-family:inherit;color:#172033}.fi:focus{border-color:#d71920;box-shadow:0 0 0 3px rgba(215,25,32,.10)}.fi-ta{min-height:86px}.chip{padding:12px 7px;border:1px solid #cbd5e1;border-radius:10px;color:#475569}.chip.on{border-color:#16834a;background:#eaf8f0;color:#16834a}.photo-box{height:138px;border:2px dashed #cbd5e1;border-radius:12px;background:#fff;color:#94a3b8}.btn-submit{padding:15px;background:#d71920;border-radius:11px;font-family:inherit;box-shadow:0 6px 16px rgba(215,25,32,.17)}.readonly-val{color:#475569;background:#eef2f6;border:1px solid #e2e8f0;border-radius:10px;padding:11px 12px}#toasts{top:76px}.toast{background:#111c2e;border-radius:11px}
+
+<style id="rdz-design-system-2026">
+@media screen {
+:root{
+  --red:#d71920;--red-d:#a90f16;--black:#172033;--anth:#111c2e;
+  --bg:#f4f7fb;--white:#fff;--border:#e2e8f0;--border2:#cbd5e1;
+  --gray:#64748b;--gray3:#94a3b8;--green:#16834a;--green-l:#eaf8f0;
+}
+html,body,.screen{background:var(--bg)}
+body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--black)}
+.topbar{
+  min-height:66px;height:auto;background:linear-gradient(135deg,#111c2e,#17263b);
+  padding:8px 14px;gap:11px;border-bottom:3px solid var(--red);
+  box-shadow:0 4px 18px rgba(15,23,42,.16)
+}
+.tb-back{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);font-size:20px}
+.tb-title{font-size:14px;letter-spacing:.01em}.tb-sub{font-size:10.5px;color:#cbd5e1;margin-top:2px}
+.body{padding:15px}
+.ev-card{border:1px solid var(--border);border-left:4px solid var(--red);border-radius:12px;padding:15px;margin-bottom:11px;box-shadow:0 5px 18px rgba(15,23,42,.055)}
+.ev-card:active{background:#f8fafc}.ev-day{color:#64748b;font-size:10px;margin-bottom:7px}.ev-title{font-size:15px}.ev-meta{font-size:11.5px;color:#64748b;margin-top:5px}.state-msg{color:#94a3b8}
+.fiche-hero{background:linear-gradient(145deg,#111c2e,#1b2d46);border-radius:14px;padding:19px 17px;margin-bottom:14px;box-shadow:0 8px 22px rgba(15,23,42,.14)}
+.fiche-title{font-size:17px}.fiche-meta{color:#cbd5e1;margin-top:6px}
+.action-row{padding:0;gap:11px}.action-btn{border:1px solid var(--border);border-radius:13px;padding:15px;box-shadow:0 5px 18px rgba(15,23,42,.05);min-height:70px}
+.action-btn:active{background:#f8fafc}.action-ico{width:43px;height:43px;flex:0 0 43px;border-radius:11px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:21px}
+.action-lbl{font-size:14px}.action-desc{font-size:11.5px;color:#64748b;margin-top:3px}.action-progress{color:var(--green);background:#eaf8f0;border:1px solid #ccebd8;border-radius:999px;padding:5px 8px}
+.sec-title{background:#e9eef5;color:#334155;border-left:4px solid var(--red);padding:10px 14px;margin-top:14px;font-size:10.5px}
+.chk-row{padding:13px 14px;border-bottom:1px solid var(--border);gap:12px}.chk-row:active{background:#f8fafc}
+.chk-box{width:24px;height:24px;border-color:#cbd5e1;border-radius:7px}.chk-box.on{background:var(--green);border-color:var(--green)}
+.chk-txt{font-size:13.5px}.chk-tag{border-radius:999px;padding:2px 7px;background:#64748b}.chk-meta{color:#64748b;margin-top:4px}
+.fg{padding:0 15px;margin-top:16px}.fl{font-size:10.5px;color:#64748b;margin-bottom:6px}
+.fi{border:1px solid #cbd5e1;border-radius:10px;padding:12px 13px;font-family:inherit;color:#172033;box-shadow:0 1px 2px rgba(15,23,42,.02)}
+.fi:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(215,25,32,.10)}.fi-ta{min-height:86px}
+.chip{padding:12px 7px;border:1px solid #cbd5e1;border-radius:10px;color:#475569;box-shadow:0 2px 7px rgba(15,23,42,.03)}
+.chip.on{border-color:var(--green);background:var(--green-l);color:var(--green)}
+.photo-box{height:138px;border:2px dashed #cbd5e1;border-radius:12px;background:#fff;color:#94a3b8}
+.btn-submit{padding:15px;background:var(--red);border-radius:11px;font-family:inherit;box-shadow:0 6px 16px rgba(215,25,32,.17)}
+.btn-submit:active{background:var(--red-d)}
+.readonly-val{color:#475569;background:#eef2f6;border:1px solid #e2e8f0;border-radius:10px;padding:11px 12px}
+#toasts{top:76px}.toast{background:#111c2e;border-radius:11px;box-shadow:0 8px 24px rgba(15,23,42,.25)}.toast.err{background:#b91c1c}
+#s-ods .body > div:first-child{border-bottom-color:#e2e8f0!important}
+#s-ods .action-btn{justify-content:center;min-height:auto}
 @media(max-width:390px){.topbar{padding-left:11px;padding-right:11px}.body{padding:12px}.fiche-hero{padding:16px 14px}.action-btn{padding:13px}}
-}</style>
+}
+</style>
+
 </head>
 <body>
 
@@ -373,11 +406,11 @@ function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
 function in7DaysStr(){ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); }
-// Fenêtre passée large (90 jours) : sert uniquement de garde-fou pour ne pas relire
-// tout l'historique de la table — les événements passés qui apparaissent malgré tout
-// dans cette fenêtre sont ensuite filtrés par loadEvents() pour ne garder que ceux
-// dont le rapport de fin d'événement n'est pas encore clôturé (voir plus bas).
-function pastWindowStr(){ const d=new Date(); d.setDate(d.getDate()-90); return d.toISOString().slice(0,10); }
+// Antériorité maximale (retour Laurent 2026-09-28 : pas d'événements passés
+// "ad vitam aeternam") — un événement passé sans rapport disparaît de toute
+// façon de cette liste au-delà de 15 jours, même s'il n'a toujours pas de
+// rapport clôturé.
+function pastWindowStr(){ const d=new Date(); d.setDate(d.getDate()-15); return d.toISOString().slice(0,10); }
 function toast(msg, err){
   const t = document.createElement('div');
   t.className = 'toast' + (err?' err':'');
@@ -392,11 +425,13 @@ function showScreen(id){
 
 // ─── CHARGEMENT ÉVÉNEMENTS ─────────────────────────────────────────────────
 // Retour Laurent 2026-09-28 : la page vient désormais du journal de bord (site
-// déjà sélectionné) — elle doit montrer les événements DE CE SITE, et parmi eux
-// seulement ceux qui restent pertinents pour l'agent : aujourd'hui + les 7
-// prochains jours (comme avant), PLUS les événements passés dont le rapport de
-// fin d'événement n'a pas encore été clôturé (pour ne pas les laisser filer sans
-// que personne ne s'en aperçoive). Un événement passé déjà clôturé disparaît.
+// déjà sélectionné) — elle doit montrer les événements DE CE SITE, avec une
+// vraie mission de sécurité (au moins un agent demandé — les événements
+// purement informatifs, sans agent, sont exclus), et parmi eux seulement ceux
+// qui restent pertinents pour l'agent : aujourd'hui + les 7 prochains jours
+// (comme avant), PLUS les événements passés dont le rapport de fin d'événement
+// n'a pas encore été clôturé (pour ne pas les laisser filer sans que personne
+// ne s'en aperçoive). Un événement passé déjà clôturé disparaît.
 async function loadEvents(){
   try{
     const { data: siteData } = await sb.from('sites').select('id,nom');
@@ -408,7 +443,11 @@ async function loadEvents(){
     if(SITE_ID) q = q.or('site_id.eq.'+SITE_ID+',site_id.is.null');
     const { data, error } = await q.order('date', { ascending: false }).order('heure_debut');
     if(error) throw error;
-    const all = data || [];
+    // Ne garde que les événements avec une véritable mission de sécurité (au moins
+    // un agent demandé) — retour Laurent 2026-09-28 : un événement purement
+    // informatif (nb_agents = 0 ou non renseigné) n'a rien à faire ici, il n'y a
+    // ni checklist ni rapport à produire par un agent.
+    const all = (data || []).filter(e => (e.nb_agents||0) > 0);
 
     const pastIds = all.filter(e=>e.date < todayStr()).map(e=>e.id);
     const closedIds = new Set();
