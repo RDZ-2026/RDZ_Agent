@@ -78,13 +78,25 @@ body{font-family:Arial,Helvetica,sans-serif;color:var(--black);}
 }
 .print-doc{display:none;}
 </style>
+<style id="rdz-harmonisation-2026">@media screen{
+:root{--red:#d71920;--red-d:#a90f16;--black:#172033;--anth:#111c2e;--bg:#f4f7fb;--border:#e2e8f0;--border2:#cbd5e1;--gray:#64748b;--gray3:#94a3b8;--green:#16834a;--green-l:#eaf8f0}
+html,body,.screen{background:#f4f7fb}body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#172033}
+.topbar{min-height:66px;height:auto;background:linear-gradient(135deg,#111c2e,#17263b);padding:8px 14px;gap:11px;border-bottom:3px solid #d71920;box-shadow:0 4px 18px rgba(15,23,42,.16)}
+.tb-back{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);font-size:20px}.tb-title{font-size:14px}.tb-sub{font-size:10.5px;color:#cbd5e1;margin-top:2px}
+.body{padding:15px}.ev-card{border:1px solid #e2e8f0;border-left:4px solid #d71920;border-radius:12px;padding:15px;margin-bottom:11px;box-shadow:0 5px 18px rgba(15,23,42,.055)}.ev-card:active{background:#f8fafc}.ev-day{color:#64748b;font-size:10px}.ev-title{font-size:15px}.ev-meta{color:#64748b;margin-top:5px}.state-msg{color:#94a3b8}
+.fiche-hero{background:linear-gradient(145deg,#111c2e,#1b2d46);border-radius:14px;padding:19px 17px;margin-bottom:14px;box-shadow:0 8px 22px rgba(15,23,42,.14)}.fiche-title{font-size:17px}.fiche-meta{color:#cbd5e1;margin-top:6px}
+.action-row{padding:0;gap:11px}.action-btn{border:1px solid #e2e8f0;border-radius:13px;padding:15px;box-shadow:0 5px 18px rgba(15,23,42,.05);min-height:70px}.action-btn:active{background:#f8fafc}.action-ico{width:43px;height:43px;flex:0 0 43px;border-radius:11px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:21px}.action-desc{color:#64748b}.action-progress{color:#16834a;background:#eaf8f0;border:1px solid #ccebd8;border-radius:999px;padding:5px 8px}
+.sec-title{background:#e9eef5;color:#334155;border-left:4px solid #d71920;padding:10px 14px;margin-top:14px}.chk-row{padding:13px 14px;border-bottom:1px solid #e2e8f0;gap:12px}.chk-box{width:24px;height:24px;border-color:#cbd5e1;border-radius:7px}.chk-box.on{background:#16834a;border-color:#16834a}.chk-txt{font-size:13.5px}.chk-tag{border-radius:999px;padding:2px 7px;background:#64748b}.chk-meta{color:#64748b}
+.fg{padding:0 15px;margin-top:16px}.fl{color:#64748b;margin-bottom:6px}.fi{border:1px solid #cbd5e1;border-radius:10px;padding:12px 13px;font-family:inherit;color:#172033}.fi:focus{border-color:#d71920;box-shadow:0 0 0 3px rgba(215,25,32,.10)}.fi-ta{min-height:86px}.chip{padding:12px 7px;border:1px solid #cbd5e1;border-radius:10px;color:#475569}.chip.on{border-color:#16834a;background:#eaf8f0;color:#16834a}.photo-box{height:138px;border:2px dashed #cbd5e1;border-radius:12px;background:#fff;color:#94a3b8}.btn-submit{padding:15px;background:#d71920;border-radius:11px;font-family:inherit;box-shadow:0 6px 16px rgba(215,25,32,.17)}.readonly-val{color:#475569;background:#eef2f6;border:1px solid #e2e8f0;border-radius:10px;padding:11px 12px}#toasts{top:76px}.toast{background:#111c2e;border-radius:11px}
+@media(max-width:390px){.topbar{padding-left:11px;padding-right:11px}.body{padding:12px}.fiche-hero{padding:16px 14px}.action-btn{padding:13px}}
+}</style>
 </head>
 <body>
 
 <!-- ÉCRAN 1 : SÉLECTION ÉVÉNEMENT -->
 <div class="screen" id="s-list">
   <div class="topbar">
-    <div><div class="tb-title">📅 Gestion d'événements</div><div class="tb-sub">Hier → J+7</div></div>
+    <div><div class="tb-title">📅 Gestion d'événements</div><div class="tb-sub" id="tb-sub">Hier → J+7</div></div>
   </div>
   <div class="body" id="events-list"><div class="state-msg">⏳ Chargement…</div></div>
 </div>
@@ -341,6 +353,15 @@ RDZSync.init({ client: sb });
 const AGENT_ID  = localStorage.getItem('rdz_agent_id');
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
 
+// Site présélectionné en venant du journal de bord (voir journal-de-bord.html::pickActivite,
+// qui ajoute toujours ?site_id=...&site=...&activite=... à l'adresse du module cliqué).
+// Retour Laurent 2026-09-28 : la liste d'événements doit être filtrée sur ce site plutôt
+// que de tout mélanger. Un accès direct (sans site_id dans l'URL) garde l'ancien
+// comportement : tous les sites.
+const params = new URLSearchParams(location.search);
+const SITE_ID = params.get('site_id') || null;
+const SITE_NOM = params.get('site') || null;
+
 let events = [], sites = [];
 let currentEvent = null;
 let sections = [], items = [], reponses = [];
@@ -352,6 +373,11 @@ function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
 function in7DaysStr(){ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); }
+// Fenêtre passée large (90 jours) : sert uniquement de garde-fou pour ne pas relire
+// tout l'historique de la table — les événements passés qui apparaissent malgré tout
+// dans cette fenêtre sont ensuite filtrés par loadEvents() pour ne garder que ceux
+// dont le rapport de fin d'événement n'est pas encore clôturé (voir plus bas).
+function pastWindowStr(){ const d=new Date(); d.setDate(d.getDate()-90); return d.toISOString().slice(0,10); }
 function toast(msg, err){
   const t = document.createElement('div');
   t.className = 'toast' + (err?' err':'');
@@ -364,16 +390,38 @@ function showScreen(id){
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ─── CHARGEMENT ÉVÉNEMENTS (jour + veille) ────────────────────────────────────
+// ─── CHARGEMENT ÉVÉNEMENTS ─────────────────────────────────────────────────
+// Retour Laurent 2026-09-28 : la page vient désormais du journal de bord (site
+// déjà sélectionné) — elle doit montrer les événements DE CE SITE, et parmi eux
+// seulement ceux qui restent pertinents pour l'agent : aujourd'hui + les 7
+// prochains jours (comme avant), PLUS les événements passés dont le rapport de
+// fin d'événement n'a pas encore été clôturé (pour ne pas les laisser filer sans
+// que personne ne s'en aperçoive). Un événement passé déjà clôturé disparaît.
 async function loadEvents(){
   try{
     const { data: siteData } = await sb.from('sites').select('id,nom');
     sites = siteData || [];
-    const { data, error } = await sb.from('evenements').select('*')
-      .gte('date', yesterdayStr()).lte('date', in7DaysStr())
-      .order('date', { ascending: false }).order('heure_debut');
+
+    let q = sb.from('evenements').select('*')
+      .gte('date', pastWindowStr())
+      .lte('date', in7DaysStr());
+    if(SITE_ID) q = q.or('site_id.eq.'+SITE_ID+',site_id.is.null');
+    const { data, error } = await q.order('date', { ascending: false }).order('heure_debut');
     if(error) throw error;
-    events = data || [];
+    const all = data || [];
+
+    const pastIds = all.filter(e=>e.date < todayStr()).map(e=>e.id);
+    const closedIds = new Set();
+    if(pastIds.length){
+      const { data: rap } = await sb.from('evenements_rapports').select('evenement_id,statut').in('evenement_id', pastIds);
+      (rap||[]).forEach(r=>{ if(r.statut==='cloture') closedIds.add(r.evenement_id); });
+    }
+    events = all.filter(e => e.date >= todayStr() || !closedIds.has(e.id));
+
+    document.getElementById('tb-sub').textContent = SITE_NOM
+      ? (SITE_NOM + ' · Aujourd\'hui + passés sans rapport + 7 prochains jours')
+      : 'Tous les sites · Aujourd\'hui + passés sans rapport + 7 prochains jours';
+
     renderEventsList();
   }catch(e){
     document.getElementById('events-list').innerHTML = `<div class="state-msg">Erreur de chargement.<br><small>${escHtml(e.message)}</small></div>`;
@@ -387,16 +435,22 @@ function dayLabel(dateStr){
   const d = new Date(dateStr+'T12:00:00Z');
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
   if (dateStr===tomorrow.toISOString().slice(0,10)) return 'Demain';
-  return d.toLocaleDateString('fr-CH',{weekday:'long', day:'2-digit', month:'2-digit'});
+  return d.toLocaleDateString('fr-CH',{weekday:'long', day:'2-digit', month:'2-digit', year: dateStr < yesterdayStr() ? 'numeric' : undefined});
 }
 function renderEventsList(){
   const el = document.getElementById('events-list');
-  if(!events.length){ el.innerHTML = `<div class="state-msg">Aucun événement entre hier et les 7 prochains jours.</div>`; return; }
-  el.innerHTML = events.map(e => `<div class="ev-card" onclick="openFiche('${e.id}')">
-    <div class="ev-day">${dayLabel(e.date)}</div>
+  if(!events.length){
+    el.innerHTML = `<div class="state-msg">Aucun événement aujourd'hui ni à venir${SITE_NOM ? ' sur '+escHtml(SITE_NOM) : ''}, et aucun événement passé sans rapport.</div>`;
+    return;
+  }
+  el.innerHTML = events.map(e => {
+    const overdue = e.date < todayStr();
+    return `<div class="ev-card" onclick="openFiche('${e.id}')">
+    <div class="ev-day">${dayLabel(e.date)}${overdue ? ' · <span style="color:#8B1A1A">⚠ rapport manquant</span>' : ''}</div>
     <div class="ev-title">${escHtml(e.titre)}</div>
     <div class="ev-meta">📍 ${escHtml(siteNom(e.site_id) || e.lieu || '—')} · ⏱ ${(e.heure_debut||'').slice(0,5)}${e.heure_fin ? ' → '+e.heure_fin.slice(0,5) : ''}</div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
 }
 
 // ─── FICHE ÉVÉNEMENT ───────────────────────────────────────────────────────────
