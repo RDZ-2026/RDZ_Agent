@@ -1,0 +1,747 @@
+<!-- RDZ · rapport-type-agent · v1 · 2026-09-28
+     Moteur AGENT unique et générique pour tous les types de rapports que
+     Laurent crée lui-même dans rapport-types-config.html (ex. "Création de
+     badge"). Reprend à l'identique le moteur de questions/catégories/
+     imbrication conditionnelle ("poupée russe") déjà éprouvé dans
+     alarme-rapport.html, mais paramétré par le type de rapport (passé en
+     ?type=<slug> dans l'adresse du bouton du journal de bord — voir
+     rapport-types-config.html, écran "Sites" d'un type) au lieu d'être fixé
+     sur l'alarme. Comme rapport-standard.html, écrit dans journal_entrees
+     (colonnes rapport_type_id + reponses — voir migration-rapport-types.sql)
+     plutôt que dans une table dédiée : ces rapports remontent donc
+     automatiquement dans supervision-rapports.html aux côtés des rapports
+     standards et alarme.
+     Important : ce fichier ne propose JAMAIS de liste "choisis ton type" à
+     l'agent — le type est déjà fixé par le bouton sur lequel il a cliqué
+     dans le journal de bord (le paramètre ?type= est invisible pour lui). -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Rapport</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;
+  --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 14px;color:var(--ink)}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:10px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
+.field .hint{font-size:12px;color:#999;font-weight:normal;text-transform:none;letter-spacing:0;margin-top:2px}
+.field .req{color:var(--danger);font-weight:bold}
+input[type=text],input[type=date],input[type=time],select,textarea{
+  width:100%;font-family:var(--font);font-size:15px;color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
+textarea{min-height:96px;resize:vertical;line-height:1.45}
+.row2{display:flex;gap:10px}
+.row2>*{flex:1}
+.meta-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 14px;margin-bottom:18px}
+.meta-card .mrow{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0}
+.meta-card .mrow .k{color:#888}
+.meta-card .mrow .v{font-weight:bold;color:var(--ink);text-align:right}
+.dictable{position:relative}
+.mic{position:absolute;right:6px;bottom:6px;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:7px 10px;font-size:13px;font-weight:bold;cursor:pointer}
+.mic.rec{background:#c0392b;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* Questions dynamiques */
+.q-cat-hdr{font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:var(--red);
+  margin:18px 0 10px;padding-bottom:4px;border-bottom:1px solid var(--line-soft)}
+.q-cat-hdr:first-child{margin-top:0}
+.q-nested{border-left:2px solid var(--line-soft);padding-left:12px}
+.q-choix{display:flex;flex-wrap:wrap;gap:8px}
+.q-choix button{flex:1 1 100%;min-width:0;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:13px 12px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink);line-height:1.35;text-align:left}
+.q-choix button.sel{background:var(--red);border-color:var(--red);color:#fff}
+.q-case{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:13px;cursor:pointer}
+.q-case .bx{width:26px;height:26px;border:2px solid var(--line);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff}
+.q-case.on .bx{background:var(--ok);border-color:var(--ok)}
+.q-heure-row{display:flex;gap:8px;align-items:center}
+.q-heure-row input[type=time]{flex:1}
+.q-heure-now{padding:11px 12px;border:1px solid var(--line);border-radius:var(--radius-ui);background:var(--bg-soft);font-weight:bold;font-size:13px;cursor:pointer;white-space:nowrap;color:var(--ink)}
+
+.photo-btns{display:flex;gap:10px;margin-bottom:10px}
+.photo-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px;font-size:14px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.photo-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:10px;margin-bottom:10px;display:flex;gap:10px}
+.photo-item img{width:74px;height:74px;object-fit:cover;border-radius:var(--radius-ui);flex-shrink:0;border:1px solid var(--line-soft)}
+.photo-item .pmeta{flex:1;display:flex;flex-direction:column;gap:6px}
+.photo-item .rm{background:none;border:none;color:var(--danger);font-size:12.5px;font-weight:bold;cursor:pointer;align-self:flex-start;padding:0}
+.save-bar{position:sticky;bottom:0;background:var(--bg-soft);padding:14px 0 4px;margin-top:8px}
+.btn-primary{width:100%;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:16px;font-size:16px;font-weight:bold;cursor:pointer}
+.btn-primary:active{background:var(--red-dark)}
+.confirm{text-align:center;padding:40px 20px}
+.confirm .big{font-size:52px}
+.confirm h2{font-size:19px;margin:14px 0 6px}
+.confirm p{color:#666;font-size:14px;margin-bottom:24px}
+.confirm .ci{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-ui);color:var(--red);font-weight:bold;padding:14px;width:100%;cursor:pointer;font-size:15px;margin-bottom:10px;display:block;text-decoration:none}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.warn-box{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:20px 10px}
+.guard{text-align:center;padding:50px 20px;color:#666}
+.guard a{display:inline-block;margin-top:16px;background:var(--red);color:#fff;text-decoration:none;padding:12px 18px;border-radius:var(--radius-ui);font-weight:bold}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub" id="hdr-sub">Rapport</div>
+      </div>
+      <a class="home" href="journal-de-bord.html">← Journal</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Garde : ouvert hors contexte (sans site) ou type introuvable/inactif -->
+    <section id="screen-guard" class="hidden">
+      <div class="guard">
+        <div style="font-size:40px">🧭</div>
+        <p style="margin-top:12px" id="guard-msg">Ce rapport s'ouvre depuis le <b>Journal de bord</b><br>(choix du site et de l'activité).</p>
+        <a href="journal-de-bord.html">Ouvrir le journal de bord</a>
+      </div>
+    </section>
+
+    <!-- Formulaire -->
+    <section id="screen-form" class="hidden">
+      <a class="back-btn" href="journal-de-bord.html">← Retour au journal</a>
+      <div class="screen-title" id="form-title">Rapport</div>
+
+      <div class="meta-card">
+        <div class="mrow"><span class="k">Agent</span><span class="v" id="m-agent">—</span></div>
+        <div class="mrow"><span class="k">Site</span><span class="v" id="m-site">—</span></div>
+      </div>
+
+      <div id="rapport-err"></div>
+
+      <div class="row2">
+        <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+        <div class="field"><label>Heure</label><input type="time" id="f-heure"></div>
+      </div>
+
+      <div class="field">
+        <label>Localisation précise</label>
+        <select id="f-loc"><option value="">— Choisir —</option></select>
+      </div>
+      <div class="field">
+        <label>Précision (facultatif)</label>
+        <input type="text" id="f-loc-autre" placeholder="Ex. zone 3, sous-sol, porte B2…">
+      </div>
+
+      <div id="questions-box"><div class="state-msg">Chargement des questions…</div></div>
+
+      <div class="field">
+        <label>Photos</label>
+        <div class="photo-btns">
+          <button type="button" onclick="document.getElementById('photo-camera').click()">📷 Caméra</button>
+          <button type="button" onclick="document.getElementById('photo-gallery').click()">🖼 Galerie</button>
+        </div>
+        <input type="file" id="photo-camera" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="photo-gallery" accept="image/*" style="display:none">
+        <div id="photo-list"></div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-primary" id="btn-save" onclick="closeOp()">✓ Enregistrer le rapport</button>
+      </div>
+    </section>
+
+    <!-- Confirmation -->
+    <section id="screen-done" class="hidden">
+      <div class="confirm">
+        <div class="big">✅</div>
+        <h2>Rapport enregistré</h2>
+        <p id="done-sub">Il est dans le journal de bord.</p>
+        <a class="ci" href="journal-de-bord.html" style="display:block;text-decoration:none">↩ Retour au journal</a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============================================================================
+   RDZ · rdz-sync · v4 · file d'attente hors-ligne PARTAGÉE entre tous les modules
+   (copie de référence application/rdz-sync-v4.js, collée telle quelle — voir
+   claude/instructions-projet.md)
+   ============================================================================ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var textEntry = {
+      id: uid(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uid(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+
+<script>
+/* ===================== Rapport (type personnalisé) — logique =====================
+   S'ouvre depuis journal-de-bord.html (site déjà connu, comme
+   rapport-standard.html / alarme-rapport.html) avec en plus ?type=<slug>,
+   qui détermine QUEL type de rapport (nom, icône, questions) charger —
+   voir rapport_types / rapport_categories / rapport_champs
+   (migration-rapport-types.sql) et rapport-types-config.html. Aucun choix
+   de type n'est proposé ici : si le slug ne correspond à aucun type actif,
+   on affiche l'écran "hors contexte" plutôt qu'une liste de repli. */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+RDZSync.init({ client: sb });
+
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
+const params = new URLSearchParams(location.search);
+const SITE_ID   = params.get('site_id') || '';
+const SITE_NOM  = params.get('site') || '';
+const TYPE_SLUG = params.get('type') || '';
+
+let photos = [];
+let questions = [];   // [{id, libelle, type, options, obligatoire, valeur, categorie_id, parent_id, condition_valeur}]
+let categories = [];  // rapport_categories actives de CE type
+let rapportType = null; // {id, nom, icone, slug}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nowHM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function show(id){ ['screen-guard','screen-form','screen-done'].forEach(s=>{
+  document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
+
+async function init(){
+  if(!SITE_NOM || !TYPE_SLUG){ show('screen-guard'); return; }
+  try{
+    const { data, error } = await sb.from('rapport_types').select('*').eq('slug', TYPE_SLUG).eq('actif', true).limit(1);
+    if(error) throw error;
+    rapportType = (data && data[0]) || null;
+  }catch(e){ rapportType = null; }
+  if(!rapportType){
+    document.getElementById('guard-msg').innerHTML = 'Ce type de rapport est introuvable ou n\'est plus actif.<br>Vérifie la configuration dans <b>rapport-types-config.html</b>.';
+    show('screen-guard'); return;
+  }
+  const titre = (rapportType.icone ? rapportType.icone+' ' : '') + rapportType.nom;
+  document.title = 'RDZ — ' + rapportType.nom;
+  document.getElementById('hdr-sub').textContent = rapportType.nom;
+  document.getElementById('form-title').textContent = titre;
+  document.getElementById('m-agent').textContent = AGENT_NOM;
+  document.getElementById('m-site').textContent = SITE_NOM;
+  await loadLocalisations();
+  await loadQuestions();
+  resetForm();
+  bindMics();
+  show('screen-form');
+}
+
+function resetForm(){
+  photos = []; renderPhotos();
+  document.getElementById('rapport-err').innerHTML = '';
+  const now = new Date();
+  document.getElementById('f-date').value = now.toISOString().slice(0,10);
+  document.getElementById('f-heure').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('f-loc').value = '';
+  document.getElementById('f-loc-autre').value = '';
+}
+
+async function loadLocalisations(){
+  const sel = document.getElementById('f-loc');
+  sel.innerHTML = '<option value="">— Choisir —</option>';
+  try{
+    let q = sb.from('journal_localisations').select('*').eq('actif',true);
+    q = SITE_ID ? q.or('site_id.is.null,site_id.eq.'+SITE_ID) : q.is('site_id',null);
+    const { data } = await q.order('ordre');
+    (data||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l.label; o.textContent=l.label; sel.appendChild(o); });
+  }catch(e){ /* facultatif */ }
+  const o=document.createElement('option'); o.value='__autre'; o.textContent='Autre / non listé'; sel.appendChild(o);
+}
+
+/* Questions de CE type de rapport (rapport_type_id), communes (site_id
+   null) + spécifiques à ce site le cas échéant, regroupées par catégorie
+   (référentiel propre à ce type), avec support des questions imbriquées
+   ("poupée russe" — parent_id/condition_valeur). Même moteur que
+   alarme-rapport.html, juste reciblé sur rapport_categories/rapport_champs. */
+async function loadQuestions(){
+  const box = document.getElementById('questions-box');
+  try{
+    const [{data:cats, error:catErr}, champsRes] = await Promise.all([
+      sb.from('rapport_categories').select('*').eq('rapport_type_id', rapportType.id).eq('actif', true).order('ordre'),
+      (function(){ let q = sb.from('rapport_champs').select('*').eq('rapport_type_id', rapportType.id).eq('actif',true);
+        q = SITE_ID ? q.or('site_id.is.null,site_id.eq.'+SITE_ID) : q.is('site_id',null);
+        return q.order('ordre'); })()
+    ]);
+    if(catErr) throw catErr;
+    const { data, error } = champsRes;
+    if(error) throw error;
+    categories = cats||[];
+    questions = (data||[]).map(c=>({
+      id:c.id, libelle:c.libelle, type:c.type||'texte',
+      options:Array.isArray(c.options)?c.options:[], obligatoire:!!c.obligatoire,
+      categorie_id: c.categorie_id||null, parent_id: c.parent_id||null, condition_valeur: c.condition_valeur||null,
+      valeur: c.type==='case' ? false : (c.type==='heure' ? null : '')
+    }));
+    renderQuestions();
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les questions (réseau ?).</div>'; }
+}
+
+/* ---------- Visibilité conditionnelle ("poupée russe") ---------- */
+function qById(id){ return questions.find(q=>q.id===id); }
+function conditionMet(parent, childConditionValeur){
+  if(!parent) return true;
+  if(parent.type === 'case'){
+    const want = (childConditionValeur||'oui').toLowerCase();
+    const isChecked = !!parent.valeur;
+    return want === 'non' ? !isChecked : isChecked;
+  }
+  if(parent.type === 'choix'){
+    if(!childConditionValeur) return !!parent.valeur;
+    return parent.valeur === childConditionValeur;
+  }
+  if(childConditionValeur) return String(parent.valeur||'') === childConditionValeur;
+  return !!(parent.valeur !== '' && parent.valeur != null && parent.valeur !== false);
+}
+function isVisible(q){
+  let cur = q;
+  while(cur.parent_id){
+    const parent = qById(cur.parent_id);
+    if(!parent) return true;
+    if(!conditionMet(parent, cur.condition_valeur)) return false;
+    cur = parent;
+  }
+  return true;
+}
+function depthOf(q){
+  let d=0, cur=q;
+  while(cur.parent_id && qById(cur.parent_id)){ d++; cur = qById(cur.parent_id); }
+  return d;
+}
+function buildOrderedVisibleList(){
+  const catIds = new Set(categories.map(c=>c.id));
+  const childrenOf = {};
+  questions.forEach(q=>{ if(q.parent_id) (childrenOf[q.parent_id]=childrenOf[q.parent_id]||[]).push(q); });
+  const roots = questions.filter(q=>!q.parent_id);
+  const rootsByCat = {};
+  roots.forEach(q=>{
+    const key = (q.categorie_id && catIds.has(q.categorie_id)) ? q.categorie_id : '__none';
+    (rootsByCat[key]=rootsByCat[key]||[]).push(q);
+  });
+  const out = [];
+  function walk(q, catLabel){
+    if(!isVisible(q)) return;
+    out.push({ q, catLabel });
+    (childrenOf[q.id]||[]).forEach(c=> walk(c, catLabel));
+  }
+  categories.slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(cat=>{
+    (rootsByCat[cat.id]||[]).forEach(q=> walk(q, cat.libelle));
+  });
+  (rootsByCat['__none']||[]).forEach(q=> walk(q, 'Autres questions'));
+  return out;
+}
+
+function renderQuestions(){
+  const box = document.getElementById('questions-box');
+  if(!questions.length){ box.innerHTML = ''; return; }
+  const ordered = buildOrderedVisibleList();
+  let html = ''; let lastCat = null;
+  ordered.forEach(({q,catLabel})=>{
+    if(catLabel !== lastCat){ html += `<div class="q-cat-hdr">${esc(catLabel)}</div>`; lastCat = catLabel; }
+    html += renderOneQuestion(q, depthOf(q));
+  });
+  box.innerHTML = html;
+  bindMics();
+}
+function renderOneQuestion(q, depth){
+  const req = q.obligatoire ? ' <span class="req">*</span>' : '';
+  const cls = depth ? ' q-nested' : '';
+  const style = depth ? ` style="margin-left:${(depth-1)*14}px"` : '';
+  if(q.type==='choix'){
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <div class="q-choix">${q.options.map(o=>`
+        <button type="button" class="${q.valeur===o?'sel':''}" onclick="pickChoix('${q.id}','${esc(o.replace(/'/g,"\\'"))}')">${esc(o)}</button>
+      `).join('')}</div></div>`;
+  }
+  if(q.type==='case'){
+    return `<div class="field${cls}"${style}><div class="q-case ${q.valeur?'on':''}" onclick="toggleCase('${q.id}')">
+      <div class="bx">${q.valeur?'✓':''}</div><div>${esc(q.libelle)}${req}</div>
+    </div></div>`;
+  }
+  if(q.type==='heure'){
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <div class="q-heure-row">
+        <input type="time" value="${esc(q.valeur||'')}" oninput="setQValeur('${q.id}',this.value)">
+        <button type="button" class="q-heure-now" onclick="stampHeure('${q.id}')">🕐 Maintenant</button>
+      </div></div>`;
+  }
+  if(q.type==='zone_texte'){
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <div class="dictable"><textarea placeholder="Décrivez ou dictez…" oninput="setQValeur('${q.id}',this.value)" onblur="renderQuestions()">${esc(q.valeur||'')}</textarea></div></div>`;
+  }
+  return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+    <input type="text" value="${esc(q.valeur||'')}" oninput="setQValeur('${q.id}',this.value)" onblur="renderQuestions()"></div>`;
+}
+function pickChoix(id,val){ const q=qById(id); q.valeur = q.valeur===val ? '' : val; renderQuestions(); }
+function toggleCase(id){ const q=qById(id); q.valeur = !q.valeur; renderQuestions(); }
+function stampHeure(id){ const q=qById(id); q.valeur = nowHM(); renderQuestions(); }
+function setQValeur(id,val){ const q=qById(id); if(q) q.valeur = val; }
+
+/* ---------- photos ---------- */
+function compressImage(file){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const max = 1280; let w=img.width, h=img.height;
+        if(w>max || h>max){ const r=Math.min(max/w, max/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(cv.toDataURL('image/jpeg',0.7));
+      };
+      img.onerror = ()=>resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function onPhotoPicked(input){
+  const file = input.files && input.files[0]; input.value='';
+  if(!file) return;
+  const dataUrl = await compressImage(file);
+  photos.push({ name:'photo_'+uid()+'.jpg', dataUrl, legende:'' });
+  renderPhotos();
+}
+document.getElementById('photo-camera').addEventListener('change', e=>onPhotoPicked(e.target));
+document.getElementById('photo-gallery').addEventListener('change', e=>onPhotoPicked(e.target));
+
+function renderPhotos(){
+  const box = document.getElementById('photo-list');
+  box.innerHTML = photos.map((p,i)=>`
+    <div class="photo-item">
+      <img src="${p.dataUrl}" alt="">
+      <div class="pmeta">
+        <div class="dictable">
+          <input type="text" placeholder="Légende de la photo…" value="${esc(p.legende)}" oninput="photos[${i}].legende=this.value" id="leg-${i}">
+        </div>
+        <button type="button" class="rm" onclick="removePhoto(${i})">✕ Retirer</button>
+      </div>
+    </div>`).join('');
+  bindMics();
+}
+function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
+
+/* ---------- dictée (Web Speech API, best-effort) ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognizer = null, recTargetBtn = null;
+function bindMics(){
+  document.querySelectorAll('.mic').forEach(btn=>{
+    if(btn.dataset.bound) return; btn.dataset.bound='1';
+    if(!SR){ btn.style.display='none'; return; }
+    btn.addEventListener('click', ()=>toggleDictation(btn));
+  });
+}
+function toggleDictation(btn){
+  if(!SR) return;
+  if(recognizer && recTargetBtn===btn){ recognizer.stop(); return; }
+  if(recognizer){ try{recognizer.stop();}catch(e){} }
+  const el = document.getElementById(btn.dataset.target);
+  if(!el) return;
+  recognizer = new SR(); recognizer.lang='fr-FR'; recognizer.interimResults=false; recognizer.continuous=true;
+  recTargetBtn = btn; btn.classList.add('rec'); btn.textContent='● Stop';
+  recognizer.onresult = ev=>{
+    let txt=''; for(let k=ev.resultIndex;k<ev.results.length;k++){ if(ev.results[k].isFinal) txt+=ev.results[k][0].transcript; }
+    if(txt){ el.value = (el.value ? el.value.trim()+' ' : '') + txt.trim(); el.dispatchEvent(new Event('input')); }
+  };
+  recognizer.onerror = ()=>stopDictationUI(btn);
+  recognizer.onend = ()=>stopDictationUI(btn);
+  try{ recognizer.start(); }catch(e){ stopDictationUI(btn); }
+}
+function stopDictationUI(btn){ btn.classList.remove('rec'); btn.textContent = btn.dataset.target.startsWith('leg-')?'🎤':'🎤 Dicter'; recognizer=null; recTargetBtn=null; }
+
+/* ---------- enregistrement ---------- */
+function closeOp(){
+  const err = document.getElementById('rapport-err'); err.innerHTML='';
+  const ordered = buildOrderedVisibleList();
+  const manquantes = ordered.filter(({q})=>q.obligatoire && (q.valeur===''||q.valeur==null||q.valeur===false));
+
+  if(!closeOp._confirmed && manquantes.length){
+    err.innerHTML = '<div class="warn-box"><b>Avant d\'enregistrer :</b><ul style="margin:6px 0 0 18px">'
+      + manquantes.map(({q})=>`<li>${esc(q.libelle)}</li>`).join('')
+      + '</ul><div style="margin-top:8px">Ré-appuyez sur « Enregistrer » pour confirmer quand même.</div></div>';
+    window.scrollTo(0,document.body.scrollHeight);
+    closeOp._confirmed = true;
+    return;
+  }
+
+  let loc = document.getElementById('f-loc').value;
+  if(loc==='__autre') loc='';
+
+  // reponses ne contient QUE les questions visibles au moment de
+  // l'enregistrement (même principe que alarme-rapport.html — pas de
+  // champs vides pour des questions imbriquées jamais révélées).
+  const reponses = ordered.map(({q,catLabel})=>({ champ_id:q.id, libelle:q.libelle, type:q.type, valeur:q.valeur, categorie:catLabel }));
+
+  const entreeId = uid();
+  const row = {
+    id: entreeId,
+    site_id: SITE_ID || null,
+    site_nom: SITE_NOM,
+    activite: rapportType.nom,
+    agent_nom: AGENT_NOM,
+    rapport_type_id: rapportType.id,
+    date_rapport: document.getElementById('f-date').value || null,
+    heure_rapport: document.getElementById('f-heure').value || null,
+    localisation: loc || null,
+    localisation_autre: document.getElementById('f-loc-autre').value.trim() || null,
+    reponses: JSON.stringify(reponses),
+    created_at: new Date().toISOString()
+  };
+  RDZSync.save({ module:'rapport-type-agent', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
+
+  photos.forEach(p=>{
+    RDZSync.save({
+      module:'rapport-type-agent', table:'journal_photos',
+      row:{ id:uid(), entree_id:entreeId, legende:p.legende||null, created_at:new Date().toISOString() },
+      op:'upsert', onConflict:'id',
+      bucket:'journal-photos', photoField:'url',
+      photos:[{ name:p.name, dataUrl:p.dataUrl }]
+    });
+  });
+
+  closeOp._confirmed = false;
+  document.getElementById('done-sub').textContent =
+    photos.length ? `Rapport enregistré. ${photos.length} photo(s) partiront en WiFi.` : 'Il est dans le journal de bord.';
+  show('screen-done');
+}
+
+init();
+</script>
+</body>
+</html>
