@@ -1,0 +1,819 @@
+<!-- RDZ · rapport-types-config · v1 · 2026-09-28
+     Retour Laurent : il veut pouvoir créer LUI-MÊME de nouveaux types de
+     rapports (ex. "Création de badge"), avec leurs propres questions, sans
+     passer par un développeur — et que chacun ait bien son propre bouton
+     distinct dans le journal de bord (jamais un écran "choisis ton type"
+     pour l'agent). Généralise alarme-rapport-config.html (mêmes types de
+     questions, mêmes catégories, même imbrication conditionnelle "poupée
+     russe") à un nombre illimité de types, chacun stocké dans rapport_types
+     / rapport_categories / rapport_champs (migration-rapport-types.sql).
+
+     Différence clé avec alarme-rapport-config.html : ici, un écran "Sites"
+     par type gère AUTOMATIQUEMENT le bouton du journal de bord pour ce
+     type (création/mise à jour de journal_modules + journal_activites,
+     exactement ce que journal-config.html fait manuellement pour les
+     autres modules) — Laurent n'a jamais besoin d'aller dans
+     journal-config.html pour ça. Le rapport agent lui-même est TOUJOURS
+     rapport-type-agent.html (un seul moteur pour tous les types, voir ce
+     fichier) ; ce que ce module change d'un type à l'autre, c'est le
+     paramètre ?type=<slug> de son adresse, invisible pour l'agent qui ne
+     voit que le bouton avec le nom/l'icône choisis ici.
+
+     Le "slug" (identifiant technique dans l'adresse) est généré une fois à
+     la création et n'est plus modifiable ensuite (pour ne jamais casser un
+     bouton déjà configuré) — seuls le nom/l'icône/la description restent
+     éditables, et sont automatiquement répercutés sur le bouton du journal
+     si ce type est déjà activé sur des sites. -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Créateur de rapports</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 14px;color:var(--ink)}
+.screen-hint{font-size:12.5px;color:#777;margin:-8px 0 16px;line-height:1.5}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:14px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:24px 10px}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.ok-msg{background:#eef6ef;border:1px solid #bfe3c6;color:var(--ok);border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);
+  border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;color:inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.group-btn:active{border-color:var(--red)}
+.group-btn .ic{font-size:26px;width:36px;text-align:center;flex-shrink:0}
+.group-btn .txt{flex:1;min-width:0}
+.group-btn .txt .t{font-weight:bold;font-size:15px;color:var(--ink)}
+.group-btn .txt .d{font-size:12.5px;color:#666;margin-top:3px;line-height:1.4}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:20px;flex-shrink:0}
+
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:bold;cursor:pointer;color:#555}
+.pill.on{background:var(--red);color:#fff;border-color:var(--red)}
+
+.cat-hdr{font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:var(--red);
+  margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line-soft)}
+.cat-hdr:first-child{margin-top:0}
+
+.list-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:13px 14px;margin-bottom:9px;display:flex;align-items:flex-start;gap:10px}
+.list-item .body{flex:1;min-width:0}
+.list-item .t1{font-weight:bold;font-size:14.5px;color:var(--ink)}
+.list-item .t2{font-size:12.5px;color:#666;margin-top:2px;line-height:1.5}
+.list-item .badge{display:inline-block;font-size:10.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.3px;
+  padding:2px 8px;border-radius:20px;margin-right:6px}
+.badge.texte{background:#eef2f7;color:#3b5b7a}
+.badge.zone_texte{background:#eef2f7;color:#3b5b7a}
+.badge.choix{background:#fff3d9;color:var(--warn)}
+.badge.case{background:#eaf5ec;color:#1b7a3d}
+.badge.heure{background:#eaf5ec;color:#1b7a3d}
+.badge.req{background:#fdf0f0;color:#8B1A1A}
+.badge.off{background:#f2f2f2;color:#999}
+.badge.on{background:#eaf5ec;color:#1b7a3d}
+.list-item .actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.list-item .actions .hint{white-space:nowrap;font-size:11px}
+.ibtn{background:none;border:1px solid var(--line);border-radius:var(--radius-ui);width:30px;height:30px;font-size:13px;cursor:pointer;color:var(--ink)}
+.ibtn:disabled{opacity:.3;cursor:default}
+.ibtn.danger{color:var(--danger);border-color:#eab8b8}
+
+.btn-add{width:100%;background:#fff;border:1.5px dashed var(--line);border-radius:var(--radius-section);padding:13px;
+  font-size:14px;font-weight:bold;color:var(--red);cursor:pointer;margin-bottom:16px}
+
+.panel{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px;margin-bottom:18px}
+.panel-title{font-size:14px;font-weight:bold;margin-bottom:12px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
+.field .hint{font-size:11.5px;color:#999;font-weight:normal;text-transform:none;letter-spacing:0;margin-top:3px}
+input[type=text],select,textarea{width:100%;font-family:var(--font);font-size:14.5px;color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px 11px}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:2px}
+.type-toggle{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.type-toggle button{flex:1 1 130px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.type-toggle button.sel{background:var(--red);border-color:var(--red);color:#fff}
+.opt-row{display:flex;gap:8px;margin-bottom:8px}
+.opt-row input{flex:1}
+.opt-row button{background:none;border:1px solid #eab8b8;color:var(--danger);border-radius:var(--radius-ui);padding:0 10px;cursor:pointer}
+.btn-mini{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:8px 12px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
+.form-actions{display:flex;gap:10px;margin-top:16px}
+.btn-primary{flex:1;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
+.btn-secondary{flex:1;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
+.icone-input{width:64px!important;flex-shrink:0;text-align:center}
+.row-inline{display:flex;gap:10px}
+.site-row{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:11px 12px;margin-bottom:7px}
+.site-row .nom{flex:1;font-size:14px}
+.switch{position:relative;width:44px;height:26px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.switch .sl{position:absolute;inset:0;background:#ddd;border-radius:26px;cursor:pointer;transition:.15s}
+.switch .sl:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch input:checked + .sl{background:var(--ok)}
+.switch input:checked + .sl:before{transform:translateX(18px)}
+.slug-note{font-size:11.5px;color:#999;background:var(--bg-soft);border-radius:var(--radius-ui);padding:8px 10px;margin-top:-6px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub">Créateur de rapports</div>
+      </div>
+      <a class="home" href="pilote.html">← Accueil</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ÉCRAN 0 : liste des types de rapports -->
+    <section id="s-home">
+      <div class="screen-title">Tes types de rapports</div>
+      <div class="screen-hint">Crée ici tes propres rapports (ex. « Création de badge ») : tu choisis les questions, tu décides sur quel(s) site(s) il apparaît, et le bouton se crée automatiquement dans le journal de bord — sans avoir besoin de créer un nouveau fichier.</div>
+      <div id="home-err"></div>
+      <button class="btn-add" onclick="openTypeForm(null)">➕ Créer un nouveau type de rapport</button>
+      <div id="types-list"><div class="state-msg">Chargement…</div></div>
+    </section>
+
+    <!-- ÉCRAN 1 : un type (pills Général / Catégories / Questions / Sites) -->
+    <section id="s-type" class="hidden">
+      <button class="back-btn" onclick="goHome()">← Tous les types</button>
+      <div class="screen-title" id="type-titre">—</div>
+      <div class="pills">
+        <button class="pill" data-tab="general" onclick="goTab('general')">⚙️ Général</button>
+        <button class="pill" data-tab="categories" onclick="goTab('categories')">🏷️ Catégories</button>
+        <button class="pill" data-tab="questions" onclick="goTab('questions')">❓ Questions</button>
+        <button class="pill" data-tab="sites" onclick="goTab('sites')">📍 Sites</button>
+      </div>
+
+      <!-- GÉNÉRAL -->
+      <div id="tab-general" class="tab hidden"></div>
+
+      <!-- CATÉGORIES -->
+      <div id="tab-categories" class="tab hidden">
+        <div class="screen-hint">Regroupent les questions dans le formulaire agent et dans le rapport imprimé.</div>
+        <div id="categories-err"></div>
+        <button class="btn-add" onclick="openCategoryForm(null)">➕ Ajouter une catégorie</button>
+        <div id="categories-list"><div class="state-msg">Chargement…</div></div>
+      </div>
+
+      <!-- QUESTIONS -->
+      <div id="tab-questions" class="tab hidden">
+        <div class="screen-hint">Ce que l'agent devra remplir. Une question peut n'apparaître que si une autre a reçu une certaine réponse.</div>
+        <div id="questions-err"></div>
+        <button class="btn-add" onclick="openItemForm(null)">➕ Ajouter une question</button>
+        <div id="questions-list"><div class="state-msg">Chargement…</div></div>
+      </div>
+
+      <!-- SITES -->
+      <div id="tab-sites" class="tab hidden">
+        <div class="screen-hint">Le bouton de ce rapport (nom + icône choisis dans « Général ») est déjà enregistré dans le catalogue des modules sous le nom « <b id="sites-module-nom">—</b> ». Pour choisir <b>sur quel(s) site(s)</b> il apparaît et <b>dans quel ordre</b> par rapport aux autres boutons, utilise l'écran que tu connais déjà : <b>Configuration du journal de bord</b> → « Activités par site ». Ne renomme pas ce module directement là-bas : reviens dans l'onglet « Général » pour ça, le bouton se met à jour tout seul partout où il est déjà activé.</div>
+        <div id="sites-err"></div>
+        <div class="cat-hdr">Sites où ce rapport est actuellement activé</div>
+        <div id="sites-current"><div class="state-msg">Chargement…</div></div>
+        <a href="journal-config.html" class="btn-add" style="display:block;text-align:center;text-decoration:none;margin-top:10px">→ Ouvrir Configuration du journal de bord</a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===================== Créateur de rapports — logique ===================== */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TYPE_LABELS = { texte:'Texte court', zone_texte:'Texte long', choix:'Choix (boutons)', case:'Case à cocher', heure:'Horodatage' };
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function show(id){ ['s-home','s-type'].forEach(s=>{ document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
+function slugify(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'type';
+}
+async function uniqueSlug(base){
+  let slug = slugify(base), n = 2;
+  while(true){
+    const { data } = await sb.from('rapport_types').select('id').eq('slug', slug).limit(1);
+    if(!data || !data.length) return slug;
+    slug = slugify(base) + '-' + n; n++;
+  }
+}
+
+/* ============================== ÉTAT ============================== */
+let types = [];        // rapport_types
+let currentType = null;
+let categories = [];   // rapport_categories du type courant
+let items = [];        // rapport_champs du type courant
+
+function goHome(){ currentType = null; show('s-home'); loadTypes(); }
+
+/* ============================== LISTE DES TYPES ============================== */
+async function loadTypes(){
+  const box = document.getElementById('types-list');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
+  try{
+    const { data, error } = await sb.from('rapport_types').select('*').order('ordre');
+    if(error) throw error;
+    types = data||[];
+    renderTypes();
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les types de rapports (réseau ?).</div>'; }
+}
+function renderTypes(){
+  const box = document.getElementById('types-list');
+  if(!types.length){ box.innerHTML = '<div class="state-msg">Aucun type de rapport pour l\'instant. Crée le premier ci-dessus.</div>'; return; }
+  box.innerHTML = types.map(t=>`
+    <button class="group-btn" onclick='openType(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
+      <span class="ic">${esc(t.icone||'🧩')}</span>
+      <span class="txt">
+        <span class="t">${esc(t.nom)}${t.actif?'':' <span class="badge off">Inactif</span>'}</span>
+        ${t.description ? `<span class="d">${esc(t.description)}</span>` : ''}
+      </span>
+      <span class="chev">›</span>
+    </button>`).join('');
+}
+
+function openTypeForm(t){
+  const editing = !!t;
+  const html = `<div class="panel">
+    <div class="panel-title">${editing?'Modifier':'Nouveau'} type de rapport</div>
+    <div class="row-inline">
+      <div class="field icone-input"><label>Icône</label><input type="text" id="tf-icone" maxlength="4" value="${t?esc(t.icone||''):'🧩'}"></div>
+      <div class="field" style="flex:1"><label>Nom *</label><input type="text" id="tf-nom" value="${t?esc(t.nom):''}" placeholder="Ex. Création de badge"></div>
+    </div>
+    <div class="field"><label>Description (facultatif, visible seulement ici)</label><input type="text" id="tf-desc" value="${t?esc(t.description||''):''}" placeholder="Ex. Utilisé sur le site X pour…"></div>
+    ${editing?`<div class="chk-row"><input type="checkbox" id="tf-actif" ${t.actif?'checked':''}><label for="tf-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Actif</label></div>`:''}
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeTypeForm()">Annuler</button>
+      <button class="btn-primary" onclick="saveType('${t?t.id:''}')">💾 Enregistrer</button>
+    </div>
+  </div>`;
+  let holder = document.getElementById('type-form-holder');
+  if(!holder){ holder = document.createElement('div'); holder.id='type-form-holder'; }
+  document.getElementById('types-list').insertAdjacentElement('beforebegin', holder);
+  holder.innerHTML = html;
+  holder.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closeTypeForm(){ const h=document.getElementById('type-form-holder'); if(h) h.innerHTML=''; }
+
+async function saveType(id){
+  const err = document.getElementById('home-err'); err.innerHTML='';
+  const nom = document.getElementById('tf-nom').value.trim();
+  if(!nom){ err.innerHTML = '<div class="err">Le nom est obligatoire.</div>'; return; }
+  const icone = document.getElementById('tf-icone').value.trim() || '🧩';
+  const description = document.getElementById('tf-desc').value.trim() || null;
+  try{
+    if(id){
+      const actifEl = document.getElementById('tf-actif');
+      const row = { nom, icone, description };
+      if(actifEl) row.actif = actifEl.checked;
+      const { error } = await sb.from('rapport_types').update(row).eq('id', id);
+      if(error) throw error;
+      // Répercute le nom/l'icône sur le bouton du journal déjà créé pour ce type, le cas échéant.
+      const t = types.find(x=>x.id===id);
+      if(t && t.module_id){
+        await sb.from('journal_modules').update({ nom, icone }).eq('id', t.module_id);
+        await sb.from('journal_activites').update({ label: nom, icone }).eq('module_id', t.module_id);
+      }
+    } else {
+      const slug = await uniqueSlug(nom);
+      const maxOrdre = types.reduce((m,t)=>Math.max(m, t.ordre||0), 0);
+      const { data, error } = await sb.from('rapport_types').insert({ nom, icone, description, slug, actif:true, ordre: maxOrdre+10 }).select().single();
+      if(error) throw error;
+      closeTypeForm();
+      await loadTypes();
+      openType(data);
+      return;
+    }
+    closeTypeForm();
+    await loadTypes();
+  }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
+}
+
+async function deleteType(){
+  if(!currentType) return;
+  if(!confirm(`Supprimer définitivement « ${currentType.nom} » ? Les catégories et questions de ce type seront supprimées. Les rapports déjà enregistrés avec ce type restent dans la supervision, mais le bouton du journal de bord cessera de fonctionner.`)) return;
+  try{
+    if(currentType.module_id){
+      await sb.from('journal_activites').delete().eq('module_id', currentType.module_id);
+      await sb.from('journal_modules').delete().eq('id', currentType.module_id);
+    }
+    const { error } = await sb.from('rapport_types').delete().eq('id', currentType.id);
+    if(error) throw error;
+    goHome();
+  }catch(e){ document.getElementById('home-err').innerHTML = '<div class="err">Erreur de suppression : '+esc(e.message)+'</div>'; }
+}
+
+/* ============================== ÉCRAN D'UN TYPE ============================== */
+function openType(t){
+  currentType = t;
+  document.getElementById('type-titre').textContent = (t.icone?t.icone+' ':'')+t.nom;
+  show('s-type');
+  goTab('general');
+}
+function goTab(tab){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on', p.dataset.tab===tab));
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('hidden', el.id!=='tab-'+tab));
+  if(tab==='general') renderGeneralTab();
+  if(tab==='categories'){ loadCategories().then(renderCategories); }
+  if(tab==='questions'){ Promise.all([loadCategories(), loadItems()]).then(()=>renderItems()); }
+  if(tab==='sites'){ loadSitesTab(); }
+  window.scrollTo(0,0);
+}
+
+function renderGeneralTab(){
+  const t = currentType;
+  const box = document.getElementById('tab-general');
+  box.innerHTML = `
+    <div class="panel">
+      <div class="row-inline">
+        <div class="field icone-input"><label>Icône</label><input type="text" id="gf-icone" maxlength="4" value="${esc(t.icone||'')}"></div>
+        <div class="field" style="flex:1"><label>Nom *</label><input type="text" id="gf-nom" value="${esc(t.nom)}"></div>
+      </div>
+      <div class="field"><label>Description (facultatif)</label><input type="text" id="gf-desc" value="${esc(t.description||'')}"></div>
+      <div class="chk-row"><input type="checkbox" id="gf-actif" ${t.actif?'checked':''}><label for="gf-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Actif</label></div>
+      <div class="slug-note">Adresse technique (ne change jamais, même si tu renommes) : <code>rapport-type-agent.html?type=${esc(t.slug)}</code></div>
+      <div class="form-actions">
+        <button class="btn-secondary" style="color:var(--danger);border-color:#eab8b8" onclick="deleteType()">🗑 Supprimer ce type</button>
+        <button class="btn-primary" onclick="saveGeneral()">💾 Enregistrer</button>
+      </div>
+    </div>`;
+}
+async function saveGeneral(){
+  const nom = document.getElementById('gf-nom').value.trim();
+  if(!nom){ toastErr('tab-general', 'Le nom est obligatoire.'); return; }
+  const icone = document.getElementById('gf-icone').value.trim() || '🧩';
+  const description = document.getElementById('gf-desc').value.trim() || null;
+  const actif = document.getElementById('gf-actif').checked;
+  try{
+    const { error } = await sb.from('rapport_types').update({ nom, icone, description, actif }).eq('id', currentType.id);
+    if(error) throw error;
+    Object.assign(currentType, { nom, icone, description, actif });
+    await ensureModuleForType();
+    document.getElementById('type-titre').textContent = (icone?icone+' ':'')+nom;
+    const idx = types.findIndex(x=>x.id===currentType.id); if(idx>-1) types[idx] = currentType;
+    renderGeneralTab();
+  }catch(e){ toastErr('tab-general', 'Erreur d\'enregistrement : '+e.message); }
+}
+function toastErr(tabId, msg){
+  const box = document.getElementById(tabId);
+  const holder = document.createElement('div');
+  holder.className = 'err'; holder.textContent = msg;
+  box.insertAdjacentElement('afterbegin', holder);
+  setTimeout(()=>holder.remove(), 4000);
+}
+
+/* ============================== CATÉGORIES (scope: currentType) ============================== */
+async function loadCategories(){
+  try{
+    const { data, error } = await sb.from('rapport_categories').select('*').eq('rapport_type_id', currentType.id).order('ordre');
+    if(error) throw error;
+    categories = data||[];
+  }catch(e){
+    categories = [];
+    const err = document.getElementById('categories-err');
+    if(err) err.innerHTML = '<div class="err">Impossible de charger les catégories (réseau ?).</div>';
+  }
+}
+function renderCategories(){
+  const box = document.getElementById('categories-list');
+  if(!categories.length){ box.innerHTML = '<div class="state-msg">Aucune catégorie pour l\'instant. Facultatif : sans catégorie, les questions apparaissent simplement dans l\'ordre.</div>'; return; }
+  box.innerHTML = categories.map((c,i)=>{
+    const offBadge = !c.actif ? '<span class="badge off">Inactive</span>' : '';
+    return `<div class="list-item">
+      <div class="body"><div class="t1">${offBadge}${esc(c.libelle)}</div></div>
+      <div class="actions">
+        <button class="ibtn" title="Monter" onclick="moveCategory(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="ibtn" title="Descendre" onclick="moveCategory(${i},1)" ${i===categories.length-1?'disabled':''}>↓</button>
+        <button class="ibtn" title="Modifier" onclick='openCategoryForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✎</button>
+        <button class="ibtn danger" title="Supprimer" onclick="deleteCategory('${c.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function moveCategory(i,dir){
+  const j=i+dir; if(j<0||j>=categories.length) return;
+  const a=categories[i], b=categories[j];
+  const ordA=a.ordre, ordB=b.ordre;
+  try{
+    await sb.from('rapport_categories').update({ordre:ordB}).eq('id',a.id);
+    await sb.from('rapport_categories').update({ordre:ordA}).eq('id',b.id);
+    await loadCategories(); renderCategories();
+  }catch(e){ document.getElementById('categories-err').innerHTML = '<div class="err">Erreur : '+esc(e.message)+'</div>'; }
+}
+function openCategoryForm(c){
+  const editing = !!c;
+  const html = `<div class="panel">
+    <div class="panel-title">${editing?'Modifier':'Nouvelle'} catégorie</div>
+    <div class="field"><label>Libellé *</label><input type="text" id="cf-libelle" value="${c?esc(c.libelle):''}" placeholder="Ex. Informations badge"></div>
+    <div class="chk-row"><input type="checkbox" id="cf-actif" ${(!c||c.actif)?'checked':''}><label for="cf-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Active</label></div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeCategoryForm()">Annuler</button>
+      <button class="btn-primary" onclick="saveCategory('${c?c.id:''}')">💾 Enregistrer</button>
+    </div>
+  </div>`;
+  let holder = document.getElementById('cat-form-holder');
+  if(!holder){ holder = document.createElement('div'); holder.id = 'cat-form-holder'; }
+  document.getElementById('categories-list').insertAdjacentElement('beforebegin', holder);
+  holder.innerHTML = html;
+  holder.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closeCategoryForm(){ const h=document.getElementById('cat-form-holder'); if(h) h.innerHTML=''; }
+async function saveCategory(id){
+  const err = document.getElementById('categories-err'); err.innerHTML='';
+  const libelle = document.getElementById('cf-libelle').value.trim();
+  if(!libelle){ err.innerHTML = '<div class="err">Le libellé est obligatoire.</div>'; return; }
+  const actif = document.getElementById('cf-actif').checked;
+  try{
+    if(id){
+      const { error } = await sb.from('rapport_categories').update({ libelle, actif }).eq('id', id);
+      if(error) throw error;
+    } else {
+      const maxOrdre = categories.reduce((m,c)=>Math.max(m, c.ordre||0), 0);
+      const { error } = await sb.from('rapport_categories').insert({ rapport_type_id: currentType.id, libelle, actif, ordre: maxOrdre+10 });
+      if(error) throw error;
+    }
+    closeCategoryForm();
+    await loadCategories(); renderCategories();
+  }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
+}
+async function deleteCategory(id){
+  const inUse = items.some(it=>it.categorie_id===id);
+  const msg = inUse
+    ? 'Des questions utilisent cette catégorie ; elles resteront mais apparaîtront dans « Sans catégorie ». Supprimer quand même ?'
+    : 'Supprimer cette catégorie ?';
+  if(!confirm(msg)) return;
+  try{
+    const { error } = await sb.from('rapport_categories').delete().eq('id', id);
+    if(error) throw error;
+    await loadCategories(); renderCategories();
+  }catch(e){ document.getElementById('categories-err').innerHTML = '<div class="err">Erreur de suppression : '+esc(e.message)+'</div>'; }
+}
+
+/* ============================== QUESTIONS (scope: currentType, pas de variante par site en v1) ============================== */
+function collectDescendants(id, list){
+  const out = []; const stack = [id];
+  while(stack.length){
+    const pid = stack.pop();
+    list.filter(x=>x.parent_id===pid).forEach(c=>{ out.push(c.id); stack.push(c.id); });
+  }
+  return out;
+}
+function siblingsOf(it){
+  return items.filter(x=> (x.parent_id||null)===(it.parent_id||null) &&
+      (it.parent_id ? true : (x.categorie_id||null)===(it.categorie_id||null)) )
+    .sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+}
+function conditionLabel(it){
+  const parent = items.find(x=>x.id===it.parent_id);
+  if(!parent) return 'question parente introuvable';
+  if(parent.type==='case') return (it.condition_valeur==='non') ? `« ${esc(parent.libelle)} » = Non` : `« ${esc(parent.libelle)} » = Oui`;
+  if(it.condition_valeur) return `« ${esc(parent.libelle)} » = ${esc(it.condition_valeur)}`;
+  return `« ${esc(parent.libelle)} » renseignée`;
+}
+async function loadItems(){
+  try{
+    const { data, error } = await sb.from('rapport_champs').select('*').eq('rapport_type_id', currentType.id).order('ordre');
+    if(error) throw error;
+    items = data||[];
+  }catch(e){
+    items = [];
+    const err = document.getElementById('questions-err');
+    if(err) err.innerHTML = '<div class="err">Impossible de charger les questions (réseau ?).</div>';
+  }
+}
+function buildTree(){
+  const catIds = new Set(categories.map(c=>c.id));
+  const childrenOf = {};
+  items.forEach(it=>{ if(it.parent_id) (childrenOf[it.parent_id]=childrenOf[it.parent_id]||[]).push(it); });
+  Object.values(childrenOf).forEach(arr=>arr.sort((a,b)=>(a.ordre||0)-(b.ordre||0)));
+  const roots = items.filter(it=>!it.parent_id).sort((a,b)=>(a.ordre||0)-(b.ordre||0));
+  const rootsByCat = {};
+  roots.forEach(it=>{
+    const key = (it.categorie_id && catIds.has(it.categorie_id)) ? it.categorie_id : '__none';
+    (rootsByCat[key]=rootsByCat[key]||[]).push(it);
+  });
+  return { childrenOf, rootsByCat };
+}
+function renderNode(it, depth, childrenOf){
+  const sibs = siblingsOf(it);
+  const i = sibs.findIndex(x=>x.id===it.id);
+  const badge = `<span class="badge ${it.type||'texte'}">${esc(TYPE_LABELS[it.type]||it.type)}</span>`;
+  const reqBadge = it.obligatoire ? '<span class="badge req">Obligatoire</span>' : '';
+  const offBadge = !it.actif ? '<span class="badge off">Inactive</span>' : '';
+  const sub = (it.type==='choix' && Array.isArray(it.options) && it.options.length) ? 'Réponses : '+it.options.join(' / ') : '';
+  const condNote = it.parent_id ? `<div class="t2" style="font-style:italic">Condition : ${conditionLabel(it)}</div>` : '';
+  let html = `<div class="list-item" style="margin-left:${depth*20}px">
+    <div class="body">
+      <div class="t1">${offBadge}${reqBadge}${badge} ${depth?'↳ ':''}${esc(it.libelle)}</div>
+      ${sub?`<div class="t2">${sub}</div>`:''}
+      ${condNote}
+    </div>
+    <div class="actions">
+      <button class="ibtn" title="Monter" onclick="moveItem('${it.id}',-1)" ${i<=0?'disabled':''}>↑</button>
+      <button class="ibtn" title="Descendre" onclick="moveItem('${it.id}',1)" ${i>=sibs.length-1?'disabled':''}>↓</button>
+      <button class="ibtn" title="Modifier" onclick='openItemForm(${JSON.stringify(it).replace(/'/g,"&#39;")})'>✎</button>
+      <button class="ibtn danger" title="Supprimer" onclick="deleteItem('${it.id}')">🗑</button>
+    </div>
+  </div>`;
+  (childrenOf[it.id]||[]).forEach(c=> html += renderNode(c, depth+1, childrenOf));
+  return html;
+}
+function renderItems(){
+  const box = document.getElementById('questions-list');
+  if(!items.length){ box.innerHTML = '<div class="state-msg">Aucune question pour l\'instant.</div>'; return; }
+  const { childrenOf, rootsByCat } = buildTree();
+  let html = '';
+  categories.slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(cat=>{
+    const roots = rootsByCat[cat.id] || [];
+    if(!roots.length) return;
+    html += `<div class="cat-hdr">${esc(cat.libelle)}${cat.actif?'':' <span class="badge off">Inactive</span>'}</div>`;
+    roots.forEach(r=> html += renderNode(r, 0, childrenOf));
+  });
+  const noCat = rootsByCat['__none'] || [];
+  if(noCat.length){
+    html += `<div class="cat-hdr">Sans catégorie</div>`;
+    noCat.forEach(r=> html += renderNode(r, 0, childrenOf));
+  }
+  box.innerHTML = html || '<div class="state-msg">Aucune question pour l\'instant.</div>';
+}
+async function moveItem(id, dir){
+  const it = items.find(x=>x.id===id); if(!it) return;
+  const sibs = siblingsOf(it);
+  const i = sibs.findIndex(x=>x.id===id);
+  const j = i+dir;
+  if(j<0 || j>=sibs.length) return;
+  const a = sibs[i], b = sibs[j];
+  const ordA = a.ordre, ordB = b.ordre;
+  try{
+    await sb.from('rapport_champs').update({ ordre: ordB }).eq('id', a.id);
+    await sb.from('rapport_champs').update({ ordre: ordA }).eq('id', b.id);
+    await loadItems(); renderItems();
+  }catch(e){ document.getElementById('questions-err').innerHTML = '<div class="err">Erreur de réordonnancement : '+esc(e.message)+'</div>'; }
+}
+async function deleteItem(id){
+  const it = items.find(x=>x.id===id);
+  const descendants = it ? collectDescendants(id, items) : [];
+  const msg = descendants.length
+    ? `Supprimer cette question et ${descendants.length} question(s) imbriquée(s) sous elle ?`
+    : 'Supprimer cette question ?';
+  if(!confirm(msg)) return;
+  try{
+    const { error } = await sb.from('rapport_champs').delete().in('id', [id, ...descendants]);
+    if(error) throw error;
+    await loadItems(); renderItems();
+  }catch(e){ document.getElementById('questions-err').innerHTML = '<div class="err">Erreur de suppression : '+esc(e.message)+'</div>'; }
+}
+
+function openItemForm(it){
+  const editing = !!it;
+  const type = it ? (it.type||'texte') : 'texte';
+  const opts = it && Array.isArray(it.options) ? it.options : ['',''];
+
+  const catIds = new Set(categories.map(c=>c.id));
+  const curCatId = it && it.categorie_id && catIds.has(it.categorie_id) ? it.categorie_id : '';
+  const curParentId = it && it.parent_id ? it.parent_id : '';
+  const excluded = new Set(it ? [it.id, ...collectDescendants(it.id, items)] : []);
+  const parentCandidates = items.filter(x=>!excluded.has(x.id));
+  const parentOptionsHtml = parentCandidates.map(p=>`<option value="${p.id}" ${curParentId===p.id?'selected':''}>${esc(p.libelle)}</option>`).join('');
+  const catOptionsHtml = categories.filter(c=>c.actif || c.id===curCatId).map(c=>`<option value="${c.id}" ${curCatId===c.id?'selected':''}>${esc(c.libelle)}</option>`).join('');
+
+  const html = `
+    <div class="panel">
+      <div class="panel-title">${editing?'Modifier':'Nouvelle'} question</div>
+
+      <div class="field">
+        <label>Question parente <span class="hint">(facultatif — pour une question qui n'apparaît que si une autre y répond d'une certaine façon)</span></label>
+        <select id="if-parent" onchange="onParentChange()">
+          <option value="">— Aucune (question indépendante) —</option>
+          ${parentOptionsHtml}
+        </select>
+      </div>
+      <div id="if-condition-wrap" class="field hidden"></div>
+
+      <div id="if-cat-wrap" class="field">
+        <label>Catégorie</label>
+        <select id="if-categorie">
+          <option value="">— Sans catégorie —</option>
+          ${catOptionsHtml}
+        </select>
+        <button type="button" class="btn-mini" onclick="toggleNewCatInput()" style="margin-top:6px;padding:6px 10px;font-size:12px">+ Nouvelle catégorie…</button>
+        <div id="if-new-cat" class="hidden" style="margin-top:8px"><input type="text" id="if-new-cat-input" placeholder="Nom de la nouvelle catégorie"></div>
+      </div>
+
+      <div class="field">
+        <label>Type</label>
+        <div class="type-toggle">
+          <button type="button" id="if-type-texte" class="${type==='texte'?'sel':''}" onclick="setItemType('texte')">Texte court</button>
+          <button type="button" id="if-type-zone_texte" class="${type==='zone_texte'?'sel':''}" onclick="setItemType('zone_texte')">Texte long</button>
+          <button type="button" id="if-type-choix" class="${type==='choix'?'sel':''}" onclick="setItemType('choix')">🔀 Choix</button>
+          <button type="button" id="if-type-case" class="${type==='case'?'sel':''}" onclick="setItemType('case')">☑ Case à cocher</button>
+          <button type="button" id="if-type-heure" class="${type==='heure'?'sel':''}" onclick="setItemType('heure')">🕐 Horodatage</button>
+        </div>
+      </div>
+      <div class="field"><label>Libellé *</label><input type="text" id="if-libelle" value="${it?esc(it.libelle):''}" placeholder="Ex. Numéro du badge remis"></div>
+
+      <div id="if-options-wrap" class="field ${type==='choix'?'':'hidden'}">
+        <label>Réponses possibles</label>
+        <div id="if-options-list"></div>
+        <button type="button" class="btn-mini" onclick="addOptionRow()">➕ Ajouter une réponse</button>
+      </div>
+
+      <div class="chk-row"><input type="checkbox" id="if-obligatoire" ${(it&&it.obligatoire)?'checked':''}><label for="if-obligatoire" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Obligatoire (avertissement à l'agent si non répondue)</label></div>
+      <div class="chk-row" style="margin-top:6px"><input type="checkbox" id="if-actif" ${(!it || it.actif)?'checked':''}><label for="if-actif" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Active</label></div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeItemForm()">Annuler</button>
+        <button class="btn-primary" onclick="saveItem('${it?it.id:''}')">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  let holder = document.getElementById('item-form-holder');
+  if(!holder){ holder = document.createElement('div'); holder.id='item-form-holder'; }
+  document.getElementById('questions-list').insertAdjacentElement('beforebegin', holder);
+  holder.innerHTML = html;
+  window._itemOptions = (opts && opts.length) ? opts.slice() : ['',''];
+  window._itemCondValeur = it ? (it.condition_valeur||'') : '';
+  renderOptionRows();
+  onParentChange();
+  holder.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function toggleCatWrapVisibility(){
+  const hasParent = !!document.getElementById('if-parent').value;
+  document.getElementById('if-cat-wrap').classList.toggle('hidden', hasParent);
+}
+function onParentChange(){
+  const parentId = document.getElementById('if-parent').value;
+  toggleCatWrapVisibility();
+  const wrap = document.getElementById('if-condition-wrap');
+  if(!parentId){ wrap.classList.add('hidden'); wrap.innerHTML=''; return; }
+  const parent = items.find(x=>x.id===parentId);
+  wrap.classList.remove('hidden');
+  const cur = window._itemCondValeur || '';
+  if(parent && parent.type==='case'){
+    wrap.innerHTML = `<label>Condition d'affichage</label>
+      <select id="if-cond-valeur">
+        <option value="oui" ${cur!=='non'?'selected':''}>Si la case est cochée (Oui)</option>
+        <option value="non" ${cur==='non'?'selected':''}>Si la case n'est PAS cochée (Non)</option>
+      </select>`;
+  } else if(parent && parent.type==='choix' && Array.isArray(parent.options)){
+    wrap.innerHTML = `<label>Condition d'affichage</label>
+      <select id="if-cond-valeur">
+        ${parent.options.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>Si la réponse est « ${esc(o)} »</option>`).join('')}
+      </select>`;
+  } else {
+    wrap.innerHTML = `<label>Condition d'affichage <span class="hint">(facultatif)</span></label>
+      <input type="text" id="if-cond-valeur" value="${esc(cur)}" placeholder="Laisser vide = dès qu'une réponse est saisie">
+      <div class="hint" style="margin-top:4px">Ou une valeur précise pour n'apparaître que si la réponse est exactement celle-ci.</div>`;
+  }
+}
+function toggleNewCatInput(){ document.getElementById('if-new-cat').classList.toggle('hidden'); }
+function setItemType(t){
+  ['texte','zone_texte','choix','case','heure'].forEach(x=>{
+    document.getElementById('if-type-'+x).classList.toggle('sel', t===x);
+  });
+  document.getElementById('if-options-wrap').classList.toggle('hidden', t!=='choix');
+}
+function renderOptionRows(){
+  const box = document.getElementById('if-options-list');
+  box.innerHTML = window._itemOptions.map((o,i)=>`
+    <div class="opt-row">
+      <input type="text" value="${esc(o)}" oninput="window._itemOptions[${i}]=this.value">
+      <button type="button" onclick="removeOptionRow(${i})">✕</button>
+    </div>`).join('');
+}
+function addOptionRow(){ window._itemOptions.push(''); renderOptionRows(); }
+function removeOptionRow(i){ window._itemOptions.splice(i,1); if(!window._itemOptions.length) window._itemOptions=['']; renderOptionRows(); }
+
+function closeItemForm(){ const h=document.getElementById('item-form-holder'); if(h) h.innerHTML=''; }
+
+async function saveItem(id){
+  const err = document.getElementById('questions-err'); err.innerHTML='';
+  const libelle = document.getElementById('if-libelle').value.trim();
+  if(!libelle){ err.innerHTML = '<div class="err">Le libellé est obligatoire.</div>'; return; }
+  const type = ['texte','zone_texte','choix','case','heure'].find(x=>document.getElementById('if-type-'+x).classList.contains('sel')) || 'texte';
+  const options = type==='choix' ? window._itemOptions.map(o=>o.trim()).filter(Boolean) : null;
+  if(type==='choix' && (!options || options.length<2)){
+    err.innerHTML = '<div class="err">Un choix doit proposer au moins deux réponses.</div>'; return;
+  }
+  const obligatoire = document.getElementById('if-obligatoire').checked;
+  const actif = document.getElementById('if-actif').checked;
+  const parentId = document.getElementById('if-parent').value || null;
+  const condEl = document.getElementById('if-cond-valeur');
+  const conditionValeur = (parentId && condEl) ? (condEl.value || null) : null;
+
+  let categorieId = null;
+  if(!parentId){
+    const newCatWrap = document.getElementById('if-new-cat');
+    const newCatInput = document.getElementById('if-new-cat-input');
+    const newCatName = (newCatWrap && !newCatWrap.classList.contains('hidden') && newCatInput) ? newCatInput.value.trim() : '';
+    if(newCatName){
+      try{
+        const { data, error } = await sb.from('rapport_categories')
+          .insert({ rapport_type_id: currentType.id, libelle:newCatName, actif:true, ordre:(categories.reduce((m,c)=>Math.max(m,c.ordre||0),0)+10) })
+          .select().single();
+        if(error) throw error;
+        categories.push(data);
+        categorieId = data.id;
+      }catch(e){ err.innerHTML = '<div class="err">Erreur création catégorie : '+esc(e.message)+'</div>'; return; }
+    } else {
+      categorieId = document.getElementById('if-categorie').value || null;
+    }
+  }
+
+  try{
+    if(id){
+      const row = { libelle, type, options, obligatoire, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur };
+      const { error } = await sb.from('rapport_champs').update(row).eq('id', id);
+      if(error) throw error;
+    } else {
+      const maxOrdre = items.reduce((m,i)=>Math.max(m, i.ordre||0), 0);
+      const row = { rapport_type_id: currentType.id, site_id: null, libelle, type, options, obligatoire, ordre: maxOrdre+10, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur };
+      const { error } = await sb.from('rapport_champs').insert(row);
+      if(error) throw error;
+    }
+    closeItemForm();
+    await loadItems();
+    renderItems();
+  }catch(e){ err.innerHTML = '<div class="err">Erreur d\'enregistrement : '+esc(e.message)+'</div>'; }
+}
+
+/* ============================== SITES (bouton du journal de bord) ==============================
+   Crée/maintient AUTOMATIQUEMENT un module de catalogue (journal_modules)
+   pour ce type de rapport, et garde son nom/icône synchronisés sur tous
+   les boutons (journal_activites) déjà créés pour lui — mais NE CRÉE ET
+   NE MODIFIE PLUS aucun bouton par site : le choix des sites et l'ORDRE
+   d'affichage se font exclusivement dans journal-config.html → « Activités
+   par site » (même écran/mêmes flèches ▲▼ que pour tous les autres
+   modules), pour éviter d'avoir deux endroits qui gèrent la même donnée.
+   Le module est retrouvé via rapport_types.module_id (stable même si le
+   nom/slug changent), pas en re-cherchant par adresse. */
+async function ensureModuleForType(){
+  const adresse = 'rapport-type-agent.html?type=' + encodeURIComponent(currentType.slug);
+  const nom = currentType.nom, icone = currentType.icone || '🧩';
+  let moduleId = currentType.module_id;
+  if(moduleId){
+    const { error } = await sb.from('journal_modules').update({ nom, icone, adresse }).eq('id', moduleId);
+    if(error) moduleId = null; // le module a peut-être été supprimé côté journal-config.html : on en recrée un
+  }
+  if(!moduleId){
+    const { data: mods } = await sb.from('journal_modules').select('ordre').order('ordre',{ascending:false}).limit(1);
+    const maxOrd = (mods && mods[0] && mods[0].ordre) || 0;
+    const { data, error } = await sb.from('journal_modules').insert({ nom, icone, adresse, ordre:maxOrd+10, actif:true }).select().single();
+    if(error) throw error;
+    moduleId = data.id;
+    await sb.from('rapport_types').update({ module_id: moduleId }).eq('id', currentType.id);
+    currentType.module_id = moduleId;
+    const idx = types.findIndex(x=>x.id===currentType.id); if(idx>-1) types[idx].module_id = moduleId;
+  }
+  // Garde le libellé/icône à jour sur tous les boutons déjà activés pour ce type, quel que soit le site
+  await sb.from('journal_activites').update({ label: nom, icone }).eq('module_id', moduleId);
+  return moduleId;
+}
+
+async function loadSitesTab(){
+  const box = document.getElementById('sites-current');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
+  try{
+    const moduleId = await ensureModuleForType();
+    document.getElementById('sites-module-nom').textContent = (currentType.icone?currentType.icone+' ':'')+currentType.nom;
+    const [{ data: sd, error: se }, { data: ad, error: ae }] = await Promise.all([
+      sb.from('sites').select('id,nom').eq('actif', true).order('nom'),
+      sb.from('journal_activites').select('*').eq('module_id', moduleId).eq('actif', true).order('ordre')
+    ]);
+    if(se) throw se;
+    if(ae) throw ae;
+    const sitesMap = {}; (sd||[]).forEach(s=>sitesMap[s.id]=s.nom);
+    if(!ad || !ad.length){
+      box.innerHTML = '<div class="state-msg">Pas encore activé sur un site — utilise le lien ci-dessous pour choisir où ce bouton doit apparaître.</div>';
+      return;
+    }
+    box.innerHTML = ad.map(a=>{
+      const label = a.site_id===null ? 'Tous les sites' : (sitesMap[a.site_id] || 'Site inconnu ou désactivé');
+      return `<div class="site-row"><span class="nom">${esc(label)}</span></div>`;
+    }).join('');
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger (réseau ?).</div>'; }
+}
+
+/* init */
+loadTypes();
+</script>
+</body>
+</html>
