@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2d2d2d">
+<title>Quiz Superviseur — RDZ Security Management</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#c0272d;--red-d:#a31f24;--red-l:#fdf2f2;
+  --accent:#c0272d;--accent-hover:#a31f24;--accent-light:#fdf2f2;
+  --anth:#2d2d2d;--anth2:#3a3a3a;
+  --bg:#f2f2f4;--bg2:#ebebee;--white:#fff;
+  --border:#e2e2e6;--border2:#c8c8cd;
+  --text:#2d2d2d;--text2:#4b5563;--text3:#9ca3af;
+  --green:#16a34a;--green-l:#f0fdf4;
+  --orange:#d97706;--orange-l:#fffbeb;
+  --blue:#2563eb;--blue-l:#eff6ff;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.18);
+  --radius:8px;--radius-lg:12px;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none!important}
+
+/* LOGIN */
+.login{position:fixed;inset:0;background:var(--anth);display:flex;align-items:center;justify-content:center;padding:16px;z-index:900}
+.login-card{background:var(--white);border-radius:16px;padding:30px 28px;width:100%;max-width:380px;box-shadow:var(--shadow-lg);border-top:4px solid var(--red)}
+.login-logo{width:46px;height:46px;border-radius:10px;background:var(--red);color:#fff;font-family:var(--mono);font-weight:500;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.login-title{font-size:20px;font-weight:700}
+.login-sub{font-size:12.5px;color:var(--text3);margin-bottom:20px}
+.login-card .flabel{margin-top:12px}
+.login-err{display:none;background:var(--red-l);border:1px solid #f5c6ce;color:var(--red-d);border-radius:var(--radius);padding:9px 12px;font-size:13px;margin-top:12px}
+.login-foot{font-size:11.5px;color:var(--text3);text-align:center;margin-top:16px}
+
+/* HEADER */
+.hdr{position:sticky;top:0;z-index:200;background:var(--anth2);color:#fff;height:56px;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:3px solid var(--red);box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:#fff;flex-shrink:0}
+.logo-mark{width:32px;height:32px;border-radius:7px;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px}
+.logo-name{display:block;font-family:var(--mono);font-size:14px;line-height:1.1}
+.logo-sub{display:block;font-size:9.5px;color:#fca5a5;text-transform:uppercase;letter-spacing:.6px}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;color:rgba(255,255,255,.65);padding:7px 12px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tab:hover{background:rgba(255,255,255,.08);color:#fff}
+.tab.active{background:rgba(192,39,45,.35);color:#fff}
+.tab-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:20px;padding:0 6px;min-width:18px;text-align:center}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sync-btn{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:11.5px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#9ca3af;flex-shrink:0}
+.sync-dot.ok{background:var(--green);box-shadow:0 0 5px #16a34a88}
+.sync-dot.saving{background:var(--orange);animation:pulse .8s infinite}
+.sync-dot.error{background:#ef4444}
+.sync-dot.offline{background:#9ca3af}
+@keyframes pulse{50%{opacity:.35}}
+.user{position:relative}
+.user-btn{display:flex;align-items:center;gap:7px;background:none;border:none;color:#fff;cursor:pointer}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+.u-name{font-size:12.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu{position:absolute;right:0;top:42px;background:var(--white);color:var(--text);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);min-width:230px;overflow:hidden;border:1px solid var(--border)}
+.menu-head{padding:12px 14px;border-bottom:1px solid var(--border)}
+.menu-head b{display:block}
+.menu-head span{font-size:12px;color:var(--text3)}
+.menu a,.menu button{display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;cursor:pointer;text-decoration:none;color:var(--text);font-size:13px}
+.menu a:hover,.menu button:hover{background:var(--bg)}
+.sync-pop{position:fixed;top:64px;right:16px;z-index:250;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:320px;max-width:calc(100vw - 32px);padding:14px;font-size:13px}
+.sync-pop .row{display:flex;justify-content:space-between;padding:4px 0}
+.sync-pop .fail{background:var(--red-l);border-radius:6px;padding:7px 9px;margin-top:6px;font-size:12px;color:var(--red-d)}
+.sync-pop .acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+
+/* LAYOUT */
+.main{max-width:1280px;margin:0 auto;padding:22px 16px 80px}
+.view{display:none}.view.active{display:block}
+.ph{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.ph-title{font-size:24px;font-weight:700;line-height:1.15}
+.ph-sub{font-size:12.5px;color:var(--text3);margin-top:3px}
+.ph-right{display:flex;gap:8px;flex-wrap:wrap}
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:18px}
+.card-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.info{background:var(--blue-l);border:1px solid #bfdbfe;color:#1e40af;border-radius:var(--radius);padding:10px 13px;font-size:12.5px;margin-bottom:14px}
+.warnbox{background:var(--orange-l);border:1px solid #fde68a;color:#92400e;border-radius:var(--radius);padding:10px 13px;font-size:12.5px;margin-bottom:14px}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow)}
+.kpi-l{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.kpi-v{font-family:var(--mono);font-size:28px;line-height:1.2;margin-top:4px}
+.kpi-s{font-size:11.5px;color:var(--text3)}
+.c-red{color:var(--red)}.c-green{color:var(--green)}.c-orange{color:var(--orange)}.c-blue{color:var(--blue)}
+
+/* FORMS */
+.sbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.inp,.sel,.finp,.fsel,.ftxt{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);padding:8px 11px;outline:none;transition:border-color .15s}
+.inp:focus,.sel:focus,.finp:focus,.fsel:focus,.ftxt:focus{border-color:var(--red)}
+.inp{min-width:200px;flex:1;max-width:320px}
+.finp,.fsel,.ftxt{width:100%}
+.ftxt{min-height:70px;resize:vertical}
+.flabel{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;display:block}
+.fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.fg.full{grid-column:1/-1}.fg.half{grid-column:span 2}
+.count{font-size:12px;color:var(--text3);margin-bottom:10px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:var(--radius);border:1px solid transparent;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;white-space:nowrap}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn-primary{background:var(--red);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--red-d)}
+.btn-dark{background:var(--anth);color:#fff}
+.btn-ghost{background:var(--white);border-color:var(--border2);color:var(--text2)}
+.btn-ghost:hover{background:var(--bg)}
+.btn-success{background:var(--green);color:#fff}
+.btn-danger{background:var(--red-l);color:var(--red-d);border-color:#f5c6ce}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11.5px}
+.btn-block{width:100%;margin-top:18px;padding:11px}
+.seg{display:inline-flex;background:var(--bg2);border-radius:var(--radius);padding:3px}
+.seg button{border:none;background:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600;font-size:12.5px;color:var(--text2)}
+.seg button.on{background:var(--white);color:var(--red);box-shadow:var(--shadow)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-green{background:var(--green-l);color:#15803d}
+.b-gray{background:var(--bg2);color:var(--text2)}
+.b-orange{background:var(--orange-l);color:#92400e}
+.b-blue{background:var(--blue-l);color:#1d4ed8}
+.b-red{background:var(--red-l);color:var(--red-d)}
+
+/* QUIZ CARDS */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.qcard{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:16px 18px 14px 22px;position:relative;display:flex;flex-direction:column;gap:9px}
+.qcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px;background:var(--text3)}
+.qcard.active::before{background:var(--green)}
+.qc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.qc-title{font-size:15.5px;font-weight:700;line-height:1.3;cursor:pointer}
+.qc-title:hover{color:var(--red)}
+.qc-desc{font-size:12.5px;color:var(--text2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qc-tags{display:flex;gap:5px;flex-wrap:wrap}
+.qc-stats{display:flex;gap:14px;font-size:12px;color:var(--text2);border-top:1px solid var(--border);padding-top:9px}
+.qc-stats b{font-family:var(--mono);font-weight:500;color:var(--text)}
+.qc-acts{display:flex;gap:5px;flex-wrap:wrap}
+.empty{text-align:center;padding:40px 16px;color:var(--text3);grid-column:1/-1}
+.empty-ico{font-size:34px;margin-bottom:8px}
+
+/* EDITOR */
+.qitem{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.qnum{font-family:var(--mono);font-size:12px;background:var(--anth);color:#fff;border-radius:6px;padding:3px 7px;flex-shrink:0}
+.qbody{flex:1;min-width:0}
+.qtext{font-weight:600;font-size:13.5px;margin-bottom:5px;word-wrap:break-word}
+.qmeta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--text3)}
+.qopts{margin-top:6px;font-size:12px;color:var(--text2)}
+.qopts span{display:inline-block;margin:2px 8px 2px 0}
+.qopts .ok{color:#15803d;font-weight:600}
+.qacts{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg);color:var(--text2);text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:9px 12px;border-bottom:2px solid var(--border);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:hover td{background:#fafafb}
+tr.clickable{cursor:pointer}
+.mono{font-family:var(--mono)}
+.bar{display:inline-block;width:56px;height:5px;background:var(--bg2);border-radius:3px;margin-left:6px;vertical-align:middle;overflow:hidden}
+.bar i{display:block;height:100%}
+
+/* MODALS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--white);border-radius:14px;width:100%;max-width:640px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
+.modal.lg{max-width:880px}
+.mhdr{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.m-title{font-size:17px;font-weight:700}
+.m-sub{font-size:12.5px;color:var(--text3)}
+.m-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1}
+.mbody{padding:18px 20px;overflow-y:auto;flex:1}
+.mfoot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.mfoot .note{margin-right:auto;font-size:11.5px;color:var(--text3);align-self:center;max-width:340px}
+.types{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.type-btn{border:2px solid var(--border);background:var(--white);border-radius:10px;padding:10px 6px;cursor:pointer;text-align:center;font-size:12px;font-weight:600;color:var(--text2)}
+.type-btn .ti{display:block;font-size:18px;margin-bottom:2px}
+.type-btn.on{border-color:var(--red);background:var(--red-l);color:var(--red)}
+.opt-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.opt-row input[type=radio],.opt-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--red);flex-shrink:0;cursor:pointer}
+.tf-row{display:flex;gap:10px}
+.tf-row label{flex:1;border:2px solid var(--border);border-radius:10px;padding:10px;text-align:center;cursor:pointer;font-weight:600}
+.tf-row input{display:none}
+.tf-row input:checked+span{color:var(--red)}
+.tf-row label:has(input:checked){border-color:var(--red);background:var(--red-l)}
+.mrow{display:grid;grid-template-columns:1fr 3fr;gap:12px;margin-top:12px}
+
+/* ANSWERS */
+.aq{background:var(--bg);border-radius:10px;padding:13px 15px;margin-bottom:10px}
+.aq-h{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px}
+.aq-t{font-weight:600;margin-bottom:9px}
+.ans{padding:7px 10px;border-radius:7px;border:1px solid var(--border);font-size:13px;margin-bottom:4px;background:var(--white)}
+.ans.ok{background:var(--green-l);border-color:#bbf7d0;color:#166534}
+.ans.ko{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+.ans.exp{background:var(--bg2)}
+.ans.open{background:var(--blue-l);border-color:#bfdbfe;color:#1e40af;white-space:pre-wrap}
+.expl{margin-top:7px;font-size:12px;color:var(--text3);background:var(--bg2);padding:7px 10px;border-radius:6px}
+.grade{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.grade .finp{width:auto}
+.recap{background:var(--blue-l);border:1px solid #bfdbfe;border-radius:10px;padding:12px 15px;font-size:13px}
+
+/* TOAST */
+#toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:6px;width:calc(100% - 32px);max-width:420px;pointer-events:none}
+.toast{background:var(--anth);color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-lg);animation:tin .2s ease}
+.toast.ok{background:#15803d}.toast.err{background:#991b1b}.toast.warn{background:#92400e}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media(max-width:900px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .fgrid{grid-template-columns:1fr 1fr}
+  .u-name,.sync-lbl{display:none}
+}
+@media(max-width:640px){
+  .hdr{gap:8px;padding:0 10px}
+  .logo-txt{display:none}
+  .tab{padding:7px 9px;font-size:12.5px}
+  .main{padding:16px 12px 80px}
+  .ph-title{font-size:20px}
+  .fgrid{grid-template-columns:1fr}
+  .fg.half{grid-column:auto}
+  .types{grid-template-columns:1fr 1fr}
+  .mrow{grid-template-columns:1fr}
+  .inp{max-width:none;min-width:0;width:100%}
+  .sbar .sel{flex:1}
+  .overlay{padding:0}
+  .modal,.modal.lg{max-height:100vh;border-radius:0;min-height:100vh}
+  .qitem{flex-wrap:wrap}
+  .qacts{width:100%;justify-content:flex-start}
+}
+@media print{
+  .hdr,.sbar,.ph-right,#toasts{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ LOGIN ═══════════ -->
+<div class="login" id="login">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <div class="login-logo">RDZ</div>
+    <div class="login-title">Quiz Formation</div>
+    <div class="login-sub">Espace superviseur · accès restreint</div>
+    <div id="li-info" class="info" hidden></div>
+    <label class="flabel" for="li-email">Email</label>
+    <input class="finp" id="li-email" type="email" autocomplete="username" required>
+    <label class="flabel" for="li-pass">Mot de passe</label>
+    <input class="finp" id="li-pass" type="password" autocomplete="current-password" required>
+    <button class="btn btn-primary btn-block" id="li-btn" type="submit">Se connecter</button>
+    <div class="login-err" id="li-err"></div>
+    <div class="login-foot">🔒 Réservé aux superviseurs et administrateurs RDZ.<br>Ce module donne accès uniquement aux questionnaires et à leurs résultats.</div>
+  </form>
+</div>
+
+<!-- ═══════════ APP ═══════════ -->
+<div id="app" hidden>
+  <header class="hdr">
+    <a class="logo" id="logo-link" title="Portail RDZ">
+      <span class="logo-mark">RDZ</span>
+      <span class="logo-txt"><span class="logo-name">Quiz_RDZ</span><span class="logo-sub">Superviseur</span></span>
+    </a>
+    <nav class="tabs">
+      <button class="tab active" data-tab="quiz">📋 Questionnaires</button>
+      <button class="tab" data-tab="results">📊 Résultats <span class="tab-badge" id="badge-corr" hidden>0</span></button>
+    </nav>
+    <div class="hdr-right">
+      <button class="sync-btn" id="sync-btn" title="État de la synchronisation"><span class="sync-dot" id="sync-dot"></span><span class="sync-lbl" id="sync-lbl">—</span></button>
+      <div class="user">
+        <button class="user-btn" id="user-btn"><span class="avatar" id="u-avatar">?</span><span class="u-name" id="u-name"></span></button>
+        <div class="menu" id="user-menu" hidden>
+          <div class="menu-head"><b id="m-name"></b><span id="m-email"></span><br><span id="m-role"></span></div>
+          <a id="m-portal">🏠 Portail RDZ</a>
+          <button id="btn-logout">↩ Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="sync-pop" id="sync-pop" hidden></div>
+
+  <main class="main">
+
+    <!-- ── QUESTIONNAIRES ── -->
+    <section class="view active" id="v-quiz">
+      <div class="ph">
+        <div><div class="ph-title">Questionnaires</div><div class="ph-sub">Créez, modifiez et partagez les questionnaires de formation</div></div>
+        <div class="ph-right">
+          <button class="btn btn-ghost btn-sm" data-act="refresh">↻ Actualiser</button>
+          <button class="btn btn-primary" data-act="new-quiz">+ Nouveau questionnaire</button>
+        </div>
+      </div>
+      <div class="kpis" id="quiz-kpis"></div>
+      <div class="sbar">
+        <input class="inp" id="q-search" placeholder="🔍 Rechercher un questionnaire…">
+        <select class="sel" id="q-status">
+          <option value="">Tous statuts</option><option value="active">Publiés</option><option value="draft">Brouillons</option>
+        </select>
+        <select class="sel" id="q-site"><option value="">Tous sites</option></select>
+      </div>
+      <div class="count" id="q-count"></div>
+      <div class="grid" id="q-grid"></div>
+    </section>
+
+    <!-- ── EDITOR ── -->
+    <section class="view" id="v-editor">
+      <div class="ph">
+        <div><div class="ph-title" id="ed-title">Nouveau questionnaire</div><div class="ph-sub" id="ed-sub"></div></div>
+        <div class="ph-right">
+          <button class="btn btn-ghost" data-act="ed-cancel">Annuler</button>
+          <button class="btn btn-ghost" data-act="ed-preview">👁 Aperçu</button>
+          <button class="btn btn-dark" data-act="ed-draft">💾 Brouillon</button>
+          <button class="btn btn-primary" data-act="ed-publish">✓ Publier</button>
+        </div>
+      </div>
+      <div id="ed-warn"></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-title">⚙️ Paramètres</div>
+        <div class="fgrid">
+          <div class="fg full"><label class="flabel" for="eq-title">Titre *</label><input class="finp" id="eq-title" maxlength="160" placeholder="Ex : Sécurité incendie — CTN"></div>
+          <div class="fg full"><label class="flabel" for="eq-desc">Description / consignes</label><textarea class="ftxt" id="eq-desc" placeholder="Objectif du questionnaire, consignes pour l'agent…"></textarea></div>
+          <div class="fg"><label class="flabel" for="eq-role">Fonction cible</label><select class="fsel" id="eq-role"></select></div>
+          <div class="fg"><label class="flabel" for="eq-site">Site cible</label><select class="fsel" id="eq-site"></select></div>
+          <div class="fg"><label class="flabel" for="eq-time">Durée (min)</label><input class="finp" type="number" id="eq-time" min="0" max="600" placeholder="0 = illimitée"></div>
+          <div class="fg"><label class="flabel" for="eq-pass">Note de passage (%)</label><input class="finp" type="number" id="eq-pass" min="0" max="100" value="70"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>❓ Questions <span class="badge b-gray mono" id="ed-qcount">0</span> <span class="badge b-blue mono" id="ed-pts">0 pt</span></span>
+          <button class="btn btn-primary btn-sm" data-act="q-add">+ Ajouter une question</button></div>
+        <div id="ed-qlist"></div>
+      </div>
+    </section>
+
+    <!-- ── RESULTS ── -->
+    <section class="view" id="v-results">
+      <div class="ph">
+        <div><div class="ph-title">Résultats</div><div class="ph-sub">Résultats des agents par questionnaire · correction des questions ouvertes</div></div>
+        <div class="ph-right">
+          <div class="seg"><button class="on" data-mode="sessions">Par passage</button><button data-mode="agents">Par agent</button></div>
+          <button class="btn btn-ghost btn-sm" data-act="csv">⬇ Export CSV</button>
+          <button class="btn btn-ghost btn-sm" data-act="refresh">↻ Actualiser</button>
+        </div>
+      </div>
+      <div class="kpis" id="res-kpis"></div>
+      <div class="sbar">
+        <input class="inp" id="r-search" placeholder="🔍 Agent…">
+        <select class="sel" id="r-quiz"><option value="">Tous les questionnaires</option></select>
+        <select class="sel" id="r-status">
+          <option value="">Tous statuts</option><option value="submitted">À corriger</option><option value="corrected">Terminés</option><option value="pending">Non terminés</option>
+        </select>
+        <input class="sel" type="date" id="r-from" title="Du">
+        <input class="sel" type="date" id="r-to" title="Au">
+        <button class="btn btn-ghost btn-sm" data-act="r-clear">✕ Filtres</button>
+      </div>
+      <div class="count" id="r-count"></div>
+      <div class="card" style="padding:0"><div class="tbl-wrap" id="r-table"></div></div>
+    </section>
+  </main>
+</div>
+
+<!-- ═══════════ MODAL : QUESTION ═══════════ -->
+<div class="overlay" id="m-question">
+  <div class="modal">
+    <div class="mhdr"><div><div class="m-title" id="mq-title">Nouvelle question</div></div><button class="m-close" data-close>✕</button></div>
+    <div class="mbody">
+      <div class="types" id="mq-types"></div>
+      <label class="flabel" for="mq-text">Question *</label>
+      <textarea class="ftxt" id="mq-text" placeholder="Intitulé de la question…"></textarea>
+      <div id="mq-opts-zone" style="margin-top:14px">
+        <label class="flabel" id="mq-opts-hint">Réponses — cochez la bonne réponse</label>
+        <div id="mq-opts"></div>
+        <button class="btn btn-ghost btn-sm" type="button" data-act="opt-add">+ Ajouter une réponse</button>
+      </div>
+      <div id="mq-tf-zone" style="margin-top:14px">
+        <label class="flabel">Bonne réponse</label>
+        <div class="tf-row">
+          <label><input type="radio" name="mq-tf" value="true"><span>✅ Vrai</span></label>
+          <label><input type="radio" name="mq-tf" value="false"><span>❌ Faux</span></label>
+        </div>
+      </div>
+      <div id="mq-open-zone" class="info" style="margin-top:14px">✏️ Question ouverte : l'agent répond librement, la note est attribuée manuellement dans l'onglet Résultats.</div>
+      <div class="mrow">
+        <div><label class="flabel" for="mq-pts">Points</label><input class="finp" type="number" id="mq-pts" min="0.5" step="0.5" value="1"></div>
+        <div><label class="flabel" for="mq-expl">Explication (affichée à l'agent après soumission)</label><input class="finp" id="mq-expl" placeholder="Pourquoi c'est la bonne réponse…"></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn btn-ghost" data-close>Annuler</button><button class="btn btn-primary" data-act="q-save">✓ Enregistrer la question</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL : APERÇU ═══════════ -->
+<div class="overlay" id="m-preview">
+  <div class="modal lg">
+    <div class="mhdr"><div><div class="m-title" id="pv-title">Aperçu</div><div class="m-sub" id="pv-sub"></div></div><button class="m-close" data-close>✕</button></div>
+    <div class="mbody" id="pv-body"></div>
+    <div class="mfoot"><button class="btn btn-ghost" data-close>Fermer</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL : PARTAGE ═══════════ -->
+<div class="overlay" id="m-share">
+  <div class="modal">
+    <div class="mhdr"><div><div class="m-title">🔗 Partager le questionnaire</div><div class="m-sub" id="sh-name"></div></div><button class="m-close" data-close>✕</button></div>
+    <div class="mbody">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Envoyez ce lien aux agents. Ils choisissent leur nom dans la liste au démarrage du quiz.</p>
+      <input class="finp mono" id="sh-link" readonly style="font-size:12px">
+    </div>
+    <div class="mfoot"><button class="btn btn-ghost" data-act="sh-open">↗ Ouvrir</button><button class="btn btn-primary" data-act="sh-copy">📋 Copier le lien</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL : RÉSULTAT / CORRECTION ═══════════ -->
+<div class="overlay" id="m-session">
+  <div class="modal lg">
+    <div class="mhdr"><div><div class="m-title" id="ss-title">Résultat</div><div class="m-sub" id="ss-sub"></div></div><button class="m-close" data-close>✕</button></div>
+    <div class="mbody" id="ss-body"></div>
+    <div class="mfoot">
+      <span class="note">La note est enregistrée dans les résultats du quiz. Le report dans la fiche formation RH reste fait par l'administration.</span>
+      <button class="btn btn-ghost" data-close>Fermer</button>
+      <button class="btn btn-ghost" data-act="ss-print">🖨 Imprimer</button>
+      <button class="btn btn-primary" data-act="ss-save" id="ss-save">✓ Enregistrer la correction</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════
+const SUPA_URL  = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const QUIZ_AGENT_URL = 'https://rdz-2026.github.io/routeops/Quiz_Agent_RDZ.html';
+const PORTAL_URL     = 'https://rdz-2026.github.io/routeops/RDZ_index.html';
+// Roles (profiles.role) allowed to use this module
+const ALLOWED_ROLES = ['admin','superviseur','supervisor'];
+// Dedicated storage keys: never shares a session with RH_RDZ (rdz_session)
+const SK = 'rdz_quizsup_session';
+const CK = 'rdz_quizsup_cache_v1';
+const DK = 'rdz_quizsup_dirty_v1';
+const ROLE_OPTIONS = ['Agent de sécurité','Agent de sécurité incendie','Chef de groupe','Planificateur','Spécialiste incendie'];
+const SITE_OPTIONS = ['Barton','Bellevue','CTN','Collex','DLCC','HDLT','MDE','MDP','MSF','Moynier','Papeterie','Parkings','REGM','Rotschild','Seujet'];
+const QTYPES = {
+  qcm:{icon:'🔘',label:'Choix unique'},
+  multiple:{icon:'☑️',label:'Choix multiple'},
+  truefalse:{icon:'⚖️',label:'Vrai / Faux'},
+  open:{icon:'✏️',label:'Ouverte'}
+};
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let session = null;
+let S = emptyState();
+let dirty = [];
+let syncing = false, pullRunning = false, pullAgain = false, netDown = false;
+let ui = { tab:'quiz', resMode:'sessions', editor:null, q:null, corr:null, shareId:null };
+let timersStarted = false;
+
+function emptyState(){ return { owner:null, templates:[], questions:{}, sessions:[], answers:{}, lastSync:null }; }
+
+// ════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function uuid(){ if(window.crypto&&crypto.randomUUID) return crypto.randomUUID(); return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);}); }
+function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ console.warn('storage',e); } }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function saveCache(){ lsSet(CK,S); }
+function saveDirty(){ lsSet(DK,dirty); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function fDate(iso){ if(!iso) return '—'; const d=new Date(iso); return isNaN(d)?'—':d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fDateTime(iso){ if(!iso) return '—'; const d=new Date(iso); return isNaN(d)?'—':d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function fDuration(a,b){ if(!a||!b) return '—'; const ms=new Date(b)-new Date(a); if(isNaN(ms)||ms<0) return '—'; const m=Math.floor(ms/60000), s=Math.floor(ms/1000)%60; return m>=60?Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'):m+' min '+String(s).padStart(2,'0')+'s'; }
+function roleAllowed(r){ return ALLOWED_ROLES.indexOf(String(r||'').toLowerCase().trim())>=0; }
+function toast(msg,type,ms){ const t=document.createElement('div'); t.className='toast '+(type||'ok'); t.textContent=msg; $('toasts').appendChild(t); setTimeout(()=>t.remove(),ms||3200); }
+function plural(n,w){ return n+' '+w+(n>1?'s':''); }
+function ptsLabel(p){ return p+' pt'+(p>1?'s':''); }
+
+class HttpError extends Error{ constructor(status,msg){ super(msg); this.status=status; } }
+function isNetErr(e){ return e instanceof TypeError || (e && e.name==='TypeError'); }
+
+// ════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════
+async function doLogin(ev){
+  ev.preventDefault();
+  const email=$('li-email').value.trim(), pass=$('li-pass').value;
+  const btn=$('li-btn'), err=$('li-err');
+  err.style.display='none';
+  if(!email||!pass) return;
+  btn.disabled=true; btn.textContent='Connexion…';
+  try{
+    const r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPA_ANON},body:JSON.stringify({email:email,password:pass})});
+    const auth=await r.json().catch(()=>({}));
+    if(!r.ok||!auth.access_token) throw new Error('Email ou mot de passe incorrect.');
+    const pr=await fetch(SUPA_URL+'/rest/v1/profiles?id=eq.'+auth.user.id+'&select=id,full_name,role,active',{headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+auth.access_token}});
+    const profiles=pr.ok?await pr.json():[];
+    const p=Array.isArray(profiles)?profiles[0]:null;
+    if(!p||!p.active||!roleAllowed(p.role)){
+      fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+auth.access_token}}).catch(()=>{});
+      throw new Error(!p||!p.active?'Compte inactif ou accès refusé.':'Accès réservé aux superviseurs et administrateurs.');
+    }
+    const now=Math.floor(Date.now()/1000);
+    session={ token:auth.access_token, refresh:auth.refresh_token, expires_at:auth.expires_at||(now+(auth.expires_in||3600)),
+      user_id:auth.user.id, email:auth.user.email, full_name:p.full_name||auth.user.email, role:p.role };
+    lsSet(SK,session);
+    if(S.owner && S.owner!==session.user_id){ S=emptyState(); dirty=[]; saveDirty(); }
+    S.owner=session.user_id; saveCache();
+    $('li-pass').value='';
+    startApp();
+  }catch(e){
+    err.textContent=isNetErr(e)?'Connexion impossible : vérifiez le réseau.':e.message;
+    err.style.display='block';
+  }finally{ btn.disabled=false; btn.textContent='Se connecter'; }
+}
+
+async function ensureToken(){
+  if(!session) throw new HttpError(401,'Non connecté');
+  const now=Math.floor(Date.now()/1000);
+  if(session.expires_at && session.expires_at-now>60) return session.token;
+  const r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPA_ANON},body:JSON.stringify({refresh_token:session.refresh})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.access_token) throw new HttpError(401,'Session expirée');
+  session.token=d.access_token; session.refresh=d.refresh_token||session.refresh;
+  session.expires_at=d.expires_at||(now+(d.expires_in||3600));
+  lsSet(SK,session);
+  return session.token;
+}
+
+function sessionLost(){
+  // Keep cached data and pending changes: after logging in again (same user) they are pushed.
+  const email=session&&session.email;
+  session=null; lsDel(SK);
+  $('app').hidden=true; $('login').style.display='flex';
+  $('li-email').value=email||'';
+  const info=$('li-info'); info.hidden=false;
+  info.textContent='Votre session a expiré. Reconnectez-vous'+(dirty.length?' : '+plural(dirty.length,'modification')+' en attente sera envoyée ensuite.':'.');
+}
+
+async function doLogout(){
+  if(dirty.length && !confirm(plural(dirty.length,'modification')+' non synchronisée(s) seront perdues. Se déconnecter quand même ?')) return;
+  const tok=session&&session.token;
+  if(tok) fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':SUPA_ANON,'Authorization':'Bearer '+tok}}).catch(()=>{});
+  session=null; S=emptyState(); dirty=[];
+  lsDel(SK); lsDel(CK); lsDel(DK);
+  $('user-menu').hidden=true;
+  $('app').hidden=true; $('login').style.display='flex'; $('li-info').hidden=true;
+}
+
+// ════════════════════════════════════════════════════════════
+// SUPABASE REST
+// ════════════════════════════════════════════════════════════
+async function sb(path,opts){
+  opts=opts||{};
+  const token=await ensureToken();
+  const headers={'apikey':SUPA_ANON,'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+  if(opts.prefer) headers['Prefer']=opts.prefer;
+  const r=await fetch(SUPA_URL+'/rest/v1/'+path,{method:opts.method||'GET',headers:headers,body:opts.body!==undefined?JSON.stringify(opts.body):undefined});
+  const txt=await r.text();
+  if(!r.ok){
+    let msg=txt; try{ const j=JSON.parse(txt); msg=j.message||j.hint||txt; }catch(e){}
+    throw new HttpError(r.status,msg||('HTTP '+r.status));
+  }
+  if(!txt) return null;
+  try{ return JSON.parse(txt); }catch(e){ return null; }
+}
+
+// ════════════════════════════════════════════════════════════
+// OFFLINE QUEUE (dirty ops)
+// ════════════════════════════════════════════════════════════
+function applyOpLocal(op){
+  if(op.kind==='saveQuiz'){
+    const i=S.templates.findIndex(t=>t.id===op.template.id);
+    const t=Object.assign({},i>=0?S.templates[i]:{},op.template);
+    if(i>=0) S.templates[i]=t; else S.templates.unshift(t);
+    S.questions[op.template.id]=clone(op.questions);
+  }else if(op.kind==='deleteQuiz'){
+    S.templates=S.templates.filter(t=>t.id!==op.id);
+    delete S.questions[op.id];
+  }else if(op.kind==='correction'){
+    const s=S.sessions.find(x=>x.id===op.session.id);
+    if(s) Object.assign(s,op.session);
+    const arr=S.answers[op.session.id];
+    if(arr) op.answers.forEach(p=>{ const a=arr.find(x=>x.id===p.id); if(a) Object.assign(a,p); });
+  }
+}
+
+function queueOp(op){
+  op.opId=uuid(); op.at=new Date().toISOString();
+  // Newer op supersedes older pending ones on the same object
+  if(op.kind==='saveQuiz') dirty=dirty.filter(o=>!(o.kind==='saveQuiz'&&o.template.id===op.template.id));
+  if(op.kind==='deleteQuiz') dirty=dirty.filter(o=>!(o.kind==='saveQuiz'&&o.template.id===op.id));
+  if(op.kind==='correction') dirty=dirty.filter(o=>!(o.kind==='correction'&&o.session.id===op.session.id));
+  dirty.push(op); saveDirty();
+  applyOpLocal(op); saveCache();
+  renderAll(); updateSyncState();
+  pullAll(true);
+}
+
+async function pushOp(op){
+  if(op.kind==='saveQuiz'){
+    await sb('quiz_templates?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:[op.template]});
+    const ids=op.questions.map(q=>q.id);
+    if(ids.length) await sb('quiz_questions?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:op.questions});
+    const del='quiz_questions?template_id=eq.'+op.template.id+(ids.length?'&id=not.in.('+ids.join(',')+')':'');
+    try{ await sb(del,{method:'DELETE',prefer:'return=minimal'}); }
+    catch(e){
+      if(e.status===409) toast("Des questions retirées sont liées à des résultats d'agents : elles ont été conservées.",'warn',7000);
+      else throw e;
+    }
+  }else if(op.kind==='deleteQuiz'){
+    try{
+      await sb('quiz_questions?template_id=eq.'+op.id,{method:'DELETE',prefer:'return=minimal'});
+      await sb('quiz_templates?id=eq.'+op.id,{method:'DELETE',prefer:'return=minimal'});
+    }catch(e){
+      if(e.status===409){ toast('Suppression impossible : des résultats sont liés. Passez-le plutôt en brouillon.','err',8000); return; }
+      throw e;
+    }
+  }else if(op.kind==='correction'){
+    for(const a of op.answers){
+      await sb('quiz_answers?id=eq.'+a.id,{method:'PATCH',prefer:'return=minimal',body:{points_earned:a.points_earned,admin_comment:a.admin_comment,is_correct:a.is_correct}});
+    }
+    const s=op.session;
+    await sb('quiz_sessions?id=eq.'+s.id,{method:'PATCH',prefer:'return=minimal',body:{final_score:s.final_score,status:'corrected',corrected_at:s.corrected_at,corrected_by:s.corrected_by}});
+  }
+}
+
+async function pushDirty(){
+  if(syncing||!dirty.some(o=>!o.failed)) return;
+  syncing=true;
+  try{
+    for(const op of dirty.slice()){
+      if(op.failed) continue;
+      try{
+        await pushOp(op);
+        dirty=dirty.filter(o=>o.opId!==op.opId); saveDirty();
+      }catch(e){
+        if(isNetErr(e)||e.status===401) throw e;
+        op.failed=true; op.error=e.message; saveDirty();
+        toast('Échec de synchronisation : '+e.message,'err',7000);
+      }
+    }
+  }finally{ syncing=false; }
+}
+
+async function pullAll(silent){
+  if(!session) return;
+  if(pullRunning){ pullAgain=true; return; }
+  pullRunning=true; setSync('saving','Synchronisation…');
+  try{
+    await pushDirty();
+    const res=await Promise.all([
+      sb('quiz_templates?select=*&order=created_at.desc'),
+      sb('quiz_questions?select=id,template_id,pos,type,text,options,correct_answers,points,explanation&order=pos.asc'),
+      sb('quiz_sessions?select=*&order=started_at.desc.nullslast')
+    ]);
+    S.templates=res[0]||[];
+    S.questions={};
+    (res[1]||[]).forEach(q=>{ (S.questions[q.template_id]=S.questions[q.template_id]||[]).push(q); });
+    S.sessions=res[2]||[];
+    dirty.forEach(applyOpLocal);
+    S.lastSync=new Date().toISOString(); S.owner=session.user_id;
+    netDown=false; saveCache(); renderAll();
+    if(!silent) toast('Données à jour','ok',1800);
+  }catch(e){
+    if(e.status===401){ pullRunning=false; sessionLost(); return; }
+    if(isNetErr(e)){ netDown=true; if(!silent) toast('Hors ligne : affichage des données locales','warn'); }
+    else toast('Erreur de chargement : '+e.message,'err',6000);
+  }finally{
+    pullRunning=false; updateSyncState();
+    if(pullAgain){ pullAgain=false; pullAll(true); }
+  }
+}
+
+function setSync(state,label){ $('sync-dot').className='sync-dot '+state; $('sync-lbl').textContent=label; }
+function updateSyncState(){
+  const pending=dirty.filter(o=>!o.failed).length, failed=dirty.filter(o=>o.failed).length;
+  if(!navigator.onLine||netDown) setSync('offline','Hors ligne'+(pending?' · '+pending+' en attente':''));
+  else if(failed) setSync('error',plural(failed,'échec'));
+  else if(pending||syncing||pullRunning) setSync('saving','Synchronisation…');
+  else setSync('ok','Synchronisé');
+  if(!$('sync-pop').hidden) renderSyncPop();
+}
+function renderSyncPop(){
+  const pending=dirty.filter(o=>!o.failed), failed=dirty.filter(o=>o.failed);
+  const label={saveQuiz:'Questionnaire',deleteQuiz:'Suppression',correction:'Correction'};
+  $('sync-pop').innerHTML=
+    '<div class="row"><span>Dernière synchro</span><b>'+(S.lastSync?fDateTime(S.lastSync):'—')+'</b></div>'+
+    '<div class="row"><span>Connexion</span><b>'+(navigator.onLine&&!netDown?'En ligne':'Hors ligne')+'</b></div>'+
+    '<div class="row"><span>En attente d’envoi</span><b>'+pending.length+'</b></div>'+
+    failed.map(o=>'<div class="fail">✗ '+esc(label[o.kind]||o.kind)+' — '+esc(o.error||'')+'</div>').join('')+
+    '<div class="acts"><button class="btn btn-primary btn-sm" data-act="sync-now">↻ Synchroniser</button>'+
+    (failed.length?'<button class="btn btn-ghost btn-sm" data-act="sync-retry">Réessayer les échecs</button><button class="btn btn-danger btn-sm" data-act="sync-drop">Abandonner les échecs</button>':'')+'</div>';
+}
+
+// ════════════════════════════════════════════════════════════
+// APP START
+// ════════════════════════════════════════════════════════════
+function startApp(){
+  $('login').style.display='none'; $('app').hidden=false; $('li-info').hidden=true;
+  const n=session.full_name||session.email;
+  $('u-name').textContent=n; $('m-name').textContent=n; $('m-email').textContent=session.email;
+  $('m-role').textContent='Rôle : '+session.role+' · 🔒 Accès quiz uniquement';
+  $('u-avatar').textContent=n.split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
+  renderAll(); updateSyncState();
+  pullAll(true);
+  if(!timersStarted){
+    timersStarted=true;
+    setInterval(()=>{ if(session&&document.visibilityState==='visible'&&navigator.onLine) pullAll(true); },180000);
+    window.addEventListener('online',()=>{ netDown=false; updateSyncState(); pullAll(true); });
+    window.addEventListener('offline',updateSyncState);
+  }
+}
+
+function renderAll(){
+  fillSelects();
+  renderQuizView();
+  renderResults();
+  const toCorrect=S.sessions.filter(s=>s.status==='submitted').length;
+  const b=$('badge-corr'); b.hidden=!toCorrect; b.textContent=toCorrect;
+}
+
+function showView(name){
+  ['quiz','editor','results'].forEach(v=>$('v-'+v).classList.toggle('active',v===name));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===(name==='editor'?'quiz':name)));
+  window.scrollTo(0,0);
+}
+function switchTab(tab){
+  if(ui.editor&&ui.editor.changed&&!confirm('Quitter l’éditeur sans enregistrer ?')) return;
+  ui.editor=null; ui.tab=tab; showView(tab);
+  if(tab==='results') pullAll(true);
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPERS DATA
+// ════════════════════════════════════════════════════════════
+function tpl(id){ return S.templates.find(t=>t.id===id); }
+function qsOf(id){ return (S.questions[id]||[]).slice().sort((a,b)=>(a.pos||0)-(b.pos||0)); }
+function totalPts(qs){ return qs.reduce((a,q)=>a+(Number(q.points)||1),0); }
+function sessOf(id){ return S.sessions.filter(s=>s.template_id===id); }
+function scoreOf(s){ return s.final_score!=null?s.final_score:(s.status==='corrected'?s.auto_score:null); }
+function passingOf(s){ const t=tpl(s.template_id); return t&&t.passing_score!=null?t.passing_score:70; }
+
+function fillSelects(){
+  const keep=(id,html)=>{ const el=$(id); const v=el.value; el.innerHTML=html; el.value=v; if(el.value!==v) el.value=''; };
+  keep('eq-role','<option value="">Tous les agents</option>'+ROLE_OPTIONS.map(r=>'<option>'+esc(r)+'</option>').join(''));
+  keep('eq-site','<option value="">Tous sites</option>'+SITE_OPTIONS.map(r=>'<option>'+esc(r)+'</option>').join(''));
+  keep('q-site','<option value="">Tous sites</option>'+SITE_OPTIONS.map(r=>'<option>'+esc(r)+'</option>').join(''));
+  keep('r-quiz','<option value="">Tous les questionnaires</option>'+S.templates.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join(''));
+}
+
+// ════════════════════════════════════════════════════════════
+// QUESTIONNAIRES LIST
+// ════════════════════════════════════════════════════════════
+function kpi(label,cls,val,sub){ return '<div class="kpi"><div class="kpi-l">'+label+'</div><div class="kpi-v '+cls+'">'+val+'</div><div class="kpi-s">'+sub+'</div></div>'; }
+
+function renderQuizView(){
+  const T=S.templates;
+  const act=T.filter(t=>t.status==='active').length;
+  $('quiz-kpis').innerHTML=
+    kpi('Questionnaires','c-blue',T.length,'au total')+
+    kpi('Publiés','c-green',act,'accessibles aux agents')+
+    kpi('Brouillons','c-orange',T.length-act,'à finaliser')+
+    kpi('À corriger','c-red',S.sessions.filter(s=>s.status==='submitted').length,'questions ouvertes');
+  const q=$('q-search').value.toLowerCase().trim(), st=$('q-status').value, site=$('q-site').value;
+  const list=T.filter(t=>{
+    if(st&&t.status!==st) return false;
+    if(site&&t.target_site!==site) return false;
+    if(q&&!((t.title||'')+' '+(t.description||'')+' '+(t.target_site||'')+' '+(t.target_role||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $('q-count').textContent=plural(list.length,'questionnaire');
+  if(!list.length){
+    $('q-grid').innerHTML='<div class="empty"><div class="empty-ico">📋</div>'+(T.length?'Aucun questionnaire ne correspond aux filtres.':'Aucun questionnaire pour l’instant.<br>Cliquez sur « + Nouveau questionnaire ».')+'</div>';
+    return;
+  }
+  $('q-grid').innerHTML=list.map(t=>{
+    const qs=qsOf(t.id), ses=sessOf(t.id), done=ses.filter(s=>scoreOf(s)!=null);
+    const avg=done.length?Math.round(done.reduce((a,s)=>a+scoreOf(s),0)/done.length):null;
+    const pend=dirty.some(o=>o.kind==='saveQuiz'&&o.template.id===t.id);
+    const isAct=t.status==='active';
+    return '<div class="qcard'+(isAct?' active':'')+'">'+
+      '<div class="qc-top"><div class="qc-title" data-act="edit" data-id="'+esc(t.id)+'">'+esc(t.title)+'</div>'+
+      '<span class="badge '+(isAct?'b-green':'b-gray')+'">'+(isAct?'Publié':'Brouillon')+'</span></div>'+
+      (t.description?'<div class="qc-desc">'+esc(t.description)+'</div>':'')+
+      '<div class="qc-tags">'+
+        (t.target_role?'<span class="badge b-blue">👤 '+esc(t.target_role)+'</span>':'')+
+        (t.target_site?'<span class="badge b-orange">📍 '+esc(t.target_site)+'</span>':'')+
+        '<span class="badge b-gray">⏱ '+(t.time_limit_min?t.time_limit_min+' min':'Libre')+'</span>'+
+        '<span class="badge b-gray">✅ '+(t.passing_score!=null?t.passing_score:70)+' %</span>'+
+        (pend?'<span class="badge b-orange">⏳ Non synchronisé</span>':'')+
+      '</div>'+
+      '<div class="qc-stats"><span><b>'+qs.length+'</b> questions</span><span><b>'+ses.length+'</b> passages</span><span>Moy. <b>'+(avg!=null?avg+' %':'—')+'</b></span></div>'+
+      '<div class="qc-acts">'+
+        '<button class="btn btn-ghost btn-xs" data-act="edit" data-id="'+esc(t.id)+'">✏️ Modifier</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="preview" data-id="'+esc(t.id)+'">👁 Aperçu</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="share" data-id="'+esc(t.id)+'">🔗 Lien</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="results-of" data-id="'+esc(t.id)+'">📊 Résultats</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="duplicate" data-id="'+esc(t.id)+'">⧉ Dupliquer</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="toggle" data-id="'+esc(t.id)+'">'+(isAct?'⏸ Dépublier':'▶ Publier')+'</button>'+
+        '<button class="btn btn-danger btn-xs" data-act="delete" data-id="'+esc(t.id)+'">🗑</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+function buildTemplatePayload(base,fields,isNew){
+  const now=new Date().toISOString();
+  return {
+    id:base.id,
+    title:fields.title, description:fields.description||null,
+    target_role:fields.target_role||null, target_site:fields.target_site||null,
+    time_limit_min:fields.time_limit_min||null,
+    passing_score:fields.passing_score!=null?fields.passing_score:70,
+    status:fields.status,
+    created_at:base.created_at||now, updated_at:now,
+    created_by:isNew?(session.full_name||session.email):(base.created_by!=null?base.created_by:null)
+  };
+}
+function buildQuestionsPayload(tid,qs){
+  return qs.map((q,i)=>({
+    id:q.id, template_id:tid, pos:i, type:q.type, text:q.text,
+    options:(q.type==='qcm'||q.type==='multiple')?q.options:null,
+    correct_answers:q.type==='open'?null:q.correct_answers,
+    points:Number(q.points)||1, explanation:q.explanation||null
+  }));
+}
+
+function toggleStatus(id){
+  const t=tpl(id); if(!t) return;
+  const qs=qsOf(id);
+  const next=t.status==='active'?'draft':'active';
+  if(next==='active'&&!qs.length){ toast('Ajoutez au moins une question avant de publier.','warn'); return; }
+  if(next==='draft'&&!confirm('Dépublier « '+t.title+' » ? Les agents ne pourront plus y répondre via le lien.')) return;
+  queueOp({kind:'saveQuiz',template:buildTemplatePayload(t,Object.assign({},t,{status:next}),false),questions:buildQuestionsPayload(id,qs)});
+  toast(next==='active'?'Questionnaire publié':'Questionnaire repassé en brouillon');
+}
+function duplicateQuiz(id){
+  const t=tpl(id); if(!t) return;
+  const nid=uuid();
+  const qs=qsOf(id).map(q=>Object.assign({},q,{id:uuid()}));
+  queueOp({kind:'saveQuiz',template:buildTemplatePayload({id:nid},Object.assign({},t,{title:t.title+' (copie)',status:'draft'}),true),questions:buildQuestionsPayload(nid,qs)});
+  toast('Copie créée en brouillon');
+}
+function deleteQuiz(id){
+  const t=tpl(id); if(!t) return;
+  const n=sessOf(id).length;
+  if(!confirm('Supprimer définitivement « '+t.title+' » ?'+(n?'\n\n⚠ '+plural(n,'passage')+' d’agents est lié à ce questionnaire. Pour conserver l’historique, préférez « Dépublier ».':''))) return;
+  queueOp({kind:'deleteQuiz',id:id});
+  toast('Questionnaire supprimé');
+}
+function openShare(id){
+  const t=tpl(id); if(!t) return;
+  if(t.status!=='active'){ toast('Publiez le questionnaire avant de le partager.','warn'); return; }
+  if(dirty.some(o=>o.kind==='saveQuiz'&&o.template.id===id)) toast('Attention : ce questionnaire n’est pas encore synchronisé, le lien ne fonctionnera qu’après synchronisation.','warn',6000);
+  ui.shareId=id;
+  $('sh-name').textContent=t.title;
+  $('sh-link').value=QUIZ_AGENT_URL+'?quiz='+encodeURIComponent(id);
+  openModal('m-share');
+}
+
+// ════════════════════════════════════════════════════════════
+// PREVIEW
+// ════════════════════════════════════════════════════════════
+function renderPreview(title,meta,qs){
+  $('pv-title').textContent='👁 '+(title||'Sans titre');
+  $('pv-sub').textContent=meta;
+  if(!qs.length){ $('pv-body').innerHTML='<div class="empty">Aucune question.</div>'; openModal('m-preview'); return; }
+  $('pv-body').innerHTML=qs.map((q,i)=>{
+    let body='';
+    if(q.type==='qcm'||q.type==='multiple'){
+      body=(q.options||[]).map(o=>{ const ok=(q.correct_answers||[]).indexOf(o)>=0; return '<div class="ans'+(ok?' ok':'')+'">'+(ok?'✅ ':'○ ')+esc(o)+'</div>'; }).join('');
+    }else if(q.type==='truefalse'){
+      const c=String((q.correct_answers||[])[0]);
+      body='<div class="ans'+(c==='true'?' ok':'')+'">'+(c==='true'?'✅ ':'○ ')+'Vrai</div><div class="ans'+(c==='false'?' ok':'')+'">'+(c==='false'?'✅ ':'○ ')+'Faux</div>';
+    }else body='<div class="ans open">✏️ Réponse libre de l’agent — correction manuelle</div>';
+    return '<div class="aq"><div class="aq-h">Question '+(i+1)+' · '+QTYPES[q.type].icon+' '+QTYPES[q.type].label+' · '+ptsLabel(Number(q.points)||1)+'</div>'+
+      '<div class="aq-t">'+esc(q.text)+'</div>'+body+(q.explanation?'<div class="expl">💡 '+esc(q.explanation)+'</div>':'')+'</div>';
+  }).join('');
+  openModal('m-preview');
+}
+function previewQuiz(id){
+  const t=tpl(id); if(!t) return;
+  const qs=qsOf(id);
+  renderPreview(t.title,plural(qs.length,'question')+' · '+totalPts(qs)+' pts · réussite à '+(t.passing_score!=null?t.passing_score:70)+' %',qs);
+}
+
+// ════════════════════════════════════════════════════════════
+// EDITOR
+// ════════════════════════════════════════════════════════════
+function openEditor(id){
+  const t=id?tpl(id):null;
+  if(id&&!t) return;
+  ui.editor={ id:t?t.id:uuid(), isNew:!t, base:t?clone(t):{}, qs:t?clone(qsOf(id)):[], changed:false };
+  $('ed-title').textContent=t?'Modifier le questionnaire':'Nouveau questionnaire';
+  $('ed-sub').textContent=t?('Statut : '+(t.status==='active'?'publié':'brouillon')+' · créé par '+(t.created_by||'—')+' le '+fDate(t.created_at)):'Le questionnaire sera enregistré en brouillon ou publié.';
+  $('eq-title').value=t?t.title||'':'';
+  $('eq-desc').value=t?t.description||'':'';
+  $('eq-role').value=t?t.target_role||'':'';
+  $('eq-site').value=t?t.target_site||'':'';
+  $('eq-time').value=t&&t.time_limit_min?t.time_limit_min:'';
+  $('eq-pass').value=t&&t.passing_score!=null?t.passing_score:70;
+  const n=t?sessOf(t.id).length:0;
+  $('ed-warn').innerHTML=n?'<div class="warnbox">⚠ '+plural(n,'passage')+' d’agents existe déjà sur ce questionnaire. Les notes enregistrées ne changent pas, mais le détail des anciens résultats s’affichera avec les questions modifiées.</div>':'';
+  renderEditorQuestions();
+  showView('editor');
+}
+function edChanged(){ if(ui.editor) ui.editor.changed=true; }
+function renderEditorQuestions(){
+  const qs=ui.editor.qs;
+  $('ed-qcount').textContent=qs.length;
+  $('ed-pts').textContent=totalPts(qs)+' pts';
+  if(!qs.length){ $('ed-qlist').innerHTML='<div class="empty"><div class="empty-ico">❓</div>Aucune question. Cliquez sur « + Ajouter une question ».</div>'; return; }
+  $('ed-qlist').innerHTML=qs.map((q,i)=>{
+    let opts='';
+    if(q.type==='qcm'||q.type==='multiple') opts='<div class="qopts">'+(q.options||[]).map(o=>'<span class="'+((q.correct_answers||[]).indexOf(o)>=0?'ok':'')+'">'+((q.correct_answers||[]).indexOf(o)>=0?'✓ ':'· ')+esc(o)+'</span>').join('')+'</div>';
+    else if(q.type==='truefalse') opts='<div class="qopts"><span class="ok">✓ '+(String((q.correct_answers||[])[0])==='true'?'Vrai':'Faux')+'</span></div>';
+    return '<div class="qitem"><span class="qnum">Q'+String(i+1).padStart(2,'0')+'</span><div class="qbody">'+
+      '<div class="qtext">'+esc(q.text)+'</div>'+
+      '<div class="qmeta"><span class="badge b-gray">'+QTYPES[q.type].icon+' '+QTYPES[q.type].label+'</span><span>'+ptsLabel(Number(q.points)||1)+'</span>'+
+      (q.type==='open'?'<span class="badge b-orange">Correction manuelle</span>':'<span class="badge b-green">Auto-corrigée</span>')+'</div>'+opts+'</div>'+
+      '<div class="qacts">'+
+        '<button class="btn btn-ghost btn-xs" data-act="q-up" data-i="'+i+'" '+(i===0?'disabled':'')+' title="Monter">↑</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="q-down" data-i="'+i+'" '+(i===qs.length-1?'disabled':'')+' title="Descendre">↓</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="q-edit" data-i="'+i+'">✏️</button>'+
+        '<button class="btn btn-ghost btn-xs" data-act="q-dup" data-i="'+i+'" title="Dupliquer">⧉</button>'+
+        '<button class="btn btn-danger btn-xs" data-act="q-del" data-i="'+i+'">🗑</button>'+
+      '</div></div>';
+  }).join('');
+}
+function editorFields(status){
+  const time=parseInt($('eq-time').value,10), pass=parseInt($('eq-pass').value,10);
+  return { title:$('eq-title').value.trim(), description:$('eq-desc').value.trim(), target_role:$('eq-role').value, target_site:$('eq-site').value,
+    time_limit_min:time>0?time:null, passing_score:isNaN(pass)?70:Math.max(0,Math.min(100,pass)), status:status };
+}
+function saveEditor(status){
+  const ed=ui.editor, f=editorFields(status);
+  if(!f.title){ toast('Le titre est obligatoire.','err'); $('eq-title').focus(); return; }
+  if(status==='active'&&!ed.qs.length){ toast('Ajoutez au moins une question avant de publier.','err'); return; }
+  const base=Object.assign({},ed.base,{id:ed.id});
+  queueOp({kind:'saveQuiz',template:buildTemplatePayload(base,f,ed.isNew),questions:buildQuestionsPayload(ed.id,ed.qs)});
+  toast('« '+f.title+' » '+(status==='active'?'publié':'enregistré en brouillon'));
+  ui.editor=null; showView('quiz');
+}
+function cancelEditor(){
+  if(ui.editor&&ui.editor.changed&&!confirm('Abandonner les modifications ?')) return;
+  ui.editor=null; showView('quiz');
+}
+function previewEditor(){
+  const f=editorFields('draft');
+  renderPreview(f.title,plural(ui.editor.qs.length,'question')+' · '+totalPts(ui.editor.qs)+' pts · réussite à '+f.passing_score+' % (aperçu non enregistré)',ui.editor.qs);
+}
+
+// ── Question modal ──
+function openQuestion(i){
+  const q=i!=null?ui.editor.qs[i]:null;
+  ui.q={ idx:i!=null?i:null, id:q?q.id:uuid(), type:q?q.type:'qcm' };
+  $('mq-title').textContent=q?'Modifier la question '+(i+1):'Nouvelle question';
+  $('mq-text').value=q?q.text:'';
+  $('mq-pts').value=q?(q.points||1):1;
+  $('mq-expl').value=q?(q.explanation||''):'';
+  $('mq-opts').innerHTML='';
+  if(q&&(q.type==='qcm'||q.type==='multiple')) (q.options||[]).forEach(o=>addOption(o,(q.correct_answers||[]).indexOf(o)>=0,q.type));
+  else for(let k=0;k<3;k++) addOption('',false,ui.q.type);
+  document.querySelectorAll('input[name=mq-tf]').forEach(r=>{ r.checked=!!(q&&q.type==='truefalse'&&String((q.correct_answers||[])[0])===r.value); });
+  setQType(ui.q.type);
+  openModal('m-question');
+  setTimeout(()=>$('mq-text').focus(),50);
+}
+function setQType(type){
+  const prev=ui.q.type; ui.q.type=type;
+  $('mq-types').innerHTML=Object.keys(QTYPES).map(k=>'<button type="button" class="type-btn'+(k===type?' on':'')+'" data-qtype="'+k+'"><span class="ti">'+QTYPES[k].icon+'</span>'+QTYPES[k].label+'</button>').join('');
+  $('mq-opts-zone').hidden=!(type==='qcm'||type==='multiple');
+  $('mq-tf-zone').hidden=type!=='truefalse';
+  $('mq-open-zone').hidden=type!=='open';
+  $('mq-opts-hint').textContent=type==='multiple'?'Réponses — cochez toutes les bonnes réponses':'Réponses — cochez la bonne réponse (une seule)';
+  if(type==='qcm'||type==='multiple'){
+    // Convert existing option inputs between radio and checkbox, keeping values
+    const rows=Array.from(document.querySelectorAll('#mq-opts .opt-row')).map(r=>({v:r.querySelector('.finp').value,c:r.querySelector('input[name=mq-correct]').checked}));
+    $('mq-opts').innerHTML='';
+    let seen=false;
+    rows.forEach(r=>{ let c=r.c; if(type==='qcm'&&c){ if(seen) c=false; seen=true; } addOption(r.v,c,type); });
+    if(!rows.length) for(let k=0;k<3;k++) addOption('',false,type);
+  }
+  if(prev!==type) void 0;
+}
+function addOption(val,checked,type){
+  const row=document.createElement('div'); row.className='opt-row';
+  row.innerHTML='<input type="'+((type||ui.q.type)==='multiple'?'checkbox':'radio')+'" name="mq-correct" title="Bonne réponse">'+
+    '<input class="finp" placeholder="Réponse possible…" maxlength="300">'+
+    '<button type="button" class="btn btn-danger btn-xs" data-act="opt-del" title="Retirer">✕</button>';
+  row.querySelector('.finp').value=val||'';
+  row.querySelector('input[name=mq-correct]').checked=!!checked;
+  $('mq-opts').appendChild(row);
+}
+function saveQuestion(){
+  const text=$('mq-text').value.trim();
+  if(!text){ toast('L’intitulé est obligatoire.','err'); return; }
+  const pts=parseFloat($('mq-pts').value);
+  const type=ui.q.type;
+  let options=null, correct=null;
+  if(type==='qcm'||type==='multiple'){
+    options=[]; correct=[];
+    for(const r of document.querySelectorAll('#mq-opts .opt-row')){
+      const v=r.querySelector('.finp').value.trim(); if(!v) continue;
+      if(options.indexOf(v)>=0){ toast('Deux réponses identiques : « '+v+' ».','err'); return; }
+      options.push(v); if(r.querySelector('input[name=mq-correct]').checked) correct.push(v);
+    }
+    if(options.length<2){ toast('Au moins 2 réponses sont nécessaires.','err'); return; }
+    if(!correct.length){ toast('Cochez au moins une bonne réponse.','err'); return; }
+    if(type==='qcm'&&correct.length>1) correct=[correct[0]];
+  }else if(type==='truefalse'){
+    const c=document.querySelector('input[name=mq-tf]:checked');
+    if(!c){ toast('Indiquez si la bonne réponse est Vrai ou Faux.','err'); return; }
+    correct=[c.value==='true'];
+  }
+  const q={ id:ui.q.id, type:type, text:text, options:options, correct_answers:correct, points:pts>0?pts:1, explanation:$('mq-expl').value.trim()||null };
+  if(ui.q.idx!=null) ui.editor.qs[ui.q.idx]=q; else ui.editor.qs.push(q);
+  edChanged(); renderEditorQuestions(); closeModal('m-question');
+}
+
+// ════════════════════════════════════════════════════════════
+// RESULTS
+// ════════════════════════════════════════════════════════════
+function filteredSessions(){
+  const q=$('r-search').value.toLowerCase().trim(), qz=$('r-quiz').value, st=$('r-status').value, from=$('r-from').value, to=$('r-to').value;
+  return S.sessions.filter(s=>{
+    if(qz&&s.template_id!==qz) return false;
+    if(st&&s.status!==st) return false;
+    if(q&&!(s.agent_name||'').toLowerCase().includes(q)) return false;
+    const d=(s.submitted_at||s.started_at||'').slice(0,10);
+    if(from&&(!d||d<from)) return false;
+    if(to&&(!d||d>to)) return false;
+    return true;
+  }).sort((a,b)=>String(b.submitted_at||b.started_at||'').localeCompare(String(a.submitted_at||a.started_at||'')));
+}
+function resultBadge(s){
+  if(s.status==='pending') return '<span class="badge b-gray">⏳ Non terminé</span>';
+  if(s.status==='submitted') return '<span class="badge b-orange">📝 À corriger</span>';
+  const sc=scoreOf(s); if(sc==null) return '<span class="badge b-gray">—</span>';
+  return sc>=passingOf(s)?'<span class="badge b-green">🏆 Réussi</span>':'<span class="badge b-red">✗ Échec</span>';
+}
+function scoreCell(s){
+  const sc=scoreOf(s);
+  if(sc==null) return s.auto_score!=null?'<span class="mono" style="color:var(--text3)">'+s.auto_score+' % <small>(partiel)</small></span>':'—';
+  const col=sc>=passingOf(s)?'var(--green)':sc>=50?'var(--orange)':'var(--red)';
+  return '<b class="mono" style="color:'+col+'">'+sc+' %</b><span class="bar"><i style="width:'+sc+'%;background:'+col+'"></i></span>';
+}
+function renderResults(){
+  const list=filteredSessions();
+  const done=list.filter(s=>scoreOf(s)!=null);
+  const passed=done.filter(s=>scoreOf(s)>=passingOf(s)).length;
+  const avg=done.length?Math.round(done.reduce((a,s)=>a+scoreOf(s),0)/done.length):null;
+  $('res-kpis').innerHTML=
+    kpi('Passages','c-blue',list.length,'selon les filtres')+
+    kpi('À corriger','c-orange',list.filter(s=>s.status==='submitted').length,'questions ouvertes')+
+    kpi('Taux de réussite','c-green',done.length?Math.round(passed/done.length*100)+' %':'—',plural(passed,'réussite')+' / '+done.length)+
+    kpi('Moyenne','c-red',avg!=null?avg+' %':'—','notes finales');
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===ui.resMode));
+  if(ui.resMode==='agents') return renderAgents(list);
+  $('r-count').textContent=plural(list.length,'passage');
+  if(!list.length){ $('r-table').innerHTML='<div class="empty"><div class="empty-ico">📊</div>Aucun résultat.</div>'; return; }
+  $('r-table').innerHTML='<table><thead><tr><th>Agent</th><th>Questionnaire</th><th>Date</th><th>Durée</th><th>Score auto</th><th>Note finale</th><th>Résultat</th><th></th></tr></thead><tbody>'+
+    list.map(s=>{ const t=tpl(s.template_id);
+      return '<tr class="clickable" data-act="session" data-id="'+esc(s.id)+'">'+
+        '<td><b>'+esc(s.agent_name||'—')+'</b></td>'+
+        '<td>'+(t?esc(t.title):'<i style="color:var(--text3)">Questionnaire supprimé</i>')+'</td>'+
+        '<td class="mono" style="font-size:12px">'+fDateTime(s.submitted_at||s.started_at)+'</td>'+
+        '<td style="font-size:12px;color:var(--text2)">'+fDuration(s.started_at,s.submitted_at)+'</td>'+
+        '<td class="mono">'+(s.auto_score!=null?s.auto_score+' %':'—')+'</td>'+
+        '<td>'+scoreCell(s)+'</td>'+
+        '<td>'+resultBadge(s)+'</td>'+
+        '<td>'+(s.status==='submitted'?'<button class="btn btn-primary btn-xs" data-act="session" data-id="'+esc(s.id)+'">✏️ Corriger</button>':s.status==='corrected'?'<button class="btn btn-ghost btn-xs" data-act="session" data-id="'+esc(s.id)+'">Voir</button>':'')+'</td>'+
+      '</tr>'; }).join('')+'</tbody></table>';
+}
+function renderAgents(list){
+  const map={};
+  list.forEach(s=>{
+    const key=(s.agent_name||'—').trim().toLowerCase();
+    const a=map[key]=map[key]||{name:(s.agent_name||'—').trim(),n:0,done:0,ok:0,sum:0,last:null,todo:0};
+    a.n++; if(s.status==='submitted') a.todo++;
+    const sc=scoreOf(s); if(sc!=null){ a.done++; a.sum+=sc; if(sc>=passingOf(s)) a.ok++; }
+    const d=s.submitted_at||s.started_at; if(d&&(!a.last||d>a.last)) a.last=d;
+  });
+  const rows=Object.values(map).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+  $('r-count').textContent=plural(rows.length,'agent');
+  if(!rows.length){ $('r-table').innerHTML='<div class="empty"><div class="empty-ico">👤</div>Aucun agent.</div>'; return; }
+  $('r-table').innerHTML='<table><thead><tr><th>Agent</th><th>Passages</th><th>Réussis</th><th>Échecs</th><th>À corriger</th><th>Moyenne</th><th>Dernier passage</th></tr></thead><tbody>'+
+    rows.map(a=>{ const avg=a.done?Math.round(a.sum/a.done):null;
+      return '<tr class="clickable" data-act="agent" data-name="'+esc(a.name)+'"><td><b>'+esc(a.name)+'</b></td><td class="mono">'+a.n+'</td>'+
+        '<td class="mono c-green">'+a.ok+'</td><td class="mono c-red">'+(a.done-a.ok)+'</td><td class="mono c-orange">'+(a.todo||'')+'</td>'+
+        '<td class="mono">'+(avg!=null?avg+' %':'—')+'</td><td class="mono" style="font-size:12px">'+fDateTime(a.last)+'</td></tr>'; }).join('')+'</tbody></table>';
+}
+function exportCSV(){
+  const list=filteredSessions();
+  if(!list.length){ toast('Rien à exporter.','warn'); return; }
+  const status={pending:'Non terminé',submitted:'À corriger',corrected:'Terminé'};
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const lines=[['Agent','Questionnaire','Date','Durée','Score auto (%)','Note finale (%)','Note de passage (%)','Résultat','Statut','Corrigé par'].map(q).join(';')];
+  list.forEach(s=>{ const t=tpl(s.template_id), sc=scoreOf(s);
+    lines.push([s.agent_name,t?t.title:'(supprimé)',fDateTime(s.submitted_at||s.started_at),fDuration(s.started_at,s.submitted_at),s.auto_score,sc,passingOf(s),
+      sc==null?'':(sc>=passingOf(s)?'Réussi':'Échec'),status[s.status]||s.status,s.corrected_by||''].map(q).join(';')); });
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='Resultats_quiz_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+// ── Session detail / correction ──
+function answerValue(v){
+  if(v==null) return null;
+  if(typeof v==='string'){ try{ const p=JSON.parse(v); if(Array.isArray(p)||typeof p==='boolean') return p; }catch(e){} }
+  return v;
+}
+async function openSession(id){
+  const s=S.sessions.find(x=>x.id===id); if(!s) return;
+  const t=tpl(s.template_id);
+  ui.corr={id:id};
+  $('ss-title').textContent=(s.status==='submitted'?'Correction — ':'Résultat — ')+(s.agent_name||'—');
+  $('ss-sub').textContent=(t?t.title:'Questionnaire supprimé')+' · '+fDateTime(s.submitted_at||s.started_at)+(s.corrected_by?' · corrigé par '+s.corrected_by:'');
+  $('ss-body').innerHTML='<div class="empty">Chargement des réponses…</div>';
+  $('ss-save').hidden=true;
+  openModal('m-session');
+  try{
+    const rows=await sb('quiz_answers?session_id=eq.'+id+'&select=*');
+    S.answers[id]=rows||[];
+    dirty.filter(o=>o.kind==='correction'&&o.session.id===id).forEach(applyOpLocal);
+    saveCache();
+  }catch(e){
+    if(e.status===401){ closeModal('m-session'); sessionLost(); return; }
+    if(!S.answers[id]){ $('ss-body').innerHTML='<div class="warnbox">Réponses indisponibles hors ligne (jamais consultées sur cet appareil). Réessayez une fois la connexion revenue.</div>'; return; }
+    toast('Hors ligne : réponses affichées depuis la copie locale','warn');
+  }
+  if(!ui.corr||ui.corr.id!==id) return;
+  renderSessionBody(s);
+}
+function renderSessionBody(s){
+  const qs=qsOf(s.template_id), ans=S.answers[s.id]||[];
+  let html='', openCount=0, autoEarned=0;
+  if(!qs.length) html+='<div class="warnbox">Les questions de ce questionnaire ne sont plus disponibles.</div>';
+  qs.forEach((q,i)=>{
+    const a=ans.find(x=>x.question_id===q.id), given=a?answerValue(a.answer):null, pts=Number(q.points)||1;
+    let body='';
+    if(q.type==='open'){
+      openCount++;
+      body='<div class="ans open">'+(given!=null&&given!==''?esc(given):'<i>(sans réponse)</i>')+'</div>'+
+        (a?'<div class="grade"><label class="flabel" style="margin:0">Note / '+pts+'</label>'+
+          '<input class="finp mono" type="number" min="0" max="'+pts+'" step="0.5" style="width:90px" data-grade="'+esc(a.id)+'" data-max="'+pts+'" value="'+(a.points_earned!=null&&(s.status==='corrected'||a.points_earned>0)?a.points_earned:'')+'" placeholder="0">'+
+          '<input class="finp" style="flex:1;min-width:180px" data-comment="'+esc(a.id)+'" placeholder="Commentaire pour l’agent (facultatif)" value="'+esc(a.admin_comment||'')+'"></div>':'<div class="expl">Aucune réponse enregistrée pour cette question.</div>');
+    }else{
+      const correct=q.correct_answers||[];
+      if(a&&a.points_earned!=null) autoEarned+=Number(a.points_earned)||0;
+      if(q.type==='truefalse'){
+        const ok=given!=null&&String(given)===String(correct[0]);
+        const lbl=v=>(v===true||v==='true')?'Vrai':(v===false||v==='false')?'Faux':'(sans réponse)';
+        body='<div class="ans '+(ok?'ok':'ko')+'">'+(ok?'✅ ':'❌ ')+lbl(given)+(ok?'':' — attendu : '+lbl(correct[0]))+'</div>';
+      }else{
+        const g=Array.isArray(given)?given:(given!=null?[given]:[]);
+        body=(q.options||[]).map(o=>{ const isC=correct.indexOf(o)>=0, isG=g.indexOf(o)>=0;
+          if(isC&&isG) return '<div class="ans ok">✅ '+esc(o)+'</div>';
+          if(!isC&&isG) return '<div class="ans ko">❌ '+esc(o)+'</div>';
+          if(isC) return '<div class="ans exp">→ '+esc(o)+' <i style="font-size:11px">(bonne réponse)</i></div>';
+          return '<div class="ans">○ '+esc(o)+'</div>'; }).join('')+(g.length?'':'<div class="expl">Sans réponse</div>');
+      }
+    }
+    html+='<div class="aq"><div class="aq-h">Question '+(i+1)+' · '+QTYPES[q.type].label+' · '+ptsLabel(pts)+(q.type!=='open'&&a?' · obtenu : '+(a.points_earned||0):'')+'</div>'+
+      '<div class="aq-t">'+esc(q.text)+'</div>'+body+(q.explanation?'<div class="expl">💡 '+esc(q.explanation)+'</div>':'')+'</div>';
+  });
+  const orphans=ans.filter(a=>!qs.some(q=>q.id===a.question_id));
+  if(orphans.length) html+='<div class="expl">'+plural(orphans.length,'réponse')+' concerne(nt) des questions retirées depuis le passage.</div>';
+  const tot=totalPts(qs), autoPct=tot?Math.round(autoEarned/tot*100):0, sc=scoreOf(s);
+  html+='<div class="recap"><b>📊 Récapitulatif</b><br>Questions fermées : '+autoEarned+' / '+tot+' pts ('+autoPct+' %)'+
+    (openCount?' · <span class="c-orange">'+plural(openCount,'question ouverte')+' à noter</span>':'')+
+    '<br>Note finale : <b>'+(sc!=null?sc+' %':'en attente de correction')+'</b> · note de passage '+passingOf(s)+' %</div>';
+  $('ss-body').innerHTML=html;
+  $('ss-save').hidden=!(openCount&&s.status!=='pending');
+  $('ss-save').textContent=s.status==='corrected'?'✓ Mettre à jour la correction':'✓ Enregistrer la correction';
+}
+function saveCorrection(){
+  const s=S.sessions.find(x=>x.id===ui.corr.id); if(!s) return;
+  const qs=qsOf(s.template_id), ans=S.answers[s.id]||[];
+  let earned=0; const patches=[];
+  for(const q of qs){
+    const a=ans.find(x=>x.question_id===q.id), pts=Number(q.points)||1;
+    if(q.type==='open'){
+      if(!a) continue;
+      const el=document.querySelector('[data-grade="'+a.id+'"]'), cm=document.querySelector('[data-comment="'+a.id+'"]');
+      let v=parseFloat(el&&el.value); if(isNaN(v)) v=0;
+      if(v<0||v>pts){ toast('Note hors limites (0 à '+pts+') pour « '+q.text.slice(0,50)+' »','err'); el&&el.focus(); return; }
+      earned+=v;
+      patches.push({id:a.id,points_earned:v,admin_comment:(cm&&cm.value.trim())||null,is_correct:v>=pts});
+    }else if(a) earned+=Number(a.points_earned)||0;
+  }
+  const tot=totalPts(qs), final=tot?Math.round(earned/tot*100):0;
+  queueOp({kind:'correction',session:{id:s.id,final_score:final,status:'corrected',corrected_at:new Date().toISOString(),corrected_by:session.full_name||session.email},answers:patches});
+  closeModal('m-session');
+  toast('Correction enregistrée — note finale '+final+' % ('+(final>=passingOf(s)?'réussi':'échec')+')');
+}
+function printSession(){
+  const w=window.open('','_blank');
+  if(!w){ toast('Autorisez les fenêtres pop-up pour imprimer.','warn'); return; }
+  const body=$('ss-body').cloneNode(true);
+  body.querySelectorAll('input').forEach(i=>{ const sp=document.createElement('b'); sp.textContent=i.value||'—'; i.replaceWith(sp); });
+  const css=Array.from(document.querySelectorAll('style')).map(s=>s.textContent).join('\n');
+  w.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Résultat quiz — RDZ</title><style>'+css+'body{background:#fff;padding:14mm}</style></head><body>'+
+    '<div style="border-bottom:2px solid #c0272d;padding-bottom:8px;margin-bottom:16px;display:flex;justify-content:space-between"><div><div style="font-size:18px;font-weight:700">'+esc($('ss-title').textContent)+'</div><div style="color:#6b7280">'+esc($('ss-sub').textContent)+'</div></div><div style="color:#9ca3af;font-size:11px">RDZ Security Management<br>'+fDate(new Date().toISOString())+'</div></div>'+
+    body.innerHTML+'</body></html>');
+  w.document.close(); setTimeout(()=>w.print(),400);
+}
+
+// ════════════════════════════════════════════════════════════
+// MODALS
+// ════════════════════════════════════════════════════════════
+function openModal(id){ $(id).classList.add('open'); }
+function closeModal(id){ $(id).classList.remove('open'); if(id==='m-session') ui.corr=null; }
+
+// ════════════════════════════════════════════════════════════
+// EVENTS
+// ════════════════════════════════════════════════════════════
+function onClick(e){
+  const tab=e.target.closest('.tab'); if(tab){ switchTab(tab.dataset.tab); return; }
+  const mode=e.target.closest('.seg button'); if(mode){ ui.resMode=mode.dataset.mode; renderResults(); return; }
+  const qt=e.target.closest('[data-qtype]'); if(qt){ setQType(qt.dataset.qtype); return; }
+  if(e.target.closest('[data-close]')){ closeModal(e.target.closest('.overlay').id); return; }
+  if(e.target.classList.contains('overlay')){ closeModal(e.target.id); return; }
+  if(!e.target.closest('.user')) $('user-menu').hidden=true;
+  if(!e.target.closest('#sync-pop')&&!e.target.closest('#sync-btn')) $('sync-pop').hidden=true;
+  const el=e.target.closest('[data-act]'); if(!el||el.disabled) return;
+  const act=el.dataset.act, id=el.dataset.id, i=el.dataset.i!=null?parseInt(el.dataset.i,10):null;
+  const qs=ui.editor?ui.editor.qs:null;
+  switch(act){
+    case 'refresh': pullAll(false); break;
+    case 'new-quiz': openEditor(null); break;
+    case 'edit': openEditor(id); break;
+    case 'preview': previewQuiz(id); break;
+    case 'share': openShare(id); break;
+    case 'duplicate': duplicateQuiz(id); break;
+    case 'toggle': toggleStatus(id); break;
+    case 'delete': deleteQuiz(id); break;
+    case 'results-of': ui.editor=null; showView('results'); ui.resMode='sessions'; $('r-quiz').value=id; renderResults(); break;
+    case 'ed-cancel': cancelEditor(); break;
+    case 'ed-preview': previewEditor(); break;
+    case 'ed-draft': saveEditor('draft'); break;
+    case 'ed-publish': saveEditor('active'); break;
+    case 'q-add': openQuestion(null); break;
+    case 'q-edit': openQuestion(i); break;
+    case 'q-dup': qs.splice(i+1,0,Object.assign(clone(qs[i]),{id:uuid()})); edChanged(); renderEditorQuestions(); break;
+    case 'q-del': if(confirm('Supprimer la question '+(i+1)+' ?')){ qs.splice(i,1); edChanged(); renderEditorQuestions(); } break;
+    case 'q-up': if(i>0){ const t=qs[i]; qs[i]=qs[i-1]; qs[i-1]=t; edChanged(); renderEditorQuestions(); } break;
+    case 'q-down': if(i<qs.length-1){ const t=qs[i]; qs[i]=qs[i+1]; qs[i+1]=t; edChanged(); renderEditorQuestions(); } break;
+    case 'q-save': saveQuestion(); break;
+    case 'opt-add': addOption('',false); break;
+    case 'opt-del': el.closest('.opt-row').remove(); break;
+    case 'sh-copy':
+      (navigator.clipboard?navigator.clipboard.writeText($('sh-link').value):Promise.reject())
+        .then(()=>toast('Lien copié'))
+        .catch(()=>{ $('sh-link').select(); try{ document.execCommand('copy'); toast('Lien copié'); }catch(err){ toast('Copiez le lien manuellement','warn'); } });
+      break;
+    case 'sh-open': window.open($('sh-link').value,'_blank','noopener'); break;
+    case 'session': e.stopPropagation(); openSession(id); break;
+    case 'agent': ui.resMode='sessions'; $('r-search').value=el.dataset.name; renderResults(); break;
+    case 'csv': exportCSV(); break;
+    case 'r-clear': ['r-search','r-quiz','r-status','r-from','r-to'].forEach(k=>$(k).value=''); renderResults(); break;
+    case 'ss-save': saveCorrection(); break;
+    case 'ss-print': printSession(); break;
+    case 'sync-now': pullAll(false); break;
+    case 'sync-retry': dirty.forEach(o=>{ delete o.failed; delete o.error; }); saveDirty(); pullAll(false); break;
+    case 'sync-drop':
+      if(confirm('Abandonner les modifications en échec ? Elles seront perdues.')){ dirty=dirty.filter(o=>!o.failed); saveDirty(); pullAll(true); }
+      break;
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  $('logo-link').href=PORTAL_URL; $('m-portal').href=PORTAL_URL;
+  $('login-form').addEventListener('submit',doLogin);
+  $('btn-logout').addEventListener('click',doLogout);
+  $('user-btn').addEventListener('click',()=>{ $('user-menu').hidden=!$('user-menu').hidden; });
+  $('sync-btn').addEventListener('click',()=>{ const p=$('sync-pop'); p.hidden=!p.hidden; if(!p.hidden) renderSyncPop(); });
+  document.addEventListener('click',onClick);
+  ['q-search','q-status','q-site'].forEach(k=>$(k).addEventListener('input',renderQuizView));
+  ['r-search','r-quiz','r-status','r-from','r-to'].forEach(k=>$(k).addEventListener('input',renderResults));
+  ['eq-title','eq-desc','eq-role','eq-site','eq-time','eq-pass'].forEach(k=>$(k).addEventListener('input',edChanged));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(o=>closeModal(o.id)); });
+  window.addEventListener('beforeunload',e=>{ if((ui.editor&&ui.editor.changed)||dirty.some(o=>!o.failed)){ e.preventDefault(); e.returnValue=''; } });
+
+  fillSelects();
+  S=Object.assign(emptyState(),lsGet(CK,{}));
+  dirty=lsGet(DK,[]);
+  const saved=lsGet(SK,null);
+  if(saved&&saved.token&&roleAllowed(saved.role)&&(!S.owner||S.owner===saved.user_id)){ session=saved; startApp(); }
+  else { $('login').style.display='flex'; }
+});
+</script>
+</body>
+</html>
