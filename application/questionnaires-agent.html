@@ -1,0 +1,972 @@
+<!-- RDZ · questionnaires-agent · v2 · 2026-09-30
+     Préparation des quiz de formation par un agent désigné.
+     Accès : UNIQUEMENT l'identification habituelle d'application.html (nom +
+     PIN). La page vérifie, dans la base principale, que l'agent connecté est
+     actif, que son PIN n'a pas changé et qu'il a la fonction
+     « questionnaires » (cochée dans comptes-agents.html). Pas d'identifiant
+     supplémentaire (choix de Laurent, 2026-09-30 : contenu des quiz jugé peu
+     sensible). v1 (email + mot de passe) abandonnée.
+
+     Base quiz : projet RH/RouteOps trdhtlcenmjlcvzuplid (tables quiz_*,
+     migration-quiz-acces-pin.sql). Les fiches RH restent fermées : la page ne
+     lit que rh_agents_annuaire (nom, prénom) ; la note validée est inscrite
+     dans la fiche formation par un déclencheur serveur.
+
+     Boucle de remontée : quiz préparés ici → passés par les agents via
+     Quiz_Agent_RDZ.html → corrigés/validés ici → ligne « Quizz sécurité » dans
+     rh_agents.formations → relue dans RDZ RH. -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDZ — Préparation des quiz</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --red-soft:#f5e8e8;
+  --ink:#1a1a1a; --muted:#666; --line:#d0d0d0; --line-soft:#e3e3e3;
+  --bg:#f5f4f2; --paper:#fff;
+  --ok:#1b7a3d; --ok-soft:#eaf6ee; --warn:#9a6700; --warn-soft:#fff6e0;
+  --blue:#1e4f8a; --blue-soft:#eaf1fa; --bad:#b02020; --bad-soft:#fdeeee;
+  --radius:8px; --radius-ui:4px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:20}
+header .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px;text-transform:uppercase}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header .hlinks{display:flex;gap:12px;align-items:center;white-space:nowrap}
+header a,header button.hl{color:rgba(255,255,255,.9);font-size:12px;text-decoration:underline;background:none;border:none;cursor:pointer;font-family:var(--font)}
+main{flex:1;padding:16px 16px 90px}
+.hidden{display:none!important}
+
+/* Accueil */
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:var(--paper);border:1px solid var(--line-soft);
+  border-left:4px solid var(--red);border-radius:var(--radius);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;color:inherit;font-family:var(--font)}
+.group-btn:active{background:var(--red-soft)}
+.group-btn .ic{font-size:26px;width:36px;text-align:center;flex-shrink:0}
+.group-btn .t{font-weight:bold;font-size:15.5px}
+.group-btn .d{font-size:12.5px;color:var(--muted);margin-top:3px}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:22px}
+.count-badge{display:inline-block;background:var(--red);color:#fff;border-radius:20px;font-size:11px;font-weight:bold;padding:2px 8px;margin-left:6px;vertical-align:middle}
+.hello{font-size:13px;color:var(--muted);margin-bottom:14px}
+.hello b{color:var(--ink)}
+
+/* Titres & barres */
+.back{background:none;border:none;color:var(--red);font-weight:bold;font-size:14px;cursor:pointer;padding:4px 0;margin-bottom:12px;font-family:var(--font)}
+h2{font-size:17px;margin-bottom:4px}
+.lead{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:var(--font);color:var(--ink)}
+.pill.on{background:var(--red);border-color:var(--red);color:#fff}
+input.f,select.f,textarea.f{width:100%;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px 11px;font-size:14px;font-family:var(--font);background:#fff;color:var(--ink)}
+input.f:focus,select.f:focus,textarea.f:focus{outline:none;border-color:var(--red)}
+textarea.f{min-height:70px;resize:vertical}
+.search{flex:1;min-width:180px}
+label.l{display:block;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:#555;margin:0 0 5px}
+.field{margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.grid2{grid-template-columns:1fr}}
+
+/* Boutons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--radius-ui);border:1px solid transparent;
+  padding:9px 14px;font-size:13px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.btn-p{background:var(--red);color:#fff;border-color:var(--red-dark)}
+.btn-p:disabled{background:#aaa;border-color:#999;cursor:not-allowed}
+.btn-g{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-bad{background:#fff;color:var(--bad);border-color:#eaa8a8}
+.btn-sm{padding:6px 10px;font-size:12px}
+.btn-block{width:100%}
+
+/* Cartes */
+.card{background:var(--paper);border:1px solid var(--line-soft);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.card.qz{border-left:4px solid #bbb}
+.card.qz.active{border-left-color:var(--ok)}
+.card .title{font-weight:bold;font-size:15px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tag{display:inline-block;border-radius:20px;font-size:11px;font-weight:bold;padding:3px 9px;background:#f0f0f0;color:#555}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.blue{background:var(--blue-soft);color:var(--blue)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.empty{text-align:center;color:#999;padding:30px 10px;font-size:13px}
+.err{background:var(--bad-soft);border:1px solid #eaa8a8;color:var(--bad);padding:10px 12px;border-radius:var(--radius-ui);font-size:13px;margin-bottom:12px}
+.note{background:var(--warn-soft);border:1px solid #f0d9a0;color:#6b5000;padding:10px 12px;border-radius:var(--radius-ui);font-size:12.5px;margin-bottom:12px;line-height:1.5}
+
+/* Éditeur de questions */
+.q-row{display:flex;gap:10px;align-items:flex-start;background:#fafafa;border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:10px 12px;margin-bottom:8px}
+.q-row .n{font-size:11px;font-weight:bold;color:#999;min-width:30px}
+.q-row .body{flex:1;min-width:0}
+.q-row .qt{font-size:13.5px;font-weight:bold;word-wrap:break-word}
+.q-row .ctrl{display:flex;flex-direction:column;gap:4px}
+.q-row .ctrl button{width:32px;height:28px;border:1px solid var(--line);background:#fff;border-radius:var(--radius-ui);cursor:pointer;font-size:13px}
+.types{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+@media(max-width:520px){.types{grid-template-columns:repeat(2,1fr)}}
+.type-btn{border:1px solid var(--line);background:#fff;border-radius:var(--radius-ui);padding:9px 6px;font-size:12.5px;cursor:pointer;font-family:var(--font);text-align:center}
+.type-btn.on{border-color:var(--red);background:var(--red-soft);color:var(--red);font-weight:bold}
+.opt-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.opt-row input[type=text]{flex:1}
+.opt-row input[type=checkbox],.opt-row input[type=radio]{width:20px;height:20px;accent-color:var(--red);flex-shrink:0}
+.tf{display:flex;gap:10px}
+.tf label{flex:1;border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px;text-align:center;cursor:pointer}
+.tf input{margin-right:6px;accent-color:var(--red)}
+
+/* Correction */
+.ans{padding:8px 10px;border-radius:var(--radius-ui);font-size:13px;margin-bottom:4px;border:1px solid var(--line-soft)}
+.ans.good{background:var(--ok-soft);border-color:#bfe3cb;color:#14532d}
+.ans.badc{background:var(--bad-soft);border-color:#f3c0c0;color:#7f1d1d}
+.ans.exp{background:#f6f6f6}
+.ans.open{background:var(--blue-soft);border-color:#c7d9f0;color:#173a66;white-space:pre-wrap}
+.explain{font-size:12px;color:#777;background:#f4f4f4;padding:7px 10px;border-radius:var(--radius-ui);margin-top:6px}
+.score-box{background:var(--blue-soft);border:1px solid #c7d9f0;border-radius:var(--radius);padding:12px 14px;margin:12px 0;font-size:13.5px}
+
+/* Barre collante & modales */
+.sticky{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line-soft);padding:10px 16px;box-shadow:0 -4px 14px rgba(0,0,0,.06);z-index:30}
+.sticky .in{max-width:760px;margin:0 auto;display:flex;gap:8px}
+.sticky .in .btn{flex:1}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:40px 12px;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:var(--radius);border-top:3px solid var(--red);width:100%;max-width:560px;padding:18px}
+.modal h3{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--red);margin-bottom:12px}
+.modal .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.linkbox{font-family:monospace;font-size:12px;background:#f4f4f4;border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:9px;word-break:break-all;margin:6px 0 8px}
+#toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:var(--radius-ui);font-size:13px;z-index:99;display:none;max-width:90vw;text-align:center}
+#toast.bad{background:var(--bad)}
+.center{text-align:center}
+.spin{width:28px;height:28px;border:3px solid #ddd;border-top-color:var(--red);border-radius:50%;animation:sp .8s linear infinite;margin:40px auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+table.res{width:100%;border-collapse:collapse;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ Security Management SA</div>
+        <div class="sub">Préparation des quiz de formation</div>
+      </div>
+      <div class="hlinks">
+        <a href="application.html">← Menu</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- CHARGEMENT -->
+    <section id="s-loading"><div class="spin"></div><div class="center" style="color:#999">Chargement…</div></section>
+
+    <!-- ACCÈS REFUSÉ -->
+    <section id="s-denied" class="hidden">
+      <h2>Accès réservé</h2>
+      <div class="note" id="denied-msg">Cette page est réservée aux agents qui préparent les quiz.</div>
+      <a class="btn btn-p" href="application.html">← Retour au menu</a>
+    </section>
+
+    <!-- ACCUEIL -->
+    <section id="s-home" class="hidden">
+      <div class="hello">Connecté : <b id="who"></b></div>
+      <button class="group-btn" onclick="openList()">
+        <span class="ic">📝</span>
+        <span><span class="t">Questionnaires</span><span id="home-q-count"></span>
+          <span class="d" style="display:block">Créer, modifier, publier, supprimer et partager les quiz.</span></span>
+        <span class="chev">›</span>
+      </button>
+      <button class="group-btn" onclick="openResults()">
+        <span class="ic">📊</span>
+        <span><span class="t">Résultats &amp; corrections</span><span id="home-r-count"></span>
+          <span class="d" style="display:block">Voir les résultats, corriger les questions ouvertes et valider les notes.</span></span>
+        <span class="chev">›</span>
+      </button>
+    </section>
+
+    <!-- LISTE DES QUESTIONNAIRES -->
+    <section id="s-list" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Questionnaires</h2>
+      <div class="lead">Un questionnaire « Brouillon » n'est pas visible par les agents. Publiez-le pour pouvoir le partager.</div>
+      <div class="toolbar">
+        <input class="f search" id="list-search" placeholder="🔍 Rechercher…" oninput="renderList()">
+        <button class="btn btn-p" onclick="openEditor(null)">+ Nouveau</button>
+      </div>
+      <div class="pills" id="list-pills" style="margin-bottom:12px">
+        <button class="pill on" data-f="">Tous</button>
+        <button class="pill" data-f="active">Publiés</button>
+        <button class="pill" data-f="draft">Brouillons</button>
+      </div>
+      <div id="list-err"></div>
+      <div id="list-body"></div>
+    </section>
+
+    <!-- ÉDITEUR -->
+    <section id="s-editor" class="hidden">
+      <button class="back" onclick="leaveEditor()">‹ Questionnaires</button>
+      <h2 id="ed-title">Nouveau questionnaire</h2>
+      <div id="ed-err"></div>
+      <div class="card">
+        <div class="field"><label class="l" for="ed-name">Titre *</label><input class="f" id="ed-name" placeholder="Ex : Sécurité incendie — CTN"></div>
+        <div class="field"><label class="l" for="ed-desc">Description</label><textarea class="f" id="ed-desc" placeholder="Objectif du quiz, consignes…"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label class="l" for="ed-role">Fonction cible</label>
+            <select class="f" id="ed-role"><option value="">Tous les agents</option><option>Agent de sécurité</option><option>Agent de sécurité incendie</option><option>Chef de groupe</option><option>Planificateur</option><option>Spécialiste incendie</option></select></div>
+          <div class="field"><label class="l" for="ed-site">Site cible</label>
+            <select class="f" id="ed-site"><option value="">Tous sites</option><option>Barton</option><option>Bellevue</option><option>CTN</option><option>Collex</option><option>DLCC</option><option>HDLT</option><option>MDE</option><option>MDP</option><option>MSF</option><option>Moynier</option><option>Papeterie</option><option>Parkings</option><option>REGM</option><option>Rotschild</option><option>Seujet</option></select></div>
+          <div class="field"><label class="l" for="ed-time">Durée (min, vide = libre)</label><input class="f" id="ed-time" type="number" min="0"></div>
+          <div class="field"><label class="l" for="ed-pass">Note de passage (%)</label><input class="f" id="ed-pass" type="number" min="0" max="100" value="70"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+          <div class="title">Questions <span class="tag" id="ed-qcount">0</span></div>
+          <button class="btn btn-p btn-sm" onclick="openQuestion(null)">+ Ajouter une question</button>
+        </div>
+        <div id="ed-qlist"></div>
+      </div>
+    </section>
+
+    <!-- RÉSULTATS -->
+    <section id="s-results" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Résultats &amp; corrections</h2>
+      <div class="lead">Une note validée ici est inscrite automatiquement dans la fiche formation de l'agent (si l'agent a choisi son nom dans la liste).</div>
+      <div class="toolbar">
+        <input class="f search" id="res-search" placeholder="🔍 Agent…" oninput="renderResults()">
+        <select class="f" id="res-quiz" style="max-width:240px" onchange="renderResults()"><option value="">Tous les quiz</option></select>
+      </div>
+      <div class="pills" id="res-pills" style="margin-bottom:12px">
+        <button class="pill on" data-f="todo">À traiter</button>
+        <button class="pill" data-f="done">Validés</button>
+        <button class="pill" data-f="pending">En cours</button>
+        <button class="pill" data-f="">Tous</button>
+      </div>
+      <div id="res-err"></div>
+      <div id="res-body"></div>
+    </section>
+
+    <!-- CORRECTION -->
+    <section id="s-corr" class="hidden">
+      <button class="back" onclick="openResults()">‹ Résultats</button>
+      <h2 id="corr-title">Correction</h2>
+      <div class="lead" id="corr-sub"></div>
+      <div id="corr-err"></div>
+      <div id="corr-body"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Barre collante de l'éditeur -->
+<div class="sticky hidden" id="ed-bar"><div class="in">
+  <button class="btn btn-g" id="ed-save-draft" onclick="saveQuiz('draft')">💾 Brouillon</button>
+  <button class="btn btn-ok" id="ed-save-pub" onclick="saveQuiz('active')">✓ Publier</button>
+</div></div>
+<!-- Barre collante de la correction -->
+<div class="sticky hidden" id="corr-bar"><div class="in">
+  <button class="btn btn-ok" id="corr-save" onclick="saveCorrection()">✓ Valider la note</button>
+</div></div>
+
+<!-- MODALE QUESTION -->
+<div class="modal-bg" id="m-question"><div class="modal">
+  <h3 id="mq-title">Nouvelle question</h3>
+  <div class="field"><label class="l">Type</label>
+    <div class="types">
+      <button class="type-btn" data-t="qcm">🔘 Choix unique</button>
+      <button class="type-btn" data-t="multiple">☑️ Choix multiple</button>
+      <button class="type-btn" data-t="truefalse">⚖️ Vrai / Faux</button>
+      <button class="type-btn" data-t="open">✏️ Ouverte</button>
+    </div>
+  </div>
+  <div class="field"><label class="l" for="mq-text">Question *</label><textarea class="f" id="mq-text"></textarea></div>
+  <div id="mq-opts-zone" class="field">
+    <label class="l" id="mq-opts-hint">Réponses — cochez la bonne</label>
+    <div id="mq-opts"></div>
+    <button class="btn btn-g btn-sm" onclick="addOpt('')">+ Ajouter une réponse</button>
+  </div>
+  <div id="mq-tf-zone" class="field hidden">
+    <label class="l">Bonne réponse</label>
+    <div class="tf">
+      <label><input type="radio" name="mq-tf" value="true">Vrai</label>
+      <label><input type="radio" name="mq-tf" value="false">Faux</label>
+    </div>
+  </div>
+  <div id="mq-open-zone" class="note hidden">Question ouverte : la réponse sera notée à la main dans « Résultats &amp; corrections ».</div>
+  <div class="grid2">
+    <div class="field"><label class="l" for="mq-pts">Points</label><input class="f" id="mq-pts" type="number" min="0.5" step="0.5" value="1"></div>
+  </div>
+  <div class="field"><label class="l" for="mq-exp">Explication (montrée à l'agent après le quiz)</label><textarea class="f" id="mq-exp" style="min-height:50px"></textarea></div>
+  <div class="foot">
+    <button class="btn btn-g" onclick="closeModal('m-question')">Annuler</button>
+    <button class="btn btn-p" onclick="saveQuestion()">✓ Enregistrer la question</button>
+  </div>
+</div></div>
+
+<!-- MODALE PARTAGE -->
+<div class="modal-bg" id="m-share"><div class="modal">
+  <h3>Partager le quiz</h3>
+  <div style="font-weight:bold;margin-bottom:10px" id="sh-name"></div>
+  <label class="l">Lien pour tous les agents (chacun choisit son nom)</label>
+  <div class="linkbox" id="sh-link"></div>
+  <div class="actions" style="margin-bottom:16px">
+    <button class="btn btn-g btn-sm" onclick="copyLink('sh-link')">📋 Copier</button>
+    <button class="btn btn-g btn-sm" onclick="shareWhatsApp('sh-link')">💬 WhatsApp</button>
+    <button class="btn btn-g btn-sm" onclick="shareMail('sh-link')">✉️ Email</button>
+    <button class="btn btn-g btn-sm hidden" id="sh-native" onclick="shareNative('sh-link')">📤 Partager…</button>
+  </div>
+  <label class="l" for="sh-agent">Lien personnel pour un agent (nom déjà rempli)</label>
+  <select class="f" id="sh-agent" onchange="buildPersonalLink()"><option value="">— Choisir un agent —</option></select>
+  <div id="sh-perso" class="hidden">
+    <div class="linkbox" id="sh-plink"></div>
+    <div class="actions">
+      <button class="btn btn-g btn-sm" onclick="copyLink('sh-plink')">📋 Copier</button>
+      <button class="btn btn-g btn-sm" onclick="shareWhatsApp('sh-plink')">💬 WhatsApp</button>
+      <button class="btn btn-g btn-sm" onclick="shareMail('sh-plink')">✉️ Email</button>
+    </div>
+  </div>
+  <div class="foot"><button class="btn btn-g" onclick="closeModal('m-share')">Fermer</button></div>
+</div></div>
+
+<!-- MODALE SUPPRESSION -->
+<div class="modal-bg" id="m-delete"><div class="modal" style="border-top-color:var(--bad)">
+  <h3 style="color:var(--bad)">Supprimer le questionnaire</h3>
+  <div id="del-msg" style="font-size:13.5px;line-height:1.55"></div>
+  <div class="foot" id="del-foot"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================== CONFIG ============================== */
+// Base RH / RouteOps : tables quiz_* (clé publique ; les fiches RH y restent
+// fermées par les règles RLS de la phase 1).
+const RH_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const RH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+// Base principale : table agents (identité, PIN, fonctions) — même que application.html.
+const MAIN_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const MAIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const QUIZ_AGENT_URL = 'https://rdz-2026.github.io/routeops/Quiz_Agent_RDZ.html';
+const FONCTION_REQUISE = 'questionnaires';
+const NO_AUTH = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
+const sb = supabase.createClient(RH_URL, RH_KEY, Object.assign({}, NO_AUTH, { auth: Object.assign({}, NO_AUTH.auth, { storageKey: 'rdz_quiz_rh' }) }));
+const sbMain = supabase.createClient(MAIN_URL, MAIN_KEY, Object.assign({}, NO_AUTH, { auth: Object.assign({}, NO_AUTH.auth, { storageKey: 'rdz_quiz_main' }) }));
+
+const TYPE_LABELS = { qcm:'🔘 Choix unique', multiple:'☑️ Choix multiple', truefalse:'⚖️ Vrai / Faux', open:'✏️ Ouverte' };
+
+let me = null;            // agent connecté via application.html { id, full_name }
+let templates = [];       // quiz_templates (+ _qcount)
+let sessions = [];        // quiz_sessions (+ quiz_templates)
+let annuaire = null;      // rh_agents_annuaire (id, nom, prenom)
+let listFilter = '';
+let resFilter = 'todo';
+// éditeur
+let edId = null, edQs = [], edOrigIds = [], edDirty = false;
+let mqIdx = null, mqType = 'qcm';
+// correction
+let corrSession = null, corrQs = [], corrAns = [];
+let shareQuizId = null;
+
+/* ============================== OUTILS ============================== */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function $(id){ return document.getElementById(id); }
+function uuid(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});
+}
+function toast(msg, bad){
+  const t=$('toast'); t.textContent=msg; t.className=bad?'bad':''; t.style.display='block';
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display='none';}, bad?5000:3000);
+}
+function showErr(id, msg){ $(id).innerHTML = msg ? `<div class="err">${esc(msg)}</div>` : ''; }
+function fDate(iso){ if(!iso) return '—'; const d=new Date(iso);
+  return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function errText(e){ return (e && (e.message || e.error_description)) || String(e); }
+
+const SECTIONS = ['s-loading','s-denied','s-home','s-list','s-editor','s-results','s-corr'];
+function show(id){
+  SECTIONS.forEach(s => $(s).classList.toggle('hidden', s!==id));
+  $('ed-bar').classList.toggle('hidden', id!=='s-editor');
+  $('corr-bar').classList.toggle('hidden', id!=='s-corr');
+  window.scrollTo(0,0);
+}
+function openModal(id){ $(id).classList.add('open'); }
+function closeModal(id){ $(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+/* ============================== IDENTIFICATION ============================== */
+// Reprend l'identité posée par application.html (mêmes clés localStorage que
+// mobile.html / tous les modules agent) et la revérifie dans la base principale.
+function denied(msg){ $('denied-msg').textContent = msg; show('s-denied'); }
+async function init(){
+  const id = localStorage.getItem('rdz_agent_id');
+  const hash = localStorage.getItem('rdz_agent_pin_hash');
+  if (!id) return denied("Identifiez-vous d'abord dans l'application (votre nom puis votre code PIN), puis ouvrez « Préparation des quiz » depuis le menu.");
+  try {
+    const { data, error } = await sbMain.from('agents').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    if (!data) return denied("Agent introuvable. Revenez au menu et identifiez-vous à nouveau.");
+    if (data.actif === false) return denied("Votre accès a été désactivé. Contactez votre responsable.");
+    if (!data.pin_hash || data.pin_hash !== hash) return denied("Votre code d'accès a changé. Revenez au menu et ressaisissez votre PIN.");
+    const fns = Array.isArray(data.fonctions) ? data.fonctions : [];
+    if (!fns.includes(FONCTION_REQUISE)) return denied("Cette page est réservée aux agents qui préparent les quiz. Si vous devriez y avoir accès, demandez à la direction de cocher « Préparation des quiz » sur votre fiche.");
+    me = { id: data.id, full_name: [data.nom, data.prenom].filter(Boolean).join(' ') || localStorage.getItem('rdz_agent_nom') || 'Agent' };
+    $('who').textContent = me.full_name;
+    await goHome();
+  } catch(e){
+    denied("Connexion impossible pour le moment (réseau ?). Réessayez dans un instant. Détail : " + errText(e));
+  }
+}
+
+/* ============================== ACCUEIL ============================== */
+async function goHome(){
+  show('s-home');
+  await Promise.all([loadTemplates(), loadSessions()]).catch(()=>{});
+  $('home-q-count').innerHTML = templates.length ? `<span class="count-badge" style="background:#777">${templates.length}</span>` : '';
+  const todo = sessions.filter(isTodo).length;
+  $('home-r-count').innerHTML = todo ? `<span class="count-badge">${todo} à traiter</span>` : '';
+}
+
+/* ============================== DONNÉES ============================== */
+async function loadTemplates(){
+  const { data, error } = await sb.from('quiz_templates').select('*').order('created_at', { ascending:false });
+  if (error) throw error;
+  const { data: qs, error: e2 } = await sb.from('quiz_questions').select('template_id');
+  if (e2) throw e2;
+  const counts = {}; (qs||[]).forEach(q => { counts[q.template_id] = (counts[q.template_id]||0)+1; });
+  templates = (data||[]).map(t => Object.assign(t, { _qcount: counts[t.id]||0 }));
+}
+async function loadSessions(){
+  const { data, error } = await sb.from('quiz_sessions')
+    .select('*, quiz_templates(title, passing_score)')
+    .order('started_at', { ascending:false });
+  if (error) throw error;
+  sessions = data || [];
+}
+async function loadAnnuaire(){
+  if (annuaire) return annuaire;
+  const { data, error } = await sb.from('rh_agents_annuaire').select('id,nom,prenom,statut').eq('statut','actif').order('nom');
+  if (error) throw error;
+  annuaire = data || [];
+  return annuaire;
+}
+
+/* ============================== LISTE ============================== */
+async function openList(){
+  show('s-list'); showErr('list-err','');
+  $('list-body').innerHTML = '<div class="spin"></div>';
+  try { await loadTemplates(); renderList(); }
+  catch(e){ $('list-body').innerHTML=''; showErr('list-err','Chargement impossible : '+errText(e)); }
+}
+$('list-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  listFilter = b.dataset.f;
+  $('list-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b));
+  renderList();
+});
+function renderList(){
+  const s = $('list-search').value.toLowerCase().trim();
+  const rows = templates.filter(t => (!listFilter || t.status===listFilter) &&
+    (!s || [t.title,t.description,t.target_site,t.target_role].join(' ').toLowerCase().includes(s)));
+  if (!rows.length){ $('list-body').innerHTML = '<div class="empty">Aucun questionnaire. Appuyez sur « + Nouveau ».</div>'; return; }
+  $('list-body').innerHTML = rows.map(t => {
+    const active = t.status==='active';
+    const nbRes = sessions.filter(x => x.template_id===t.id && x.status!=='pending').length;
+    return `<div class="card qz ${active?'active':''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div class="title">${esc(t.title)}</div>
+        <span class="tag ${active?'ok':''}">${active?'Publié':'Brouillon'}</span>
+      </div>
+      <div class="meta">
+        <span class="tag">${t._qcount} question${t._qcount>1?'s':''}</span>
+        ${t.target_site?`<span class="tag warn">📍 ${esc(t.target_site)}</span>`:''}
+        ${t.target_role?`<span class="tag blue">👤 ${esc(t.target_role)}</span>`:''}
+        ${t.time_limit_min?`<span class="tag">⏱ ${t.time_limit_min} min</span>`:''}
+        <span class="tag">✅ ${t.passing_score||70}%</span>
+        ${nbRes?`<span class="tag blue">📊 ${nbRes} résultat${nbRes>1?'s':''}</span>`:''}
+      </div>
+      <div class="actions">
+        <button class="btn btn-g btn-sm" data-act="edit" data-id="${esc(t.id)}">✏️ Modifier</button>
+        <button class="btn btn-g btn-sm" data-act="share" data-id="${esc(t.id)}" ${active?'':'disabled title="Publiez d\'abord le questionnaire"'}>🔗 Partager</button>
+        <button class="btn btn-bad btn-sm" data-act="del" data-id="${esc(t.id)}">🗑 Supprimer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+$('list-body').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if(!b || b.disabled) return;
+  const id = b.dataset.id;
+  if (b.dataset.act==='edit') openEditor(id);
+  else if (b.dataset.act==='share') openShare(id);
+  else if (b.dataset.act==='del') askDelete(id);
+});
+
+/* ============================== SUPPRESSION ============================== */
+function askDelete(id){
+  const t = templates.find(x => x.id===id); if(!t) return;
+  const linked = sessions.filter(s => s.template_id===id);
+  const foot = $('del-foot');
+  if (linked.length){
+    $('del-msg').innerHTML = `<b>${esc(t.title)}</b> a déjà <b>${linked.length} passage(s)</b> d'agents.<br><br>
+      • <b>Dépublier</b> : le quiz redevient brouillon, les agents ne peuvent plus le passer, les résultats sont conservés.<br>
+      • <b>Tout supprimer</b> : supprime aussi ces résultats (les notes déjà inscrites dans les fiches RH restent).`;
+    foot.innerHTML = `<button class="btn btn-g" onclick="closeModal('m-delete')">Annuler</button>
+      <button class="btn btn-g" onclick="unpublish('${esc(id)}')">Dépublier</button>
+      <button class="btn btn-bad" onclick="doDelete('${esc(id)}', true)">Tout supprimer</button>`;
+  } else {
+    $('del-msg').innerHTML = `Supprimer définitivement <b>${esc(t.title)}</b> et ses ${t._qcount} question(s) ?`;
+    foot.innerHTML = `<button class="btn btn-g" onclick="closeModal('m-delete')">Annuler</button>
+      <button class="btn btn-bad" onclick="doDelete('${esc(id)}', false)">Supprimer définitivement</button>`;
+  }
+  openModal('m-delete');
+}
+async function unpublish(id){
+  const { error } = await sb.from('quiz_templates').update({ status:'draft', updated_at:new Date().toISOString() }).eq('id', id);
+  closeModal('m-delete');
+  if (error) return toast('Erreur : '+errText(error), true);
+  toast('Questionnaire dépublié.');
+  await loadTemplates(); renderList();
+}
+async function doDelete(id, withResults){
+  closeModal('m-delete');
+  try {
+    if (withResults){
+      const ids = sessions.filter(s => s.template_id===id).map(s => s.id);
+      if (ids.length){
+        let r = await sb.from('quiz_answers').delete().in('session_id', ids); if (r.error) throw r.error;
+        r = await sb.from('quiz_sessions').delete().in('id', ids); if (r.error) throw r.error;
+      }
+    }
+    let r = await sb.from('quiz_questions').delete().eq('template_id', id); if (r.error) throw r.error;
+    r = await sb.from('quiz_templates').delete().eq('id', id); if (r.error) throw r.error;
+    toast('Questionnaire supprimé.');
+    await Promise.all([loadTemplates(), loadSessions()]); renderList();
+  } catch(e){ toast('Suppression impossible : '+errText(e), true); }
+}
+
+/* ============================== ÉDITEUR ============================== */
+async function openEditor(id){
+  edId = id; edQs = []; edOrigIds = []; edDirty = false;
+  showErr('ed-err','');
+  const t = id ? templates.find(x => x.id===id) : null;
+  $('ed-title').textContent = t ? 'Modifier — '+t.title : 'Nouveau questionnaire';
+  $('ed-name').value = t ? t.title||'' : '';
+  $('ed-desc').value = t ? t.description||'' : '';
+  setSelect('ed-role', t ? t.target_role : '');
+  setSelect('ed-site', t ? t.target_site : '');
+  $('ed-time').value = t && t.time_limit_min ? t.time_limit_min : '';
+  $('ed-pass').value = t && t.passing_score!=null ? t.passing_score : 70;
+  show('s-editor');
+  if (id){
+    $('ed-qlist').innerHTML = '<div class="spin"></div>';
+    const { data, error } = await sb.from('quiz_questions').select('*').eq('template_id', id).order('pos');
+    if (error){ showErr('ed-err','Questions non chargées : '+errText(error)); edQs=[]; }
+    else { edQs = (data||[]).map(q => ({ id:q.id, type:q.type, text:q.text, options:q.options||null,
+      correct_answers:q.correct_answers||null, points:q.points||1, explanation:q.explanation||'' }));
+      edOrigIds = edQs.map(q => q.id); }
+  }
+  renderEdQs();
+}
+function setSelect(id, val){
+  const s=$(id); val=val||'';
+  if (val && ![...s.options].some(o => o.value===val)) s.insertAdjacentHTML('beforeend', `<option>${esc(val)}</option>`);
+  s.value = val;
+}
+['ed-name','ed-desc','ed-role','ed-site','ed-time','ed-pass'].forEach(id => $(id).addEventListener('input', ()=>{ edDirty=true; }));
+function leaveEditor(){
+  if (edDirty && !confirm('Des modifications ne sont pas enregistrées. Quitter quand même ?')) return;
+  openList();
+}
+function renderEdQs(){
+  $('ed-qcount').textContent = edQs.length;
+  if (!edQs.length){ $('ed-qlist').innerHTML = '<div class="empty">Aucune question pour l\'instant.</div>'; return; }
+  $('ed-qlist').innerHTML = edQs.map((q,i) => {
+    const auto = q.type!=='open';
+    let detail = '';
+    if (q.type==='qcm' || q.type==='multiple'){
+      detail = (q.options||[]).map(o => `<div style="font-size:12.5px;color:${(q.correct_answers||[]).includes(o)?'var(--ok)':'#666'}">${(q.correct_answers||[]).includes(o)?'✓':'·'} ${esc(o)}</div>`).join('');
+    } else if (q.type==='truefalse'){
+      const c = q.correct_answers && String(q.correct_answers[0])==='true';
+      detail = `<div style="font-size:12.5px;color:var(--ok)">✓ ${c?'Vrai':'Faux'}</div>`;
+    }
+    return `<div class="q-row">
+      <div class="n">Q${i+1}</div>
+      <div class="body">
+        <div class="qt">${esc(q.text)}</div>
+        <div class="meta" style="margin:6px 0 4px"><span class="tag">${TYPE_LABELS[q.type]||esc(q.type)}</span><span class="tag">${q.points} pt${q.points>1?'s':''}</span>
+          <span class="tag ${auto?'ok':'warn'}">${auto?'Corrigée automatiquement':'Correction manuelle'}</span></div>
+        ${detail}
+        <div class="actions"><button class="btn btn-g btn-sm" data-qa="edit" data-i="${i}">✏️ Modifier</button>
+          <button class="btn btn-bad btn-sm" data-qa="del" data-i="${i}">🗑</button></div>
+      </div>
+      <div class="ctrl">
+        <button data-qa="up" data-i="${i}" ${i===0?'disabled':''} aria-label="Monter">▲</button>
+        <button data-qa="down" data-i="${i}" ${i===edQs.length-1?'disabled':''} aria-label="Descendre">▼</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+$('ed-qlist').addEventListener('click', e => {
+  const b = e.target.closest('button[data-qa]'); if(!b || b.disabled) return;
+  const i = +b.dataset.i;
+  if (b.dataset.qa==='edit') return openQuestion(i);
+  if (b.dataset.qa==='del'){ if(!confirm('Supprimer cette question ?')) return; edQs.splice(i,1); }
+  if (b.dataset.qa==='up' && i>0){ [edQs[i-1],edQs[i]]=[edQs[i],edQs[i-1]]; }
+  if (b.dataset.qa==='down' && i<edQs.length-1){ [edQs[i+1],edQs[i]]=[edQs[i],edQs[i+1]]; }
+  edDirty = true; renderEdQs();
+});
+
+/* ---- Modale question ---- */
+document.querySelectorAll('#m-question .type-btn').forEach(b => b.addEventListener('click', () => setQType(b.dataset.t, true)));
+function setQType(t, keepOptions){
+  const prev = mqType; mqType = t;
+  document.querySelectorAll('#m-question .type-btn').forEach(b => b.classList.toggle('on', b.dataset.t===t));
+  const withOpts = (t==='qcm' || t==='multiple');
+  $('mq-opts-zone').classList.toggle('hidden', !withOpts);
+  $('mq-tf-zone').classList.toggle('hidden', t!=='truefalse');
+  $('mq-open-zone').classList.toggle('hidden', t!=='open');
+  $('mq-opts-hint').textContent = t==='multiple' ? 'Réponses — cochez toutes les bonnes' : 'Réponses — cochez la bonne (une seule)';
+  if (withOpts){
+    // conserve les textes saisis en changeant choix unique <-> multiple
+    const current = keepOptions ? readOpts() : [];
+    $('mq-opts').innerHTML = '';
+    if (current.length) current.forEach(o => addOpt(o.text, o.ok && (t==='multiple' || prev!=='multiple')));
+    else { addOpt(''); addOpt(''); addOpt(''); }
+    if (t==='qcm'){ // une seule case cochée au plus
+      let seen=false; $('mq-opts').querySelectorAll('input.ok').forEach(c => { if(c.checked){ if(seen) c.checked=false; seen=true; } });
+    }
+  }
+}
+function addOpt(text, checked){
+  const row = document.createElement('div'); row.className='opt-row';
+  const type = mqType==='multiple' ? 'checkbox' : 'radio';
+  row.innerHTML = `<input type="${type}" class="ok" name="mq-ok" ${checked?'checked':''} aria-label="Bonne réponse">
+    <input type="text" class="f" placeholder="Réponse possible…" value="${esc(text||'')}">
+    <button class="btn btn-bad btn-sm" type="button" aria-label="Retirer">✕</button>`;
+  row.querySelector('button').addEventListener('click', () => row.remove());
+  $('mq-opts').appendChild(row);
+}
+function readOpts(){
+  return [...$('mq-opts').querySelectorAll('.opt-row')].map(r => ({
+    text: r.querySelector('input[type=text]').value.trim(),
+    ok: r.querySelector('input.ok').checked
+  })).filter(o => o.text);
+}
+function openQuestion(i){
+  mqIdx = (i===null || i===undefined) ? null : i;
+  const q = mqIdx!==null ? edQs[mqIdx] : null;
+  $('mq-title').textContent = q ? 'Modifier la question '+(mqIdx+1) : 'Nouvelle question';
+  $('mq-text').value = q ? q.text : '';
+  $('mq-pts').value = q ? q.points : 1;
+  $('mq-exp').value = q ? (q.explanation||'') : '';
+  document.querySelectorAll('input[name=mq-tf]').forEach(r => r.checked=false);
+  mqType = q ? q.type : 'qcm';
+  setQType(mqType, false);
+  if (q && (q.type==='qcm' || q.type==='multiple')){
+    $('mq-opts').innerHTML='';
+    (q.options||[]).forEach(o => addOpt(o, (q.correct_answers||[]).includes(o)));
+  }
+  if (q && q.type==='truefalse'){
+    const c = q.correct_answers && String(q.correct_answers[0]);
+    document.querySelectorAll('input[name=mq-tf]').forEach(r => r.checked = (r.value===c));
+  }
+  openModal('m-question');
+  setTimeout(()=>$('mq-text').focus(), 50);
+}
+function saveQuestion(){
+  const text = $('mq-text').value.trim();
+  if (!text) return alert('Écrivez la question.');
+  const points = parseFloat($('mq-pts').value) || 1;
+  let options=null, correct=null;
+  if (mqType==='qcm' || mqType==='multiple'){
+    const opts = readOpts();
+    const uniq = new Set(opts.map(o => o.text));
+    if (opts.length < 2) return alert('Il faut au moins 2 réponses possibles.');
+    if (uniq.size !== opts.length) return alert('Deux réponses ont le même texte : modifiez-en une.');
+    options = opts.map(o => o.text);
+    correct = opts.filter(o => o.ok).map(o => o.text);
+    if (!correct.length) return alert('Cochez la bonne réponse.');
+    if (mqType==='qcm' && correct.length>1) return alert('Choix unique : une seule bonne réponse.');
+  } else if (mqType==='truefalse'){
+    const c = document.querySelector('input[name=mq-tf]:checked');
+    if (!c) return alert('Choisissez Vrai ou Faux.');
+    correct = [c.value==='true'];
+  }
+  const q = { id: mqIdx!==null ? edQs[mqIdx].id : uuid(), type: mqType, text, options, correct_answers: correct,
+              points, explanation: $('mq-exp').value.trim() };
+  if (mqIdx!==null) edQs[mqIdx]=q; else edQs.push(q);
+  edDirty = true; closeModal('m-question'); renderEdQs();
+}
+
+/* ---- Enregistrement ---- */
+async function saveQuiz(status){
+  showErr('ed-err','');
+  const title = $('ed-name').value.trim();
+  if (!title) return showErr('ed-err','Le titre est obligatoire.');
+  if (!edQs.length) return showErr('ed-err','Ajoutez au moins une question.');
+  const pass = parseInt($('ed-pass').value,10);
+  const payload = {
+    title,
+    description: $('ed-desc').value.trim() || null,
+    target_role: $('ed-role').value || null,
+    target_site: $('ed-site').value || null,
+    time_limit_min: parseInt($('ed-time').value,10) || null,
+    passing_score: isNaN(pass) ? 70 : Math.max(0, Math.min(100, pass)),
+    status,
+    updated_at: new Date().toISOString()
+  };
+  const b1=$('ed-save-draft'), b2=$('ed-save-pub'); b1.disabled=b2.disabled=true;
+  try {
+    let tid = edId;
+    if (tid){
+      const r = await sb.from('quiz_templates').update(payload).eq('id', tid);
+      if (r.error) throw r.error;
+    } else {
+      tid = uuid();
+      const r = await sb.from('quiz_templates').insert(Object.assign({ id: tid, created_at: new Date().toISOString(),
+        created_by: me && me.full_name || null }, payload));
+      if (r.error) throw r.error;
+    }
+    // Questions : mise à jour en place (les identifiants sont conservés, les
+    // réponses déjà données par les agents restent rattachées à leur question).
+    const rows = edQs.map((q,i) => ({ id:q.id, template_id:tid, pos:i, type:q.type, text:q.text,
+      options:q.options, correct_answers:q.correct_answers, points:q.points, explanation:q.explanation||null }));
+    const up = await sb.from('quiz_questions').upsert(rows, { onConflict:'id' });
+    if (up.error) throw up.error;
+    const removed = edOrigIds.filter(id => !edQs.some(q => q.id===id));
+    if (removed.length){
+      const del = await sb.from('quiz_questions').delete().in('id', removed);
+      if (del.error) throw new Error("Questionnaire enregistré, mais certaines questions retirées n'ont pas pu être supprimées (des agents y ont déjà répondu). Détail : "+errText(del.error));
+    }
+    edId = tid; edOrigIds = edQs.map(q => q.id); edDirty = false;
+    toast(status==='active' ? 'Questionnaire publié ✓' : 'Brouillon enregistré ✓');
+    await loadTemplates();
+    openList();
+  } catch(e){
+    showErr('ed-err','Enregistrement impossible : '+errText(e));
+  } finally { b1.disabled=b2.disabled=false; }
+}
+
+/* ============================== PARTAGE ============================== */
+async function openShare(id){
+  const t = templates.find(x => x.id===id); if(!t) return;
+  shareQuizId = id;
+  $('sh-name').textContent = t.title;
+  $('sh-link').textContent = QUIZ_AGENT_URL + '?quiz=' + encodeURIComponent(id);
+  $('sh-perso').classList.add('hidden');
+  $('sh-native').classList.toggle('hidden', !navigator.share);
+  const sel = $('sh-agent');
+  sel.innerHTML = '<option value="">Chargement…</option>';
+  openModal('m-share');
+  try {
+    const list = await loadAnnuaire();
+    sel.innerHTML = '<option value="">— Choisir un agent —</option>' +
+      list.map(a => `<option value="${esc(a.id)}">${esc(a.nom)} ${esc(a.prenom||'')}</option>`).join('');
+  } catch(e){ sel.innerHTML = '<option value="">Liste des agents indisponible</option>'; }
+}
+function buildPersonalLink(){
+  const id = $('sh-agent').value;
+  if (!id){ $('sh-perso').classList.add('hidden'); return; }
+  const a = (annuaire||[]).find(x => x.id===id); if(!a) return;
+  const name = (a.nom+' '+(a.prenom||'')).trim();
+  $('sh-plink').textContent = QUIZ_AGENT_URL + '?quiz=' + encodeURIComponent(shareQuizId) +
+    '&agent=' + encodeURIComponent(a.id) + '&name=' + encodeURIComponent(name);
+  $('sh-perso').classList.remove('hidden');
+}
+function shareText(boxId){
+  const t = templates.find(x => x.id===shareQuizId);
+  return 'Quiz de formation RDZ' + (t ? ' — ' + t.title : '') + ' : ' + $(boxId).textContent;
+}
+function copyLink(boxId){
+  const txt = $(boxId).textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
+    .then(() => toast('Lien copié ✓'))
+    .catch(() => { window.prompt('Copiez le lien :', txt); });
+}
+function shareWhatsApp(boxId){ window.open('https://wa.me/?text=' + encodeURIComponent(shareText(boxId)), '_blank'); }
+function shareMail(boxId){
+  const t = templates.find(x => x.id===shareQuizId);
+  location.href = 'mailto:?subject=' + encodeURIComponent('Quiz de formation RDZ' + (t ? ' — ' + t.title : '')) +
+    '&body=' + encodeURIComponent('Bonjour,\n\nMerci de répondre au quiz de formation suivant :\n' + $(boxId).textContent + '\n\nMerci.');
+}
+function shareNative(boxId){ navigator.share({ title:'Quiz RDZ', text: shareText(boxId) }).catch(()=>{}); }
+
+/* ============================== RÉSULTATS ============================== */
+function statusOf(s){
+  if (s.status==='pending') return { k:'pending', html:'<span class="tag">⏳ En cours</span>' };
+  if (s.status==='submitted') return { k:'todo', html:'<span class="tag warn">📝 À corriger</span>' };
+  if (s.status==='corrected' && !s.corrected_at) return { k:'todo', html:'<span class="tag blue">🤖 Corrigé auto — à valider</span>' };
+  return { k:'done', html:'<span class="tag ok">✓ Validé</span>' };
+}
+function isTodo(s){ return statusOf(s).k==='todo'; }
+async function openResults(){
+  show('s-results'); showErr('res-err','');
+  $('res-body').innerHTML = '<div class="spin"></div>';
+  try {
+    await Promise.all([loadSessions(), templates.length ? Promise.resolve() : loadTemplates()]);
+    const sel = $('res-quiz'); const cur = sel.value;
+    sel.innerHTML = '<option value="">Tous les quiz</option>' + templates.map(t => `<option value="${esc(t.id)}">${esc(t.title)}</option>`).join('');
+    sel.value = cur;
+    renderResults();
+  } catch(e){ $('res-body').innerHTML=''; showErr('res-err','Chargement impossible : '+errText(e)); }
+}
+$('res-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  resFilter = b.dataset.f;
+  $('res-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b));
+  renderResults();
+});
+function renderResults(){
+  const s = $('res-search').value.toLowerCase().trim();
+  const qf = $('res-quiz').value;
+  const rows = sessions.filter(x => (!resFilter || statusOf(x).k===resFilter) && (!qf || x.template_id===qf) &&
+    (!s || (x.agent_name||'').toLowerCase().includes(s)));
+  if (!rows.length){ $('res-body').innerHTML = '<div class="empty">Aucun résultat dans cette catégorie.</div>'; return; }
+  $('res-body').innerHTML = rows.map(x => {
+    const st = statusOf(x);
+    const pass = (x.quiz_templates && x.quiz_templates.passing_score) || 70;
+    const score = x.final_score!=null ? x.final_score : x.auto_score;
+    const scoreTag = score==null ? '' : `<span class="tag ${score>=pass?'ok':'bad'}">${x.final_score!=null?'Note':'Score auto'} : ${score}%</span>`;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><div class="title">${esc(x.agent_name||'—')}</div>
+          <div style="font-size:12.5px;color:#666">${esc((x.quiz_templates && x.quiz_templates.title) || 'Questionnaire supprimé')}</div></div>
+        ${st.html}
+      </div>
+      <div class="meta">
+        <span class="tag">${fDate(x.submitted_at || x.started_at)}</span>
+        ${scoreTag}
+        ${x.agent_id ? '' : '<span class="tag warn" title="L\'agent a tapé son nom au lieu de le choisir dans la liste">⚠ Non relié à une fiche RH</span>'}
+        ${x.corrected_by ? `<span class="tag">par ${esc(x.corrected_by)}</span>` : ''}
+      </div>
+      ${x.status!=='pending' ? `<div class="actions"><button class="btn ${st.k==='todo'?'btn-p':'btn-g'} btn-sm" data-sid="${esc(x.id)}">${st.k==='todo'?'✏️ Corriger / valider':'👁 Voir / modifier'}</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+$('res-body').addEventListener('click', e => { const b=e.target.closest('button[data-sid]'); if(b) openCorrection(b.dataset.sid); });
+
+/* ============================== CORRECTION ============================== */
+function ansToText(v){
+  if (v===null || v===undefined) return '(sans réponse)';
+  if (Array.isArray(v)) return v.length ? v.join(' · ') : '(sans réponse)';
+  if (v===true || v==='true') return 'Vrai';
+  if (v===false || v==='false') return 'Faux';
+  return String(v);
+}
+async function openCorrection(sid){
+  corrSession = sessions.find(s => s.id===sid); if(!corrSession) return;
+  show('s-corr'); showErr('corr-err','');
+  $('corr-title').textContent = 'Correction — ' + (corrSession.agent_name||'');
+  $('corr-sub').textContent = ((corrSession.quiz_templates && corrSession.quiz_templates.title) || '') + ' · ' + fDate(corrSession.submitted_at);
+  $('corr-body').innerHTML = '<div class="spin"></div>';
+  try {
+    const [qr, ar] = await Promise.all([
+      sb.from('quiz_questions').select('*').eq('template_id', corrSession.template_id).order('pos'),
+      sb.from('quiz_answers').select('*').eq('session_id', sid)
+    ]);
+    if (qr.error) throw qr.error; if (ar.error) throw ar.error;
+    corrQs = qr.data || []; corrAns = ar.data || [];
+    renderCorrection();
+  } catch(e){ $('corr-body').innerHTML=''; showErr('corr-err','Chargement impossible : '+errText(e)); }
+}
+function renderCorrection(){
+  let html = '';
+  if (!corrSession.agent_id) html += `<div class="note">⚠ Cet agent a tapé son nom (« ${esc(corrSession.agent_name)} ») au lieu de le choisir dans la liste : la note ne pourra pas être inscrite automatiquement dans sa fiche RH. Pour la suite, envoyez-lui plutôt un <b>lien personnel</b> (bouton Partager).</div>`;
+  corrQs.forEach((q,i) => {
+    const a = corrAns.find(x => x.question_id===q.id);
+    const given = a ? a.answer : null;
+    const pts = q.points || 1;
+    let body = '';
+    if (q.type==='open'){
+      body = `<div class="ans open">${esc(ansToText(given))}</div>
+        <div class="grid2" style="margin-top:8px">
+          <div><label class="l" for="on-${esc(q.id)}">Note / ${pts}</label>
+            <input class="f" type="number" min="0" max="${pts}" step="0.5" id="on-${esc(q.id)}" value="${corrSession.corrected_at && a && a.points_earned!=null ? a.points_earned : ''}" placeholder="0" oninput="updateCorrTotal()"></div>
+        </div>
+        <div style="margin-top:8px"><label class="l" for="oc-${esc(q.id)}">Commentaire</label>
+          <input class="f" id="oc-${esc(q.id)}" value="${esc((a && a.admin_comment)||'')}" placeholder="Optionnel"></div>`;
+    } else if (q.type==='truefalse'){
+      const exp = q.correct_answers && q.correct_answers[0];
+      const ok = a && a.is_correct;
+      body = `<div class="ans ${ok?'good':'badc'}">${ok?'✅':'❌'} Réponse : <b>${esc(ansToText(given))}</b>${ok?'':' — attendu : '+esc(ansToText(exp))}</div>`;
+    } else {
+      const corr = q.correct_answers || [];
+      const g = Array.isArray(given) ? given : (given!=null ? [given] : []);
+      body = (q.options||[]).map(o => {
+        const isC = corr.includes(o), isG = g.includes(o);
+        if (isC && isG) return `<div class="ans good">✅ ${esc(o)}</div>`;
+        if (!isC && isG) return `<div class="ans badc">❌ ${esc(o)}</div>`;
+        if (isC) return `<div class="ans exp">→ ${esc(o)} <i>(bonne réponse)</i></div>`;
+        return `<div class="ans" style="color:#999">${esc(o)}</div>`;
+      }).join('') + (g.length ? '' : '<div class="ans badc">(sans réponse)</div>');
+    }
+    html += `<div class="card">
+      <div style="font-size:11px;font-weight:bold;color:#999;text-transform:uppercase;margin-bottom:4px">Question ${i+1} · ${pts} pt${pts>1?'s':''} · ${TYPE_LABELS[q.type]||esc(q.type)}</div>
+      <div style="font-weight:bold;margin-bottom:8px">${esc(q.text)}</div>
+      ${body}
+      ${q.explanation ? `<div class="explain">💡 ${esc(q.explanation)}</div>` : ''}
+    </div>`;
+  });
+  html += '<div class="score-box" id="corr-total"></div>';
+  $('corr-body').innerHTML = html;
+  $('corr-save').textContent = corrSession.corrected_at ? '✓ Enregistrer la nouvelle note' : '✓ Valider la note';
+  updateCorrTotal();
+}
+function computeScore(){
+  let total=0, earned=0, openMissing=0;
+  corrQs.forEach(q => {
+    const pts = q.points || 1; total += pts;
+    if (q.type==='open'){
+      const el = $('on-'+q.id); const v = el && el.value!=='' ? parseFloat(el.value) : NaN;
+      if (isNaN(v)) openMissing++; else earned += Math.max(0, Math.min(pts, v));
+    } else {
+      const a = corrAns.find(x => x.question_id===q.id);
+      earned += (a && a.points_earned) ? Number(a.points_earned) : 0;
+    }
+  });
+  return { total, earned, openMissing, pct: total>0 ? Math.round(earned/total*100) : 0 };
+}
+function updateCorrTotal(){
+  const c = computeScore();
+  const pass = (corrSession.quiz_templates && corrSession.quiz_templates.passing_score) || 70;
+  $('corr-total').innerHTML = `<b>Note finale : ${c.pct}%</b> (${c.earned} / ${c.total} pts) — ${c.pct>=pass?'<span style="color:var(--ok)">RÉUSSI</span>':'<span style="color:var(--bad)">ÉCHEC</span>'} · seuil ${pass}%`
+    + (c.openMissing ? `<div style="color:var(--warn);margin-top:4px">⚠ ${c.openMissing} question(s) ouverte(s) sans note (comptée(s) 0).</div>` : '');
+}
+async function saveCorrection(){
+  const c = computeScore();
+  if (c.openMissing && !confirm(c.openMissing+' question(s) ouverte(s) sans note seront comptées 0. Valider quand même ?')) return;
+  const btn = $('corr-save'); btn.disabled = true;
+  showErr('corr-err','');
+  try {
+    for (const q of corrQs.filter(q => q.type==='open')){
+      const a = corrAns.find(x => x.question_id===q.id);
+      const pts = q.points || 1;
+      const v = parseFloat(($('on-'+q.id)||{}).value);
+      const note = isNaN(v) ? 0 : Math.max(0, Math.min(pts, v));
+      const comm = (($('oc-'+q.id)||{}).value || '').trim() || null;
+      const r = a
+        ? await sb.from('quiz_answers').update({ points_earned: note, admin_comment: comm, is_correct: note >= pts }).eq('id', a.id)
+        : await sb.from('quiz_answers').insert({ id: uuid(), session_id: corrSession.id, question_id: q.id, answer: null, points_earned: note, admin_comment: comm, is_correct: note >= pts });
+      if (r.error) throw r.error;
+    }
+    const r = await sb.from('quiz_sessions').update({
+      final_score: c.pct, status: 'corrected',
+      corrected_at: new Date().toISOString(),
+      corrected_by: me && me.full_name || null
+    }).eq('id', corrSession.id);
+    if (r.error) throw r.error;
+    toast(corrSession.agent_id ? 'Note validée ✓ — inscrite dans la fiche formation de l\'agent' : 'Note validée ✓ (agent non relié à une fiche RH)');
+    await openResults();
+  } catch(e){ showErr('corr-err','Enregistrement impossible : '+errText(e)); window.scrollTo(0,0); }
+  finally { btn.disabled = false; }
+}
+
+/* ============================== DÉMARRAGE ============================== */
+window.addEventListener('beforeunload', e => { if (edDirty && !$('s-editor').classList.contains('hidden')) { e.preventDefault(); e.returnValue=''; } });
+init();
+</script>
+</body>
+</html>
