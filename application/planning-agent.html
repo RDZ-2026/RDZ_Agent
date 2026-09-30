@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v12 · 2026-09-30 · + conversations de groupe -->
+<!-- RDZ · planning-agent (pilote) · v13 · 2026-09-30 · + boutons PDSA / PDS -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -145,6 +145,23 @@ main.with-compose{padding-bottom:170px;}
 .grp-head span{display:block;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .icon-b{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;}
 .icon-b svg{width:20px;height:20px;}
+.pdsa-box{margin-top:14px;border-radius:12px;padding:12px;background:#fff;border:1px solid var(--line);}
+.pdsa-box.dark{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.12);}
+.d-head + .pdsa-box{margin:0 0 12px;}
+.pd-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:9px;display:flex;align-items:center;gap:8px;}
+.pdsa-box.dark .pd-title{color:rgba(255,255,255,.6);}
+.pd-late{background:var(--red);color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;letter-spacing:.02em;animation:pulse 1.4s ease-in-out infinite;}
+.pd-steps{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pd-step{display:flex;align-items:center;gap:9px;border-radius:11px;padding:10px;text-align:left;min-height:58px;font-family:inherit;border:1.5px solid transparent;}
+.pd-step svg{width:20px;height:20px;flex:none;}
+.pd-step b{display:block;font-size:15px;font-weight:800;}
+.pd-step span{display:block;font-size:11.5px;line-height:1.3;opacity:.85;}
+.pd-step.go.pdsa{background:#f59e0b;color:#1f1300;}
+.pd-step.go.pds{background:#16a34a;color:#fff;}
+.pd-step.wait{background:var(--muted-bg);color:var(--text3);}
+.pdsa-box.dark .pd-step.wait{background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);}
+.pd-step.done{background:var(--ok-bg);color:var(--ok);}
+.pdsa-box.dark .pd-step.done{background:rgba(22,163,74,.2);color:#86efac;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -486,7 +503,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v12 · 30.09.2026';
+const APP_VERSION = 'v13 · 30.09.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -546,6 +563,15 @@ async function agentGet(q){
   const d = await r.json().catch(()=>null);
   if(!r.ok) throw new Error((d&&d.message)||'Connexion impossible');
   return d||[];
+}
+async function agentRpc(fn,args){
+  const r = await fetch(AGENT_URL+'/rest/v1/rpc/'+fn, {
+    method:'POST', headers:{ apikey:AGENT_KEY, Authorization:'Bearer '+AGENT_KEY, 'Content-Type':'application/json' },
+    body: JSON.stringify(args||{})
+  });
+  const d = await r.json().catch(()=>null);
+  if(!r.ok) throw new Error(String((d&&(d.message||d.hint))||'Service indisponible').replace(/^ERROR:\s*/,''));
+  return d;
 }
 async function opsRpc(fn,args){
   const r = await fetch(OPS_URL+'/rest/v1/rpc/'+fn, {
@@ -663,6 +689,7 @@ async function reload(manual){
     ]);
     if(msgs) setMessages(msgs);
     if(gfeed) setGroupFeed(gfeed);
+    await loadPdsa();
     SHIFTS = (rows||[]).map(mapShift).filter(s=>s.status && s.status!==HIDDEN_STATUS);
     if(chg) setChanges(chg);
     if(abs){
@@ -792,6 +819,7 @@ function renderHome(){
       </div>
       <span class="chev">${I.chev}</span>
     </div>
+    ${pdsaBlock(next, true)}
     <div class="next-actions ${next.siteAddress?'':'one'}">
       <button class="btn btn-red btn-sm" onclick="openShift('${esc(next.id)}')">Voir le service</button>
       ${next.siteAddress?`<a class="btn btn-white btn-sm" href="${esc(mapsUrl(next.siteAddress))}" target="_blank" rel="noopener">${I.pin}Itinéraire</a>`:''}
@@ -880,6 +908,70 @@ function openWeekDetail(){
     ${body}
     <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">Fermer</button>
   </div></div>`;
+}
+
+// ── PDSA / PDS (prise de service anticipée / prise de service) ──
+// L'agent envoie sa PDSA dès 3 h avant le service (à faire 1 h avant), puis
+// sa PDS à la prise de poste (dès 1 h avant). Le centraliste voit le service
+// passer de rouge à orange puis vert dans planning-agendrix.
+const PDSA_OPEN_MIN = 180, PDS_OPEN_MIN = 60;
+let PDSA = {};   // shift id -> { pdsa:{at,matched}, pds:{at,matched} }
+function pdsaCandidates(){ const now=new Date(); return SHIFTS.filter(s=>sEnd(s)>now && sStart(s)-now < 24*3600000); }
+async function loadPdsa(){
+  const ids = pdsaCandidates().map(s=>s.id);
+  if(!ids.length || !AGENT){ PDSA={}; return; }
+  try{
+    const rows = await agentRpc('rdz_agent_pdsa_status', { p_agent_id:String(AGENT.id), p_pin_hash:localStorage.getItem(LS_HASH)||'', p_shift_refs:ids });
+    PDSA = {};
+    (rows||[]).forEach(r=>{ (PDSA[r.shift_ref] = PDSA[r.shift_ref]||{})[r.kind] = { at:r.at, matched:!!r.matched }; });
+  }catch(e){ /* non bloquant */ }
+}
+function hm(d){ return d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
+function pdsaBlock(s, dark){
+  const now=new Date(), st=sStart(s), en=sEnd(s);
+  if(en<=now || st-now > 24*3600000) return '';
+  const p=PDSA[s.id]||{};
+  const openA=new Date(st-PDSA_OPEN_MIN*60000), openS=new Date(st-PDS_OPEN_MIN*60000);
+  const step=(kind,label,open,sub)=>{
+    const done=p[kind];
+    if(done) return `<div class="pd-step done">${I.checkC}<div><b>${label} envoyée</b><span>à ${esc(hm(new Date(done.at)))}${done.matched?'':' · non reçue par le centraliste'}</span></div></div>`;
+    if(now<open) return `<button class="pd-step wait" disabled>${I.clock}<div><b>${label}</b><span>dès ${esc(hm(open))}</span></div></button>`;
+    return `<button class="pd-step go ${kind}" onclick="event.stopPropagation();askPdsa('${esc(s.id)}','${kind}')">${kind==='pdsa'?I.send:I.check}<div><b>${label}</b><span>${sub}</span></div></button>`;
+  };
+  const late = !p.pdsa && now > new Date(st-60*60000);
+  return `<div class="pdsa-box ${dark?'dark':''}">
+    <div class="pd-title">Prise de service${late? ' <span class="pd-late">PDSA attendue</span>' : ''}</div>
+    <div class="pd-steps">
+      ${step('pdsa','PDSA',openA,'Prise de service anticipée')}
+      ${step('pds','PDS',openS,'Je prends mon poste')}
+    </div>
+  </div>`;
+}
+function askPdsa(id, kind){
+  const s=SHIFTS.find(x=>x.id===id); if(!s) return;
+  const lbl = kind==='pdsa'? 'PDSA' : 'PDS';
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Envoyer votre ${lbl} ?</h2>
+    <div class="sub">${kind==='pdsa'? 'Vous confirmez au centraliste que vous serez à l’heure pour ce service.' : 'Vous confirmez au centraliste que vous prenez votre poste maintenant.'}</div>
+    <div class="dc-plan"><b>${esc(s.siteName)}</b>${s.post?' · '+esc(s.post):''}<br>${esc(dayLabel(s.date))} · ${esc(s.start)} – ${esc(s.end)}</div>
+    <button class="btn btn-red btn-block" id="pd-btn" style="margin-top:16px" onclick="sendPdsa('${esc(id)}','${kind}')">Envoyer ma ${lbl} (${esc(hm(new Date()))})</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+async function sendPdsa(id, kind){
+  const s=SHIFTS.find(x=>x.id===id); const btn=$('pd-btn'); if(!s) return;
+  if(btn){ btn.disabled=true; btn.textContent='Envoi…'; }
+  try{
+    const r = await agentRpc('rdz_agent_pdsa_signal', { p_agent_id:String(AGENT.id), p_pin_hash:localStorage.getItem(LS_HASH)||'', p_kind:kind,
+      p_shift_ref:s.id, p_date:s.date, p_start:s.start, p_end:s.end });
+    (PDSA[id] = PDSA[id]||{})[kind] = { at:(r&&r.at)||new Date().toISOString(), matched:!!(r&&r.matched) };
+    closeSheet();
+    if(r && r.matched) toast((kind==='pdsa'?'PDSA':'PDS')+' envoyée au centraliste');
+    else toast((kind==='pdsa'?'PDSA':'PDS')+' enregistrée, mais service introuvable chez le centraliste : prévenez-le', true);
+    render();
+  }catch(e){
+    closeSheet(); toast(e.message||'Envoi impossible', true);
+  }
 }
 
 function renderStats(up){
@@ -1146,6 +1238,7 @@ function renderDetail(s){
       ${s.plannedStart? `<div class="d-line" style="font-size:13px;color:var(--text2);">Heures réelles validées · prévu initialement ${esc(s.plannedStart)} – ${esc(s.plannedEnd)}</div>` : ''}
       ${s.post?`<div class="d-line">${I.people}<span>${esc(s.post)}</span></div>`:''}
     </div>
+    ${pdsaBlock(s, false)}
     <div class="d-card">
       ${s.siteAddress?`<div class="d-item">${I.pinO}<div><div class="k">Adresse du site</div><div class="v">${esc(s.siteAddress)}</div></div></div>`:''}
       ${!ended?`<div class="d-item">${I.run}<div><div class="k">Arrivée conseillée</div><div class="v">${esc(minusMinutes(s.start,ARRIVAL_ADVANCE_MIN))}</div></div></div>`:''}
@@ -1681,6 +1774,11 @@ function renderAccount(){
 }
 
 // ── Démarrage (même logique que mobile.html) ─────────────────
+// Les boutons PDSA / PDS s'activent à l'heure : rafraîchit l'affichage chaque minute
+setInterval(()=>{
+  if(!AGENT || document.visibilityState!=='visible' || $('sheet-root').innerHTML) return;
+  if(VIEW.tab==='home' || VIEW.detail) render();
+}, 60000);
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible' && AGENT && Date.now()-LAST_LOAD>5*60*1000) reload(false);
 });
