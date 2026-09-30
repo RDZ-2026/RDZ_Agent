@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent (pilote) · v11 · 2026-09-30 · + messagerie avec la direction -->
+<!-- RDZ · planning-agent (pilote) · v12 · 2026-09-30 · + conversations de groupe -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -128,6 +128,23 @@ main.with-compose{padding-bottom:170px;}
 .compose .send{width:44px;height:44px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
 .compose .send:disabled{opacity:.5;}
 .compose .send svg{width:20px;height:20px;}
+.msg-seg.three{grid-template-columns:1fr 1fr 1fr;}
+.msg-seg.three button{font-size:13px;}
+.grp-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;}
+.grp-row:active{background:#fafafa;}
+.grp-av{width:40px;height:40px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex:none;}
+.grp-av svg{width:20px;height:20px;}
+.grp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.grp-main b{font-size:15px;}
+.grp-main span{font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.grp-side{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;}
+.grp-side small{font-size:11px;color:var(--text3);}
+.grp-side .n{min-width:20px;height:20px;border-radius:10px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;}
+.grp-head{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px 8px 6px;margin-bottom:10px;}
+.grp-head b{display:block;font-size:15px;}
+.grp-head span{display:block;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.icon-b{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none;}
+.icon-b svg{width:20px;height:20px;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -469,7 +486,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v11 · 30.09.2026';
+const APP_VERSION = 'v12 · 30.09.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -608,7 +625,7 @@ async function pinDigit(d){
     setTimeout(()=>{ el.classList.remove('shake'); pinBuf=''; dots(0); },400);
   }
 }
-function logout(){ closeSheet(); MSGS=[]; MSG_DRAFT=''; if(MSG_POLL){ clearInterval(MSG_POLL); MSG_POLL=null; } const cp=document.getElementById('compose'); if(cp) cp.remove(); clearLocal(); AGENT=null; SHIFTS=[]; ABS={list:[],balance:null,loaded:false}; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
+function logout(){ closeSheet(); MSGS=[]; GROUPS=[]; GMSGS=[]; VIEW.groupId=null; MSG_DRAFT=''; if(MSG_POLL){ clearInterval(MSG_POLL); MSG_POLL=null; } const cp=document.getElementById('compose'); if(cp) cp.remove(); clearLocal(); AGENT=null; SHIFTS=[]; ABS={list:[],balance:null,loaded:false}; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
 
 // ── Données planning ─────────────────────────────────────────
 function mapShift(r){
@@ -637,13 +654,15 @@ async function reload(manual){
   try{
     // Services terminés : heures prévues reportées d'office (modifiables ensuite)
     await opsRpc('rdz_planning_pilot_autofill', { p_agent_id:String(AGENT.id) }).catch(()=>0);
-    const [rows, chg, abs, msgs] = await Promise.all([
+    const [rows, chg, abs, msgs, gfeed] = await Promise.all([
       opsRpc('rdz_planning_pilot_shifts', { p_agent_id:String(AGENT.id) }),
       opsRpc('rdz_planning_pilot_changes', { p_agent_id:String(AGENT.id) }).catch(()=>null),
       opsRpc('rdz_planning_pilot_absences', { p_agent_id:String(AGENT.id) }).catch(()=>null),
-      opsRpc('rdz_planning_pilot_messages', { p_agent_id:String(AGENT.id) }).catch(()=>null)
+      opsRpc('rdz_planning_pilot_messages', { p_agent_id:String(AGENT.id) }).catch(()=>null),
+      opsRpc('rdz_planning_pilot_group_feed', { p_agent_id:String(AGENT.id) }).catch(()=>null)
     ]);
     if(msgs) setMessages(msgs);
+    if(gfeed) setGroupFeed(gfeed);
     SHIFTS = (rows||[]).map(mapShift).filter(s=>s.status && s.status!==HIDDEN_STATUS);
     if(chg) setChanges(chg);
     if(abs){
@@ -730,7 +749,7 @@ function render(){
   document.querySelectorAll('.tab').forEach(b=>{
     b.classList.toggle('on', b.dataset.tab===VIEW.tab);
     const old=b.querySelector('.tab-dot'); if(old) old.remove();
-    const n = b.dataset.tab==='planning'? pending : b.dataset.tab==='temps'? SHIFTS.filter(toCheck).length : b.dataset.tab==='messages'? msgUnread('mine')+msgUnread('broadcast') : 0;
+    const n = b.dataset.tab==='planning'? pending : b.dataset.tab==='temps'? SHIFTS.filter(toCheck).length : b.dataset.tab==='messages'? totalUnread() : 0;
     if(n){ const d=document.createElement('span'); d.className='tab-dot'; d.textContent=n; b.appendChild(d); }
   });
   const left=$('tb-left'), center=$('tb-center');
@@ -745,7 +764,7 @@ function render(){
     ? '<div class="logo" role="img" aria-label="RDZ Security Management"></div>'
     : `<span class="tb-title">${VIEW.tab==='planning'?'Mon planning':VIEW.tab==='temps'?'Temps &amp; présence':VIEW.tab==='messages'?'Messages':'Mon compte'}</span>`;
   if(!LAST_LOAD && VIEW.tab!=='account'){ $('main').innerHTML='<div class="loader">Chargement de votre planning…</div>'; return; }
-  const main=$('main'); main.classList.toggle('with-compose', VIEW.tab==='messages' && VIEW.msgTab!=='broadcast');
+  const main=$('main'); if(VIEW.tab!=='messages') main.classList.remove('with-compose');
   const oldCompose=document.getElementById('compose'); if(oldCompose && VIEW.tab!=='messages') oldCompose.remove();
   if(VIEW.tab==='messages'){ renderMessagesTab(); return; }
   main.innerHTML = VIEW.tab==='home'? renderHome() : VIEW.tab==='planning'? renderPlanning() : VIEW.tab==='temps'? renderTemps() : renderAccount();
@@ -779,8 +798,8 @@ function renderHome(){
     </div>
   </div>`;
   }
-  const unreadMsg = msgUnread('mine')+msgUnread('broadcast');
-  if(unreadMsg) h += `<button class="msg-banner" onclick="VIEW.msgTab=msgUnread('mine')?'mine':'broadcast';go('messages')">${I.chat}<span>${unreadMsg} nouveau${unreadMsg>1?'x':''} message${unreadMsg>1?'s':''} de la direction</span>${I.chev}</button>`;
+  const unreadMsg = totalUnread();
+  if(unreadMsg) h += `<button class="msg-banner" onclick="VIEW.msgTab=msgUnread('mine')?'mine':msgUnread('groups')?'groups':'broadcast';VIEW.groupId=null;go('messages')">${I.chat}<span>${unreadMsg} nouveau${unreadMsg>1?'x':''} message${unreadMsg>1?'s':''}</span>${I.chev}</button>`;
   h += renderWeek();
   const toDecl = SHIFTS.filter(toCheck).length;
   if(toDecl) h += `<div class="validate-bar"><span>${toDecl} service${toDecl>1?'s':''} terminé${toDecl>1?'s':''} : vérifiez vos heures</span><button class="btn btn-red btn-sm" onclick="go('temps')">Vérifier</button></div>`;
@@ -1487,37 +1506,52 @@ async function exportPdf(mode){
   }
 }
 
-// ── Messages (fil privé avec la direction + annonces) ────────
-let MSGS = [];            // { id, channel:'mine'|'broadcast', body, fromAgent, at, pending? }
+// ── Messages : fil privé avec la direction, groupes, annonces ─
+// Canaux : 'mine' (fil privé), 'broadcast' (annonces), 'g:<id>' (groupe)
+let MSGS = [];            // fil privé + annonces
+let GROUPS = [];          // { id, name, members:[noms] }
+let GMSGS = [];           // messages de groupe
 let MSG_DRAFT = '';
 let MSG_POLL = null;
 const LS_MSG_SEEN = 'rdz_planning_pilot_msg_seen_'; // + agent + '_' + canal
 function setMessages(list){
   const pend = MSGS.filter(m=>m.pending);
-  MSGS = (list||[]).map(m=>({ id:String(m.id), channel:m.channel, body:m.body||'', fromAgent:!!m.from_agent, at:m.created_at }));
-  // un message en cours d'envoi reste affiché tant que le serveur ne l'a pas renvoyé
-  pend.forEach(p=>{ if(!MSGS.some(m=>m.fromAgent && m.body===p.body && new Date(m.at)>=new Date(p.at)-60000)) MSGS.push(p); });
+  MSGS = (list||[]).map(m=>({ id:String(m.id), channel:m.channel, body:m.body||'', fromMe:!!m.from_agent, name:m.from_agent?'':'Direction RDZ', at:m.created_at }));
+  pend.forEach(p=>{ if(!MSGS.some(m=>m.fromMe && m.body===p.body && new Date(m.at)>=new Date(p.at)-60000)) MSGS.push(p); });
 }
+function setGroupFeed(feed){
+  const pend = GMSGS.filter(m=>m.pending);
+  GROUPS = (feed&&feed.groups||[]).map(g=>({ id:String(g.id), name:g.name||'Groupe', members:g.members||[] }));
+  GMSGS = (feed&&feed.messages||[]).map(m=>({ id:String(m.id), channel:'g:'+m.group_id, body:m.body||'', fromMe:!!m.mine, name:m.sender_name||'', at:m.created_at }));
+  pend.forEach(p=>{ if(!GMSGS.some(m=>m.channel===p.channel && m.fromMe && m.body===p.body && new Date(m.at)>=new Date(p.at)-60000)) GMSGS.push(p); });
+  if(VIEW.groupId && !GROUPS.some(g=>g.id===VIEW.groupId)) VIEW.groupId=null;
+}
+function chanMsgs(ch){ return (ch.startsWith('g:')? GMSGS : MSGS).filter(m=>m.channel===ch).sort((a,b)=>new Date(a.at)-new Date(b.at)); }
 function msgSeen(ch){ return localStorage.getItem(LS_MSG_SEEN+(AGENT?AGENT.id:'')+'_'+ch)||''; }
 function markChannelSeen(ch){
-  const last = MSGS.filter(m=>m.channel===ch && !m.pending).reduce((a,m)=> m.at>a? m.at : a, '');
+  const last = chanMsgs(ch).filter(m=>!m.pending).reduce((a,m)=> m.at>a? m.at : a, '');
   if(last){ try{ localStorage.setItem(LS_MSG_SEEN+AGENT.id+'_'+ch, last); }catch(e){} }
 }
 function msgUnread(ch){
   if(!AGENT) return 0;
+  if(ch==='groups') return GROUPS.reduce((n,g)=>n+msgUnread('g:'+g.id),0);
   const seen = msgSeen(ch);
-  return MSGS.filter(m=>m.channel===ch && !m.fromAgent && (!seen || new Date(m.at)>new Date(seen))).length;
+  return chanMsgs(ch).filter(m=>!m.fromMe && (!seen || new Date(m.at)>new Date(seen))).length;
 }
+function totalUnread(){ return msgUnread('mine')+msgUnread('broadcast')+msgUnread('groups'); }
+function currentChannel(){ return VIEW.msgTab==='broadcast'? 'broadcast' : VIEW.msgTab==='groups'? (VIEW.groupId? 'g:'+VIEW.groupId : null) : 'mine'; }
 function bubbleHtml(m, ch){
   const t = new Date(m.at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
   if(ch==='broadcast') return `<div class="bub ann"><span class="who" style="display:block;font-size:11px;font-weight:700;color:var(--red);margin-bottom:2px;">Annonce · RDZ</span>${esc(m.body)}<span class="t">${esc(t)}</span></div>`;
-  return m.fromAgent
+  return m.fromMe
     ? `<div class="bub me ${m.pending?'pending':''}">${esc(m.body)}<span class="t">${m.pending?'Envoi…':esc(t)}</span></div>`
-    : `<div class="bub them"><span class="who">Direction RDZ</span>${esc(m.body)}<span class="t">${esc(t)}</span></div>`;
+    : `<div class="bub them"><span class="who">${esc(m.name||'Direction RDZ')}</span>${esc(m.body)}<span class="t">${esc(t)}</span></div>`;
 }
 function messagesListHtml(ch){
-  const list = MSGS.filter(m=>m.channel===ch).sort((a,b)=>new Date(a.at)-new Date(b.at));
-  if(!list.length) return `<div class="empty">${ch==='mine'? '<b>Aucun message</b>Écrivez à la direction : votre message arrive directement dans le planning RDZ.' : '<b>Aucune annonce</b>Les messages envoyés à tous les agents apparaîtront ici.'}</div>`;
+  const list = chanMsgs(ch);
+  if(!list.length) return `<div class="empty">${ch==='mine'? '<b>Aucun message</b>Écrivez à la direction : votre message arrive directement dans le planning RDZ.'
+    : ch==='broadcast'? '<b>Aucune annonce</b>Les messages envoyés à tous les agents apparaîtront ici.'
+    : '<b>Aucun message dans ce groupe</b>Lancez la conversation !'}</div>`;
   let h='', lastDay='';
   list.forEach(m=>{
     const d=isoDate(new Date(m.at));
@@ -1526,68 +1560,102 @@ function messagesListHtml(ch){
   });
   return h;
 }
+function groupsListHtml(){
+  if(!GROUPS.length) return '<div class="empty"><b>Aucun groupe</b>Quand votre responsable vous ajoute à une conversation de groupe, elle apparaît ici.</div>';
+  return GROUPS.map(g=>{
+    const list=chanMsgs('g:'+g.id), last=list[list.length-1], n=msgUnread('g:'+g.id);
+    const preview = last? (last.fromMe?'Vous : ':(last.name? last.name.split(' ')[0]+' : ' : ''))+last.body : g.members.length+' membre'+(g.members.length>1?'s':'');
+    return `<button class="grp-row" onclick="openGroup('${esc(g.id)}')">
+      <span class="grp-av">${I.people}</span>
+      <span class="grp-main"><b>${esc(g.name)}</b><span>${esc(preview)}</span></span>
+      <span class="grp-side">${last? `<small>${esc(relTime(last.at))}</small>` : ''}${n? `<span class="n">${n}</span>` : ''}</span>
+    </button>`;
+  }).join('');
+}
 function renderMessagesTab(){
-  const ch = VIEW.msgTab==='broadcast'? 'broadcast' : 'mine';
-  const um = msgUnread('mine'), ub = msgUnread('broadcast');
-  $('main').innerHTML = `<div class="msg-seg">
-      <button class="${ch==='mine'?'on':''}" onclick="setMsgTab('mine')">Mes messages${um&&ch!=='mine'?`<span class="n">${um}</span>`:''}</button>
-      <button class="${ch==='broadcast'?'on':''}" onclick="setMsgTab('broadcast')">Annonces${ub&&ch!=='broadcast'?`<span class="n">${ub}</span>`:''}</button>
-    </div>
-    <div id="msg-list">${messagesListHtml(ch)}</div>`;
+  const tab = VIEW.msgTab==='broadcast'? 'broadcast' : VIEW.msgTab==='groups'? 'groups' : 'mine';
+  const ch = currentChannel();
+  if(ch) markChannelSeen(ch);
+  const um=msgUnread('mine'), ug=msgUnread('groups'), ub=msgUnread('broadcast');
+  const badge=(n,on)=> n&&!on? `<span class="n">${n}</span>` : '';
+  let body;
+  if(tab==='groups' && !ch) body = groupsListHtml();
+  else if(tab==='groups'){
+    const g=GROUPS.find(x=>'g:'+x.id===ch);
+    body = `<div class="grp-head"><button class="icon-b" onclick="closeGroup()" aria-label="Retour">${I.back}</button><div style="min-width:0"><b>${esc(g?g.name:'Groupe')}</b><span>${esc(g? g.members.join(', ') : '')}</span></div></div>
+      <div id="msg-list">${messagesListHtml(ch)}</div>`;
+  } else body = `<div id="msg-list">${messagesListHtml(ch)}</div>`;
+  $('main').innerHTML = `<div class="msg-seg three">
+      <button class="${tab==='mine'?'on':''}" onclick="setMsgTab('mine')">Direction${badge(um,tab==='mine')}</button>
+      <button class="${tab==='groups'?'on':''}" onclick="setMsgTab('groups')">Groupes${badge(ug,false)}</button>
+      <button class="${tab==='broadcast'?'on':''}" onclick="setMsgTab('broadcast')">Annonces${badge(ub,tab==='broadcast')}</button>
+    </div>${body}`;
+  const withCompose = ch==='mine' || (ch && ch.startsWith('g:'));
+  $('main').classList.toggle('with-compose', !!withCompose);
   let c=document.getElementById('compose');
-  if(ch==='mine'){
+  if(withCompose){
+    const ph = ch==='mine'? 'Écrire à la direction…' : 'Écrire au groupe…';
     if(!c){ c=document.createElement('div'); c.id='compose'; c.className='compose'; document.body.appendChild(c);
-      c.innerHTML = `<div class="compose-in"><textarea id="msg-in" rows="1" maxlength="2000" placeholder="Écrire à la direction…" oninput="MSG_DRAFT=this.value;autoGrow(this);$('msg-send').disabled=!this.value.trim()"></textarea><button class="send" id="msg-send" onclick="sendMsg()" aria-label="Envoyer" disabled>${I.send}</button></div>`; }
-    const ta=document.getElementById('msg-in'); if(ta && ta.value!==MSG_DRAFT){ ta.value=MSG_DRAFT; autoGrow(ta); $('msg-send').disabled=!MSG_DRAFT.trim(); }
+      c.innerHTML = `<div class="compose-in"><textarea id="msg-in" rows="1" maxlength="2000" oninput="MSG_DRAFT=this.value;autoGrow(this);$('msg-send').disabled=!this.value.trim()"></textarea><button class="send" id="msg-send" onclick="sendMsg()" aria-label="Envoyer" disabled>${I.send}</button></div>`; }
+    const ta=document.getElementById('msg-in'); ta.placeholder=ph;
+    if(ta.value!==MSG_DRAFT){ ta.value=MSG_DRAFT; autoGrow(ta); $('msg-send').disabled=!MSG_DRAFT.trim(); }
   } else if(c) c.remove();
-  markChannelSeen(ch);
+  if(ch) markChannelSeen(ch);
   updateTabDots();
-  requestAnimationFrame(()=>window.scrollTo(0, document.body.scrollHeight));
+  if(ch) requestAnimationFrame(()=>window.scrollTo(0, document.body.scrollHeight));
   startMsgPoll();
 }
-function setMsgTab(ch){ VIEW.msgTab=ch; render(); }
+function setMsgTab(t){ if(VIEW.msgTab!==t) MSG_DRAFT=''; VIEW.msgTab=t; if(t!=='groups') VIEW.groupId=null; render(); }
+function openGroup(id){ VIEW.msgTab='groups'; VIEW.groupId=id; MSG_DRAFT=''; render(); }
+function closeGroup(){ VIEW.groupId=null; MSG_DRAFT=''; render(); window.scrollTo(0,0); }
 function autoGrow(ta){ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,120)+'px'; }
 function updateTabDots(){
   document.querySelectorAll('.tab').forEach(b=>{
     if(b.dataset.tab!=='messages') return;
     const old=b.querySelector('.tab-dot'); if(old) old.remove();
-    const n=msgUnread('mine')+msgUnread('broadcast');
+    const n=totalUnread();
     if(n){ const d=document.createElement('span'); d.className='tab-dot'; d.textContent=n; b.appendChild(d); }
   });
 }
 async function sendMsg(){
+  const ch=currentChannel(); if(!ch || ch==='broadcast') return;
   const ta=document.getElementById('msg-in'); const body=(ta&&ta.value||'').trim(); if(!body) return;
-  const pending={ id:'tmp'+Date.now(), channel:'mine', body, fromAgent:true, at:new Date().toISOString(), pending:true };
-  MSGS.push(pending); MSG_DRAFT=''; ta.value=''; autoGrow(ta); $('msg-send').disabled=true;
+  const isG = ch.startsWith('g:');
+  const pending={ id:'tmp'+Date.now(), channel:ch, body, fromMe:true, name:'', at:new Date().toISOString(), pending:true };
+  (isG? GMSGS : MSGS).push(pending); MSG_DRAFT=''; ta.value=''; autoGrow(ta); $('msg-send').disabled=true;
   refreshMsgList();
   try{
-    await opsRpc('rdz_planning_pilot_send_message', { p_agent_id:String(AGENT.id), p_body:body });
-    await pollMessages();
-    MSGS = MSGS.filter(m=>m!==pending || !MSGS.some(x=>!x.pending && x.fromAgent && x.body===body));
-    refreshMsgList();
+    if(isG) await opsRpc('rdz_planning_pilot_group_send', { p_agent_id:String(AGENT.id), p_group_id:ch.slice(2), p_body:body });
+    else await opsRpc('rdz_planning_pilot_send_message', { p_agent_id:String(AGENT.id), p_body:body });
+    await pollMessages(true);
   }catch(e){
-    MSGS = MSGS.filter(m=>m!==pending); MSG_DRAFT=body; ta.value=body; autoGrow(ta); $('msg-send').disabled=false;
+    if(isG) GMSGS=GMSGS.filter(m=>m!==pending); else MSGS=MSGS.filter(m=>m!==pending);
+    MSG_DRAFT=body; ta.value=body; autoGrow(ta); $('msg-send').disabled=false;
     refreshMsgList(); toast(e.message||'Envoi impossible', true);
   }
 }
-// Mise à jour légère : seule la liste des bulles est redessinée (la saisie
-// en cours n'est jamais effacée).
+// Mise à jour légère : seules les bulles sont redessinées (la saisie reste).
 function refreshMsgList(){
-  if(VIEW.tab!=='messages' || VIEW.detail) { updateTabDots(); return; }
-  const ch = VIEW.msgTab==='broadcast'? 'broadcast' : 'mine';
+  if(VIEW.tab!=='messages' || VIEW.detail){ updateTabDots(); return; }
+  const ch=currentChannel();
+  if(!ch){ renderMessagesTab(); return; }   // liste des groupes : aperçus à jour
   const el=document.getElementById('msg-list'); if(!el) return;
   const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 120;
   el.innerHTML = messagesListHtml(ch);
   markChannelSeen(ch); updateTabDots();
   if(nearBottom) window.scrollTo(0, document.body.scrollHeight);
 }
-async function pollMessages(){
+async function pollMessages(force){
   if(!AGENT) return;
   try{
-    const list = await opsRpc('rdz_planning_pilot_messages', { p_agent_id:String(AGENT.id) });
-    const before = MSGS.filter(m=>!m.pending).length;
-    setMessages(list);
-    if(MSGS.filter(m=>!m.pending).length!==before) refreshMsgList(); else updateTabDots();
+    const [list, feed] = await Promise.all([
+      opsRpc('rdz_planning_pilot_messages', { p_agent_id:String(AGENT.id) }),
+      opsRpc('rdz_planning_pilot_group_feed', { p_agent_id:String(AGENT.id) }).catch(()=>null)
+    ]);
+    const sig = ()=> MSGS.filter(m=>!m.pending).length+'/'+GMSGS.filter(m=>!m.pending).length+'/'+GROUPS.length+'/'+MSGS.filter(m=>m.pending).length+'/'+GMSGS.filter(m=>m.pending).length;
+    const before = sig();
+    setMessages(list); if(feed) setGroupFeed(feed);
+    if(force || sig()!==before) refreshMsgList(); else updateTabDots();
   }catch(e){}
 }
 // Sondage : toutes les 10 s sur l'onglet Messages, toutes les 60 s ailleurs.
