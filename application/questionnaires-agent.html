@@ -175,6 +175,65 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
 }
 </style>
 
+
+<style id="rdz-harmonisation-2026-10-01">
+@media screen{
+:root{
+ --rdz-red:#d71920;--rdz-red-dark:#a90f16;--rdz-navy:#111c2e;--rdz-navy-2:#17263b;
+ --rdz-text:#172033;--rdz-muted:#64748b;--rdz-border:#e2e8f0;--rdz-bg:#f4f7fb;
+ --rdz-soft:#f8fafc;--rdz-radius:12px;--rdz-shadow:0 8px 24px rgba(15,23,42,.07);
+}
+html{background:var(--rdz-bg)}
+body{background:var(--rdz-bg)!important;color:var(--rdz-text)!important}
+header{
+ position:sticky!important;top:0!important;z-index:1000!important;
+ background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy-2))!important;
+ border-bottom:3px solid var(--rdz-red)!important;
+ box-shadow:0 7px 22px rgba(15,23,42,.15)!important;
+}
+header .top{max-width:1180px!important;margin:auto!important;min-height:58px!important}
+header .brand{color:#fff!important;font-weight:800!important;letter-spacing:.02em}
+header .sub{color:#cbd5e1!important}
+header a,header button.hl{
+ border-radius:9px!important;border:1px solid rgba(255,255,255,.22)!important;
+ background:rgba(255,255,255,.08)!important;color:#fff!important;
+ text-decoration:none!important;box-shadow:none!important
+}
+header a:hover,header button.hl:hover{background:rgba(255,255,255,.15)!important}
+main,.wrap,.container{max-width:1180px}
+.card,.panel,.box,.quiz-card,.result-card,.question-card{
+ background:#fff!important;border:1px solid var(--rdz-border)!important;
+ border-radius:var(--rdz-radius)!important;box-shadow:var(--rdz-shadow)!important
+}
+h1,h2,h3{color:var(--rdz-text)}
+input,select,textarea{
+ background:#fff!important;color:var(--rdz-text)!important;border:1px solid #cbd5e1!important;
+ border-radius:9px!important;min-height:40px;outline:none
+}
+input:focus,select:focus,textarea:focus{
+ border-color:var(--rdz-red)!important;box-shadow:0 0 0 3px rgba(215,25,32,.11)!important
+}
+button,.btn{
+ border-radius:9px!important;font-weight:700;transition:transform .14s ease,box-shadow .14s ease,background .14s ease
+}
+button:hover,.btn:hover{transform:translateY(-1px)}
+button.primary,.btn.primary,.primary{
+ background:var(--rdz-red)!important;border-color:var(--rdz-red)!important;color:#fff!important
+}
+button.primary:hover,.btn.primary:hover,.primary:hover{background:var(--rdz-red-dark)!important}
+table{background:#fff!important;border-radius:10px;overflow:hidden}
+th{background:#f1f5f9!important;color:#334155!important}
+td,th{border-color:var(--rdz-border)!important}
+.badge,.pill,.tag{border-radius:999px!important}
+.muted,.hint,.small{color:var(--rdz-muted)}
+@media(max-width:640px){
+ header .top{min-height:54px!important;padding:7px 10px!important}
+ main,.wrap,.container{padding-left:12px!important;padding-right:12px!important}
+ .card,.panel,.box,.quiz-card,.result-card,.question-card{border-radius:11px!important}
+}
+}
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -186,7 +245,7 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
         <div class="sub">Préparation des quiz de formation</div>
       </div>
       <div class="hlinks">
-        <a href="application.html">← Menu</a>
+        <a href="mobile.html">← Menu</a>
       </div>
     </div>
   </header>
@@ -199,7 +258,7 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
     <section id="s-denied" class="hidden">
       <h2>Accès réservé</h2>
       <div class="note" id="denied-msg">Cette page est réservée aux agents qui préparent les quiz.</div>
-      <a class="btn btn-p" href="application.html">← Retour au menu</a>
+      <a class="btn btn-p" href="mobile.html">← Retour au menu</a>
     </section>
 
     <!-- ACCUEIL -->
