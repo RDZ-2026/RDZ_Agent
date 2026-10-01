@@ -17,7 +17,8 @@
     --rdz-border: #d0ccc5;
     --rdz-bg: #f5f4f2;
   }
-  html, body { height: 100%; }
+  /* height:auto (et non 100%) : sinon le bandeau sticky décroche après un écran de défilement */
+  html, body { height: auto; }
   body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
 
   .app-header { background: var(--rdz-red); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
