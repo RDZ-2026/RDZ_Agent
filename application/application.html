@@ -289,6 +289,19 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
 }
 </style>
 
+
+<style id="rdz-bandeau-fixe-application2-2026">
+@media screen{
+  #screen-menu header{
+    position:sticky!important;
+    top:0!important;
+    z-index:1000!important;
+    width:100%;
+    box-sizing:border-box;
+  }
+  #screen-menu main{position:relative;z-index:1}
+}
+</style>
 </head>
 <body>
 
@@ -395,7 +408,7 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
           <span class="ic">▶</span>
           <span class="txt">
             <span class="t">Prise de poste</span>
-            <span class="d">Démarrer la vacation : prise de véhicule, prise de matériel et validation des consignes.</span>
+            <span class="d">Démarrer la vacation : prise de véhicule et validation des consignes.</span>
           </span>
           <span class="chev">›</span>
         </a>
@@ -650,11 +663,10 @@ const OUTIL_TERRAIN_ITEMS = [
   { icon: '📇', name: 'MEMO SITES', desc: "Fiches Mémo des sites RDZ", disabled: true }
 ];
 
-// Sous-menu "Prise de poste" : mêmes 3 destinations et mêmes fichiers que
-// POSTE_ITEMS dans mobile.html (aucune duplication de module).
+// Sous-menu "Prise de poste" : consignes + véhicule (bouton "Matériel & clés"
+// retiré le 01.10.2026 à la demande de Laurent).
 const POSTE_ITEMS = [
   { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
-  { icon: '📦', name: 'Matériel & clés', desc: "Sortie combinée, en cours, maintenance", href: 'materiel-agent.html' },
   { icon: '🚗', name: 'Prise de véhicule', desc: "État, dégâts, assurance", href: 'vehicule-agent.html' }
 ];
 
