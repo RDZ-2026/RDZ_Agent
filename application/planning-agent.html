@@ -579,6 +579,31 @@ th{background:var(--rdz-soft)}
 }
 </style>
 
+
+<style id="rdz-menu-text-force-correctif">
+@media screen{
+  header a[href="mobile.html"]{
+    position:relative !important;display:inline-flex !important;align-items:center !important;
+    justify-content:center !important;min-width:72px !important;min-height:38px !important;
+    padding:8px 15px !important;background:#fff !important;color:#7f1720 !important;
+    border:1px solid rgba(255,255,255,.9) !important;border-radius:9px !important;
+    box-shadow:0 4px 12px rgba(0,0,0,.16) !important;font-size:0 !important;
+    line-height:1 !important;text-decoration:none !important;overflow:hidden !important;
+  }
+  header a[href="mobile.html"] > *{display:none !important;}
+  header a[href="mobile.html"]::before{
+    content:"Menu" !important;display:block !important;position:static !important;
+    width:auto !important;height:auto !important;background:none !important;border:0 !important;
+    transform:none !important;opacity:1 !important;color:#7f1720 !important;
+    font-family:Inter,"Segoe UI",Arial,sans-serif !important;font-size:13px !important;
+    font-weight:850 !important;letter-spacing:.01em !important;line-height:1 !important;
+  }
+  header a[href="mobile.html"]::after{content:none !important;display:none !important;}
+  header a[href="mobile.html"]:hover{background:#fff5f5 !important;}
+  header > .rdz-added-logo{grid-column:1 !important;justify-self:start !important;margin-left:0 !important;}
+}
+</style>
+
 </head>
 <body>
 
