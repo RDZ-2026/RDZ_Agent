@@ -104,6 +104,48 @@ html,body{background:var(--bg)} body{font-family:Inter,-apple-system,BlinkMacSys
 .toast{background:#111c2e;border-radius:10px;padding:11px 14px} #toasts{top:14px} .state-msg{color:#64748b}
 @media(max-width:390px){.app-header-txt{padding-left:96px}.app-header-txt:before{width:84px;height:38px}.app-header-name{display:none}.app-header-sub{font-size:13px}.back-btn{padding:8px 10px}}
 </style>
+
+<style id="rdz-fin-service-harmonisation-2026">
+@media screen{
+:root{
+ --rdz-red:#d71920;--rdz-red-dark:#a90f16;--rdz-navy:#111c2e;--rdz-navy-2:#17263b;
+ --rdz-text:#172033;--rdz-muted:#64748b;--rdz-border:#e2e8f0;--rdz-bg:#f4f7fb;
+ --rdz-soft:#f8fafc;--rdz-radius:12px;--rdz-shadow:0 8px 24px rgba(15,23,42,.07);
+}
+html,body{background:var(--rdz-bg)!important;color:var(--rdz-text)!important}
+body{padding-top:74px!important}
+header,.topbar,.app-header{
+ position:fixed!important;top:0!important;left:0!important;right:0!important;z-index:2000!important;
+ background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy-2))!important;
+ border-bottom:3px solid var(--rdz-red)!important;box-shadow:0 7px 22px rgba(15,23,42,.16)!important;
+}
+header{min-height:62px!important}
+.rdz-added-logo{display:flex;align-items:center;justify-content:center;width:94px;min-width:94px;padding:4px 7px;background:#fff;border-radius:9px;box-shadow:0 4px 13px rgba(0,0,0,.16)}
+.rdz-added-logo img{display:block;width:100%;height:auto;max-height:38px;object-fit:contain}
+header a[href],.topbar a[href],.app-header a[href]{
+ border-radius:9px!important;text-decoration:none!important
+}
+.card,.panel,.box,.section,.bloc{
+ background:#fff!important;border-color:var(--rdz-border)!important;border-radius:var(--rdz-radius)!important;
+ box-shadow:var(--rdz-shadow)!important
+}
+input,select,textarea{
+ background:#fff!important;color:var(--rdz-text)!important;border-color:#cbd5e1!important;border-radius:9px!important
+}
+input:focus,select:focus,textarea:focus{
+ border-color:var(--rdz-red)!important;box-shadow:0 0 0 3px rgba(215,25,32,.11)!important;outline:none!important
+}
+button,.btn{border-radius:9px!important}
+button.primary,.btn.primary,.primary{background:var(--rdz-red)!important;border-color:var(--rdz-red)!important;color:#fff!important}
+@media(max-width:640px){
+ body{padding-top:68px!important}
+ header{min-height:56px!important}
+ .rdz-added-logo{width:76px;min-width:76px}
+ .rdz-added-logo img{max-height:31px}
+}
+}
+</style>
+
 </head>
 <body>
 
