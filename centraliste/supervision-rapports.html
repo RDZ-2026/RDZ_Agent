@@ -1,4 +1,5 @@
 <!-- RDZ · supervision-rapports · v17 · 2026-09-28 · support des rapports issus d'un type personnalisé créé dans rapport-types-config.html (journal_entrees.rapport_type_id + reponses — voir migration-rapport-types.sql) : badge/étiquette avec le nom du type dans la liste et les modales, détail/édition/rapport imprimable via le même moteur "réponses groupées par catégorie" que le rapport d'alarme (reponsesSectionsHtml/qaGroupedHtml, réutilisés tels quels), et prise en compte dans les prompts "Analyser avec Claude"/"Classer". RAPPORT_TYPES chargé dans loadData() pour l'affichage du nom/icône -->
+<!-- v18 · 2026-10-02 · impression/PDF : sections jamais coupées (sauf si > 1 page ; photos alors coupées entre deux rangées), plus de zone grise sous le pied de rapport, nom de fichier PDF formaté "Site - JJ.MM.AAAA - Nature d'activité" (bouton "Imprimer / PDF"). -->
 <!-- v16 · 2026-09-28 · deux nouveaux boutons dans la sélection multiple : "🏷️ Classer" (classification nature_activite/type_action SEULE, pont manuel Claude.ai texte simple, sans reformuler le texte du rapport — bouton séparé de "Analyser avec Claude") et "🖨 Exporter en PDF" (aperçu imprimable concaténant plusieurs rapports, un par page, via window.print()) -->
 <!-- v15 · 2026-09-26 · rapport alarme : regroupement des réponses par catégorie (Questions/Vérifications découpées en une section par catégorie, numérotée dynamiquement), préservation du champ categorie à l'édition -->
 <!-- v14 · 2026-09-25 · support alarme-rapport.html (format reponses/localisation, coexistence avec l'ancien format alarme-agent.html) -->
@@ -137,6 +138,21 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
   @page{margin:12mm;size:A4}
   .pdf-report-page{page-break-after:always}
   .pdf-report-page:last-child{page-break-after:auto}
+  /* Retour Laurent 2026-10-02 :
+     - une section (titre + contenu, ex. Photos) n'est jamais coupée entre
+       deux pages, sauf si elle dépasse à elle seule une page entière (le
+       navigateur la coupe alors forcément) ; une photo n'est jamais coupée.
+     - plus d'ombre portée sur le document : Chrome la prolongeait en zone
+       grise sous le pied de rapport sur la dernière page. */
+  .rp-sec,.rp-photo,.rp-photo-row{break-inside:avoid;page-break-inside:avoid}
+  /* Section photos : peut se couper ENTRE deux rangées de photos (si elle
+     dépasse une page), mais le titre reste collé à la 1re rangée. Avec 1 ou
+     2 rangées, l'ensemble passe donc d'un bloc sur la page suivante. */
+  .rp-sec.rp-sec-photos{break-inside:auto;page-break-inside:auto}
+  .rp-sec-h{break-after:avoid;page-break-after:avoid}
+  .rp-foot{break-inside:avoid;page-break-inside:avoid}
+  .rp-doc{box-shadow:none!important}
+  html,body{background:#fff!important}
 }
 </style>
 
@@ -434,7 +450,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 <div class="report-view" id="report-view" onclick="if(event.target===this)closeReport()">
   <div class="report-inner">
     <div class="report-toolbar">
-      <button class="btn" onclick="window.print()">🖨 Imprimer</button>
+      <button class="btn" onclick="printReport()">🖨 Imprimer / PDF</button>
       <div style="flex:1"></div>
       <button class="btn btn-sec" onclick="closeReport()">✕ Fermer l'aperçu</button>
     </div>
@@ -1237,11 +1253,48 @@ async function removeEditPhoto(photoId){
   }catch(e){ toast('❌ Échec de la suppression : ' + (e.message||e), true); }
 }
 
+/* ---------- Nom du fichier PDF (retour Laurent 2026-10-02) ----------
+   Chrome/Edge/Safari proposent document.title comme nom de fichier dans
+   "Enregistrer au format PDF". On pose donc un titre formaté juste avant
+   l'impression, puis on remet le titre d'origine.
+   Format : <Site> - <JJ.MM.AAAA> - <Nature d'activité>
+   Plusieurs rapports : sites / natures distincts joints par " + " (au-delà
+   de 2 : "Plusieurs sites" / "Plusieurs natures"), dates en plage. */
+let REPORT_FILE_NAME = null;
+function reportNature(r, override){
+  return override || r.raw.nature_activite || (r.kind==='alarme' ? 'Alarmes' : (r.raw.activite || ''));
+}
+function localDateDMY(ts){
+  if(!ts) return '';
+  const d = new Date(ts); const p = n=>String(n).padStart(2,'0');
+  return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();
+}
+function buildReportFileName(entries){ // entries : [{site, ts, nature}]
+  const uniq = (arr, plural)=>{ const u=[...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))];
+    return !u.length ? '' : u.length<=2 ? u.join(' + ') : plural; };
+  const site = uniq(entries.map(e=>e.site), 'Plusieurs sites') || 'Rapport';
+  const tss = entries.map(e=>e.ts).filter(Boolean).sort((a,b)=>new Date(a)-new Date(b));
+  const d1 = localDateDMY(tss[0]), d2 = localDateDMY(tss[tss.length-1]);
+  const date = d1 && d2 && d1!==d2 ? d1+' au '+d2 : d1;
+  const nature = uniq(entries.map(e=>e.nature), 'Plusieurs natures');
+  return [site, date, nature].filter(Boolean).join(' - ')
+    .replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 150);
+}
+function printReport(){
+  const prev = document.title;
+  if(REPORT_FILE_NAME) document.title = REPORT_FILE_NAME;
+  const restore = ()=>{ document.title = prev; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+  setTimeout(restore, 1000); // filet de sécurité si afterprint n'est pas émis
+}
+
 /* ---------- Rapport imprimable individuel (un seul rapport, sans IA) ---------- */
 function openSingleReport(id){
   const r = allReports.find(x=>x.id===id); if(!r) return;
   const html = r.kind==='standard' ? buildStandardReport(r) : buildAlarmeReport(r);
   document.getElementById('report-content').innerHTML = html;
+  REPORT_FILE_NAME = buildReportFileName([{ site:r.site, ts:r.ts, nature:reportNature(r) }]);
   closeModal();
   const rv = document.getElementById('report-view');
   rv.classList.add('open');
@@ -1265,6 +1318,7 @@ function exportSelectionReport(){
     return `<div class="pdf-report-page">${inner}</div>`;
   }).join('');
   document.getElementById('report-content').innerHTML = html;
+  REPORT_FILE_NAME = buildReportFileName(items.map(r=>({ site:r.site, ts:r.ts, nature:reportNature(r) })));
   const rv = document.getElementById('report-view');
   rv.classList.add('open');
   rv.scrollTop = 0;
@@ -1653,6 +1707,7 @@ async function finalizeSyntheseReport(){
 
   const html = buildMultiReport(titreGlobal, corrected);
   document.getElementById('report-content').innerHTML = html;
+  REPORT_FILE_NAME = buildReportFileName(corrected.map(c=>({ site:c.r.site, ts:c.r.ts, nature:reportNature(c.r, c.nature_activite) })));
   closeIAModal();
   const rv = document.getElementById('report-view');
   rv.classList.add('open');
@@ -1899,7 +1954,19 @@ function rpPhotoBoxO(label,url){
   const box = url
     ? `<div style="border:1.5px solid #e0e0e0;border-radius:8px;background:#fafafa;overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:180px"><img src="${url}" style="width:100%;height:100%;max-height:300px;object-fit:contain;display:block"></div>`
     : `<div style="border:1.5px dashed #e0e0e0;border-radius:8px;background:#fafafa;color:#bbb;font-size:12px;text-align:center;padding:24px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;min-height:180px">📷<span>Photo non disponible</span></div>`;
-  return `<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</div>${box}</div>`;
+  return `<div class="rp-photo" style="display:flex;flex-direction:column;gap:6px"><div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${label}</div>${box}</div>`;
+}
+/* Photos par rangées de 2 (blocs indépendants, et non une seule grille) :
+   à l'impression, une section de photos trop longue pour une page se coupe
+   proprement ENTRE deux rangées — une grille CSS unique était déplacée d'un
+   bloc par Chrome, laissant le titre seul sur sa page. */
+function rpPhotoGrid(photos, marginTop){
+  const rows = [];
+  for(let i=0;i<photos.length;i+=2){
+    const pair = photos.slice(i,i+2).map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('');
+    rows.push(`<div class="rp-photo-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;${i?'margin-top:16px':''}">${pair}</div>`);
+  }
+  return `<div${marginTop?` style="margin-top:${marginTop}"`:''}>${rows.join('')}</div>`;
 }
 /* Statut de clôture — reprend exactement les pilules "cloture-wrap" du
    modèle de référence fourni par Laurent (rapport_intervention_rdz),
@@ -1946,7 +2013,7 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
      (où chaque colonne avait sa propre hauteur, indépendante des autres). */
   const labelRowHtml = cols.map((c,i)=>`<div style="grid-column:${i+1};grid-row:1;padding:.9rem 1rem 0;${i<cols.length-1?'border-right:1px solid #ddd;':''}"><label style="display:block;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#999;line-height:1.4">${esc(c.label)}</label></div>`).join('');
   const valueRowHtml = cols.map((c,i)=>`<div style="grid-column:${i+1};grid-row:2;padding:5px 1rem .9rem;${i<cols.length-1?'border-right:1px solid #ddd;':''}"><div style="font-size:13px;color:#1a1a1a;font-weight:600">${c.value}</div></div>`).join('');
-  return `<div style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
+  return `<div class="rp-doc" style="max-width:800px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.1);font-family:Arial,sans-serif">
     <div style="background:#1a1a1a;padding:1.5rem 2rem">
       <div style="height:4px;background:#C8102E;margin:-1.5rem -2rem 1.25rem"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:1.5rem">
@@ -1962,7 +2029,7 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
       ${valueRowHtml}
     </div>
     <div style="padding:1.5rem 2rem">${bodyHtml}</div>
-    <div style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
+    <div class="rp-foot" style="background:#1a1a1a;padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;border-top:3px solid #C8102E">
       <div style="display:flex;align-items:center;gap:.75rem">
         <div style="background:#fff;border-radius:6px;padding:5px 10px"><img src="data:${RPTO_LOGO_MIME};base64,${RPTO_LOGO_B64}" style="height:28px;width:auto;display:block"></div>
         <div style="font-size:10px;color:#aaa;line-height:1.6">RDZ Security Management SA © ${new Date().getFullYear()}<br>Document confidentiel</div>
@@ -1972,8 +2039,9 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
   </div>`;
 }
 function rpSec(numTitre, innerHtml){
-  return `<div style="margin-bottom:2.5rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
-    <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">${esc(numTitre)}</div>
+  const photosCls = innerHtml.indexOf('rp-photo')>=0 ? ' rp-sec-photos' : '';
+  return `<div class="rp-sec${photosCls}" style="margin-bottom:2.5rem;border:1.5px solid #d0d0d0;border-radius:8px;overflow:hidden">
+    <div class="rp-sec-h" style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#C8102E;background:#d0d0d0;padding:.7rem 1rem">${esc(numTitre)}</div>
     <div style="padding:1.5rem 1rem 1rem">${innerHtml}</div>
   </div>`;
 }
@@ -2033,7 +2101,7 @@ function buildMultiReport(titreGlobal, corrected){
     }
 
     const photosHtml = r.photos.length
-      ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+      ? rpPhotoGrid(r.photos, '16px')
       : '<div style="color:#999;font-size:13px;margin-top:16px"><i>Aucune photo jointe.</i></div>';
 
     const last = i === corrected.length - 1;
@@ -2088,7 +2156,7 @@ function buildStandardReport(r){
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.raw.statut_cloture||null))
       + rpSec((nextNum+1) + ' — Photos', r.photos.length
-          ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+          ? rpPhotoGrid(r.photos)
           : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
@@ -2097,7 +2165,7 @@ function buildStandardReport(r){
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
-        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+        ? rpPhotoGrid(r.photos)
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
   const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
   return rpParkShell('Rapport d\'intervention', esc(r.raw.nature_activite || r.raw.activite || '—'), body, meta);
@@ -2112,7 +2180,7 @@ function buildAlarmeReport(r){
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.raw.statut_cloture||null))
       + rpSec((nextNum+1) + ' — Photos', r.photos.length
-          ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+          ? rpPhotoGrid(r.photos)
           : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
     const arriveeH = arriveeTimeFor(r.raw);
     const meta = {
@@ -2135,7 +2203,7 @@ function buildAlarmeReport(r){
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.raw.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
     + rpSec('4 — Photos', r.photos.length
-        ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">${r.photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
+        ? rpPhotoGrid(r.photos)
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
   /* Bandeau : heure de l'alarme (created_at), heure d'arrivée sur site
      (retrouvée dans la checklist par mot-clé — pas de colonne dédiée en
