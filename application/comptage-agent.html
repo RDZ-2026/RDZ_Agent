@@ -1,0 +1,659 @@
+<!-- RDZ · comptage-agent · v1 · 2026-10-03
+     Module de comptage générique (application/). S'ouvre depuis
+     journal-de-bord.html (site déjà connu) avec ?type=<slug>, qui détermine
+     QUEL module de comptage charger (comptage_types / comptage_champs —
+     paramétrés dans comptage-config.html). Jamais de liste « choisis ton
+     module » : le bouton cliqué dans le journal le fixe déjà.
+
+     Compteurs « comme la bibliothèque » : bouton −, bouton +, ou saisie
+     directe du chiffre. Listes de sélection (menus déroulants) en dessous.
+     Les chiffres en cours sont gardés sur le téléphone (brouillon par
+     module + site) : l'agent peut quitter la page et revenir sans rien
+     perdre, jusqu'à l'envoi du relevé.
+
+     Écriture : RDZSync v4 → comptage_releves (fonctionne hors réseau).
+     Photo facultative → bucket comptage-photos (attend le WiFi ou l'envoi
+     manuel). Voir migration-comptage.sql. -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Comptage</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+  --anth:#2d2d2d;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 12px;color:var(--ink)}
+.back-btn{display:inline-block;color:var(--red);font-size:14px;font-weight:bold;text-decoration:none;padding:4px 0;margin-bottom:10px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:24px 10px}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+.guard{text-align:center;padding:50px 20px;color:#666}
+.guard a{display:inline-block;margin-top:16px;background:var(--red);color:#fff;text-decoration:none;padding:12px 18px;border-radius:var(--radius-ui);font-weight:bold}
+
+.meta-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:10px 14px;margin-bottom:14px}
+.mrow{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0}
+.mrow .k{color:#888}
+.mrow .v{font-weight:bold;text-align:right}
+
+.draft-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#777;margin:-4px 0 12px}
+.draft-bar button{background:none;border:1px solid var(--line);border-radius:var(--radius-ui);padding:5px 10px;font-size:12px;color:#555;cursor:pointer;font-family:var(--font)}
+
+/* Compteurs — même gabarit que bibliotheque-agent.html */
+.counter-card{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-card);padding:16px;margin-bottom:12px}
+.counter-lbl{font-size:14px;font-weight:bold;margin-bottom:12px;text-align:center}
+.counter-row{display:flex;align-items:center;justify-content:center;gap:18px}
+.counter-btn{width:56px;height:56px;border-radius:50%;border:none;background:var(--anth);color:#fff;font-size:28px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.counter-btn:active{background:var(--red)}
+.counter-btn.minus{background:var(--bg-soft);color:var(--anth);border:2px solid var(--line)}
+.counter-btn.minus:active{background:var(--line-soft)}
+.counter-val{font-size:36px;font-weight:900;width:110px;text-align:center;border:none;border-bottom:2px dashed transparent;background:transparent;color:var(--red);font-family:var(--font);-moz-appearance:textfield}
+.counter-val::-webkit-outer-spin-button,.counter-val::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.counter-val:focus{outline:none;border-bottom-color:var(--red)}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
+.field .req{color:var(--danger)}
+select,textarea{width:100%;font-family:var(--font);font-size:15px;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
+select:focus,textarea:focus{outline:none;border-color:var(--red)}
+select.missing{border-color:var(--danger);background:#fff7f7}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+
+.photo-btns{display:flex;gap:10px;margin-bottom:8px}
+.photo-btn{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px;font-size:14px;color:var(--ink);cursor:pointer;font-family:var(--font)}
+.photo-btn:active{background:var(--bg-meta)}
+.photo-thumb-wrap{position:relative;display:inline-block;margin-top:6px}
+.photo-thumb{max-width:140px;max-height:140px;border-radius:var(--radius-section);border:1px solid var(--line-soft);display:block}
+.photo-thumb-del{position:absolute;top:-8px;right:-8px;background:#991b1b;color:#fff;border:none;border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer}
+
+.btn-submit{margin:10px 0 30px;width:100%;padding:16px;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);font-size:16px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.btn-submit:disabled{opacity:.5}
+.btn-secondary{display:block;width:100%;text-align:center;padding:14px;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-ui);font-size:15px;font-weight:bold;cursor:pointer;text-decoration:none;font-family:var(--font);margin-bottom:10px}
+
+.done{text-align:center;padding:30px 10px 10px}
+.done .big{font-size:48px}
+.done .t{font-size:18px;font-weight:bold;margin-top:10px}
+.done .s{font-size:13px;color:#777;margin-top:6px;line-height:1.5}
+.recap{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:10px 14px;margin:18px 0}
+.recap .mrow{border-bottom:1px solid var(--bg-meta);padding:7px 0}
+.recap .mrow:last-child{border-bottom:none}
+
+#toasts{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:999;width:calc(100% - 24px);max-width:380px}
+.toast{background:var(--anth);color:#fff;padding:10px 13px;border-radius:9px;font-size:13px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);margin-bottom:6px}
+.toast.err{background:#991b1b}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub" id="hdr-sub">Comptage</div>
+      </div>
+      <a class="home" href="journal-de-bord.html">← Journal</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Chargement -->
+    <section id="screen-loading"><div class="state-msg">Chargement…</div></section>
+
+    <!-- Garde : ouvert hors contexte ou module introuvable -->
+    <section id="screen-guard" class="hidden">
+      <div class="guard">
+        <div style="font-size:40px">🧭</div>
+        <p style="margin-top:12px" id="guard-msg">Ce comptage s'ouvre depuis le <b>Journal de bord</b><br>(choix du site puis du bouton).</p>
+        <a href="journal-de-bord.html">Ouvrir le journal de bord</a>
+      </div>
+    </section>
+
+    <!-- Formulaire -->
+    <section id="screen-form" class="hidden">
+      <a class="back-btn" href="journal-de-bord.html">← Retour au journal</a>
+      <div class="screen-title" id="form-title">Comptage</div>
+
+      <div class="meta-card">
+        <div class="mrow"><span class="k">Agent</span><span class="v" id="m-agent">—</span></div>
+        <div class="mrow"><span class="k">Site</span><span class="v" id="m-site">—</span></div>
+      </div>
+
+      <div class="draft-bar">
+        <span id="draft-info">💾 Les chiffres sont gardés si vous quittez la page.</span>
+        <button type="button" onclick="resetAll(true)">↺ Remettre à zéro</button>
+      </div>
+
+      <div id="form-err"></div>
+      <div id="fields"></div>
+
+      <div class="field">
+        <label>Notes (facultatif)</label>
+        <textarea id="f-note" placeholder="Précision à ajouter au relevé…" oninput="saveDraft()"></textarea>
+      </div>
+      <div class="field">
+        <label>Photo (facultatif)</label>
+        <div class="photo-btns">
+          <button type="button" class="photo-btn" onclick="document.getElementById('photo-camera').click()">📷 Caméra</button>
+          <button type="button" class="photo-btn" onclick="document.getElementById('photo-gallery').click()">🖼 Galerie</button>
+        </div>
+        <input type="file" id="photo-camera" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(this)">
+        <input type="file" id="photo-gallery" accept="image/*" style="display:none" onchange="onPhotoSelected(this)">
+        <div id="photo-preview"></div>
+      </div>
+
+      <button class="btn-submit" id="btn-submit" onclick="submitReleve()">✅ Enregistrer le relevé</button>
+    </section>
+
+    <!-- Confirmation -->
+    <section id="screen-done" class="hidden">
+      <div class="done">
+        <div class="big">✅</div>
+        <div class="t">Relevé pris en compte</div>
+        <div class="s" id="done-sub"></div>
+      </div>
+      <div class="recap" id="done-recap"></div>
+      <button class="btn-secondary" onclick="newReleve()">➕ Nouveau relevé</button>
+      <a class="btn-secondary" href="journal-de-bord.html">← Retour au journal</a>
+    </section>
+  </main>
+</div>
+<div id="toasts"></div>
+
+<script>
+// ═══ RDZSync v4 — brique commune, collée telle quelle (voir rdz-sync-v4.js) ═══
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  /* ---------- détection WiFi (best-effort, jamais garantie) ---------- */
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;               // inconnu (iPhone/Safari notamment)
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null; // effectiveType = vitesse, pas le support
+      return null;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- badge visuel ---------- */
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  /* ---------- API publique ---------- */
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  /* save() : NON bloquant. Le texte est mis en file et une tentative
+     d'envoi part immédiatement (auto, sur n'importe quel réseau).
+     Les photos sont mises de côté et attendent le WiFi ou un geste manuel. */
+  function save(item) {
+    var textEntry = {
+      id: uid(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],   // gardées ici jusqu'à ce que le texte soit parti
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  /* ---------- file TEXTE : envoi auto, tout réseau ---------- */
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      // Pas de .select() après écriture : on ne dépend jamais d'une permission de
+      // LECTURE en plus de la permission d'ÉCRITURE (une table plus ancienne peut
+      // autoriser l'insert sans autoriser le select en retour — .select() y échouerait
+      // silencieusement et la ligne resterait bloquée en file indéfiniment).
+      // On utilise l'id fourni côté agent (row.id, déjà généré via uid() par tous les
+      // modules) pour rattacher les photos ensuite.
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        // succès texte : retirer de la file texte + logguer
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        // s'il y avait des photos en attente, les basculer dans la file photo
+        // (rattachées via l'id fourni côté agent dans row.id)
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uid(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function (err) {
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
+        _flushingText = false; // réseau probablement absent : on retentera au prochain online/ouverture
+      });
+    }
+    next();
+  }
+
+  /* ---------- file PHOTOS : envoi WiFi (best-effort) ou manuel (force=true) ---------- */
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return; // pas de WiFi détecté et pas d'appui manuel -> on attend
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function (err) {
+          console.warn('RDZSync: échec envoi photo', p.module, p.table, err && (err.message || err));
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+</script>
+
+<script>
+/* ===================== Comptage (module générique) — logique ===================== */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+RDZSync.init({ client: sb });
+
+const AGENT_NOM = localStorage.getItem('rdz_agent_nom') || 'Agent';
+const params    = new URLSearchParams(location.search);
+const SITE_ID   = params.get('site_id') || '';
+const SITE_NOM  = params.get('site') || '';
+const ACTIVITE  = params.get('activite') || '';
+const TYPE_SLUG = params.get('type') || '';
+const DRAFT_KEY = 'rdz_comptage_draft_' + TYPE_SLUG + '_' + (SITE_ID || SITE_NOM);
+// Cache local de la configuration : permet d'ouvrir le module sans réseau
+// (sous-sol, parking) si l'agent l'a déjà ouvert une fois sur ce téléphone.
+const CFG_CACHE_KEY = 'rdz_comptage_cfg_' + TYPE_SLUG;
+
+let comptageType = null; // {id, nom, icone, slug}
+let champs = [];         // comptage_champs actifs, dans l'ordre
+let counts = {};         // { champ_id: n }
+let choix = {};          // { champ_id: 'valeur' }
+let photoData = null;
+
+// UUID v4 valide (piège technique n°10) — nécessaire ici pour rattacher la photo (piège n°6).
+function uuidv4(){
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0'));
+  return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h[10]}${h[11]}${h[12]}${h[13]}${h[14]}${h[15]}`;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function show(id){ ['screen-loading','screen-guard','screen-form','screen-done'].forEach(s=>document.getElementById(s).classList.toggle('hidden', s!==id)); window.scrollTo(0,0); }
+function toast(msg, err){
+  const t = document.createElement('div');
+  t.className = 'toast' + (err?' err':'');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+function localDate(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function localTime(){ return new Date().toTimeString().slice(0,8); }
+function buzz(){ try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} }
+function guard(msg){ if(msg) document.getElementById('guard-msg').innerHTML = msg; show('screen-guard'); }
+
+/* ---------- Chargement de la configuration ---------- */
+async function init(){
+  if(!SITE_NOM || !TYPE_SLUG){ guard(); return; }
+  let cfg = null;
+  try{
+    const { data: t, error } = await sb.from('comptage_types').select('*').eq('slug', TYPE_SLUG).limit(1);
+    if(error) throw error;
+    const type = t && t[0];
+    if(type){
+      const { data: c, error: e2 } = await sb.from('comptage_champs').select('*').eq('comptage_type_id', type.id).eq('actif', true).order('ordre');
+      if(e2) throw e2;
+      cfg = { type, champs: c||[] };
+      try{ localStorage.setItem(CFG_CACHE_KEY, JSON.stringify(cfg)); }catch(_){}
+    } else {
+      cfg = { type: null, champs: [] };
+    }
+  }catch(e){
+    // Pas de réseau : on retombe sur la dernière configuration connue sur ce téléphone
+    try{ cfg = JSON.parse(localStorage.getItem(CFG_CACHE_KEY) || 'null'); }catch(_){ cfg = null; }
+    if(cfg) toast('Hors réseau — configuration en mémoire utilisée');
+  }
+  if(!cfg){ guard('Impossible de charger ce comptage (pas de réseau).<br>Réessayez une fois le réseau retrouvé.'); return; }
+  if(!cfg.type || !cfg.type.actif){ guard('Ce module de comptage est introuvable ou n\'est plus actif.<br>Prévenez votre responsable.'); return; }
+
+  comptageType = cfg.type;
+  champs = cfg.champs || [];
+  document.title = 'RDZ — ' + comptageType.nom;
+  document.getElementById('hdr-sub').textContent = comptageType.nom;
+  document.getElementById('form-title').textContent = (comptageType.icone ? comptageType.icone+' ' : '') + comptageType.nom;
+  document.getElementById('m-agent').textContent = AGENT_NOM;
+  document.getElementById('m-site').textContent = SITE_NOM;
+
+  if(!champs.length){ document.getElementById('fields').innerHTML = '<div class="state-msg">Aucun compteur n\'est encore configuré pour ce module.</div>'; }
+  resetAll(false, true);
+  loadDraft();
+  renderFields();
+  show('screen-form');
+}
+
+/* ---------- Brouillon (chiffres conservés si l'agent quitte la page) ---------- */
+function saveDraft(){
+  try{
+    const note = document.getElementById('f-note').value;
+    const hasSomething = Object.values(counts).some(n=>n>0) || Object.values(choix).some(Boolean) || note.trim();
+    if(hasSomething) localStorage.setItem(DRAFT_KEY, JSON.stringify({ counts, choix, note, ts: Date.now() }));
+    else localStorage.removeItem(DRAFT_KEY);
+  }catch(_){}
+}
+function loadDraft(){
+  try{
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if(!d) return;
+    champs.forEach(c=>{
+      if(c.type==='compteur' && d.counts && d.counts[c.id]!=null) counts[c.id] = Math.max(0, parseInt(d.counts[c.id])||0);
+      if(c.type==='choix' && d.choix && d.choix[c.id] && (c.options||[]).includes(d.choix[c.id])) choix[c.id] = d.choix[c.id];
+    });
+    document.getElementById('f-note').value = d.note || '';
+    const when = new Date(d.ts);
+    document.getElementById('draft-info').textContent = '💾 Comptage en cours repris (' + String(when.getHours()).padStart(2,'0') + 'h' + String(when.getMinutes()).padStart(2,'0') + ').';
+  }catch(_){}
+}
+
+/* ---------- Affichage des compteurs et listes ---------- */
+function renderFields(){
+  if(!champs.length) return;
+  document.getElementById('fields').innerHTML = champs.map(c=>{
+    if(c.type==='compteur'){
+      return `<div class="counter-card">
+        <div class="counter-lbl">${esc(c.libelle)}</div>
+        <div class="counter-row">
+          <button type="button" class="counter-btn minus" aria-label="Moins" onclick="incr('${c.id}',-1)">−</button>
+          <input class="counter-val" id="c-${c.id}" type="number" inputmode="numeric" pattern="[0-9]*" min="0" value="${counts[c.id]||0}"
+            onfocus="this.select()" onchange="setVal('${c.id}',this.value)" onblur="setVal('${c.id}',this.value)">
+          <button type="button" class="counter-btn" aria-label="Plus" onclick="incr('${c.id}',1)">+</button>
+        </div>
+      </div>`;
+    }
+    const opts = (c.options||[]).map(o=>`<option value="${esc(o)}" ${choix[c.id]===o?'selected':''}>${esc(o)}</option>`).join('');
+    return `<div class="field">
+      <label>${esc(c.libelle)}${c.obligatoire?' <span class="req">*</span>':''}</label>
+      <select id="s-${c.id}" onchange="setChoix('${c.id}',this.value)"><option value="">— Sélectionner —</option>${opts}</select>
+    </div>`;
+  }).join('');
+}
+function incr(id, delta){
+  counts[id] = Math.max(0, (counts[id]||0) + delta);
+  document.getElementById('c-'+id).value = counts[id];
+  buzz(); saveDraft();
+}
+function setVal(id, val){
+  counts[id] = Math.max(0, parseInt(val)||0);
+  document.getElementById('c-'+id).value = counts[id];
+  saveDraft();
+}
+function setChoix(id, val){
+  choix[id] = val || '';
+  const el = document.getElementById('s-'+id); if(el) el.classList.remove('missing');
+  saveDraft();
+}
+// keepDraft=true uniquement à l'ouverture : on initialise à zéro SANS effacer
+// le brouillon enregistré, que loadDraft() relit juste après.
+function resetAll(ask, keepDraft){
+  if(ask && !confirm('Remettre tous les compteurs à zéro ?')) return;
+  counts = {}; choix = {};
+  champs.forEach(c=>{ if(c.type==='compteur') counts[c.id] = 0; else choix[c.id] = ''; });
+  document.getElementById('f-note').value = '';
+  photoData = null; renderPhotoPreview();
+  document.getElementById('form-err').innerHTML = '';
+  document.getElementById('draft-info').textContent = '💾 Les chiffres sont gardés si vous quittez la page.';
+  if(!keepDraft){ try{ localStorage.removeItem(DRAFT_KEY); }catch(_){} }
+  if(ask){ renderFields(); window.scrollTo(0,0); }
+}
+
+/* ---------- Photo (caméra / galerie — piège technique n°3) ---------- */
+function onPhotoSelected(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { photoData = reader.result; renderPhotoPreview(); };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+function renderPhotoPreview(){
+  document.getElementById('photo-preview').innerHTML = photoData
+    ? `<div class="photo-thumb-wrap"><img class="photo-thumb" src="${photoData}" alt=""><button type="button" class="photo-thumb-del" onclick="photoData=null;renderPhotoPreview()">✕</button></div>`
+    : '';
+}
+
+/* ---------- Envoi ---------- */
+function submitReleve(){
+  const errBox = document.getElementById('form-err'); errBox.innerHTML = '';
+  // Relit les cases au cas où l'agent a tapé un chiffre sans quitter le champ
+  champs.filter(c=>c.type==='compteur').forEach(c=>{ const el=document.getElementById('c-'+c.id); if(el) counts[c.id] = Math.max(0, parseInt(el.value)||0); });
+
+  const manquants = champs.filter(c=>c.type==='choix' && c.obligatoire && !choix[c.id]);
+  if(manquants.length){
+    manquants.forEach(c=>{ const el=document.getElementById('s-'+c.id); if(el) el.classList.add('missing'); });
+    errBox.innerHTML = '<div class="err">⚠️ À choisir avant d\'envoyer : '+manquants.map(c=>esc(c.libelle)).join(', ')+'</div>';
+    window.scrollTo(0,0);
+    return;
+  }
+  const note = document.getElementById('f-note').value.trim();
+  const tousZero = champs.filter(c=>c.type==='compteur').every(c=>!counts[c.id]);
+  if(tousZero && !note && !photoData && !confirm('Tous les compteurs sont à 0. Envoyer quand même ?')) return;
+
+  const valeurs = champs.map(c=>({
+    champ_id: c.id, libelle: c.libelle, type: c.type,
+    valeur: c.type==='compteur' ? (counts[c.id]||0) : (choix[c.id]||null)
+  }));
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true; btn.textContent = 'Envoi…';
+  try{
+    RDZSync.save({
+      module: 'comptage', table: 'comptage_releves',
+      row: {
+        id: uuidv4(),
+        comptage_type_id: comptageType.id, type_nom: comptageType.nom,
+        site_id: SITE_ID || null, site_nom: SITE_NOM, activite: ACTIVITE || null,
+        agent_nom: AGENT_NOM,
+        date_releve: localDate(), heure_releve: localTime(),
+        valeurs, note: note || null
+      },
+      bucket: photoData ? 'comptage-photos' : null,
+      photoField: 'photo_url',
+      photos: photoData ? [{ name: 'comptage.jpg', dataUrl: photoData }] : []
+    });
+    try{ localStorage.removeItem(DRAFT_KEY); }catch(_){}
+    showDone(valeurs);
+  }catch(e){ toast('Erreur : '+e.message, true); }
+  finally{ btn.disabled = false; btn.textContent = '✅ Enregistrer le relevé'; }
+}
+function showDone(valeurs){
+  document.getElementById('done-sub').textContent = navigator.onLine
+    ? 'Envoyé à ' + localTime().slice(0,5) + ' — ' + SITE_NOM
+    : 'Hors réseau : le relevé partira automatiquement dès le retour du réseau.';
+  document.getElementById('done-recap').innerHTML = valeurs.map(v=>
+    `<div class="mrow"><span class="k">${esc(v.libelle)}</span><span class="v">${v.valeur==null||v.valeur===''?'—':esc(v.valeur)}</span></div>`).join('');
+  show('screen-done');
+}
+function newReleve(){
+  resetAll(false);
+  renderFields();
+  show('screen-form');
+}
+
+init();
+</script>
+</body>
+</html>
