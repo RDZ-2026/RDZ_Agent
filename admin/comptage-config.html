@@ -1,0 +1,511 @@
+<!-- RDZ · comptage-config · v1 · 2026-10-03
+     Paramétrage des modules de comptage (admin/). Demande Laurent : pouvoir
+     créer LUI-MÊME autant de modules de comptage qu'il veut (ex. « Parking
+     hôpital »), et dans chacun autant de compteurs (− / + / saisie directe,
+     comme la bibliothèque) et de listes de sélection qu'il souhaite.
+
+     Même mécanique que rapport-types-config.html : chaque module a un slug
+     fixe (comptage-agent.html?type=<slug>) et reçoit AUTOMATIQUEMENT son
+     entrée dans le catalogue du journal de bord (journal_modules). Le choix
+     des sites et l'ordre des boutons se font dans journal-config.html →
+     « Activités par site » (un seul endroit pour gérer les boutons).
+     Tables : comptage_types / comptage_champs (migration-comptage.sql). -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RDZ — Modules de comptage</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212; --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;min-height:100vh;background:var(--bg-soft);display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 14px;color:var(--ink)}
+.screen-hint{font-size:12.5px;color:#777;margin:-8px 0 16px;line-height:1.5}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:14px}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:24px 10px}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
+
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);
+  border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;color:inherit;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);font-family:var(--font)}
+.group-btn:active{border-color:var(--red)}
+.group-btn .ic{font-size:26px;width:36px;text-align:center;flex-shrink:0}
+.group-btn .txt{flex:1;min-width:0}
+.group-btn .txt .t{display:block;font-weight:bold;font-size:15px;color:var(--ink)}
+.group-btn .txt .d{display:block;font-size:12.5px;color:#666;margin-top:3px;line-height:1.4}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:20px;flex-shrink:0}
+
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:bold;cursor:pointer;color:#555;font-family:var(--font)}
+.pill.on{background:var(--red);color:#fff;border-color:var(--red)}
+
+.list-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:13px 14px;margin-bottom:9px;display:flex;align-items:flex-start;gap:10px}
+.list-item .body{flex:1;min-width:0}
+.list-item .t1{font-weight:bold;font-size:14.5px;color:var(--ink)}
+.list-item .t2{font-size:12.5px;color:#666;margin-top:4px;line-height:1.5}
+.badge{display:inline-block;font-size:10.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.3px;
+  padding:2px 8px;border-radius:20px;margin-right:6px;vertical-align:1px}
+.badge.compteur{background:#eaf5ec;color:var(--ok)}
+.badge.choix{background:#fff3d9;color:var(--warn)}
+.badge.req{background:#fdf0f0;color:#8B1A1A}
+.badge.off{background:#f2f2f2;color:#999}
+.list-item .actions{display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;max-width:136px}
+.ibtn{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);width:30px;height:30px;font-size:13px;cursor:pointer;color:var(--ink)}
+.ibtn:disabled{opacity:.3;cursor:default}
+.ibtn.danger{color:var(--danger);border-color:#eab8b8}
+
+.btn-add{width:100%;background:#fff;border:1.5px dashed var(--line);border-radius:var(--radius-section);padding:13px;
+  font-size:14px;font-weight:bold;color:var(--red);cursor:pointer;margin-bottom:16px;font-family:var(--font)}
+.add-row{display:flex;gap:10px;margin-bottom:16px}
+.add-row .btn-add{margin-bottom:0}
+
+.panel{background:#fff;border:1px solid var(--line-soft);border-top:3px solid var(--red);border-radius:var(--radius-section);padding:16px;margin-bottom:18px}
+.panel-title{font-size:14px;font-weight:bold;margin-bottom:12px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#777;font-weight:bold;margin-bottom:6px}
+.field .hint{font-size:11.5px;color:#999;font-weight:normal;text-transform:none;letter-spacing:0;margin-top:3px}
+input[type=text],select,textarea{width:100%;font-family:var(--font);font-size:14.5px;color:var(--ink);background:#fff;
+  border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px 11px}
+.chk-row{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:2px}
+.chk-row label{margin:0;text-transform:none;font-weight:normal;color:var(--ink);font-size:13.5px;letter-spacing:0}
+.type-toggle{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.type-toggle button{flex:1 1 150px;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px;font-size:13.5px;font-weight:bold;cursor:pointer;color:var(--ink);font-family:var(--font)}
+.type-toggle button.sel{background:var(--red);border-color:var(--red);color:#fff}
+.opt-row{display:flex;gap:8px;margin-bottom:8px}
+.opt-row input{flex:1}
+.opt-row button{background:none;border:1px solid #eab8b8;color:var(--danger);border-radius:var(--radius-ui);padding:0 10px;cursor:pointer}
+.btn-mini{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:8px 12px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink);font-family:var(--font)}
+.form-actions{display:flex;gap:10px;margin-top:16px}
+.btn-primary{flex:1;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.btn-secondary{flex:1;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.icone-input{width:70px!important;flex-shrink:0}
+.icone-input input{text-align:center}
+.row-inline{display:flex;gap:10px}
+.slug-note{font-size:11.5px;color:#999;background:var(--bg-soft);border-radius:var(--radius-ui);padding:8px 10px;margin:4px 0 14px;word-break:break-all}
+
+/* Aperçu agent (lecture seule) */
+.preview{background:var(--bg-meta);border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-top:6px}
+.preview-title{font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:#888;margin-bottom:10px}
+.pv-counter{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-card);padding:12px;margin-bottom:10px;text-align:center}
+.pv-counter .l{font-size:13px;font-weight:bold;margin-bottom:8px}
+.pv-counter .r{display:flex;align-items:center;justify-content:center;gap:16px}
+.pv-counter .b{width:38px;height:38px;border-radius:50%;background:#2d2d2d;color:#fff;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.pv-counter .b.m{background:var(--bg-soft);color:#2d2d2d;border:2px solid var(--line)}
+.pv-counter .v{font-size:26px;font-weight:900;color:var(--red);min-width:50px}
+.pv-select{margin-bottom:10px}
+.pv-select .l{font-size:11px;font-weight:bold;text-transform:uppercase;color:#777;margin-bottom:5px}
+.pv-select .s{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:9px 11px;font-size:13px;color:#999}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
+        <div class="sub">Paramétrage — Modules de comptage</div>
+      </div>
+      <a class="home" href="pilote.html">← Accueil</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ÉCRAN 0 : liste des modules de comptage -->
+    <section id="s-home">
+      <div class="screen-title">Tes modules de comptage</div>
+      <div class="screen-hint">Crée ici tes propres comptages (ex. « Parking hôpital ») : tu choisis les compteurs et les listes, et le bouton se crée automatiquement dans le catalogue du journal de bord. Il te reste ensuite à l'activer sur le(s) site(s) voulu(s) dans <b>Configuration du journal de bord</b> → « Activités par site ».</div>
+      <div id="home-err"></div>
+      <button class="btn-add" onclick="openTypeForm()">➕ Créer un nouveau module de comptage</button>
+      <div id="type-form-holder"></div>
+      <div id="types-list"><div class="state-msg">Chargement…</div></div>
+    </section>
+
+    <!-- ÉCRAN 1 : un module (pills Contenu / Général) -->
+    <section id="s-type" class="hidden">
+      <button class="back-btn" onclick="goHome()">← Tous les modules</button>
+      <div class="screen-title" id="type-titre">—</div>
+      <div class="pills">
+        <button class="pill" data-tab="contenu" onclick="goTab('contenu')">🔢 Compteurs &amp; listes</button>
+        <button class="pill" data-tab="general" onclick="goTab('general')">⚙️ Général</button>
+      </div>
+
+      <!-- CONTENU -->
+      <div id="tab-contenu" class="tab hidden">
+        <div class="screen-hint">Ce que l'agent verra, dans cet ordre. Un <b>compteur</b> a les boutons − et + (et l'agent peut aussi taper le chiffre). Une <b>liste</b> est un menu déroulant.</div>
+        <div id="contenu-err"></div>
+        <div class="add-row">
+          <button class="btn-add" onclick="openItemForm(null,'compteur')">➕ Compteur</button>
+          <button class="btn-add" onclick="openItemForm(null,'choix')">➕ Liste de sélection</button>
+        </div>
+        <div id="item-form-holder"></div>
+        <div id="items-list"><div class="state-msg">Chargement…</div></div>
+        <div id="preview-holder"></div>
+      </div>
+
+      <!-- GÉNÉRAL -->
+      <div id="tab-general" class="tab hidden"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ===================== Modules de comptage — paramétrage ===================== */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const AGENT_FILE = 'comptage-agent.html';
+const TYPE_LABELS = { compteur:'Compteur', choix:'Liste' };
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function show(id){ ['s-home','s-type'].forEach(s=>{ document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
+function slugify(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'comptage';
+}
+async function uniqueSlug(base){
+  let slug = slugify(base), n = 2;
+  while(true){
+    const { data } = await sb.from('comptage_types').select('id').eq('slug', slug).limit(1);
+    if(!data || !data.length) return slug;
+    slug = slugify(base) + '-' + n; n++;
+  }
+}
+function errBox(id, msg){ document.getElementById(id).innerHTML = msg ? '<div class="err">'+esc(msg)+'</div>' : ''; }
+
+/* ============================== ÉTAT ============================== */
+let types = [];         // comptage_types
+let currentType = null;
+let items = [];         // comptage_champs du module courant
+
+function goHome(){ currentType = null; show('s-home'); loadTypes(); }
+
+/* ============================== LISTE DES MODULES ============================== */
+async function loadTypes(){
+  const box = document.getElementById('types-list');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
+  try{
+    const { data, error } = await sb.from('comptage_types').select('*').order('ordre');
+    if(error) throw error;
+    types = data||[];
+    renderTypes();
+  }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les modules de comptage (réseau, ou migration-comptage.sql pas encore exécutée ?).</div>'; }
+}
+function renderTypes(){
+  const box = document.getElementById('types-list');
+  if(!types.length){ box.innerHTML = '<div class="state-msg">Aucun module de comptage pour l\'instant. Crée le premier ci-dessus.</div>'; return; }
+  box.innerHTML = types.map(t=>`
+    <button class="group-btn" onclick="openType('${t.id}')">
+      <span class="ic">${esc(t.icone||'🔢')}</span>
+      <span class="txt">
+        <span class="t">${esc(t.nom)}${t.actif?'':' <span class="badge off">Inactif</span>'}</span>
+        ${t.description ? `<span class="d">${esc(t.description)}</span>` : ''}
+      </span>
+      <span class="chev">›</span>
+    </button>`).join('');
+}
+
+function openTypeForm(){
+  document.getElementById('type-form-holder').innerHTML = `<div class="panel">
+    <div class="panel-title">Nouveau module de comptage</div>
+    <div class="row-inline">
+      <div class="field icone-input"><label>Icône</label><input type="text" id="tf-icone" maxlength="4" value="🔢"></div>
+      <div class="field" style="flex:1"><label>Nom *</label><input type="text" id="tf-nom" placeholder="Ex. Parking hôpital"></div>
+    </div>
+    <div class="field"><label>Description (facultatif)</label><input type="text" id="tf-desc" placeholder="Ex. Comptage des véhicules traités à l'entrée"></div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeTypeForm()">Annuler</button>
+      <button class="btn-primary" onclick="createType()">💾 Créer</button>
+    </div>
+  </div>`;
+  document.getElementById('tf-nom').focus();
+}
+function closeTypeForm(){ document.getElementById('type-form-holder').innerHTML=''; }
+
+async function createType(){
+  errBox('home-err','');
+  const nom = document.getElementById('tf-nom').value.trim();
+  if(!nom){ errBox('home-err','Le nom est obligatoire.'); return; }
+  const icone = document.getElementById('tf-icone').value.trim() || '🔢';
+  const description = document.getElementById('tf-desc').value.trim() || null;
+  try{
+    const slug = await uniqueSlug(nom);
+    const maxOrdre = types.reduce((m,t)=>Math.max(m, t.ordre||0), 0);
+    const { data, error } = await sb.from('comptage_types').insert({ nom, icone, description, slug, actif:true, ordre:maxOrdre+10 }).select().single();
+    if(error) throw error;
+    currentType = data;
+    // Crée tout de suite le bouton catalogue, pour qu'il apparaisse dans journal-config.html.
+    try{ await ensureModuleForType(); }catch(_){ /* pas bloquant : réessayé à l'enregistrement de l'onglet Général */ }
+    closeTypeForm();
+    types.push(currentType);
+    openType(currentType.id);
+  }catch(e){ errBox('home-err','Erreur de création : '+e.message); }
+}
+
+/* ============================== ÉCRAN D'UN MODULE ============================== */
+function openType(id){
+  const t = types.find(x=>x.id===id); if(!t) return;
+  currentType = t;
+  setTitle();
+  show('s-type');
+  goTab('contenu');
+}
+function setTitle(){ document.getElementById('type-titre').textContent = (currentType.icone?currentType.icone+' ':'')+currentType.nom; }
+function goTab(tab){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on', p.dataset.tab===tab));
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('hidden', el.id!=='tab-'+tab));
+  if(tab==='general') renderGeneralTab();
+  if(tab==='contenu'){ closeItemForm(); loadItems().then(renderItems); }
+  window.scrollTo(0,0);
+}
+
+/* ---------- Onglet Général ---------- */
+function renderGeneralTab(){
+  const t = currentType;
+  document.getElementById('tab-general').innerHTML = `
+    <div id="general-err"></div>
+    <div class="panel">
+      <div class="row-inline">
+        <div class="field icone-input"><label>Icône</label><input type="text" id="gf-icone" maxlength="4" value="${esc(t.icone||'')}"></div>
+        <div class="field" style="flex:1"><label>Nom *</label><input type="text" id="gf-nom" value="${esc(t.nom)}"></div>
+      </div>
+      <div class="field"><label>Description (facultatif)</label><input type="text" id="gf-desc" value="${esc(t.description||'')}"></div>
+      <div class="chk-row"><input type="checkbox" id="gf-actif" ${t.actif?'checked':''}><label for="gf-actif">Actif (décoché = l'agent voit « module plus actif »)</label></div>
+      <div class="slug-note">Adresse technique (ne change jamais, même si tu renommes) : <code>${AGENT_FILE}?type=${esc(t.slug)}</code></div>
+      <div class="screen-hint" style="margin:0">Le bouton est créé automatiquement dans le catalogue des modules, avec ce nom et cette icône. Pour choisir <b>sur quel(s) site(s)</b> il apparaît et <b>dans quel ordre</b>, va dans <b>Configuration du journal de bord</b> → « Activités par site ».</div>
+      <div class="form-actions">
+        <button class="btn-secondary" style="color:var(--danger);border-color:#eab8b8" onclick="deleteType()">🗑 Supprimer</button>
+        <button class="btn-primary" onclick="saveGeneral()">💾 Enregistrer</button>
+      </div>
+    </div>`;
+}
+async function saveGeneral(){
+  errBox('general-err','');
+  const nom = document.getElementById('gf-nom').value.trim();
+  if(!nom){ errBox('general-err','Le nom est obligatoire.'); return; }
+  const icone = document.getElementById('gf-icone').value.trim() || '🔢';
+  const description = document.getElementById('gf-desc').value.trim() || null;
+  const actif = document.getElementById('gf-actif').checked;
+  try{
+    const { error } = await sb.from('comptage_types').update({ nom, icone, description, actif }).eq('id', currentType.id);
+    if(error) throw error;
+    Object.assign(currentType, { nom, icone, description, actif });
+    await ensureModuleForType();
+    setTitle();
+    renderGeneralTab();
+    document.getElementById('general-err').innerHTML = '<div class="err" style="background:#eef6ef;border-color:#bfe3c6;color:var(--ok)">✓ Enregistré</div>';
+    setTimeout(()=>errBox('general-err',''), 2500);
+  }catch(e){ errBox('general-err','Erreur d\'enregistrement : '+e.message); }
+}
+async function deleteType(){
+  if(!currentType) return;
+  if(!confirm(`Supprimer définitivement « ${currentType.nom} » ?\n\nSes compteurs et listes seront supprimés, et son bouton disparaîtra du journal de bord. Les relevés déjà enregistrés sont conservés.`)) return;
+  try{
+    if(currentType.module_id){
+      await sb.from('journal_activites').delete().eq('module_id', currentType.module_id);
+      await sb.from('journal_modules').delete().eq('id', currentType.module_id);
+    }
+    const { error } = await sb.from('comptage_types').delete().eq('id', currentType.id);
+    if(error) throw error;
+    goHome();
+  }catch(e){ errBox('general-err','Erreur de suppression : '+e.message); }
+}
+
+/* ---------- Onglet Compteurs & listes ---------- */
+async function loadItems(){
+  try{
+    const { data, error } = await sb.from('comptage_champs').select('*').eq('comptage_type_id', currentType.id).order('ordre');
+    if(error) throw error;
+    items = data||[];
+  }catch(e){
+    items = [];
+    errBox('contenu-err','Impossible de charger le contenu (réseau ?).');
+  }
+}
+function renderItems(){
+  const box = document.getElementById('items-list');
+  if(!items.length){
+    box.innerHTML = '<div class="state-msg">Rien pour l\'instant. Ajoute un premier compteur ci-dessus (ex. « Véhicules traités »).</div>';
+    document.getElementById('preview-holder').innerHTML = '';
+    return;
+  }
+  box.innerHTML = items.map((it,i)=>{
+    const badge = `<span class="badge ${it.type}">${esc(TYPE_LABELS[it.type]||it.type)}</span>`;
+    const req = (it.type==='choix' && it.obligatoire) ? '<span class="badge req">Obligatoire</span>' : '';
+    const off = !it.actif ? '<span class="badge off">Masqué</span>' : '';
+    const sub = (it.type==='choix' && Array.isArray(it.options)) ? `<div class="t2">Choix : ${it.options.map(esc).join(' · ')}</div>` : '';
+    return `<div class="list-item">
+      <div class="body"><div class="t1">${badge}${req}${off}${esc(it.libelle)}</div>${sub}</div>
+      <div class="actions">
+        <button class="ibtn" title="Monter" onclick="moveItem(${i},-1)" ${i===0?'disabled':''}>↑</button>
+        <button class="ibtn" title="Descendre" onclick="moveItem(${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
+        <button class="ibtn" title="Modifier" onclick="openItemForm('${it.id}')">✎</button>
+        <button class="ibtn danger" title="Supprimer" onclick="deleteItem('${it.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  renderPreview();
+}
+function renderPreview(){
+  const act = items.filter(x=>x.actif);
+  if(!act.length){ document.getElementById('preview-holder').innerHTML=''; return; }
+  document.getElementById('preview-holder').innerHTML = `<div class="preview">
+    <div class="preview-title">👁 Aperçu — ce que voit l'agent</div>
+    ${act.map(it=> it.type==='compteur'
+      ? `<div class="pv-counter"><div class="l">${esc(it.libelle)}</div><div class="r"><span class="b m">−</span><span class="v">0</span><span class="b">+</span></div></div>`
+      : `<div class="pv-select"><div class="l">${esc(it.libelle)}${it.obligatoire?' *':''}</div><div class="s">— Sélectionner — ▾</div></div>`
+    ).join('')}
+  </div>`;
+}
+async function moveItem(i, dir){
+  const j = i+dir; if(j<0 || j>=items.length) return;
+  const a = items[i], b = items[j];
+  // Ordres égaux possibles (lignes créées à la main) : on renumérote proprement
+  let ordA = a.ordre, ordB = b.ordre;
+  if(ordA===ordB){ ordA = (i+1)*10; ordB = (j+1)*10; }
+  try{
+    await sb.from('comptage_champs').update({ ordre: ordB }).eq('id', a.id);
+    await sb.from('comptage_champs').update({ ordre: ordA }).eq('id', b.id);
+    await loadItems(); renderItems();
+  }catch(e){ errBox('contenu-err','Erreur : '+e.message); }
+}
+async function deleteItem(id){
+  const it = items.find(x=>x.id===id);
+  if(!confirm(`Supprimer « ${it?it.libelle:''} » ?\n\nLes relevés déjà enregistrés gardent leur valeur.`)) return;
+  try{
+    const { error } = await sb.from('comptage_champs').delete().eq('id', id);
+    if(error) throw error;
+    await loadItems(); renderItems();
+  }catch(e){ errBox('contenu-err','Erreur de suppression : '+e.message); }
+}
+
+let _formType = 'compteur';
+let _options = [];
+function openItemForm(id, forcedType){
+  errBox('contenu-err','');
+  const it = id ? items.find(x=>x.id===id) : null;
+  _formType = it ? it.type : (forcedType || 'compteur');
+  _options = (it && Array.isArray(it.options) && it.options.length) ? it.options.slice() : ['',''];
+  document.getElementById('item-form-holder').innerHTML = `
+    <div class="panel">
+      <div class="panel-title">${it?'Modifier':'Ajouter'}</div>
+      <div class="field">
+        <label>Type</label>
+        <div class="type-toggle">
+          <button type="button" id="if-type-compteur" onclick="setItemType('compteur')">🔢 Compteur (− / +)</button>
+          <button type="button" id="if-type-choix" onclick="setItemType('choix')">🔀 Liste de sélection</button>
+        </div>
+      </div>
+      <div class="field"><label>Libellé *</label><input type="text" id="if-libelle" value="${it?esc(it.libelle):''}" placeholder=""></div>
+      <div id="if-choix-wrap">
+        <div class="field">
+          <label>Choix proposés</label>
+          <div id="if-options-list"></div>
+          <button type="button" class="btn-mini" onclick="addOption()">➕ Ajouter un choix</button>
+        </div>
+        <div class="chk-row" style="margin-bottom:8px"><input type="checkbox" id="if-obligatoire" ${(it&&it.obligatoire)?'checked':''}><label for="if-obligatoire">Obligatoire (l'agent ne peut pas envoyer sans choisir)</label></div>
+      </div>
+      <div class="chk-row"><input type="checkbox" id="if-actif" ${(!it || it.actif)?'checked':''}><label for="if-actif">Visible par l'agent</label></div>
+      <div class="form-actions">
+        <button class="btn-secondary" onclick="closeItemForm()">Annuler</button>
+        <button class="btn-primary" onclick="saveItem('${it?it.id:''}')">💾 Enregistrer</button>
+      </div>
+    </div>`;
+  setItemType(_formType);
+  renderOptions();
+  document.getElementById('item-form-holder').scrollIntoView({behavior:'smooth', block:'start'});
+  document.getElementById('if-libelle').focus();
+}
+function closeItemForm(){ const h=document.getElementById('item-form-holder'); if(h) h.innerHTML=''; }
+function setItemType(t){
+  _formType = t;
+  ['compteur','choix'].forEach(x=>document.getElementById('if-type-'+x).classList.toggle('sel', x===t));
+  document.getElementById('if-choix-wrap').classList.toggle('hidden', t!=='choix');
+  document.getElementById('if-libelle').placeholder = t==='compteur' ? 'Ex. Véhicules traités' : 'Ex. Affluence générale';
+}
+function renderOptions(){
+  document.getElementById('if-options-list').innerHTML = _options.map((o,i)=>`
+    <div class="opt-row">
+      <input type="text" value="${esc(o)}" placeholder="Choix ${i+1}" oninput="_options[${i}]=this.value">
+      <button type="button" title="Retirer" onclick="removeOption(${i})">✕</button>
+    </div>`).join('');
+}
+function addOption(){ _options.push(''); renderOptions(); }
+function removeOption(i){ _options.splice(i,1); if(!_options.length) _options=['']; renderOptions(); }
+
+async function saveItem(id){
+  errBox('contenu-err','');
+  const libelle = document.getElementById('if-libelle').value.trim();
+  if(!libelle){ errBox('contenu-err','Le libellé est obligatoire.'); return; }
+  const type = _formType;
+  let options = null, obligatoire = false;
+  if(type==='choix'){
+    options = _options.map(o=>o.trim()).filter(Boolean);
+    if(options.length<2){ errBox('contenu-err','Une liste doit proposer au moins deux choix.'); return; }
+    obligatoire = document.getElementById('if-obligatoire').checked;
+  }
+  const actif = document.getElementById('if-actif').checked;
+  try{
+    if(id){
+      const { error } = await sb.from('comptage_champs').update({ libelle, type, options, obligatoire, actif }).eq('id', id);
+      if(error) throw error;
+    } else {
+      const maxOrdre = items.reduce((m,x)=>Math.max(m, x.ordre||0), 0);
+      const { error } = await sb.from('comptage_champs').insert({ comptage_type_id: currentType.id, libelle, type, options, obligatoire, actif, ordre: maxOrdre+10 });
+      if(error) throw error;
+    }
+    closeItemForm();
+    await loadItems(); renderItems();
+  }catch(e){ errBox('contenu-err','Erreur d\'enregistrement : '+e.message); }
+}
+
+/* ============================== BOUTON DU JOURNAL DE BORD ==============================
+   Crée/maintient AUTOMATIQUEMENT l'entrée du catalogue (journal_modules) de ce
+   module, et garde nom/icône synchronisés sur les boutons déjà activés par site
+   (journal_activites). L'activation par site et l'ordre se font uniquement dans
+   journal-config.html → « Activités par site » (même logique que
+   rapport-types-config.html). Module retrouvé via comptage_types.module_id. */
+async function ensureModuleForType(){
+  const adresse = AGENT_FILE + '?type=' + encodeURIComponent(currentType.slug);
+  const nom = currentType.nom, icone = currentType.icone || '🔢';
+  let moduleId = currentType.module_id;
+  if(moduleId){
+    const { data, error } = await sb.from('journal_modules').update({ nom, icone, adresse }).eq('id', moduleId).select('id');
+    if(error || !data || !data.length) moduleId = null; // supprimé entre-temps côté journal-config.html : on le recrée
+  }
+  if(!moduleId){
+    const { data: mods } = await sb.from('journal_modules').select('ordre').order('ordre',{ascending:false}).limit(1);
+    const maxOrd = (mods && mods[0] && mods[0].ordre) || 0;
+    const { data, error } = await sb.from('journal_modules').insert({ nom, icone, adresse, ordre:maxOrd+10, actif:true }).select().single();
+    if(error) throw error;
+    moduleId = data.id;
+    await sb.from('comptage_types').update({ module_id: moduleId }).eq('id', currentType.id);
+    currentType.module_id = moduleId;
+  }
+  await sb.from('journal_activites').update({ label: nom, icone }).eq('module_id', moduleId);
+  return moduleId;
+}
+
+/* init */
+loadTypes();
+</script>
+</body>
+</html>
