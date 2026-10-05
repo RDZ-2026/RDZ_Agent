@@ -36,29 +36,35 @@
     .main { max-width: 1100px; margin: 0 auto; padding: 40px 32px; }
     .section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--rdz-border); }
 
+    /* SECTIONS — une couleur par section */
+    section { --accent: var(--rdz-red); --accent-light: var(--rdz-red-light); --accent-shadow: rgba(139,26,26,.1); }
+    .sec-info      { --accent: #8B1A1A; --accent-light: #f5e8e8; --accent-shadow: rgba(139,26,26,.12); }
+    .sec-ops       { --accent: #a4500c; --accent-light: #fbeee1; --accent-shadow: rgba(164,80,12,.12); }
+    .sec-terrain   { --accent: #1f6b3a; --accent-light: #e5f3ea; --accent-shadow: rgba(31,107,58,.12); }
+    .sec-rapports  { --accent: #1e3a5f; --accent-light: #e8edf5; --accent-shadow: rgba(30,58,95,.12); }
+    .sec-controle  { --accent: #5b3a8c; --accent-light: #efe9f7; --accent-shadow: rgba(91,58,140,.12); }
+    .sec-config    { --accent: #0f5e66; --accent-light: #e2f1f2; --accent-shadow: rgba(15,94,102,.12); }
+    .sec-reclasser { --accent: #6b6b6b; --accent-light: #efefed; --accent-shadow: rgba(0,0,0,.08); }
+    section .section-label { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
     /* MODULE GRID */
     .modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 40px; }
     .module-card { background: #fff; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-border); border-radius: 2px; padding: 24px; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px; transition: border-top-color .15s, box-shadow .15s; cursor: pointer; }
-    .module-card.active { border-top-color: var(--rdz-red); }
-    .module-card.active:hover { box-shadow: 0 4px 16px rgba(139,26,26,.1); }
-    .module-card.admin { border-top-color: #1e3a5f; }
-    .module-card.admin:hover { box-shadow: 0 4px 16px rgba(30,58,95,.1); }
+    .module-card { border-top-color: var(--accent); }
+    .module-card:hover { box-shadow: 0 4px 16px var(--accent-shadow); }
     .module-card.coming-soon { opacity: .6; cursor: default; }
     .module-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .module-icon { width: 44px; height: 44px; background: var(--rdz-red-light); border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .module-icon.blue { background: #e8edf5; }
-    .module-icon svg { width: 22px; height: 22px; stroke: var(--rdz-red); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .module-icon.blue svg { stroke: #1e3a5f; }
+    .module-icon { width: 44px; height: 44px; background: var(--accent-light); border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .module-icon svg { width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .module-badge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 2px; }
     .badge-live { background: #dcfce7; color: #166534; }
     .badge-soon { background: #f3f4f6; color: #6b7280; }
     .badge-wip { background: #fef9c3; color: #854d0e; }
-    .badge-admin { background: #e8edf5; color: #1e3a5f; }
+    .badge-sec { background: var(--accent-light); color: var(--accent); }
     .module-name { font-size: 15px; font-weight: 700; color: var(--rdz-black); letter-spacing: .02em; }
     .module-desc { font-size: 12.5px; color: var(--rdz-gray); line-height: 1.6; }
     .module-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rdz-border); display: flex; align-items: center; justify-content: space-between; }
-    .module-link { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--rdz-red); text-decoration: none; display: flex; align-items: center; gap: 5px; }
-    .module-link.blue { color: #1e3a5f; }
+    .module-link { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 5px; }
     .module-link svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .module-card.coming-soon .module-link { color: #9a9a9a; }
 
@@ -97,129 +103,191 @@
     }
   </style>
 
-<style id="rdz-index-design-system-2026">
-@media screen{
+<style id="rdz-index-harmonisation-2026">
+@media screen {
   :root{
-    --rdz-red:#e3062c;--rdz-red-dark:#b80425;--rdz-red-soft:#fff0f3;
-    --rdz-navy:#142130;--rdz-navy2:#223241;--rdz-navy3:#304457;
-    --rdz-ink:#102033;--rdz-muted:#63758f;--rdz-line:#dbe3ec;
-    --rdz-bg:#eef3f7;--rdz-surface:#fff;
-    --rdz-shadow:0 10px 28px rgba(16,32,51,.08);
+    --rdz-red:#e3062c;
+    --rdz-red-dark:#b80425;
+    --rdz-red-soft:#fff0f3;
+    --rdz-navy:#142130;
+    --rdz-navy2:#223241;
+    --rdz-navy3:#30465b;
+    --rdz-ink:#102033;
+    --rdz-muted:#63758f;
+    --rdz-line:#dbe3ec;
+    --rdz-bg:#eef3f7;
+    --rdz-surface:#fff;
+    --rdz-shadow:0 10px 30px rgba(16,32,51,.075);
   }
-  html{background:#e7edf3}
+
+  html{background:#e8eef4}
   body{
     font-family:Inter,"Segoe UI",Arial,Helvetica,sans-serif;
     background:
-      radial-gradient(circle at 85% 0%,rgba(227,6,44,.045),transparent 26rem),
-      linear-gradient(180deg,#f8fafc 0,#eef3f7 100%);
+      radial-gradient(circle at 92% 0%,rgba(227,6,44,.045),transparent 25rem),
+      linear-gradient(180deg,#f9fbfc 0,#eef3f7 100%);
     color:var(--rdz-ink);
   }
 
-  /* Bandeau principal */
+  /* Structure RDZ */
   .header{
     position:sticky;top:0;z-index:100;
-    background:linear-gradient(135deg,var(--rdz-navy) 0%,var(--rdz-navy2) 72%,#293b4d 100%);
+    background:linear-gradient(135deg,var(--rdz-navy) 0%,var(--rdz-navy2) 72%,#293c4e 100%);
     border-bottom:3px solid var(--rdz-red);
-    box-shadow:0 5px 20px rgba(16,32,51,.18);
+    box-shadow:0 6px 22px rgba(16,32,51,.20);
   }
-  .header-inner{max-width:1240px;padding:0 32px;min-height:78px;align-items:center}
+  .header-inner{
+    max-width:1240px;min-height:78px;padding:0 32px;
+    align-items:center;
+  }
   .rdz-brand-lockup{display:flex;align-items:center;gap:16px;min-width:0}
   .rdz-logo-plate{
-    width:92px;height:54px;flex:0 0 92px;display:flex;align-items:center;justify-content:center;
-    background:#fff;border-radius:11px;padding:5px 8px;box-shadow:0 3px 12px rgba(0,0,0,.20)
+    width:92px;height:54px;flex:0 0 92px;
+    display:flex;align-items:center;justify-content:center;
+    padding:5px 8px;background:#fff;border-radius:11px;
+    box-shadow:0 3px 12px rgba(0,0,0,.20)
   }
   .rdz-logo-official{display:block;max-width:100%;max-height:100%;object-fit:contain}
-  .header-brand{padding:0;gap:4px}
+  .header-brand{padding:0;gap:4px;min-width:0}
   .header-brand-name{font-size:16px;color:#fff;letter-spacing:.06em}
-  .header-brand-sub{font-size:10.5px;color:#bfcbd6;line-height:1.45}
+  .header-brand-sub{font-size:10.5px;color:#bdc9d4;line-height:1.45}
   .header-meta{padding-left:22px;border-left:1px solid rgba(255,255,255,.13)}
-  .header-meta-item{color:#aebdca;font-size:10.5px}
+  .header-meta-item{font-size:10.5px;color:#aebdca}
 
-  /* Sous-bandeau */
-  .banner{background:#fff;border-bottom:1px solid var(--rdz-line);padding:0;box-shadow:0 2px 8px rgba(16,32,51,.035)}
+  .banner{
+    padding:0;background:rgba(255,255,255,.96);
+    border-bottom:1px solid var(--rdz-line);
+    box-shadow:0 2px 8px rgba(16,32,51,.035)
+  }
   .banner-inner{max-width:1240px;padding:13px 32px}
   .banner-title{font-size:12px;color:var(--rdz-navy);letter-spacing:.075em}
   .banner-title::before{
-    content:"";display:inline-block;width:18px;height:3px;border-radius:4px;
-    background:var(--rdz-red);vertical-align:middle;margin:-2px 9px 0 0
+    content:"";display:inline-block;width:18px;height:3px;margin:-2px 9px 0 0;
+    vertical-align:middle;border-radius:4px;background:var(--rdz-red)
   }
-  .banner-date{font-size:11.5px;color:var(--rdz-muted);font-weight:600}
+  .banner-date{font-size:11.5px;font-weight:600;color:var(--rdz-muted)}
 
-  /* Zone de travail */
-  .main{max-width:1240px;padding:30px 32px 48px}
+  .main{max-width:1240px;padding:30px 32px 50px}
   .info-bar{
+    margin-bottom:32px;padding:14px 18px;
     border:1px solid var(--rdz-line);border-left:4px solid var(--rdz-red);
-    border-radius:12px;background:rgba(255,255,255,.92);padding:14px 18px;
-    box-shadow:0 6px 18px rgba(16,32,51,.05);margin-bottom:30px
+    border-radius:12px;background:rgba(255,255,255,.94);
+    box-shadow:0 6px 18px rgba(16,32,51,.05)
   }
   .info-bar-icon{width:36px;height:36px;border-radius:10px;background:var(--rdz-red-soft)}
   .info-bar-icon svg{stroke:var(--rdz-red)}
-  .info-bar-text{color:var(--rdz-muted);font-size:12px}
+  .info-bar-text{font-size:12px;color:var(--rdz-muted)}
   .info-bar-text strong{color:var(--rdz-ink)}
 
-  .section-label{
-    display:flex;align-items:center;gap:12px;margin:34px 0 14px;padding:0;
-    border:0;color:#43566e;font-size:10.5px;letter-spacing:.105em
+  /* Les couleurs métier restent des repères secondaires, la marque reste RDZ */
+  section{
+    --accent:var(--rdz-navy3);
+    --accent-light:#eef3f7;
+    --accent-shadow:rgba(16,32,51,.10);
+    margin-top:2px;
   }
-  .section-label::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,var(--rdz-line),transparent)}
-  .modules-grid{grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-bottom:34px}
+  .sec-info{--accent:#9d1830;--accent-light:#fff0f3}
+  .sec-ops{--accent:#9a541b;--accent-light:#fbf3e9}
+  .sec-terrain{--accent:#28704a;--accent-light:#edf7f1}
+  .sec-rapports{--accent:#315575;--accent-light:#edf3f8}
+  .sec-controle{--accent:#655181;--accent-light:#f3f0f7}
+  .sec-config{--accent:#35676d;--accent-light:#edf6f6}
+  .sec-reclasser{--accent:#697685;--accent-light:#f1f4f6}
+
+  section .section-label{
+    display:flex;align-items:center;gap:12px;
+    margin:34px 0 14px;padding:0;border:0;
+    color:var(--rdz-navy);font-size:10.5px;letter-spacing:.105em
+  }
+  section .section-label::before{
+    content:"";width:8px;height:8px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 0 4px var(--accent-light)
+  }
+  section .section-label::after{
+    content:"";height:1px;flex:1;
+    background:linear-gradient(90deg,var(--rdz-line),transparent)
+  }
+
+  .modules-grid{
+    grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+    gap:14px;margin-bottom:36px
+  }
 
   /* Cartes modules */
   .module-card{
-    position:relative;overflow:hidden;border:1px solid var(--rdz-line);border-top:1px solid var(--rdz-line);
-    border-radius:14px;padding:20px;background:rgba(255,255,255,.96);gap:13px;
+    position:relative;overflow:hidden;
+    padding:20px;border:1px solid var(--rdz-line);border-top:1px solid var(--rdz-line);
+    border-radius:14px;background:rgba(255,255,255,.97);
     box-shadow:0 5px 16px rgba(16,32,51,.045);
+    gap:13px;
     transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease
   }
   .module-card::before{
-    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#cbd5df;
-    transition:width .18s ease,background .18s ease
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--accent);
+    transition:width .18s ease
   }
-  .module-card.active::before{background:var(--rdz-red)}
-  .module-card.admin::before{background:var(--rdz-navy3)}
-  .module-card.active,.module-card.admin{border-top-color:var(--rdz-line)}
-  .module-card.active:hover,.module-card.admin:hover{
-    transform:translateY(-3px);border-color:#cbd7e2;
-    box-shadow:0 14px 32px rgba(16,32,51,.11)
+  .module-card:not(.coming-soon):hover{
+    transform:translateY(-3px);
+    border-color:#cbd7e2;
+    box-shadow:0 14px 32px var(--accent-shadow)
   }
-  .module-card.active:hover::before{width:5px;background:var(--rdz-red)}
-  .module-card.admin:hover::before{width:5px;background:var(--rdz-navy)}
-  .module-card.coming-soon:hover{transform:none;box-shadow:0 5px 16px rgba(16,32,51,.045)}
-
+  .module-card:not(.coming-soon):hover::before{width:5px}
+  .module-card.coming-soon{opacity:.68}
   .module-icon{
-    width:46px;height:46px;border-radius:12px;background:var(--rdz-red-soft);
-    box-shadow:inset 0 0 0 1px rgba(227,6,44,.06)
+    width:46px;height:46px;border-radius:12px;
+    background:var(--accent-light);
+    box-shadow:inset 0 0 0 1px rgba(16,32,51,.035)
   }
-  .module-icon svg{width:21px;height:21px;stroke:var(--rdz-red);stroke-width:1.9}
-  .module-icon.blue{background:#eef3f8;box-shadow:inset 0 0 0 1px rgba(20,33,48,.05)}
-  .module-icon.blue svg{stroke:var(--rdz-navy3)}
-  .module-badge{border-radius:999px;padding:4px 9px;font-size:9px;letter-spacing:.055em}
-  .badge-admin{background:#edf2f7;color:#334b63}
+  .module-icon svg{width:21px;height:21px;stroke:var(--accent);stroke-width:1.9}
+  .module-badge{
+    border-radius:999px;padding:4px 9px;
+    font-size:9px;letter-spacing:.055em
+  }
   .badge-live{background:#eaf7ef;color:#187447}
+  .badge-soon{background:#f0f3f6;color:#667587}
+  .badge-wip{background:#fff7d9;color:#8a6113}
+  .badge-sec{background:var(--accent-light);color:var(--accent)}
   .module-name{font-size:14.5px;color:var(--rdz-ink);line-height:1.3}
   .module-desc{font-size:12px;color:var(--rdz-muted);line-height:1.6}
-  .module-footer{border-top:1px solid #edf1f5;padding-top:12px}
-  .module-link{color:var(--rdz-red);font-size:10.5px}
-  .module-link.blue{color:#38546f}
-  .module-card:hover .module-link svg{transform:translateX(3px)}
+  .module-footer{padding-top:12px;border-top:1px solid #edf1f5}
+  .module-link{font-size:10.5px;color:var(--accent)}
   .module-link svg{transition:transform .18s ease}
+  .module-card:not(.coming-soon):hover .module-link svg{transform:translateX(3px)}
 
-  /* Action impression */
+  /* Impression du jour */
   .print-bar{
-    position:relative;overflow:hidden;border:1px solid var(--rdz-line);border-top:0;
-    border-radius:14px;padding:18px 20px;background:#fff;box-shadow:var(--rdz-shadow);margin-bottom:18px
+    position:relative;overflow:hidden;
+    margin-bottom:18px;padding:18px 20px;
+    border:1px solid var(--rdz-line);border-top:0;
+    border-radius:14px;background:#fff;box-shadow:var(--rdz-shadow)
   }
-  .print-bar::before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:var(--rdz-red)}
-  .print-bar-icon{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--rdz-red),#c80629)}
-  .print-bar-title{color:var(--rdz-ink);font-size:14px}
+  .print-bar::before{
+    content:"";position:absolute;left:0;top:0;right:0;height:3px;background:var(--rdz-red)
+  }
+  .print-bar-icon{
+    width:46px;height:46px;border-radius:12px;
+    background:linear-gradient(135deg,var(--rdz-red),#c80629)
+  }
+  .print-bar-title{font-size:14px;color:var(--rdz-ink)}
   .print-bar-sub{color:var(--rdz-muted)}
   .btn-print-all{
-    border-radius:9px;padding:10px 16px;background:var(--rdz-red);
-    box-shadow:0 5px 12px rgba(227,6,44,.18);transition:transform .15s ease,box-shadow .15s ease,background .15s ease
+    padding:10px 16px;border-radius:9px;
+    background:var(--rdz-red);
+    box-shadow:0 5px 12px rgba(227,6,44,.18);
+    transition:transform .15s ease,box-shadow .15s ease,background .15s ease
   }
-  .btn-print-all:hover{background:var(--rdz-red-dark);transform:translateY(-1px);box-shadow:0 8px 18px rgba(227,6,44,.22)}
+  .btn-print-all:hover{
+    background:var(--rdz-red-dark);
+    transform:translateY(-1px);
+    box-shadow:0 8px 18px rgba(227,6,44,.22)
+  }
 
-  .footer{max-width:1240px;border-top:1px solid var(--rdz-line);padding:18px 32px 24px;color:#8290a2}
+  .footer{
+    max-width:1240px;padding:18px 32px 24px;
+    border-top:1px solid var(--rdz-line);
+    color:#8290a2
+  }
 
   @media(max-width:760px){
     .header-inner,.banner-inner,.main,.footer{padding-left:16px;padding-right:16px}
@@ -233,7 +301,7 @@
     .main{padding-top:22px}
     .modules-grid{grid-template-columns:1fr;gap:11px}
     .module-card{padding:17px}
-    .section-label{margin-top:28px}
+    section .section-label{margin-top:28px}
     .print-bar{padding:16px}
   }
   @media(max-width:480px){
@@ -280,8 +348,9 @@
       </div>
     </div>
 
-    <!-- ── INFORMATION ── -->
-    <div class="section-label">Information</div>
+    <!-- ── SUPERVISION DE L'INFORMATION ── -->
+    <section class="sec-info">
+    <div class="section-label">Supervision de l'information</div>
     <div class="print-bar">
       <div class="print-bar-left">
         <div class="print-bar-icon">
@@ -301,8 +370,7 @@
     </div>
     <div class="modules-grid">
 
-      <!-- ÉVÉNEMENTS -->
-      <a class="module-card active" href="centraliste/evenements.html">
+      <a class="module-card" href="centraliste/evenements.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -318,8 +386,7 @@
         </div>
       </a>
 
-      <!-- CONSIGNES -->
-      <a class="module-card active" href="centraliste/consignes.html">
+      <a class="module-card" href="centraliste/consignes.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -335,8 +402,7 @@
         </div>
       </a>
 
-      <!-- CONSTATS -->
-      <a class="module-card active" href="centraliste/constats.html">
+      <a class="module-card" href="centraliste/constats.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -353,13 +419,14 @@
       </a>
 
     </div>
+    </section>
 
-    <!-- ── OPÉRATIONNEL — SUPERVISION DES AGENTS ── -->
-    <div class="section-label">Opérationnel — Supervision des agents</div>
+    <!-- ── SUPERVISION OPÉRATIONNELLE DES AGENTS ── -->
+    <section class="sec-ops">
+    <div class="section-label">Supervision opérationnelle des agents</div>
     <div class="modules-grid">
 
-      <!-- PLANNING AGENDRIX -->
-      <a class="module-card active" href="centraliste/planning-agendrix.html">
+      <a class="module-card" href="centraliste/planning-agendrix.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -375,8 +442,7 @@
         </div>
       </a>
 
-      <!-- FEUILLES DE ROUTE -->
-      <a class="module-card active" href="centraliste/RouteOps_Supervision.html">
+      <a class="module-card" href="centraliste/RouteOps_Supervision.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -392,8 +458,7 @@
         </div>
       </a>
 
-      <!-- VÉHICULES & FLOTTE -->
-      <a class="module-card active" href="centraliste/fleet-agent.html" target="_blank" rel="noopener">
+      <a class="module-card" href="centraliste/fleet-agent.html" target="_blank" rel="noopener">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -409,8 +474,7 @@
         </div>
       </a>
 
-      <!-- RÉSIDENTS -->
-      <a class="module-card active" href="centraliste/residents.html">
+      <a class="module-card" href="centraliste/residents.html">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -427,13 +491,14 @@
       </a>
 
     </div>
+    </section>
 
     <!-- ── APPLICATIONS TERRAIN ── -->
-    <div class="section-label">Applications Terrain</div>
+    <section class="sec-terrain">
+    <div class="section-label">Applications terrain</div>
     <div class="modules-grid">
 
-      <!-- APPLICATION MOBILE AGENT -->
-      <a class="module-card active" href="https://rdz-2026.github.io/RDZ_Agent/application/mobile.html" target="_blank" rel="noopener">
+      <a class="module-card" href="https://rdz-2026.github.io/RDZ_Agent/application/mobile.html" target="_blank" rel="noopener">
         <div class="module-card-header">
           <div class="module-icon">
             <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
@@ -450,291 +515,295 @@
       </a>
 
     </div>
+    </section>
 
-    <!-- ── SUPERVISION RAPPORTS ── -->
-    <div class="section-label">Supervision rapports</div>
+    <!-- ── SUPERVISION DES RAPPORTS ── -->
+    <section class="sec-rapports">
+    <div class="section-label">Supervision des rapports</div>
     <div class="modules-grid">
 
-      <!-- SUPERVISION RAPPORTS (JOURNAL DE BORD) -->
-      <a class="module-card admin" href="centraliste/supervision-rapports.html">
+      <a class="module-card" href="centraliste/supervision-rapports.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Rapports</span>
         </div>
         <div>
           <div class="module-name">Rapports du journal de bord</div>
           <div class="module-desc">Rapports standard et interventions alarme remontés par les agents : consultation, correction, classification (nature d'activité, statut de clôture), reformulation IA et rapport imprimable.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- SUPERVISION ÉVÉNEMENTS -->
-      <a class="module-card admin" href="centraliste/supervision-evenements.html">
+      <a class="module-card" href="parkguard-admin.html" target="_blank" rel="noopener">
         <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Rapports</span>
         </div>
         <div>
-          <div class="module-name">Gestion d'événements — Supervision</div>
+          <div class="module-name">Rapport de contrôle des parkings</div>
+          <div class="module-desc">Historique des rapports, suivi des dossiers en attente d'analyse IA, export et historique des comptages/passages par site.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+      <a class="module-card" href="centraliste/supervision-evenements.html">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <span class="module-badge badge-sec">Rapports</span>
+        </div>
+        <div>
+          <div class="module-name">Rapport des événements</div>
           <div class="module-desc">Consultation et correction des checklists (générique/responsable) et des rapports événementiels remontés par les agents.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- SUPERVISION BIBLIOTHÈQUE IHEID -->
-      <a class="module-card admin" href="centraliste/supervision-bibliotheque.html">
+      <a class="module-card" href="centraliste/supervision-bibliotheque.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Rapports</span>
         </div>
         <div>
-          <div class="module-name">Supervision Bibliothèque IHEID</div>
+          <div class="module-name">Rapport Bibliothèque IHEID</div>
           <div class="module-desc">Rapports individuels de comptage/filtrage (format identique au rapport client), et statistiques d'affluence jour/semaine/mois/année.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- SUPERVISION COMPTAGES -->
-      <a class="module-card admin" href="centraliste/supervision-comptages.html">
+      <a class="module-card" href="direction/historique-ouvertures.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Rapports</span>
         </div>
         <div>
-          <div class="module-name">Supervision des comptages</div>
+          <div class="module-name">Rapport ouvertures résidences</div>
+          <div class="module-desc">Historique complet des ouvertures enregistrées par les agents, avec génération d'un rapport client imprimable (PDF) par période.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+      <a class="module-card" href="centraliste/supervision-comptages.html">
+        <div class="module-card-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span class="module-badge badge-sec">Rapports</span>
+        </div>
+        <div>
+          <div class="module-name">Rapport des comptages</div>
           <div class="module-desc">Relevés de tous les modules de comptage par site et par période : chiffres clés, évolution, répartitions, correction des relevés, rapport de synthèse et export Excel.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
     </div>
+    </section>
 
-    <!-- ── MODULES ADMIN / SUPERVISION ── -->
-    <div class="section-label">Modules Admin / Supervision</div>
+    <!-- ── CONTRÔLES OPÉRATIONNELS ── -->
+    <section class="sec-controle">
+    <div class="section-label">Contrôles opérationnels</div>
     <div class="modules-grid">
 
-      <!-- 1. CONTRÔLE PARKING — SUPERVISION -->
-      <a class="module-card admin" href="parkguard-admin.html" target="_blank" rel="noopener">
+      <a class="module-card" href="direction/historique-pdsa.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>
-          </div>
-          <span class="module-badge badge-admin">Supervision</span>
-        </div>
-        <div>
-          <div class="module-name">Contrôle Parking — Supervision</div>
-          <div class="module-desc">Historique des rapports, suivi des dossiers en attente d'analyse IA, export et historique des comptages/passages par site.</div>
-        </div>
-        <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-        </div>
-      </a>
-
-      <!-- 2. HISTORIQUE OUVERTURES RÉSIDENCES -->
-      <a class="module-card admin" href="direction/historique-ouvertures.html">
-        <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/></svg>
-          </div>
-          <span class="module-badge badge-admin">Supervision</span>
-        </div>
-        <div>
-          <div class="module-name">Historique Ouvertures Résidences</div>
-          <div class="module-desc">Historique complet des ouvertures enregistrées par les agents, avec génération d'un rapport client imprimable (PDF) par période.</div>
-        </div>
-        <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-        </div>
-      </a>
-
-      <!-- HISTORIQUE PDSA -->
-      <a class="module-card admin" href="direction/historique-pdsa.html">
-        <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Contrôle</span>
         </div>
         <div>
-          <div class="module-name">Historique PDSA</div>
+          <div class="module-name">Historique des PDSA</div>
           <div class="module-desc">Historique complet des prises de service (PDSA et heure réelle) saisies par le centraliste, toutes semaines confondues.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- 3. VALIDATION CONSIGNES -->
-      <a class="module-card admin" href="direction/validation_consignes.html">
+      <a class="module-card" href="direction/validation_consignes.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Contrôle</span>
         </div>
         <div>
-          <div class="module-name">Validation consignes</div>
+          <div class="module-name">Validation des consignes</div>
           <div class="module-desc">Suivi des validations agents depuis l'application mobile : qui a pris connaissance des consignes, événements et constats, sur quel site et à quelle heure.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- 4. VÉRIFICATION FEUILLES DE ROUTE -->
-      <a class="module-card admin" href="centraliste/comparatif-feuilles-route.html">
+      <a class="module-card" href="centraliste/comparatif-feuilles-route.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">Contrôle</span>
         </div>
         <div>
-          <div class="module-name">Vérification feuilles de route</div>
+          <div class="module-name">Vérification des feuilles de route</div>
           <div class="module-desc">Comparatif ligne par ligne entre le planning théorique et les horaires réellement pointés par les agents sur le terrain.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- 5. PARAMÉTRAGE DES SITES -->
-      <a class="module-card admin" href="admin/parametrage-site.html">
+    </div>
+    </section>
+
+    <!-- ── CONFIGURATION ── -->
+    <section class="sec-config">
+    <div class="section-label">Configuration</div>
+    <div class="modules-grid">
+
+      <a class="module-card" href="admin/comptes-agents.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <span class="module-badge badge-sec">Configuration</span>
+        </div>
+        <div>
+          <div class="module-name">Paramétrage des comptes agents &amp; PIN</div>
+          <div class="module-desc">Gestion de la liste des agents et de leur code PIN de connexion à l'application mobile. Création, renommage, activation et réinitialisation de PIN.</div>
+        </div>
+        <div class="module-footer">
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+        </div>
+      </a>
+
+      <a class="module-card" href="admin/parametrage-site.html">
+        <div class="module-card-header">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </div>
-          <span class="module-badge badge-admin">Administration</span>
+          <span class="module-badge badge-sec">Configuration</span>
         </div>
         <div>
           <div class="module-name">Paramétrage des sites</div>
           <div class="module-desc">Gestion de la liste des sites de surveillance. Ajout, renommage, activation et suppression des sites utilisés dans tous les modules.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- PARAMÉTRAGE CHECKLISTS ÉVÉNEMENTS -->
-      <a class="module-card admin" href="admin/checklist-evenements-config.html">
+      <a class="module-card" href="admin/bibliotheque-config.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          </div>
-          <span class="module-badge badge-admin">Administration</span>
-        </div>
-        <div>
-          <div class="module-name">Paramétrage checklists événements</div>
-          <div class="module-desc">Gestion des sections et items des checklists générique et responsable : ajout, modification, suppression, ordre.</div>
-        </div>
-        <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
-        </div>
-      </a>
-
-      <!-- PARAMÉTRAGE BIBLIOTHÈQUE IHEID -->
-      <a class="module-card admin" href="admin/bibliotheque-config.html">
-        <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           </div>
-          <span class="module-badge badge-admin">Administration</span>
+          <span class="module-badge badge-sec">Configuration</span>
         </div>
         <div>
           <div class="module-name">Paramétrage Bibliothèque IHEID</div>
           <div class="module-desc">Gestion des listes ambiances et origines/établissements utilisées par l'application mobile de comptage/filtrage.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- 6. COMPTES AGENTS & PIN -->
-      <a class="module-card admin" href="admin/comptes-agents.html">
+      <a class="module-card" href="admin/checklist-evenements-config.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
-          <span class="module-badge badge-admin">Administration</span>
+          <span class="module-badge badge-sec">Configuration</span>
         </div>
         <div>
-          <div class="module-name">Comptes agents &amp; PIN</div>
-          <div class="module-desc">Gestion de la liste des agents et de leur code PIN de connexion à l'application mobile. Création, renommage, activation et réinitialisation de PIN.</div>
+          <div class="module-name">Paramétrage checklists événements</div>
+          <div class="module-desc">Gestion des sections et items des checklists générique et responsable : ajout, modification, suppression, ordre.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- GESTION AGENTS, MATÉRIEL & ACCÈS (simplifié) -->
-      <a class="module-card admin" href="centraliste/gestion-agents-materiel-acces.html">
+    </div>
+    </section>
+
+    <!-- ── À RECLASSER ── -->
+    <section class="sec-reclasser">
+    <div class="section-label">À reclasser</div>
+    <div class="modules-grid">
+
+      <a class="module-card" href="centraliste/gestion-agents-materiel-acces.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/></svg>
           </div>
-          <span class="module-badge badge-admin">Administration</span>
+          <span class="module-badge badge-sec">À reclasser</span>
         </div>
         <div>
           <div class="module-name">Gestion Agents, Matériel &amp; Accès</div>
           <div class="module-desc">Configuration simplifiée : liste des agents, catalogue matériel, sites/clés/badges/réceptionnaires. Version allégée de l'admin complet.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-
-      <!-- DOTATIONS VESTIAIRE -->
-      <a class="module-card admin" href="centraliste/dotations-vestiaire.html">
+      <a class="module-card" href="centraliste/dotations-vestiaire.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">À reclasser</span>
         </div>
         <div>
           <div class="module-name">Dotations vestiaire</div>
           <div class="module-desc">Sortir ou réintégrer une dotation vestiaire pour un agent. Module limité au centraliste — la gestion complète du stock reste dans l'admin.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
-      <!-- PRISE DE MATÉRIEL — CENTRALISTE -->
-      <a class="module-card admin" href="centraliste/prise-materiel-centraliste.html">
+      <a class="module-card" href="centraliste/prise-materiel-centraliste.html">
         <div class="module-card-header">
-          <div class="module-icon blue">
+          <div class="module-icon">
             <svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
           </div>
-          <span class="module-badge badge-admin">Supervision</span>
+          <span class="module-badge badge-sec">À reclasser</span>
         </div>
         <div>
           <div class="module-name">Prise de Matériel — Centraliste</div>
           <div class="module-desc">Sortir du matériel, une clé ou un badge pour le compte d'un agent déjà parti sur le terrain. Sélection de l'agent dans la liste, suivi des attributions en cours.</div>
         </div>
         <div class="module-footer">
-          <span class="module-link blue">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          <span class="module-link">Ouvrir le module <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
         </div>
       </a>
 
     </div>
+    </section>
 
   </main>
 
@@ -749,7 +818,7 @@
     }
     const now = new Date();
     document.getElementById('current-date').textContent = formatDate(now);
-    document.getElementById('footer-date').textContent = 'Version 1.9 — ' + now.getFullYear();
+    document.getElementById('footer-date').textContent = 'Version 2.0 — ' + now.getFullYear();
   </script>
 
 </body>
