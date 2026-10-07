@@ -207,7 +207,7 @@ input[type="checkbox"]{width:16px;height:16px;cursor:pointer;accent-color:var(--
   .tabs-row{border:1px solid var(--rdz-line);border-radius:12px !important;box-shadow:var(--rdz-shadow-sm) !important}
   .stat-box{border-color:var(--rdz-line) !important;border-top-color:var(--rdz-accent) !important;border-radius:11px !important;box-shadow:var(--rdz-shadow-sm)}
   .modal-overlay,.overlay{backdrop-filter:blur(3px)}
-  .modal{overflow:hidden}
+  .modal{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .modal-title{color:var(--rdz-ink) !important}
   .save-status,.tlabel,.detail-lbl,.card-dates,.control-sub{color:var(--rdz-muted) !important}
   .status{border-radius:10px !important}
@@ -559,6 +559,13 @@ async function loadData() {
       .limit(1000);
     if (error) throw error;
     allVehicles = data || [];
+
+    // Purge de la sélection : un rapport qui n'est plus "en attente IA"
+    // (traité, supprimé…) disparaît de la vue → il est désélectionné.
+    const pendingIds = new Set(allVehicles.filter(v => v.ia_pending).map(v => v.id));
+    selectedIds.forEach(id => { if (!pendingIds.has(id)) selectedIds.delete(id); });
+    if (!selectedIds.size) { const ca = document.getElementById('check-all'); if (ca) ca.checked = false; }
+    updateSelToolbar();
 
     // Remplir les filtres "site" des différents onglets
     const sites = [...new Set(allVehicles.map(v=>v.site).filter(Boolean))].sort();
