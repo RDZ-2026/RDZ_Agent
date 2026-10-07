@@ -1,4 +1,5 @@
 <!-- RDZ · supervision-rapports · v17 · 2026-09-28 · support des rapports issus d'un type personnalisé créé dans rapport-types-config.html (journal_entrees.rapport_type_id + reponses — voir migration-rapport-types.sql) : badge/étiquette avec le nom du type dans la liste et les modales, détail/édition/rapport imprimable via le même moteur "réponses groupées par catégorie" que le rapport d'alarme (reponsesSectionsHtml/qaGroupedHtml, réutilisés tels quels), et prise en compte dans les prompts "Analyser avec Claude"/"Classer". RAPPORT_TYPES chargé dans loadData() pour l'affichage du nom/icône -->
+<!-- v19 · 2026-10-07 · impression/PDF : aucun bloc (section, ou bloc "Rapport N" du rapport IA, photos comprises) n'est coupé entre deux pages s'il tient sur une page A4 entière — mesure réelle de chaque bloc juste avant l'impression (beforeprint, largeur A4) ; seuls les blocs plus hauts qu'une page sont coupés (entre deux rangées de photos). -->
 <!-- v18 · 2026-10-02 · impression/PDF : sections jamais coupées (sauf si > 1 page ; photos alors coupées entre deux rangées), plus de zone grise sous le pied de rapport, nom de fichier PDF formaté "Site - JJ.MM.AAAA - Nature d'activité" (bouton "Imprimer / PDF"). -->
 <!-- v16 · 2026-09-28 · deux nouveaux boutons dans la sélection multiple : "🏷️ Classer" (classification nature_activite/type_action SEULE, pont manuel Claude.ai texte simple, sans reformuler le texte du rapport — bouton séparé de "Analyser avec Claude") et "🖨 Exporter en PDF" (aperçu imprimable concaténant plusieurs rapports, un par page, via window.print()) -->
 <!-- v15 · 2026-09-26 · rapport alarme : regroupement des réponses par catégorie (Questions/Vérifications découpées en une section par catégorie, numérotée dynamiquement), préservation du champ categorie à l'édition -->
@@ -149,6 +150,14 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
      dépasse une page), mais le titre reste collé à la 1re rangée. Avec 1 ou
      2 rangées, l'ensemble passe donc d'un bloc sur la page suivante. */
   .rp-sec.rp-sec-photos{break-inside:auto;page-break-inside:auto}
+  /* v19 (retour Laurent 2026-10-07) : chaque bloc est mesuré juste avant
+     l'impression (voir tagPrintBlocks) — .rp-keep = tient sur une page,
+     donc jamais coupé (photos comprises) ; .rp-split = plus haut qu'une
+     page, coupure autorisée (entre deux rangées de photos uniquement).
+     La règle .rp-sec-photos ci-dessus ne sert plus que de repli. */
+  .rp-block{break-inside:avoid;page-break-inside:avoid}
+  .rp-keep{break-inside:avoid!important;page-break-inside:avoid!important}
+  .rp-split{break-inside:auto!important;page-break-inside:auto!important}
   .rp-sec-h{break-after:avoid;page-break-after:avoid}
   .rp-foot{break-inside:avoid;page-break-inside:avoid}
   .rp-doc{box-shadow:none!important}
@@ -1333,11 +1342,38 @@ function buildReportFileName(entries){ // entries : [{site, ts, nature}]
   return [site, date, nature].filter(Boolean).join(' - ')
     .replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 150);
 }
+/* ---------- Blocs jamais coupés à l'impression (v19, retour Laurent 2026-10-07) ----------
+   Règle : un bloc (section .rp-sec, ou bloc "Rapport N" .rp-block du
+   rapport IA) reste entier sur une page, SAUF s'il est à lui seul plus
+   haut qu'une page A4. Le CSS seul ne sait pas faire "évite de couper
+   sauf si trop grand" de façon fiable (d'où l'ancien compromis sur la
+   section Photos) : on mesure donc chaque bloc à la largeur réelle
+   d'impression (A4 − marges 12 mm = 186 mm) juste avant l'impression,
+   et on pose .rp-keep ou .rp-split. Branché sur "beforeprint", donc
+   valable pour le bouton Imprimer / PDF, l'export groupé ET Ctrl/Cmd+P. */
+function tagPrintBlocks(){
+  const root = document.getElementById('report-content');
+  if(!root || !root.innerHTML) return;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;height:273mm;width:186mm';
+  document.body.appendChild(probe);
+  const pageH = probe.getBoundingClientRect().height * 0.97; // petite marge de sécurité
+  document.body.removeChild(probe);
+  const prevW = root.style.width;
+  root.style.width = '186mm';
+  root.querySelectorAll('.rp-sec,.rp-block').forEach(el=>{
+    el.classList.remove('rp-keep','rp-split');
+    el.classList.add(el.getBoundingClientRect().height <= pageH ? 'rp-keep' : 'rp-split');
+  });
+  root.style.width = prevW;
+}
+window.addEventListener('beforeprint', tagPrintBlocks);
 function printReport(){
   const prev = document.title;
   if(REPORT_FILE_NAME) document.title = REPORT_FILE_NAME;
   const restore = ()=>{ document.title = prev; window.removeEventListener('afterprint', restore); };
   window.addEventListener('afterprint', restore);
+  tagPrintBlocks();
   window.print();
   setTimeout(restore, 1000); // filet de sécurité si afterprint n'est pas émis
 }
@@ -2158,7 +2194,7 @@ function buildMultiReport(titreGlobal, corrected){
       : '<div style="color:#999;font-size:13px;margin-top:16px"><i>Aucune photo jointe.</i></div>';
 
     const last = i === corrected.length - 1;
-    return `<div style="margin-bottom:2rem;${last?'':'padding-bottom:2rem;border-bottom:2px dashed #ddd'}">${header}${incomplete}${inner}${photosHtml}</div>`;
+    return `<div class="rp-block" style="margin-bottom:2rem;${last?'':'padding-bottom:2rem;border-bottom:2px dashed #ddd'}">${header}${incomplete}${inner}${photosHtml}</div>`;
   }).join('');
 
   const sites = [...new Set(corrected.map(c=>c.r.site).filter(Boolean))];
