@@ -1,3 +1,7 @@
+<!-- v23 · 2026-10-08 · rapport imprimable : les sauts de ligne, lignes vides et retraits saisis (constats, mesures prises, résultat, réponses texte) sont conservés tels quels (white-space:pre-wrap dans rpFieldO) ; le prompt "Analyser avec Claude" demande aussi de garder des retours à la ligne (\n) pour les énumérations. -->
+<!-- v22 · 2026-10-08 · (1) code de validation demandé UNIQUEMENT pour changer le statut d'un rapport déjà Transmis au client / Validé (= le déprotéger). Passer un rapport en Transmis/Validé ne demande plus de code. Un rapport protégé ne peut être ni modifié, ni classé, ni supprimé, ni mis à jour par l'IA tant qu'il n'est pas déprotégé : la page propose alors directement de le déprotéger (choix du nouveau statut + code). (2) "Modifier" : les menus déroulants des questions à choix (rapports d'alarme et types personnalisés) sont de nouveau alimentés — les options n'étant pas recopiées dans `reponses`, elles sont relues dans alarme_champs / rapport_champs (champ_id). Idem pour les cases à cocher à choix multiples (toutes les options proposées, pas seulement celles cochées). -->
+<!-- v21 · 2026-10-08 · "Modifier" : légende de chaque photo éditable (y compris une photo ajoutée depuis l'ordinateur, champ légende proposé juste après l'envoi) — enregistrée dans journal_photos.legende dès qu'on quitte le champ, et de nouveau au clic sur Enregistrer. Ajouter/supprimer une photo ne réaffiche plus tout le formulaire (les textes en cours de saisie ne sont plus perdus). -->
+<!-- v20 · 2026-10-08 · statut du rapport (colonne statut_rapport, voir migration-statut-rapport.sql) : Fait par l'agent / En cours / Terminé / À revoir / Transmis au client / Validé. Deux vues : "À valider" (rapports ni validés ni transmis, OU dont la nature d'activité / le type d'action manque — regroupés par site) et "Tous les rapports". Changement de statut groupé depuis la sélection. Protection simple par code de validation direction (4 chiffres, haché dans supervision_reglages) : passer un rapport en Transmis/Validé, le modifier, le classer, le supprimer ou le sortir de ce statut demande le code (déverrouillage mémorisé 10 min dans l'onglet). -->
 <!-- RDZ · supervision-rapports · v17 · 2026-09-28 · support des rapports issus d'un type personnalisé créé dans rapport-types-config.html (journal_entrees.rapport_type_id + reponses — voir migration-rapport-types.sql) : badge/étiquette avec le nom du type dans la liste et les modales, détail/édition/rapport imprimable via le même moteur "réponses groupées par catégorie" que le rapport d'alarme (reponsesSectionsHtml/qaGroupedHtml, réutilisés tels quels), et prise en compte dans les prompts "Analyser avec Claude"/"Classer". RAPPORT_TYPES chargé dans loadData() pour l'affichage du nom/icône -->
 <!-- v19 · 2026-10-07 · impression/PDF : aucun bloc (section, ou bloc "Rapport N" du rapport IA, photos comprises) n'est coupé entre deux pages s'il tient sur une page A4 entière — mesure réelle de chaque bloc juste avant l'impression (beforeprint, largeur A4) ; seuls les blocs plus hauts qu'une page sont coupés (entre deux rangées de photos). -->
 <!-- v18 · 2026-10-02 · impression/PDF : sections jamais coupées (sauf si > 1 page ; photos alors coupées entre deux rangées), plus de zone grise sous le pied de rapport, nom de fichier PDF formaté "Site - JJ.MM.AAAA - Nature d'activité" (bouton "Imprimer / PDF"). -->
@@ -68,6 +72,24 @@ tr.selected td{background:#fdf0f0}
 input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--red)}
 
 .state-msg{text-align:center;color:#999;font-size:14px;padding:36px 10px}
+
+/* v20 — statut du rapport, vues, regroupement par site, code de validation */
+.view-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
+.view-tab{border:1.5px solid var(--line);background:#fff;color:#475569;border-radius:9px;padding:9px 14px;font-size:13.5px;font-weight:bold;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:8px}
+.view-tab .n{background:var(--bg-meta);color:#334155;border-radius:999px;padding:1px 8px;font-size:12px}
+.view-tab.on{background:#142130;border-color:#142130;color:#fff}
+.view-tab.on .n{background:var(--red);color:#fff}
+.view-hint{font-size:12px;color:#64748b;margin:-6px 0 12px}
+.st-badge{font-size:11px;font-weight:bold;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;border:1px solid transparent}
+.miss{display:inline-block;margin-top:4px;font-size:10.5px;font-weight:bold;color:#b45c00;background:#fff8f0;border:1px solid #f5d9b8;border-radius:999px;padding:2px 8px;white-space:nowrap}
+tr.site-group td{background:#eef2f6!important;border-top:2px solid #cfd8e3;font-weight:bold;font-size:13px;color:#142130;padding:8px 10px}
+tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-left:6px}
+.sel-status{display:flex;align-items:center;gap:6px}
+.sel-status select{border-radius:8px;padding:6px 8px;font-size:12.5px;border:1px solid #cfd8e3;font-family:var(--font)}
+.lock-note{background:#fff8f0;border:1px solid #f5d9b8;color:#8a4b00;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+.pin-input{font-size:26px!important;letter-spacing:10px;text-align:center;width:180px!important;margin:6px auto 0;display:block;padding:10px!important}
+.pin-err{color:#c81e2a;font-size:12.5px;text-align:center;min-height:18px;margin-top:8px}
+.linklike{background:none;border:none;color:#64748b;text-decoration:underline;font-size:12px;cursor:pointer;font-family:var(--font)}
 
 /* Modales génériques (détail + IA) */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:20px;overflow:auto;z-index:100}
@@ -356,6 +378,13 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
       <div class="card-title">📋 Rapports remontés du journal de bord</div>
       <div class="card-hint">Sélectionne un ou plusieurs rapports (standard et/ou alarme), télécharge le pack photos + message, fais analyser par Claude.ai, colle le JSON retourné pour obtenir un rapport de synthèse dans le style RDZ Reports (imprimable).</div>
 
+      <div class="view-tabs">
+        <button class="view-tab on" id="tab-avalider" onclick="setView('avalider')">🗂️ À valider <span class="n" id="cnt-avalider">…</span></button>
+        <button class="view-tab" id="tab-tous" onclick="setView('tous')">📋 Tous les rapports <span class="n" id="cnt-tous">…</span></button>
+        <button class="linklike" style="margin-left:auto" onclick="openChangePin()" title="Définir ou changer le code de validation direction">🔑 Code de validation</button>
+      </div>
+      <div class="view-hint" id="view-hint"></div>
+
       <div class="filterbar">
         <div class="ffield grow">
           <label>Recherche</label>
@@ -368,6 +397,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
             <option value="standard">📝 Rapport standard</option>
             <option value="alarme">🚨 Intervention alarme</option>
           </select>
+        </div>
+        <div class="ffield">
+          <label>Statut</label>
+          <select id="flt-statut" onchange="render()"><option value="">Tous les statuts</option></select>
         </div>
         <div class="ffield">
           <label>Site</label>
@@ -388,6 +421,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 
       <div class="sel-toolbar" id="sel-toolbar">
         <div class="sel-count" id="sel-count">0 sélectionné(s)</div>
+        <div class="sel-status">
+          <select id="bulk-statut"><option value="">Changer le statut…</option></select>
+          <button class="btn btn-sm" onclick="applyBulkStatus()">✔ Appliquer</button>
+        </div>
         <button class="btn btn-black btn-sm" onclick="openIAModal()">🤖 Analyser avec Claude</button>
         <button class="btn btn-sec btn-sm" onclick="openClassifyModal()">🏷️ Classer</button>
         <button class="btn btn-sec btn-sm" onclick="exportSelectionReport()">🖨 Exporter en PDF</button>
@@ -399,10 +436,10 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
           <thead>
             <tr>
               <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
-              <th>Date / Heure</th><th>Type</th><th>Site</th><th>Agent</th><th>Aperçu</th><th>Photos</th><th></th>
+              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Site</th><th>Agent</th><th>Aperçu</th><th>Photos</th><th></th>
             </tr>
           </thead>
-          <tbody id="list-body"><tr><td colspan="8"><div class="state-msg">Chargement…</div></td></tr></tbody>
+          <tbody id="list-body"><tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -502,6 +539,39 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
           <button class="btn btn-sec" onclick="backToClassifyStep1()">◀ Revenir au JSON</button>
           <button class="btn btn-sec" onclick="closeClassifyModal()">Fermer</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v20 — Code de validation direction -->
+<div class="overlay" id="pin-overlay" style="z-index:160" onclick="if(event.target===this)closePinModal(false)">
+  <div class="modal" style="max-width:420px">
+    <div class="mh"><button class="x" onclick="closePinModal(false)">✕</button>
+      <div class="k">Protection des rapports</div><h3 id="pin-title">Code de validation</h3></div>
+    <div class="mb">
+      <div id="pin-text" style="font-size:13.5px;color:#334155;line-height:1.5;text-align:center"></div>
+      <input type="password" inputmode="numeric" maxlength="4" autocomplete="off" class="pin-input" id="pin-input" onkeydown="if(event.key==='Enter')submitPin()">
+      <div class="pin-err" id="pin-err"></div>
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:10px">
+        <button class="btn btn-sec" onclick="closePinModal(false)">Annuler</button>
+        <button class="btn" onclick="submitPin()">Valider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v22 — Déprotection d'un rapport Transmis / Validé -->
+<div class="overlay" id="unprot-overlay" style="z-index:155" onclick="if(event.target===this)closeUnprotect(false)">
+  <div class="modal" style="max-width:460px">
+    <div class="mh"><button class="x" onclick="closeUnprotect(false)">✕</button>
+      <div class="k">Rapport protégé</div><h3>🔒 Retirer la protection</h3></div>
+    <div class="mb">
+      <div id="unprot-text" style="font-size:13.5px;color:#334155;line-height:1.55;margin-bottom:12px"></div>
+      <div class="efield"><label>Nouveau statut</label><select id="unprot-statut"></select></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+        <button class="btn btn-sec" onclick="closeUnprotect(false)">Annuler</button>
+        <button class="btn" onclick="confirmUnprotect()">🔓 Déprotéger</button>
       </div>
     </div>
   </div>
@@ -636,6 +706,162 @@ const CLOTURE_OPTIONS = [
   {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
 ];
 
+/* ---------- v20 · Statut du RAPPORT (cycle de vie administratif) ----------
+   À ne pas confondre avec statut_cloture (situation terrain : terminée /
+   action à venir / info / problème). statut_rapport suit le rapport
+   lui-même, de la saisie agent jusqu'à l'envoi au client. NULL en base =
+   "agent" (rapports créés avant la migration ou par un module qui ne
+   pose pas la colonne). Les statuts `locked` protègent le rapport : toute
+   modification passe par le code de validation direction. */
+const RAPPORT_STATUTS = [
+  {k:'agent',    label:'Fait par l\'agent',    icon:'📝', color:'#475569', bg:'#f1f5f9', bd:'#cbd5e1'},
+  {k:'en_cours', label:'En cours',            icon:'⏳', color:'#1a5a8a', bg:'#f0f6ff', bd:'#bcd6f0'},
+  {k:'termine',  label:'Terminé',             icon:'✔',  color:'#1e6b1e', bg:'#f0f8f0', bd:'#bfe0bf'},
+  {k:'a_revoir', label:'À revoir',            icon:'🔁', color:'#b45c00', bg:'#fff8f0', bd:'#f5d9b8'},
+  {k:'transmis', label:'Transmis au client',  icon:'📤', color:'#ffffff', bg:'#142130', bd:'#142130', locked:true},
+  {k:'valide',   label:'Validé',              icon:'🔒', color:'#ffffff', bg:'#16834a', bd:'#16834a', locked:true}
+];
+const STATUT_BY_K = Object.fromEntries(RAPPORT_STATUTS.map(o=>[o.k,o]));
+function statutOf(r){ const k = r.raw.statut_rapport; return STATUT_BY_K[k] ? k : 'agent'; }
+function statutInfo(k){ return STATUT_BY_K[k] || STATUT_BY_K.agent; }
+function isLocked(r){ return !!statutInfo(statutOf(r)).locked; }
+function statutBadgeHtml(r){
+  const o = statutInfo(statutOf(r));
+  return `<span class="st-badge" style="color:${o.color};background:${o.bg};border-color:${o.bd}">${o.icon} ${esc(o.label)}</span>`;
+}
+/* Classification manquante : nature + type pour un rapport standard ;
+   type seul pour une alarme (nature implicite "Alarmes"). */
+function missingClassif(r){
+  const m = [];
+  if(r.kind==='standard' && !r.raw.nature_activite) m.push('Nature d\'activité');
+  if(!r.raw.type_action) m.push('Type d\'action');
+  return m;
+}
+/* Vue "À valider" : pas encore validé / transmis, OU classification
+   incomplète (même un rapport validé y revient s'il lui manque la
+   nature ou le type, à la demande de Laurent). */
+function needsValidation(r){ return !isLocked(r) || missingClassif(r).length>0; }
+
+/* ---------- v20 · Code de validation direction ----------
+   Protection volontairement SIMPLE (demande de Laurent) : un seul code
+   à 4 chiffres, stocké haché (SHA-256 + sel) dans supervision_reglages
+   (cle = 'pin_validation_rapports'). Contrôle côté navigateur uniquement :
+   il empêche les manipulations involontaires des agents depuis cette
+   page, ce n'est pas une sécurité serveur. Une fois le bon code saisi,
+   la page reste déverrouillée 10 minutes dans cet onglet. */
+const PIN_KEY = 'pin_validation_rapports';
+const UNLOCK_MS = 10*60*1000;
+let VALID_PIN_HASH = null;      // null = aucun code défini encore
+let REGLAGES_OK = true;         // false si la table n'existe pas (migration non lancée)
+let unlockedUntil = 0;
+let _pinResolve = null, _pinMode = 'check', _pinFirst = '';
+async function hashValidationPin(pin){
+  const enc = new TextEncoder().encode('RDZ-VALIDATION-2026-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function isUnlocked(){ return Date.now() < unlockedUntil; }
+/* Demande le code si nécessaire. Résout true si autorisé. */
+function requireUnlock(reason){
+  if(isUnlocked()) return Promise.resolve(true);
+  if(!REGLAGES_OK){ toast('❌ Table supervision_reglages absente — lance migration-statut-rapport.sql', true); return Promise.resolve(false); }
+  return new Promise(res=>{
+    _pinResolve = res;
+    if(!VALID_PIN_HASH) openPinModal('create1', 'Aucun code de validation n\'est encore défini.<br>Choisis un code à 4 chiffres (il sera demandé uniquement pour changer le statut d\'un rapport Transmis au client ou Validé).');
+    else openPinModal('check', (reason || 'Cette action concerne un rapport protégé.') + '<br>Saisis le code de validation.');
+  });
+}
+function openPinModal(mode, html, title){
+  _pinMode = mode;
+  document.getElementById('pin-title').textContent = title || (mode.startsWith('create') ? 'Définir le code de validation' : 'Code de validation');
+  document.getElementById('pin-text').innerHTML = html;
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-err').textContent = '';
+  document.getElementById('pin-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('pin-input').focus(), 80);
+}
+function closePinModal(ok){
+  document.getElementById('pin-overlay').classList.remove('show');
+  const r = _pinResolve; _pinResolve = null;
+  if(r) r(!!ok);
+}
+async function submitPin(){
+  const pin = document.getElementById('pin-input').value.trim();
+  const err = document.getElementById('pin-err');
+  if(!/^\d{4}$/.test(pin)){ err.textContent = 'Le code doit contenir exactement 4 chiffres.'; return; }
+  const h = await hashValidationPin(pin);
+  if(_pinMode==='check'){
+    if(h===VALID_PIN_HASH){ unlockedUntil = Date.now()+UNLOCK_MS; closePinModal(true); toast('🔓 Déverrouillé pour 10 minutes'); }
+    else { err.textContent = 'Code incorrect.'; document.getElementById('pin-input').value=''; }
+    return;
+  }
+  if(_pinMode==='change-old'){
+    if(h!==VALID_PIN_HASH){ err.textContent = 'Code actuel incorrect.'; document.getElementById('pin-input').value=''; return; }
+    openPinModal('create1', 'Choisis le nouveau code à 4 chiffres.', 'Changer le code de validation');
+    return;
+  }
+  if(_pinMode==='create1'){
+    _pinFirst = pin;
+    openPinModal('create2', 'Confirme le code en le saisissant une seconde fois.', document.getElementById('pin-title').textContent);
+    return;
+  }
+  if(_pinMode==='create2'){
+    if(pin!==_pinFirst){ openPinModal('create1', 'Les deux codes ne correspondent pas. Recommence : choisis un code à 4 chiffres.', document.getElementById('pin-title').textContent); return; }
+    const { error } = await sb.from('supervision_reglages').upsert({ cle:PIN_KEY, valeur:h, updated_at:new Date().toISOString() });
+    if(error){ err.textContent = 'Erreur d\'enregistrement : ' + (error.message||error); return; }
+    VALID_PIN_HASH = h; unlockedUntil = Date.now()+UNLOCK_MS;
+    closePinModal(true);
+    toast('🔑 Code de validation enregistré');
+  }
+}
+/* Bouton "🔑 Code de validation" : définir (si aucun) ou changer (ancien code requis). */
+function openChangePin(){
+  if(!REGLAGES_OK){ toast('❌ Table supervision_reglages absente — lance migration-statut-rapport.sql', true); return; }
+  _pinResolve = null;
+  if(!VALID_PIN_HASH) openPinModal('create1', 'Choisis un code à 4 chiffres. Il sera demandé uniquement pour changer le statut d\'un rapport Transmis au client ou Validé.');
+  else openPinModal('change-old', 'Saisis d\'abord le code actuel.', 'Changer le code de validation');
+}
+/* Garde commune : true si on peut agir sur ces rapports (demande le code
+   si au moins un est protégé). */
+async function guardLocked(reports, actionLbl){
+  const locked = reports.filter(isLocked);
+  if(!locked.length) return true;
+  // v22 — un rapport protégé n'est jamais modifiable tel quel : on propose
+  // de le déprotéger (nouveau statut + code), puis l'action continue.
+  return await openUnprotect(locked, actionLbl);
+}
+let _unprotResolve = null, _unprotReports = [];
+function openUnprotect(locked, actionLbl){
+  return new Promise(res=>{
+    _unprotResolve = res; _unprotReports = locked;
+    const lbl = locked.length===1
+      ? `Ce rapport est <b>${esc(statutInfo(statutOf(locked[0])).label)}</b> : il est protégé.`
+      : `<b>${locked.length}</b> rapport(s) de la sélection sont Transmis au client ou Validés : ils sont protégés.`;
+    document.getElementById('unprot-text').innerHTML = lbl + `<br>Pour ${esc(actionLbl)}, retire d'abord la protection en changeant le statut (code de validation demandé).`;
+    document.getElementById('unprot-statut').innerHTML = RAPPORT_STATUTS.filter(o=>!o.locked).map(o=>`<option value="${o.k}" ${o.k==='a_revoir'?'selected':''}>${o.icon} ${esc(o.label)}</option>`).join('');
+    document.getElementById('unprot-overlay').classList.add('show');
+  });
+}
+function closeUnprotect(ok){
+  document.getElementById('unprot-overlay').classList.remove('show');
+  const r = _unprotResolve; _unprotResolve = null;
+  if(r) r(!!ok);
+}
+async function confirmUnprotect(){
+  const k = document.getElementById('unprot-statut').value;
+  document.getElementById('unprot-overlay').classList.remove('show');
+  const ok = await requireUnlock(`Déprotéger <b>${_unprotReports.length}</b> rapport(s) → <b>${esc(statutInfo(k).label)}</b>.`);
+  if(!ok){ closeUnprotect(false); return; }
+  const payload = { statut_rapport:k, statut_rapport_at:new Date().toISOString() };
+  const results = await Promise.allSettled(_unprotReports.map(r=>applyCorrectionToSource(r, payload)));
+  const failed = results.filter(x=>x.status==='rejected');
+  failed.forEach(x=>console.error(x.reason));
+  if(failed.length){ toast('❌ Déprotection impossible — ' + ((failed[0].reason && failed[0].reason.message) || 'voir console'), true); closeUnprotect(false); return; }
+  toast(`🔓 ${_unprotReports.length} rapport(s) → ${statutInfo(k).label}`);
+  render();
+  closeUnprotect(true);
+}
+
 /* Rendu d'un sélecteur de statut de clôture ÉDITABLE (radios stylées en
    pilules), utilisé dans le formulaire de modification d'un rapport et
    dans l'étape de vérification du résultat IA. idPrefix distingue les
@@ -735,7 +961,21 @@ function uid(){ return Date.now().toString(36) + Math.random().toString(36).slic
    propose un rendu dédié à chaque format plutôt que de forcer les
    nouvelles entrées dans les anciens champs. */
 function parseReponses(raw){
+  if(Array.isArray(raw)) return raw;   // colonne jsonb renvoyée déjà décodée
   try{ const arr = JSON.parse(raw||'[]'); return Array.isArray(arr) ? arr : []; }catch(_){ return []; }
+}
+/* v22 — options des questions à choix : `reponses` ne mémorise que
+   champ_id/libelle/type/valeur/categorie, pas la liste des options. On la
+   relit dans la configuration (alarme_champs pour l'alarme, rapport_champs
+   pour les types personnalisés), chargée dans loadData(). La valeur déjà
+   enregistrée reste toujours proposée, même si l'option a été renommée ou
+   supprimée depuis dans la configuration. */
+let CHAMP_OPTIONS = {};  // champ_id -> [options]
+function optionsFor(q){
+  let opts = Array.isArray(q.options) ? q.options.slice() : (CHAMP_OPTIONS[q.champ_id] || []).slice();
+  const vals = Array.isArray(q.valeur) ? q.valeur : (q.valeur!=null && q.valeur!=='' && typeof q.valeur!=='boolean' ? [String(q.valeur)] : []);
+  vals.forEach(v=>{ if(!opts.includes(v)) opts.push(v); });
+  return opts;
 }
 function isNewFormatAlarme(r){ return r.kind==='alarme' && !!r.raw.reponses; }
 /* Rapport standard produit à partir d'un type personnalisé créé par
@@ -834,11 +1074,12 @@ function compressImage(file){
 let allReports = [];     // {id, kind:'standard'|'alarme', site, agent, ts, raw, photos:[{url,legende}]}
 let filteredData = [];
 let selectedIds = new Set();
+let currentView = 'avalider';   // v20 : 'avalider' | 'tous'
 let RAPPORT_TYPES = {};  // id -> {nom, icone} — types de rapports personnalisés (rapport-types-config.html)
 
 /* ---------- Chargement ---------- */
 async function loadData(){
-  document.getElementById('list-body').innerHTML = '<tr><td colspan="8"><div class="state-msg">Chargement…</div></td></tr>';
+  document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr>';
   try{
     const [{data:entrees, error:e1}, {data:alarmes, error:e2}, {data:photosAll, error:e3}, {data:rtypes, error:e4}] = await Promise.all([
       sb.from('journal_entrees').select('*').order('created_at',{ascending:false}).limit(500),
@@ -846,6 +1087,27 @@ async function loadData(){
       sb.from('journal_photos').select('*').order('created_at',{ascending:false}).limit(3000),
       sb.from('rapport_types').select('id,nom,icone')
     ]);
+    // v22 — options des questions à choix (voir optionsFor)
+    CHAMP_OPTIONS = {};
+    try{
+      const [{data:ac, error:e6}, {data:rc, error:e7}] = await Promise.all([
+        sb.from('alarme_champs').select('id,options'),
+        sb.from('rapport_champs').select('id,options')
+      ]);
+      if(e6) console.warn('alarme_champs:', e6.message||e6);
+      if(e7) console.warn('rapport_champs:', e7.message||e7);
+      [...(ac||[]), ...(rc||[])].forEach(c=>{
+        let o = c.options;
+        if(typeof o==='string'){ try{ o = JSON.parse(o); }catch(_){ o = null; } }
+        if(Array.isArray(o)) CHAMP_OPTIONS[c.id] = o.map(String);
+      });
+    }catch(e){ console.warn(e); }
+    // v20 — code de validation direction
+    try{
+      const { data:rg, error:e5 } = await sb.from('supervision_reglages').select('valeur').eq('cle', PIN_KEY).maybeSingle();
+      if(e5){ REGLAGES_OK = false; console.warn('supervision_reglages:', e5.message||e5); }
+      else { REGLAGES_OK = true; VALID_PIN_HASH = rg ? rg.valeur : null; }
+    }catch(e){ REGLAGES_OK = false; console.warn(e); }
     if(e1) console.warn('journal_entrees:', e1.message||e1);
     if(e2) console.warn('alarme_interventions:', e2.message||e2);
     if(e3) console.warn('journal_photos:', e3.message||e3);
@@ -870,12 +1132,25 @@ async function loadData(){
     populateSiteFilter();
     render();
   }catch(err){
-    document.getElementById('list-body').innerHTML = '<tr><td colspan="8"><div class="state-msg">Erreur de chargement (réseau ?).</div></td></tr>';
+    document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Erreur de chargement (réseau ?).</div></td></tr>';
     console.error(err);
   }
 }
 
+function populateStatutSelects(){
+  const opts = RAPPORT_STATUTS.map(o=>`<option value="${o.k}">${o.icon} ${esc(o.label)}</option>`).join('');
+  const f = document.getElementById('flt-statut'); const cur = f.value;
+  f.innerHTML = '<option value="">Tous les statuts</option>' + opts; f.value = cur;
+  document.getElementById('bulk-statut').innerHTML = '<option value="">Changer le statut…</option>' + opts;
+}
+function setView(v){
+  currentView = v;
+  document.getElementById('tab-avalider').classList.toggle('on', v==='avalider');
+  document.getElementById('tab-tous').classList.toggle('on', v==='tous');
+  render();
+}
 function populateSiteFilter(){
+  populateStatutSelects();
   const sel = document.getElementById('flt-site');
   const cur = sel.value;
   const sites = [...new Set(allReports.map(r=>r.site).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
@@ -888,6 +1163,7 @@ function resetFilters(){
   document.getElementById('flt-search').value = '';
   document.getElementById('flt-kind').value = '';
   document.getElementById('flt-site').value = '';
+  document.getElementById('flt-statut').value = '';
   document.getElementById('flt-from').value = '';
   document.getElementById('flt-to').value = '';
   render();
@@ -925,7 +1201,10 @@ function getFilteredEntries(){
   const site = document.getElementById('flt-site').value;
   const from = document.getElementById('flt-from').value;
   const to = document.getElementById('flt-to').value;
+  const statut = document.getElementById('flt-statut').value;
   return allReports.filter(r=>{
+    if(currentView==='avalider' && !needsValidation(r)) return false;
+    if(statut && statutOf(r)!==statut) return false;
     if(kind && r.kind!==kind) return false;
     if(site && r.site!==site) return false;
     if(from || to){
@@ -942,19 +1221,15 @@ function getFilteredEntries(){
   });
 }
 
-function render(){
-  filteredData = getFilteredEntries();
-  document.getElementById('fcount').textContent = filteredData.length + ' rapport(s)';
-  const tbody = document.getElementById('list-body');
-  if(!filteredData.length){ tbody.innerHTML = '<tr><td colspan="8"><div class="state-msg">Aucun rapport ne correspond à ces filtres.</div></td></tr>'; updateSelToolbar(); return; }
-
-  tbody.innerHTML = filteredData.map(r=>{
-    const isSel = selectedIds.has(r.id);
-    const kindLbl = isCustomTypeReport(r) ? esc(customTypeLabel(r)) : (r.kind==='standard' ? '📝 Standard' : '🚨 Alarme');
-    return `<tr class="${isSel?'selected':''}" id="row-${r.id}">
+function rowHtml(r){
+  const isSel = selectedIds.has(r.id);
+  const kindLbl = isCustomTypeReport(r) ? esc(customTypeLabel(r)) : (r.kind==='standard' ? '📝 Standard' : '🚨 Alarme');
+  const miss = missingClassif(r);
+  return `<tr class="${isSel?'selected':''}" id="row-${r.id}">
       <td><input type="checkbox" ${isSel?'checked':''} onchange="toggleRow('${r.id}',this.checked)"></td>
       <td style="white-space:nowrap">${fmtDateShort(r.ts)}<br><span style="color:#999;font-size:11.5px">${fmtTime(r.ts)}</span></td>
       <td><span class="tag ${r.kind}">${kindLbl}</span></td>
+      <td>${statutBadgeHtml(r)}${miss.length?`<br><span class="miss" title="Classification à compléter (Modifier ou 🏷️ Classer)">⚠ ${esc(miss.join(' + '))}</span>`:''}</td>
       <td>${esc(r.site||'—')}</td>
       <td>${esc(r.agent||'—')}</td>
       <td class="snip">${esc(reportSnippet(r))||'<i>Sans description</i>'}</td>
@@ -964,7 +1239,73 @@ function render(){
         <button class="btn btn-sm" style="background:#fdf0f0;color:#8B1A1A;border:1px solid #f3c9c9" onclick="deleteReport('${r.id}')" title="Supprimer ce rapport">🗑️</button>
       </td>
     </tr>`;
-  }).join('');
+}
+
+function render(){
+  filteredData = getFilteredEntries();
+  // Compteurs des onglets (indépendants des filtres)
+  document.getElementById('cnt-avalider').textContent = allReports.filter(needsValidation).length;
+  document.getElementById('cnt-tous').textContent = allReports.length;
+  document.getElementById('view-hint').textContent = currentView==='avalider'
+    ? 'Rapports pas encore validés ni transmis au client, ou dont la nature d\'activité / le type d\'action manque — regroupés par site.'
+    : 'Tous les rapports, du plus récent au plus ancien.';
+  document.getElementById('fcount').textContent = filteredData.length + ' rapport(s)';
+  const tbody = document.getElementById('list-body');
+  if(!filteredData.length){
+    tbody.innerHTML = '<tr><td colspan="9"><div class="state-msg">' + (currentView==='avalider' ? '✅ Aucun rapport en attente de validation.' : 'Aucun rapport ne correspond à ces filtres.') + '</div></td></tr>';
+    updateSelToolbar(); return;
+  }
+
+  if(currentView==='avalider'){
+    // Regroupement par site (ordre alphabétique, "Site inconnu" en dernier),
+    // rapports du plus récent au plus ancien dans chaque groupe.
+    const groups = {};
+    filteredData.forEach(r=>{ const k = r.site || ''; (groups[k] = groups[k] || []).push(r); });
+    const keys = Object.keys(groups).sort((a,b)=> (a==='')-(b==='') || a.localeCompare(b,'fr'));
+    tbody.innerHTML = keys.map((k,gi)=>{
+      const list = groups[k];
+      const allSel = list.every(r=>selectedIds.has(r.id));
+      return `<tr class="site-group"><td><input type="checkbox" ${allSel?'checked':''} onchange="toggleGroup(${gi},this.checked)" title="Sélectionner tout le site"></td>
+        <td colspan="8">📍 ${esc(k||'Site inconnu')}<span class="gcount">${list.length} rapport(s)</span></td></tr>` + list.map(rowHtml).join('');
+    }).join('');
+    window._groupIds = keys.map(k=>groups[k].map(r=>r.id));
+  } else {
+    tbody.innerHTML = filteredData.map(rowHtml).join('');
+  }
+  updateSelToolbar();
+}
+function toggleGroup(gi, checked){
+  (window._groupIds && window._groupIds[gi] || []).forEach(id=>{ if(checked) selectedIds.add(id); else selectedIds.delete(id); });
+  render();
+}
+
+/* ---------- v20 · Changement de statut groupé ---------- */
+async function applyBulkStatus(){
+  const k = document.getElementById('bulk-statut').value;
+  if(!k){ toast('Choisis d\'abord un statut'); return; }
+  const items = allReports.filter(r=>selectedIds.has(r.id));
+  if(!items.length) return;
+  const target = statutInfo(k);
+  // v22 — code requis UNIQUEMENT pour changer le statut d'un rapport déjà
+  // protégé (Transmis au client / Validé). Le passer en Transmis/Validé est libre.
+  const lockedToChange = items.filter(r=>isLocked(r) && statutOf(r)!==k);
+  if(lockedToChange.length){
+    const ok = await requireUnlock(`<b>${lockedToChange.length}</b> rapport(s) sont protégés (Transmis au client / Validé) — changer leur statut demande le code de validation.`);
+    if(!ok) return;
+  }
+  const missing = target.locked ? items.filter(r=>missingClassif(r).length).length : 0;
+  if(!confirm(`Passer ${items.length} rapport(s) au statut « ${target.label} » ?` + (missing ? `\n\n⚠ ${missing} d'entre eux n'ont pas encore de nature d'activité / type d'action : ils resteront visibles dans « À valider » tant que ce n'est pas complété.` : ''))) return;
+  const now = new Date().toISOString();
+  const payload = { statut_rapport:k, statut_rapport_at:now };
+  const results = await Promise.allSettled(items.map(r=>applyCorrectionToSource(r, payload)));
+  const failed = results.filter(x=>x.status==='rejected');
+  failed.forEach(x=>console.error(x.reason));
+  if(failed.length) toast(`⚠️ ${failed.length} rapport(s) non mis à jour — ` + ((failed[0].reason && failed[0].reason.message) || 'voir console'), true);
+  else toast(`✅ ${items.length} rapport(s) → ${target.label}`);
+  document.getElementById('bulk-statut').value = '';
+  selectedIds.clear();
+  const ca = document.getElementById('check-all'); if(ca) ca.checked = false;
+  render();
 }
 
 /* ---------- Sélection ---------- */
@@ -979,6 +1320,7 @@ function toggleAll(checked){
     const row = document.getElementById('row-'+r.id); if(row) row.className = checked ? 'selected' : '';
     const cb = row ? row.querySelector('input[type=checkbox]') : null; if(cb) cb.checked = checked;
   });
+  if(currentView==='avalider') render(); // met aussi à jour les cases des groupes de site
   updateSelToolbar();
 }
 function clearSelection(){
@@ -1049,7 +1391,10 @@ function openDetail(id){
       <div class="mgrid">
         <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent||'—')}</div></div>
         <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(r.ts)} ${fmtTime(r.ts)}</div></div>
+        <div class="mcell"><div class="k">Statut du rapport</div><div class="v">${statutBadgeHtml(r)}${r.raw.statut_rapport_at?`<div style="font-size:11px;color:#888;font-weight:normal;margin-top:4px">depuis le ${fmtDate(r.raw.statut_rapport_at)} ${fmtTime(r.raw.statut_rapport_at)}</div>`:''}</div></div>
+        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:''}</div></div>
       </div>
+      ${isLocked(r) ? '<div class="lock-note">🔒 Rapport protégé (' + esc(statutInfo(statutOf(r)).label) + ') — pour le modifier, le classer ou le supprimer, il faudra d\'abord changer son statut (code de validation).</div>' : ''}
       ${extra}
       ${photosHtml}
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -1066,6 +1411,7 @@ function closeModal(){ document.getElementById('overlay').classList.remove('show
 /* ---------- Suppression d'un rapport ---------- */
 async function deleteReport(id){
   const r = allReports.find(x=>x.id===id); if(!r) return;
+  if(!(await guardLocked([r], 'la suppression'))) return;
   if(!confirm('Supprimer définitivement ce rapport ? Le rapport et ses photos seront supprimés — action irréversible.')) return;
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
   try{
@@ -1121,20 +1467,20 @@ function renderReponsesEditHtml(r){
     const i = q._i;
     if(q.type==='case'){
       if(Array.isArray(q.valeur)){
-        // Case à cocher avec liste (choix multiples) : pas d'`options` mémorisée dans reponses,
-        // on ne peut donc proposer d'autres cases que celles déjà cochées à la clôture.
+        // Case à cocher avec liste (choix multiples) : toutes les options de la
+        // configuration (optionsFor), cochées selon la valeur enregistrée.
         return `<div class="efield"><label>${esc(q.libelle)}</label>
-          <div style="display:flex;flex-direction:column;gap:6px">${q.valeur.map(o=>`
+          <div style="display:flex;flex-direction:column;gap:6px">${optionsFor(q).map(o=>`
             <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a;font-weight:normal">
-              <input type="checkbox" class="ef-rep-multi" data-repidx="${i}" data-val="${esc(o)}" checked style="width:auto"> ${esc(o)}
-            </label>`).join('') || '<div class="hint">Aucune case cochée.</div>'}</div></div>`;
+              <input type="checkbox" class="ef-rep-multi" data-repidx="${i}" data-val="${esc(o)}" ${q.valeur.includes(o)?'checked':''} style="width:auto"> ${esc(o)}
+            </label>`).join('') || '<div class="hint">Aucune option configurée.</div>'}</div></div>`;
       }
       return `<div class="efield"><label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
         <input type="checkbox" id="ef-rep-${i}" ${q.valeur?'checked':''} style="width:auto"> ${esc(q.libelle)}
       </label></div>`;
     }
     if(q.type==='choix'){
-      const opts = Array.isArray(q.options) ? q.options : [];
+      const opts = optionsFor(q);
       return `<div class="efield"><label>${esc(q.libelle)}</label>
         <select id="ef-rep-${i}"><option value="">— Non renseigné —</option>${opts.map(o=>`<option value="${esc(o)}" ${q.valeur===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
     }
@@ -1149,11 +1495,40 @@ function renderReponsesEditHtml(r){
   return `<div class="efield"><label style="margin-bottom:10px">Questions / Vérifications</label>${rows}</div>`;
 }
 
-function openEdit(id){
+async function openEdit(id){
   const r = allReports.find(x=>x.id===id); if(!r) return;
+  if(!(await guardLocked([r], 'la modification'))) return;
   window._editingId = id;
   renderEditForm(r);
   document.getElementById('overlay').classList.add('show');
+}
+
+/* v21 — vignettes éditables : image + bouton supprimer + champ légende.
+   La légende est enregistrée dès qu'on quitte le champ (saveEditPhotoLegende),
+   et rejouée par saveEdit pour celles qui auraient changé entre-temps. */
+function editPhotosHtml(r){
+  if(!r.photos.length) return '<div style="color:#999;font-size:12.5px;grid-column:1/-1"><i>Aucune photo.</i></div>';
+  return r.photos.map(p=>`
+          <div class="photo" style="position:relative">
+            <a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>
+            <button type="button" class="btn btn-sm" style="position:absolute;top:4px;right:4px;background:#8B1A1A;color:#fff;padding:3px 7px" onclick="removeEditPhoto('${p.id}')" title="Supprimer cette photo">✕</button>
+            <input type="text" class="ef-photo-lg" data-photoid="${esc(p.id)}" value="${esc(p.legende||'')}" placeholder="Légende de la photo…"
+              style="width:100%;border:none!important;border-top:1px solid var(--line-soft)!important;border-radius:0!important;padding:7px 8px;font-size:12px;font-family:var(--font)"
+              onchange="saveEditPhotoLegende('${esc(p.id)}', this.value)">
+          </div>`).join('');
+}
+function refreshEditPhotos(r){
+  const el = document.getElementById('edit-photos'); if(el) el.innerHTML = editPhotosHtml(r);
+}
+async function saveEditPhotoLegende(photoId, value){
+  const r = allReports.find(x=>x.id===window._editingId); if(!r) return;
+  const p = r.photos.find(x=>x.id===photoId); if(!p) return;
+  const legende = (value||'').trim();
+  if(legende === (p.legende||'')) return;
+  const { error } = await sb.from('journal_photos').update({ legende: legende || null }).eq('id', photoId);
+  if(error){ toast('❌ Légende non enregistrée : ' + (error.message||error), true); return; }
+  p.legende = legende;
+  toast('✅ Légende enregistrée');
 }
 
 function renderEditForm(r){
@@ -1189,17 +1564,16 @@ function renderEditForm(r){
         ${alarmeTypeActionSelectHtml('ef-type_action', r.raw.type_action)}
       </div>`}
       <div class="efield">
-        <label>Statut de clôture</label>
+        <label>Statut de clôture (situation terrain)</label>
         ${clotureSelectHtml('ef', r.raw.statut_cloture)}
       </div>
       <div class="efield">
+        <label>Statut du rapport</label>
+        <select id="ef-statut_rapport">${RAPPORT_STATUTS.map(o=>`<option value="${o.k}" ${statutOf(r)===o.k?'selected':''}>${o.icon} ${esc(o.label)}</option>`).join('')}</select>
+      </div>
+      <div class="efield">
         <label>Photos</label>
-        <div class="photos" id="edit-photos">${r.photos.map(p=>`
-          <div class="photo" style="position:relative">
-            <a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>
-            <button type="button" class="btn btn-sm" style="position:absolute;top:4px;right:4px;background:#8B1A1A;color:#fff;padding:3px 7px" onclick="removeEditPhoto('${p.id}')" title="Supprimer cette photo">✕</button>
-          </div>`).join('') || '<div style="color:#999;font-size:12.5px;grid-column:1/-1"><i>Aucune photo.</i></div>'}
-        </div>
+        <div class="photos" id="edit-photos">${editPhotosHtml(r)}</div>
         <div style="margin-top:8px">
           <button type="button" class="btn btn-sec btn-sm" onclick="document.getElementById('ef-photo-input').click()">➕ Ajouter une photo</button>
           <input type="file" id="ef-photo-input" accept="image/*" style="display:none" onchange="onEditPhotoPicked(this,'${r.id}')">
@@ -1232,6 +1606,11 @@ async function saveEdit(id){
     payload.reponses = JSON.stringify(reponses);
   }
   payload.statut_cloture = clotureSelectedValue('ef');
+  const stEl = document.getElementById('ef-statut_rapport');
+  if(stEl && stEl.value !== statutOf(r)){
+    payload.statut_rapport = stEl.value;
+    payload.statut_rapport_at = new Date().toISOString();
+  }
   const natEl = document.getElementById('ef-nature_activite');
   const typeEl = document.getElementById('ef-type_action');
   if(natEl){
@@ -1264,6 +1643,9 @@ async function saveEdit(id){
     if(hArriveeEl) payload.heure_arrivee = hArriveeEl.value || null;
     if(hFinEl) payload.heure_fin = hFinEl.value || null;
   }
+  // v21 — légendes de photos modifiées mais pas encore enregistrées
+  const lgEls = Array.from(document.querySelectorAll('.ef-photo-lg'));
+  for(const el of lgEls){ await saveEditPhotoLegende(el.dataset.photoid, el.value); }
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
   try{
     const { error } = await sb.from(table).update(payload).eq('id', id);
@@ -1295,7 +1677,10 @@ async function onEditPhotoPicked(input, entreeId){
     const { error: insErr } = await sb.from('journal_photos').insert({ id:photoId, entree_id:entreeId, legende:null, url });
     if(insErr) throw insErr;
     r.photos.push({ id:photoId, url, legende:'' });
-    renderEditForm(r);
+    if(statusEl) statusEl.textContent = '';
+    refreshEditPhotos(r);
+    const lg = document.querySelector('.ef-photo-lg[data-photoid="'+photoId+'"]');
+    if(lg){ lg.focus(); lg.scrollIntoView({block:'nearest'}); }
     render();
     toast('✅ Photo ajoutée');
   }catch(e){ if(statusEl) statusEl.textContent=''; toast('❌ Échec de l\'envoi de la photo : ' + (e.message||e), true); }
@@ -1309,7 +1694,7 @@ async function removeEditPhoto(photoId){
     const { error } = await sb.from('journal_photos').delete().eq('id', photoId);
     if(error) throw error;
     r.photos = r.photos.filter(p=>p.id!==photoId);
-    renderEditForm(r);
+    refreshEditPhotos(r);
     render();
     toast('🗑️ Photo supprimée');
   }catch(e){ toast('❌ Échec de la suppression : ' + (e.message||e), true); }
@@ -1567,6 +1952,7 @@ function buildPromptLines(items){
     'RAPPEL DE LA MÉTHODE DE RÉDACTION DE RAPPORT (formation interne RDZ) :',
     '══════════════════════════════════════════',
     '- Chaque "situation_corrigee" doit répondre aux questions Qui / Quoi / Où / Quand / Comment pour CE rapport.',
+    '- MISE EN FORME : conserve la structure du texte d\'origine. Si l\'agent a fait des retours à la ligne, des listes ou des étapes, garde-les dans "situation_corrigee"/"actions_corrigees" en utilisant des retours à la ligne (\\n dans le JSON), une étape ou un élément par ligne (préfixé de "- " pour une liste). Ne fusionne pas tout en un seul paragraphe.',
     '- Décris la scène telle qu\'elle apparaît (les FAITS constatés), sans JAMAIS ajouter d\'impressions, de sentiments ou d\'interprétations qui ne figurent pas explicitement dans le rapport source.',
     '- N\'affirme AUCUNE durée ou cause qui ne serait pas explicitement rapportée par l\'agent dans le texte source (exemples à proscrire si l\'agent ne l\'a pas écrit : "c\'est comme ça depuis 3 jours", "cela fait suite à un manque d\'entretien").',
     '- Dans "actions_corrigees", utilise si pertinent le vocabulaire attendu pour les mesures prises : demande de renfort(s), demande de moyens, suivi / prise en compte / action / réparation, demande du client (si un client était présent), appel aux secours (police/pompiers — matricule si mentionné), arrivée des services publics, date et heure de départ des lieux, remplacement / relève.',
@@ -1776,6 +2162,7 @@ async function finalizeSyntheseReport(){
   });
 
   const toApply = corrected.filter(c=>c.apply);
+  if(toApply.length && !(await guardLocked(toApply.map(c=>c.r), 'la mise à jour des fiches source'))) return;
   if(toApply.length){
     const results = await Promise.allSettled(toApply.map(c=>{
       // Le résumé IA (situation/actions/résultat) est écrit dans les
@@ -1885,9 +2272,10 @@ function buildClassifyPromptLines(items){
   return lines;
 }
 
-function openClassifyModal(){
+async function openClassifyModal(){
   const ids = Array.from(selectedIds);
   if(!ids.length){ toast('Sélectionne au moins un rapport'); return; }
+  if(!(await guardLocked(allReports.filter(r=>ids.includes(r.id)), 'la classification'))) return;
   window._classifyIds = ids;
   window._classifyParsed = null;
   document.getElementById('classify-result').value = '';
@@ -2037,7 +2425,7 @@ const RPTO_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAABgAAAAJPCAIAAAA1zYiWAAAACXBIWXMAA
 const RPTO_LOGO_MIME = 'image/png';
 function rpFmtDate(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); if(!d) return iso; return `${d}.${m}.${y}`; }
 function rpFieldO(lbl,val){
-  return `<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">${lbl}</label><div style="font-size:13px;color:#1a1a1a;padding:5px 0;border-bottom:1.5px solid #ddd;min-height:24px">${val}</div></div>`;
+  return `<div style="display:flex;flex-direction:column;gap:4px"><label style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px">${lbl}</label><div style="font-size:13px;color:#1a1a1a;padding:5px 0;border-bottom:1.5px solid #ddd;min-height:24px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5">${String(val).trim()}</div></div>`;
 }
 function rpPhotoBoxO(label,url){
   const box = url
