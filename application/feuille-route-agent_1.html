@@ -1,4 +1,4 @@
-<!-- RDZ · feuille-route-agent · v3.1 · 2026-10-09 · seul endroit où l'on active la feuille pour l'accueil (badge « Active » dans la liste, lien Désactiver). v3 · bouton « Activer sur l'accueil » (la feuille s'affiche alors en haut du menu de mobile.html pour pointer arrivée/départ en un geste) ; les pointages encore en attente dans la file RDZSync (saisis hors réseau, ici ou depuis l'accueil) sont relus à l'ouverture. -->
+<!-- RDZ · feuille-route-agent · v3.2 · 2026-10-09 · « Retirer de l'accueil » sans fenêtre de confirmation (rien n'est supprimé) ; activer une autre feuille remplace directement l'active. v3.1 · seul endroit où l'on active la feuille pour l'accueil (badge « Active » dans la liste, lien Désactiver). v3 · bouton « Activer sur l'accueil » (la feuille s'affiche alors en haut du menu de mobile.html pour pointer arrivée/départ en un geste) ; les pointages encore en attente dans la file RDZSync (saisis hors réseau, ici ou depuis l'accueil) sont relus à l'ouverture. -->
 <!-- v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -518,6 +518,7 @@ function backToSelect() {
   document.getElementById('screen-select').style.display = 'block';
   document.getElementById('header-sub').textContent = 'Feuille de route';
   currentSheet = null;
+  renderSheetsList(); // v3.2 : badge « Active sur l'accueil » à jour
 }
 
 // ═══ OUVERTURE D'UNE FEUILLE ═══
@@ -633,13 +634,20 @@ function activeBarHtml(sh, date) {
   const a = getActiveFdr();
   const isActive = a && a.sheetId === sh.id && a.date === date;
   if (date !== todayStr()) return '';
-  return isActive
-    ? `<div class="obs-box" style="border-left-color:#16834a">✅ <b>Feuille active sur l'accueil</b> — pointez vos arrivées et départs directement depuis le menu.<br><a href="mobile.html" style="color:#16834a;font-weight:700">← Retour au menu</a> &nbsp;·&nbsp; <a href="#" onclick="deactivateOnHome();return false;" style="color:#8B1A1A">Désactiver</a></div>`
-    : `<button onclick="activateOnHome('${sh.id}','${date}')" style="width:100%;margin-bottom:12px;padding:14px;border:none;border-radius:2px;background:#16834a;color:#fff;font-size:14.5px;font-weight:700;cursor:pointer">▶ Activer sur l'accueil (pointer arrivée / départ depuis le menu)</button>`;
+  const other = (!isActive && a && a.date === date) ? S.sheets.find(s => s.id === a.sheetId && s.date === date) : null;
+  const info = window._fdrJustDeactivated
+    ? `<div class="obs-box" style="border-left-color:#64748b">Feuille retirée de l'accueil. <b>Vos heures et notes sont conservées.</b></div>` : '';
+  window._fdrJustDeactivated = false;
+  return info + (isActive
+    ? `<div class="obs-box" style="border-left-color:#16834a">✅ <b>Feuille active sur l'accueil</b> — pointez vos arrivées et départs directement depuis le menu.<br><a href="mobile.html" style="color:#16834a;font-weight:700">← Retour au menu</a> &nbsp;·&nbsp; <a href="#" onclick="deactivateOnHome();return false;" style="color:#8B1A1A">Retirer de l'accueil</a> <span style="color:#64748b;font-size:11.5px">(les heures saisies sont conservées)</span></div>`
+    : `<button onclick="activateOnHome('${sh.id}','${date}')" style="width:100%;margin-bottom:12px;padding:14px;border:none;border-radius:2px;background:#16834a;color:#fff;font-size:14.5px;font-weight:700;cursor:pointer">▶ ${other ? 'Activer à la place de « ' + escHtml(other.name) + ' »' : 'Activer sur l\'accueil (pointer arrivée / départ depuis le menu)'}</button>`);
 }
 function deactivateOnHome() {
-  if (!confirm('Retirer cette feuille de l\'accueil ? Les heures déjà pointées restent enregistrées.')) return;
+  // v3.2 (retour Laurent) : plus de fenêtre de confirmation — elle laissait
+  // croire à une suppression. Désactiver ne fait que retirer la carte du
+  // menu : les heures et notes saisies ne sont jamais touchées.
   localStorage.removeItem('rdz_fdr_active');
+  window._fdrJustDeactivated = true;
   if (currentSheet) renderSheetDetail(currentSheet, document.getElementById('date-picker').value || todayStr());
 }
 function activateOnHome(sheetId, date) {
