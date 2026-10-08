@@ -1,4 +1,4 @@
-<!-- RDZ · application · v5.2 · 2026-10-09 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · application · v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -331,6 +331,28 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
 .fdr-pick{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;background:#f8fafc;border:1px solid #dbe3ec;border-left:4px solid #2563eb;border-radius:11px;padding:12px 13px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:#172033}
 .fdr-pick b{font-size:15px}
 .fdr-pick span{font-size:12px;color:#64748b;font-family:monospace}
+
+/* v5.3 — version compacte */
+.fdr-card{padding:10px 12px;margin-bottom:11px;border-radius:14px;border-top-width:3px}
+.fdr-row{display:flex;align-items:center;gap:10px}
+.fdr-main{flex:1;min-width:0}
+.fdr-kicker{font-size:10.5px}
+.fdr-title{font-size:16px;margin-top:2px;gap:6px}
+.fdr-dot{width:9px;height:9px;flex:0 0 9px}
+.fdr-sub{font-size:12px;color:#64748b;font-weight:600;margin-top:1px}
+.fdr-ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fdr-btn{flex:0 0 auto;border:none;border-radius:11px;padding:12px 13px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 4px 10px rgba(15,23,42,.14)}
+.fdr-btn.arrive{background:#2563eb}
+.fdr-btn.leave{background:#16834a}
+.fdr-btn:active{transform:scale(.97)}
+.fdr-next{margin-top:7px;font-size:11.5px;padding:5px 9px;border-radius:7px}
+.fdr-edit{margin-top:4px}
+.fdr-edit summary{font-size:11.5px;color:#475569;cursor:pointer;padding:3px 0;list-style:none;display:inline-block}
+.fdr-edit summary::-webkit-details-marker{display:none}
+.fdr-times{margin-top:6px}
+.fdr-foot{display:flex;justify-content:flex-end;gap:14px;margin-top:-22px;pointer-events:none}
+.fdr-foot .fdr-link{pointer-events:auto;font-size:11.5px;margin-top:0;padding:3px 0}
+.fdr-edit[open] + .fdr-foot{margin-top:4px}
 </style>
 </head>
 <body>
@@ -1166,17 +1188,17 @@ function draw(){
   const valid = calc.map((r,i)=>({ r, i, m:getMission(r.mId) })).filter(x=>x.m);
   const cur = valid.find(x=> !hhmm(FP[x.i]?.heure_depart_reelle) && !skipped.includes(x.i));
   const doneCount = valid.filter(x=> hhmm(FP[x.i]?.heure_depart_reelle) || skipped.includes(x.i)).length;
-  const footer = `<div class="fdr-foot">
-      <a class="fdr-link" href="feuille-route-agent.html">📋 Feuille complète</a>
-      <a class="fdr-link" href="feuille-route-agent.html">⇄ Changer de feuille</a>
-    </div>`;
+  // v5.3 (retour Laurent) : carte compacte — environ la hauteur d'un bouton
+  // du menu. Les champs pour corriger les heures sont repliés (✏️ Heures).
+  const links = (extra) => `<div class="fdr-foot">${extra||''}<a class="fdr-link" href="feuille-route-agent.html">📋 Feuille</a><a class="fdr-link" href="feuille-route-agent.html">⇄ Changer</a></div>`;
 
   if(!cur){
     el.innerHTML = `<div class="fdr-card done">
-      <div class="fdr-kicker">🗺️ ${esc(sh.name)}</div>
-      <div class="fdr-title">✅ Feuille terminée</div>
-      <div class="fdr-muted">${doneCount} / ${valid.length} mission(s) pointée(s). Pensez à la fin de poste.</div>
-      ${footer}
+      <div class="fdr-row"><div class="fdr-main">
+        <div class="fdr-kicker">🗺️ ${esc(sh.name)}</div>
+        <div class="fdr-title">✅ Feuille terminée <span class="fdr-sub">${doneCount}/${valid.length}</span></div>
+      </div></div>
+      ${links()}
     </div>`;
     return;
   }
@@ -1190,25 +1212,29 @@ function draw(){
   const pos = valid.indexOf(cur) + 1;
   const prevX = valid[valid.indexOf(cur) - 1];
   const sameSiteAsPrev = !!(prevX && prevX.m.siteId && prevX.m.siteId === cur.m.siteId);
+  const kicker = onSite ? ('📍 Sur site depuis ' + esc(arr)) : (sameSiteAsPrev ? '➡️ Suivante · même site' : '➡️ Prochain site');
 
   el.innerHTML = `<div class="fdr-card ${onSite?'on-site':''}">
-    <div class="fdr-top">
-      <div class="fdr-kicker">${onSite ? '📍 Site en cours' : (sameSiteAsPrev ? '➡️ Mission suivante · même site' : '➡️ Prochain site')}</div>
-      <div class="fdr-prog">Mission ${pos} / ${valid.length}</div>
+    <div class="fdr-row">
+      <div class="fdr-main">
+        <div class="fdr-kicker">${kicker} · ${pos}/${valid.length}</div>
+        <div class="fdr-title">${site?`<span class="fdr-dot" style="background:${esc(site.color||'#999')}"></span>`:''}<span class="fdr-ell">${esc(site ? site.name : cur.m.name)}</span></div>
+        <div class="fdr-sub fdr-ell">${esc(cur.m.name)} · ${esc(cur.r.startTime)}→${esc(cur.r.endTime)}</div>
+      </div>
+      ${onSite
+        ? `<button class="fdr-btn leave" onclick="fdrPoint(${cur.i},'heure_depart_reelle')">🚗 Je repars</button>`
+        : `<button class="fdr-btn arrive" onclick="fdrPoint(${cur.i},'heure_arrivee_reelle')">📍 Arrivé</button>`}
     </div>
-    <div class="fdr-title">${site?`<span class="fdr-dot" style="background:${esc(site.color||'#999')}"></span>`:''}${esc(site ? site.name : cur.m.name)}</div>
-    <div class="fdr-mission">${esc(cur.m.name)}${cur.r.note?` · <i>${esc(cur.r.note)}</i>`:''}</div>
-    <div class="fdr-plan">Prévu <b>${esc(cur.r.startTime)}</b> → <b>${esc(cur.r.endTime)}</b></div>
-    ${onSite
-      ? `<button class="fdr-big leave" onclick="fdrPoint(${cur.i},'heure_depart_reelle')">🚗 Je repars</button>`
-      : `<button class="fdr-big arrive" onclick="fdrPoint(${cur.i},'heure_arrivee_reelle')">📍 Je suis arrivé</button>`}
-    <div class="fdr-times">
-      <label>Arrivée<input type="time" value="${esc(arr)}" onchange="fdrSetTime(${cur.i},'heure_arrivee_reelle',this.value)"></label>
-      <label>Départ<input type="time" value="" ${onSite?'':'disabled'} onchange="fdrSetTime(${cur.i},'heure_depart_reelle',this.value)"></label>
-    </div>
-    ${!onSite ? `<button class="fdr-link" onclick="fdrSkip(${cur.i})">⏭ Mission non effectuée — passer</button>` : ''}
-    ${nextX ? `<div class="fdr-next">Ensuite : <b>${esc(nextSite ? nextSite.name : nextX.m.name)}</b> · ${esc(nextX.m.name)} · prévu ${esc(nextX.r.startTime)}</div>` : `<div class="fdr-next">Dernière mission de la feuille.</div>`}
-    ${footer}
+    ${nextX ? `<div class="fdr-next fdr-ell">Ensuite : <b>${esc(nextSite ? nextSite.name : nextX.m.name)}</b> · ${esc(nextX.r.startTime)}</div>` : ''}
+    <details class="fdr-edit">
+      <summary>✏️ Heures</summary>
+      <div class="fdr-times">
+        <label>Arrivée<input type="time" value="${esc(arr)}" onchange="fdrSetTime(${cur.i},'heure_arrivee_reelle',this.value)"></label>
+        <label>Départ<input type="time" value="" ${onSite?'':'disabled'} onchange="fdrSetTime(${cur.i},'heure_depart_reelle',this.value)"></label>
+      </div>
+      ${!onSite ? `<button class="fdr-link" onclick="fdrSkip(${cur.i})">⏭ Mission non effectuée — passer</button>` : ''}
+    </details>
+    ${links()}
   </div>`;
 }
 
