@@ -1,4 +1,4 @@
-<!-- RDZ · application · v5.1 · 2026-10-09 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · application · v5.2 · 2026-10-09 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -419,8 +419,6 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
 
       <!-- Vue principale -->
       <div id="main-list">
-        <!-- v5 : feuille de route active (arrivée / départ en un geste) -->
-        <div id="fdr-card-wrap"></div>
         <!-- Planning : ouvre la vue agent planning-agent.html (même répertoire application/). -->
         <div class="section-h">Planning</div>
 
@@ -467,6 +465,9 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
              Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
              pas besoin de dupliquer le HTML. -->
         <div class="section-h spaced">Outil terrain</div>
+        <!-- v5.2 : feuille de route active (arrivée / départ en un geste), juste
+             au-dessus du Journal de bord — tout l'outil terrain au même endroit. -->
+        <div id="fdr-card-wrap"></div>
         <div id="outil-terrain-list"></div>
 
         <!-- Dépannage -->
