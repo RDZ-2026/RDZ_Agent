@@ -1,4 +1,5 @@
-<!-- RDZ · application · v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
+<!-- RDZ · application · v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+     v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
      v3 · 2026-08-10 -->
@@ -302,6 +303,57 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
   #screen-menu main{position:relative;z-index:1}
 }
 </style>
+<style id="rdz-fdr-active-2026-10">
+/* v5 — carte « Feuille de route active » (voir bloc JS en fin de page) */
+#fdr-card-wrap:empty{display:none}
+.fdr-card{background:#fff;border:1px solid var(--rdz-border,#e1e8f0);border-radius:16px;padding:16px;margin-bottom:18px;box-shadow:0 10px 28px rgba(15,23,42,.08);border-top:4px solid #2563eb}
+.fdr-card.on-site{border-top-color:#16834a}
+.fdr-card.done{border-top-color:#16834a;background:#f4fbf6}
+.fdr-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fdr-kicker{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.fdr-prog{font-size:11.5px;font-weight:700;color:#64748b;background:#f1f5f9;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.fdr-title{font-size:21px;font-weight:850;color:#172033;margin-top:6px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;line-height:1.2}
+.fdr-dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
+.fdr-mission{font-size:13.5px;color:#334155;margin-top:3px}
+.fdr-plan{font-size:13px;color:#64748b;margin-top:6px}
+.fdr-big{display:block;width:100%;margin-top:14px;border:none;border-radius:13px;padding:17px 12px;font-size:18px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;box-shadow:0 6px 16px rgba(15,23,42,.15)}
+.fdr-big.arrive{background:#2563eb}
+.fdr-big.leave{background:#16834a}
+.fdr-big:active{transform:scale(.98)}
+.fdr-times{display:flex;gap:10px;margin-top:12px}
+.fdr-times label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.fdr-times input{font-size:15px;padding:8px 9px;border:1px solid #cfd8e3;border-radius:9px;background:#fff;color:#172033;font-family:inherit}
+.fdr-times input:disabled{background:#f1f5f9;color:#94a3b8}
+.fdr-next{margin-top:12px;font-size:12.5px;color:#475569;background:#f8fafc;border-radius:9px;padding:9px 11px;line-height:1.45}
+.fdr-muted{font-size:12.5px;color:#64748b;margin-top:4px;line-height:1.45}
+.fdr-foot{display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}
+.fdr-link{background:none;border:none;color:#475569;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px 0;font-family:inherit;margin-top:6px;display:inline-block}
+.fdr-pick{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;background:#f8fafc;border:1px solid #dbe3ec;border-left:4px solid #2563eb;border-radius:11px;padding:12px 13px;margin-bottom:8px;cursor:pointer;font-family:inherit;color:#172033}
+.fdr-pick b{font-size:15px}
+.fdr-pick span{font-size:12px;color:#64748b;font-family:monospace}
+
+/* v5.3 — version compacte */
+.fdr-card{padding:10px 12px;margin-bottom:11px;border-radius:14px;border-top-width:3px}
+.fdr-row{display:flex;align-items:center;gap:10px}
+.fdr-main{flex:1;min-width:0}
+.fdr-kicker{font-size:10.5px}
+.fdr-title{font-size:16px;margin-top:2px;gap:6px}
+.fdr-dot{width:9px;height:9px;flex:0 0 9px}
+.fdr-sub{font-size:12px;color:#64748b;font-weight:600;margin-top:1px}
+.fdr-ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.fdr-btn{flex:0 0 auto;border:none;border-radius:11px;padding:12px 13px;font-size:14.5px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 4px 10px rgba(15,23,42,.14)}
+.fdr-btn.arrive{background:#2563eb}
+.fdr-btn.leave{background:#16834a}
+.fdr-btn:active{transform:scale(.97)}
+.fdr-next{margin-top:7px;font-size:11.5px;padding:5px 9px;border-radius:7px}
+.fdr-edit{margin-top:4px}
+.fdr-edit summary{font-size:11.5px;color:#475569;cursor:pointer;padding:3px 0;list-style:none;display:inline-block}
+.fdr-edit summary::-webkit-details-marker{display:none}
+.fdr-times{margin-top:6px}
+.fdr-foot{display:flex;justify-content:flex-end;gap:14px;margin-top:-22px;pointer-events:none}
+.fdr-foot .fdr-link{pointer-events:auto;font-size:11.5px;margin-top:0;padding:3px 0}
+.fdr-edit[open] + .fdr-foot{margin-top:4px}
+</style>
 </head>
 <body>
 
@@ -435,6 +487,9 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
              Pour ajouter un futur module ici, il suffit d'ajouter une entrée au tableau JS —
              pas besoin de dupliquer le HTML. -->
         <div class="section-h spaced">Outil terrain</div>
+        <!-- v5.2 : feuille de route active (arrivée / départ en un geste), juste
+             au-dessus du Journal de bord — tout l'outil terrain au même endroit. -->
+        <div id="fdr-card-wrap"></div>
         <div id="outil-terrain-list"></div>
 
         <!-- Dépannage -->
@@ -449,7 +504,7 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
           <span class="chev">›</span>
         </a>
 
-        <div class="foot">RDZ · Outil terrain · v4.1</div>
+        <div class="foot">RDZ · Outil terrain · v5</div>
       </div>
 
       <!-- Sous-menu "Prise de poste" : mêmes 3 destinations que dans mobile.html
@@ -754,6 +809,474 @@ const _enterMenuSansFonctions = enterMenu;
 enterMenu = function(nom){ _enterMenuSansFonctions(nom); renderFonctions(); };
 // Cas où le menu est déjà affiché au moment où ce bloc se charge
 if (document.getElementById('screen-menu').classList.contains('on')) renderFonctions();
+</script>
+<script>
+/* ═══ RDZSync v4 — copie de référence, collée telle quelle (voir application/rdz-sync-v4.js) ═══ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uidSync() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var textEntry = {
+      id: uidSync(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uidSync(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   RDZ · mobile.html · bloc « Feuille de route active » · v5 · 2026-10-09
+   Demande de Laurent : éviter les allers-retours vers la feuille de route
+   pour pointer l'arrivée / le départ sur chaque site.
+   - L'agent ACTIVE sa feuille du jour UNIQUEMENT depuis
+     feuille-route-agent.html (v5.1, retour Laurent : aucun choix de feuille
+     dans le menu ; sans feuille active, la carte n'apparaît pas). Mémorisée sur le téléphone
+     (localStorage rdz_fdr_active), valable pour la journée de service.
+   - La carte en haut du menu affiche la mission en cours / la prochaine
+     mission (heure théorique), un gros bouton « Je suis arrivé » puis
+     « Je repars ». Après le départ, la carte passe toute seule à la
+     mission suivante. Pointage PAR MISSION (choix de Laurent), exactement
+     comme les lignes de la feuille de route.
+   - Écriture : MÊME table, MÊMES colonnes, MÊME clé d'upsert que
+     feuille-route-agent.html (feuille_pointages, sheet_id+task_index+
+     sheet_date) via RDZSync → fonctionne hors réseau ; les deux écrans
+     restent synchronisés. Les pointages encore dans la file RDZSync (pas
+     encore envoyés) sont relus pour l'affichage.
+   - Planning théorique lu dans RouteOps (lecture seule), mis en cache
+     sur le téléphone pour rester utilisable en zone sans réseau.
+   ════════════════════════════════════════════════════════════════════ */
+(function(){
+const FDR_RO_URL = 'https://trdhtlcenmjlcvzuplid.supabase.co';
+const FDR_RO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyZGh0bGNlbm1qbGN2enVwbGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NTE2NzQsImV4cCI6MjA5MjAyNzY3NH0.8r-ITHC-w28vQ4_FKI6Hbwg4AYVqYR0i-69_oHSD5DU';
+const LS_ACTIVE = 'rdz_fdr_active';      // {sheetId, date}
+const LS_CACHE  = 'rdz_fdr_cache';       // {date, S:{sites,missions,sheets,travel}}
+const LS_SKIP   = 'rdz_fdr_skip';        // {"<sheetId>|<date>": [taskIndex,…]}
+
+if (typeof RDZSync !== 'undefined' && !window._rdzSyncInit) { RDZSync.init({ client: sb }); window._rdzSyncInit = true; }
+
+let FS = null;            // planning RouteOps du jour {sites,missions,sheets,travel}
+let FP = {};              // pointages : task_index -> {heure_arrivee_reelle, heure_depart_reelle}
+let fdrTick = null;
+
+/* ---------- utilitaires (repris de feuille-route-agent.html) ---------- */
+function serviceDate(d){ d = d ? new Date(d) : new Date(); d = new Date(d.getTime() - (6*60+30)*60000); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function tMin(t){ if(!t || !t.includes(':')) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function minToT(m){ m=((m%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function nowHHMM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function lsGet(k, def){ try{ const v = JSON.parse(localStorage.getItem(k)); return v==null ? def : v; }catch(e){ return def; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function getMission(id){ return FS.missions.find(m=>m.id===id); }
+function getSite(id){ return FS.sites.find(s=>s.id===id); }
+function getTravel(a,b){ if(!a||!b||a===b) return 0; return FS.travel[a]?.[b] ?? FS.travel[b]?.[a] ?? 15; }
+function calcSheetTimes(sh){
+  let cur = tMin(sh.startTime) || 0, lastSite = null;
+  return sh.tasks.map(task=>{
+    const m = getMission(task.mId);
+    if(!m) return { ...task, startTime:'', endTime:'' };
+    if(task.fixedStart){
+      let ft = tMin(task.fixedStart);
+      if(ft !== null){ if(ft < cur-120) ft += 1440; if(ft >= cur) cur = ft; }
+    } else if(lastSite && m.siteId && lastSite !== m.siteId){ cur += getTravel(lastSite, m.siteId); }
+    const st = minToT(cur);
+    const [dh,dm] = (task.overrideDuree || m.duree || '00:00').split(':').map(Number);
+    cur += dh*60+dm;
+    if(m.siteId) lastSite = m.siteId;
+    return { ...task, startTime: st, endTime: minToT(cur) };
+  });
+}
+
+/* ---------- chargement ---------- */
+async function loadRouteOps(date){
+  const h = { apikey: FDR_RO_KEY, Authorization: 'Bearer ' + FDR_RO_KEY };
+  const base = FDR_RO_URL + '/rest/v1';
+  try{
+    const get = u => fetch(base + u, { headers: h }).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+    const [sites, missions, sheets, travel] = await Promise.all([
+      get('/sites?active=eq.true&order=name'),
+      get('/missions?active=eq.true'),
+      get('/sheets?active=eq.true&is_template=eq.false&date=eq.' + date),
+      get('/travel?select=*')
+    ]);
+    const S = {
+      sites: sites.map(r=>({ id:r.id, name:r.name, code:r.code, color:r.color })),
+      missions: missions.map(r=>({ id:r.id, name:r.name, siteId:r.site_id, type:r.type||'', duree:r.duree||'00:30', desc:r.description||'' })),
+      sheets: sheets.map(r=>({ id:r.id, name:r.name, cat:r.cat, date:r.date, startTime:r.start_time, endService:r.end_time||'', tasks: Array.isArray(r.tasks)?r.tasks:[] })),
+      travel: {}
+    };
+    travel.forEach(t=>{ (S.travel[t.site_a] = S.travel[t.site_a] || {})[t.site_b] = t.minutes; });
+    lsSet(LS_CACHE, { date, S });
+    return S;
+  }catch(e){
+    const c = lsGet(LS_CACHE, null);          // hors réseau : dernier planning connu
+    return (c && c.date === date) ? c.S : null;
+  }
+}
+async function loadPointages(sheetId, date){
+  const map = {};
+  try{
+    const { data, error } = await sb.from('feuille_pointages').select('*').eq('sheet_id', sheetId).eq('sheet_date', date);
+    if(!error) (data||[]).forEach(p=>{ map[p.task_index] = p; });
+  }catch(e){}
+  // Saisies encore dans la file RDZSync (pas encore envoyées) : elles priment.
+  lsGet('rdz_sync_queue', []).forEach(it=>{
+    const r = it && it.row;
+    if(it.table !== 'feuille_pointages' || !r || r.sheet_id !== sheetId || r.sheet_date !== date) return;
+    const cur = map[r.task_index] || {};
+    ['heure_arrivee_reelle','heure_depart_reelle','note'].forEach(f=>{ if(f in r) cur[f] = r[f]; });
+    map[r.task_index] = cur;
+  });
+  return map;
+}
+
+/* ---------- état ---------- */
+function getActive(){
+  const a = lsGet(LS_ACTIVE, null);
+  if(!a) return null;
+  if(a.date !== serviceDate()){ localStorage.removeItem(LS_ACTIVE); return null; }   // nouvelle journée de service
+  return a;
+}
+function skipKey(a){ return a.sheetId + '|' + a.date; }
+function getSkipped(a){ return (lsGet(LS_SKIP, {})[skipKey(a)] || []); }
+function setSkipped(a, arr){ const all = lsGet(LS_SKIP, {}); all[skipKey(a)] = arr; lsSet(LS_SKIP, all); }
+function hhmm(v){ return (v||'').slice(0,5); }
+
+/* ---------- rendu ---------- */
+function box(){ return document.getElementById('fdr-card-wrap'); }
+async function renderFdr(refresh){
+  const el = box(); if(!el) return;
+  const date = serviceDate();
+  const a = getActive();
+  if(refresh || !FS || (FS._date !== date)){
+    if(!a){ el.innerHTML = ''; return; }   // aucune feuille active : rien à charger ni à afficher
+    if(!FS) el.innerHTML = '<div class="fdr-card"><div class="fdr-muted">⏳ Chargement de la feuille de route…</div></div>';
+    const S = await loadRouteOps(date);
+    if(S){ FS = S; FS._date = date; }
+  }
+  if(a && FS) FP = await loadPointages(a.sheetId, a.date);
+  draw();
+}
+function draw(){
+  const el = box(); if(!el) return;
+  const date = serviceDate();
+  const a = getActive();
+  if(!FS){
+    el.innerHTML = getActive() ? `<div class="fdr-card"><div class="fdr-kicker">🗺️ Feuille de route</div><div class="fdr-muted">Planning indisponible (pas de réseau ?).</div><button class="fdr-link" onclick="fdrRefresh()">↻ Réessayer</button></div>` : '';
+    return;
+  }
+  const sheets = FS.sheets.filter(s=>s.date===date).sort((x,y)=>(x.startTime||'99').localeCompare(y.startTime||'99'));
+  const sh = a ? sheets.find(s=>s.id===a.sheetId) : null;
+
+  // v5.1 (retour Laurent) : pas de choix de feuille ici. La feuille s'active
+  // UNIQUEMENT depuis feuille-route-agent.html ; sans feuille active, rien
+  // n'apparaît dans le menu.
+  if(!sh){ el.innerHTML = ''; return; }
+
+  const calc = calcSheetTimes(sh);
+  const skipped = getSkipped(a);
+  const valid = calc.map((r,i)=>({ r, i, m:getMission(r.mId) })).filter(x=>x.m);
+  const cur = valid.find(x=> !hhmm(FP[x.i]?.heure_depart_reelle) && !skipped.includes(x.i));
+  const doneCount = valid.filter(x=> hhmm(FP[x.i]?.heure_depart_reelle) || skipped.includes(x.i)).length;
+  // v5.3 (retour Laurent) : carte compacte — environ la hauteur d'un bouton
+  // du menu. Les champs pour corriger les heures sont repliés (✏️ Heures).
+  const links = (extra) => `<div class="fdr-foot">${extra||''}<a class="fdr-link" href="feuille-route-agent.html">📋 Feuille</a><a class="fdr-link" href="feuille-route-agent.html">⇄ Changer</a></div>`;
+
+  if(!cur){
+    el.innerHTML = `<div class="fdr-card done">
+      <div class="fdr-row"><div class="fdr-main">
+        <div class="fdr-kicker">🗺️ ${esc(sh.name)}</div>
+        <div class="fdr-title">✅ Feuille terminée <span class="fdr-sub">${doneCount}/${valid.length}</span></div>
+      </div></div>
+      ${links()}
+    </div>`;
+    return;
+  }
+
+  const p = FP[cur.i] || {};
+  const arr = hhmm(p.heure_arrivee_reelle);
+  const site = getSite(cur.m.siteId);
+  const onSite = !!arr;
+  const nextX = valid.find(x=> x.i > cur.i && !hhmm(FP[x.i]?.heure_depart_reelle) && !skipped.includes(x.i));
+  const nextSite = nextX ? getSite(nextX.m.siteId) : null;
+  const pos = valid.indexOf(cur) + 1;
+  const prevX = valid[valid.indexOf(cur) - 1];
+  const sameSiteAsPrev = !!(prevX && prevX.m.siteId && prevX.m.siteId === cur.m.siteId);
+  const kicker = onSite ? ('📍 Sur site depuis ' + esc(arr)) : (sameSiteAsPrev ? '➡️ Suivante · même site' : '➡️ Prochain site');
+
+  el.innerHTML = `<div class="fdr-card ${onSite?'on-site':''}">
+    <div class="fdr-row">
+      <div class="fdr-main">
+        <div class="fdr-kicker">${kicker} · ${pos}/${valid.length}</div>
+        <div class="fdr-title">${site?`<span class="fdr-dot" style="background:${esc(site.color||'#999')}"></span>`:''}<span class="fdr-ell">${esc(site ? site.name : cur.m.name)}</span></div>
+        <div class="fdr-sub fdr-ell">${esc(cur.m.name)} · ${esc(cur.r.startTime)}→${esc(cur.r.endTime)}</div>
+      </div>
+      ${onSite
+        ? `<button class="fdr-btn leave" onclick="fdrPoint(${cur.i},'heure_depart_reelle')">🚗 Je repars</button>`
+        : `<button class="fdr-btn arrive" onclick="fdrPoint(${cur.i},'heure_arrivee_reelle')">📍 Arrivé</button>`}
+    </div>
+    ${nextX ? `<div class="fdr-next fdr-ell">Ensuite : <b>${esc(nextSite ? nextSite.name : nextX.m.name)}</b> · ${esc(nextX.r.startTime)}</div>` : ''}
+    <details class="fdr-edit">
+      <summary>✏️ Heures</summary>
+      <div class="fdr-times">
+        <label>Arrivée<input type="time" value="${esc(arr)}" onchange="fdrSetTime(${cur.i},'heure_arrivee_reelle',this.value)"></label>
+        <label>Départ<input type="time" value="" ${onSite?'':'disabled'} onchange="fdrSetTime(${cur.i},'heure_depart_reelle',this.value)"></label>
+      </div>
+      ${!onSite ? `<button class="fdr-link" onclick="fdrSkip(${cur.i})">⏭ Mission non effectuée — passer</button>` : ''}
+    </details>
+    ${links()}
+  </div>`;
+}
+
+/* ---------- actions ---------- */
+function savePointage(taskIndex, field, value){
+  const a = getActive(); if(!a || !FS) return;
+  const sh = FS.sheets.find(s=>s.id===a.sheetId); if(!sh) return;
+  const m = getMission(sh.tasks[taskIndex]?.mId);
+  const row = {
+    sheet_id: a.sheetId, sheet_date: a.date, task_index: taskIndex,
+    mission_name: m ? m.name : null,
+    agent_id: localStorage.getItem('rdz_agent_id'), agent_nom: localStorage.getItem('rdz_agent_nom'),
+    updated_at: new Date().toISOString()
+  };
+  row[field] = value ? value + ':00' : null;
+  RDZSync.save({ module:'feuille-route-agent', table:'feuille_pointages', op:'upsert', onConflict:'sheet_id,task_index,sheet_date', row });
+  FP[taskIndex] = { ...(FP[taskIndex]||{}), [field]: row[field] };
+}
+window.fdrPoint = function(i, field){
+  savePointage(i, field, nowHHMM());
+  if(navigator.vibrate) try{ navigator.vibrate(40); }catch(e){}
+  draw();
+};
+window.fdrSetTime = function(i, field, v){ savePointage(i, field, v); draw(); };
+window.fdrSkip = function(i){
+  const a = getActive(); if(!a) return;
+  if(!confirm('Passer cette mission sans pointer d\'heure ?\n(Vous pourrez toujours la compléter dans la feuille complète.)')) return;
+  setSkipped(a, [...new Set([...getSkipped(a), i])]);
+  draw();
+};
+window.fdrRefresh = function(){ renderFdr(true); };
+
+/* Affichage à chaque entrée dans le menu + rafraîchissement au retour sur l'app */
+const _enterMenuSansFdr = enterMenu;
+enterMenu = function(nom){ _enterMenuSansFdr(nom); renderFdr(false); };
+if (document.getElementById('screen-menu').classList.contains('on')) renderFdr(false);
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && document.getElementById('screen-menu').classList.contains('on')) renderFdr(false);
+});
+window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementById('screen-menu').classList.contains('on')) renderFdr(false); });
+})();
+
 </script>
 </body>
 </html>
