@@ -1,3 +1,4 @@
+<!-- RDZ · supervision-journal · v48 · 2026-10-09 · la précision de localisation (localisation_autre) est ajoutée à la localisation dans les rapports imprimables et le détail : « Localisation — précision ». Mise en page inchangée. -->
 <!-- RDZ · supervision-journal · v47 · 2026-09-26
      v47 : Rapport alarme imprimable — regroupement des réponses par
        catégorie (une rpSec par catégorie rencontrée dans reponses, au lieu
@@ -855,6 +856,16 @@ async function loadFleetVehicles(){
 }
 
 /* ---------- Utilitaires ---------- */
+/* Localisation complète pour l'affichage et les rapports imprimés (retour
+   Laurent 2026-10-09) : la "précision" saisie par l'agent
+   (localisation_autre) était perdue dès qu'une localisation était choisie
+   dans la liste. Les deux sont désormais réunies : "Hall — porte B2". */
+function locFull(o){
+  if(!o) return '';
+  const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
+  if(a && b && a!==b) return a + ' — ' + b;
+  return a || b;
+}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
@@ -1183,7 +1194,7 @@ function buildBiblioFiltrageReport(f){
 function buildStandardReport(r){
   const photos = journalPhotosByEntree[r.id]||[];
   const body = rpSec('1 — Contexte',
-      rpFieldO('Localisation', esc(r.localisation||r.localisation_autre||'—'))
+      rpFieldO('Localisation', esc(locFull(r)||'—'))
       + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + rpClotureRow(r.statut_cloture||null))
@@ -1209,7 +1220,7 @@ function buildAlarmeReport(r){
     // supervision-rapports.html::buildAlarmeReport, repris à l'identique ici.
     const reponses = parseReponses(r.reponses);
     const { html: qaSectionsHtml, nextNum } = reponsesSectionsHtml(reponses, 2);
-    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(r.localisation||r.localisation_autre||'—')) + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
+    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(locFull(r)||'—')) + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.statut_cloture||null))
       + rpSec((nextNum+1) + ' — Photos', photosHtml);
@@ -1626,11 +1637,11 @@ const SOURCES = [
     expand(r){ return [{ ts:r.created_at, sub:'', kind:'rapport_standard', raw:r }]; },
     site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
     title(r){ return `Rapport standard — ${r.nature_activite||r.activite||'—'} — ${r.site_nom||''}`; },
-    snippet(r){ const parts=[r.activite, r.localisation||r.localisation_autre, r.situation].filter(Boolean); return parts.join(' · ')||(r.actions||''); },
+    snippet(r){ const parts=[r.activite, locFull(r), r.situation].filter(Boolean); return parts.join(' · ')||(r.actions||''); },
     photos(r){ return journalPhotosByEntree[r.id]||[]; },
     detailHtml(r){
       return `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.activite||'—')}</div></div>
-        <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.localisation||r.localisation_autre||'—')}</div></div>
+        <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r)||'—')}</div></div>
         <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation||'—')}</div></div>
         <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.actions||'—')}</div></div>
         <div class="msec"><div class="st">Classification</div><div class="txt">${esc(r.nature_activite||'Non classé')}${r.type_action?' — '+esc(r.type_action):''}</div></div>
@@ -1653,7 +1664,7 @@ const SOURCES = [
     snippet(r){
       if(isNewFormatAlarme(r)){
         const reponses = parseReponses(r.reponses);
-        const parts = [r.type_action||'', r.localisation||r.localisation_autre||'', ...reponses.map(q=>reponseValueText(q)).filter(v=>v && v!=='—')].filter(Boolean);
+        const parts = [r.type_action||'', locFull(r)||'', ...reponses.map(q=>reponseValueText(q)).filter(v=>v && v!=='—')].filter(Boolean);
         return parts.slice(0,3).join(' · ');
       }
       const parts=[r.transmetteur_code?('Transmetteur '+r.transmetteur_code):'', r.zone, r.resultat, r.situation].filter(Boolean); return parts.join(' · '); },
@@ -1664,7 +1675,7 @@ const SOURCES = [
         const qaHtml = reponses.length
           ? qaGroupedHtml(reponses, q=>`<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:.3px">${esc(q.libelle)}</div><div>${esc(reponseValueText(q))}</div></div>`)
           : '<i>Aucune question renseignée.</i>';
-        return `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.localisation||r.localisation_autre||'—')}</div></div>
+        return `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r)||'—')}</div></div>
         <div class="msec"><div class="st">Horaires</div><div class="txt">Alarme ${esc(fmtTime(r.created_at)||'—')} · Arrivée sur site ${esc(r.heure_arrivee||'—')} · Fin d'intervention ${esc(r.heure_fin||'—')}</div></div>
         ${r.type_action?`<div class="msec"><div class="st">Type d'action</div><div class="txt">${esc(r.type_action)}</div></div>`:''}
         <div class="msec"><div class="st">Questions / Vérifications</div><div class="txt">${qaHtml}</div></div>

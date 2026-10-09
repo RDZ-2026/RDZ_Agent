@@ -1,3 +1,4 @@
+<!-- v24 · 2026-10-09 · la précision de localisation (localisation_autre) est ajoutée à la localisation partout (rapport imprimable, détail, liste, message Claude) : « Localisation — précision ». Mise en page inchangée. -->
 <!-- v23 · 2026-10-08 · rapport imprimable : les sauts de ligne, lignes vides et retraits saisis (constats, mesures prises, résultat, réponses texte) sont conservés tels quels (white-space:pre-wrap dans rpFieldO) ; le prompt "Analyser avec Claude" demande aussi de garder des retours à la ligne (\n) pour les énumérations. -->
 <!-- v22 · 2026-10-08 · (1) code de validation demandé UNIQUEMENT pour changer le statut d'un rapport déjà Transmis au client / Validé (= le déprotéger). Passer un rapport en Transmis/Validé ne demande plus de code. Un rapport protégé ne peut être ni modifié, ni classé, ni supprimé, ni mis à jour par l'IA tant qu'il n'est pas déprotégé : la page propose alors directement de le déprotéger (choix du nouveau statut + code). (2) "Modifier" : les menus déroulants des questions à choix (rapports d'alarme et types personnalisés) sont de nouveau alimentés — les options n'étant pas recopiées dans `reponses`, elles sont relues dans alarme_champs / rapport_champs (champ_id). Idem pour les cases à cocher à choix multiples (toutes les options proposées, pas seulement celles cochées). -->
 <!-- v21 · 2026-10-08 · "Modifier" : légende de chaque photo éditable (y compris une photo ajoutée depuis l'ordinateur, champ légende proposé juste après l'envoi) — enregistrée dans journal_photos.legende dès qu'on quitte le champ, et de nouveau au clic sur Enregistrer. Ajouter/supprimer une photo ne réaffiche plus tout le formulaire (les textes en cours de saisie ne sont plus perdus). -->
@@ -910,6 +911,16 @@ const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* Localisation complète pour l'affichage et les rapports imprimés (retour
+   Laurent 2026-10-09) : la "précision" saisie par l'agent
+   (localisation_autre) était perdue dès qu'une localisation était choisie
+   dans la liste. Les deux sont désormais réunies : "Hall — porte B2". */
+function locFull(o){
+  if(!o) return '';
+  const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
+  if(a && b && a!==b) return a + ' — ' + b;
+  return a || b;
+}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
 function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—'; return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}); }
@@ -1173,20 +1184,20 @@ function reportSnippet(r){
   if(isCustomTypeReport(r)){
     const reponses = parseReponses(r.raw.reponses);
     const parts = [
-      r.raw.localisation||r.raw.localisation_autre||'',
+      locFull(r.raw)||'',
       ...reponses.map(q=>reponseValueText(q)).filter(v=>v && v!=='—')
     ].filter(Boolean);
     return parts.slice(0,3).join(' · ');
   }
   if(r.kind==='standard'){
-    const parts = [r.raw.activite, r.raw.localisation||r.raw.localisation_autre, r.raw.situation].filter(Boolean);
+    const parts = [r.raw.activite, locFull(r.raw), r.raw.situation].filter(Boolean);
     return parts.join(' · ') || (r.raw.actions||'');
   }
   if(isNewFormatAlarme(r)){
     const reponses = parseReponses(r.raw.reponses);
     const parts = [
       r.raw.type_action || '',
-      r.raw.localisation||r.raw.localisation_autre||'',
+      locFull(r.raw)||'',
       ...reponses.map(q=>reponseValueText(q)).filter(v=>v && v!=='—')
     ].filter(Boolean);
     return parts.slice(0,3).join(' · ');
@@ -1346,11 +1357,11 @@ function openDetail(id){
     const qaHtml = reponses.length
       ? qaGroupedHtml(reponses, q=>`<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:.3px">${esc(q.libelle)}</div><div>${esc(reponseValueText(q))}</div></div>`)
       : '<i>Aucune question renseignée.</i>';
-    extra = `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.raw.localisation||r.raw.localisation_autre||'—')}</div></div>
+    extra = `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Questions / Réponses</div><div class="txt">${qaHtml}</div></div>`;
   }else if(r.kind==='standard'){
     extra = `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.raw.activite||'—')}</div></div>
-      <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.raw.localisation||r.raw.localisation_autre||'—')}</div></div>
+      <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.raw.situation||'—')}</div></div>
       <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.raw.actions||'—')}</div></div>`;
   }else if(isNewFormatAlarme(r)){
@@ -1358,7 +1369,7 @@ function openDetail(id){
     const qaHtml = reponses.length
       ? qaGroupedHtml(reponses, q=>`<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:.3px">${esc(q.libelle)}</div><div>${esc(reponseValueText(q))}</div></div>`)
       : '<i>Aucune question renseignée.</i>';
-    extra = `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(r.raw.localisation||r.raw.localisation_autre||'—')}</div></div>
+    extra = `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       ${r.raw.type_action ? `<div class="msec"><div class="st">Type d'action</div><div class="txt">${esc(r.raw.type_action)}</div></div>` : ''}
       <div class="msec"><div class="st">Questions / Vérifications</div><div class="txt">${qaHtml}</div></div>`;
   }else{
@@ -1981,7 +1992,7 @@ function buildPromptLines(items){
     lines.push('  Site: ' + (r.site||'—') + ' | ' + fmtDate(r.ts) + ' ' + fmtTime(r.ts) + ' | Agent: ' + (r.agent||'—'));
     if(isCustomTypeReport(r)){
       lines.push('  Type de rapport: ' + customTypeLabel(r));
-      lines.push('  Localisation: ' + (r.raw.localisation||r.raw.localisation_autre||'—'));
+      lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       const reponses = parseReponses(r.raw.reponses);
       if(reponses.length){
         lines.push('  Questions / Réponses saisies par l\'agent:');
@@ -1991,11 +2002,11 @@ function buildPromptLines(items){
       }
     }else if(r.kind==='standard'){
       lines.push('  Activité: ' + (r.raw.activite||'—'));
-      lines.push('  Localisation: ' + (r.raw.localisation||r.raw.localisation_autre||'—'));
+      lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       lines.push('  Situation (saisie brute agent): ' + (r.raw.situation||'—'));
       lines.push('  Actions (saisie brute agent): ' + (r.raw.actions||'—'));
     }else if(isNewFormatAlarme(r)){
-      lines.push('  Localisation: ' + (r.raw.localisation||r.raw.localisation_autre||'—'));
+      lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       if(r.raw.type_action) lines.push('  Type d\'action: ' + r.raw.type_action);
       const reponses = parseReponses(r.raw.reponses);
       if(reponses.length){
@@ -2555,14 +2566,14 @@ function buildMultiReport(titreGlobal, corrected){
 
     let inner;
     if(r.kind==='standard'){
-      const localisation = r.raw.localisation||r.raw.localisation_autre||'';
+      const localisation = locFull(r.raw)||'';
       inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
         + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
     }else if(isNewFormatAlarme(r)){
-      const localisation = r.raw.localisation||r.raw.localisation_autre||'';
+      const localisation = locFull(r.raw)||'';
       inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
         + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
@@ -2628,7 +2639,7 @@ function buildStandardReport(r){
   if(isCustomTypeReport(r)){
     const reponses = parseReponses(r.raw.reponses);
     const { html: qaSectionsHtml, nextNum } = reponsesSectionsHtml(reponses, 2);
-    const localisation = r.raw.localisation||r.raw.localisation_autre||'—';
+    const localisation = locFull(r.raw)||'—';
     const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(localisation)))
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.raw.statut_cloture||null))
@@ -2638,7 +2649,7 @@ function buildStandardReport(r){
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
   }
-  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(r.raw.localisation||r.raw.localisation_autre||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
+  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
@@ -2652,7 +2663,7 @@ function buildAlarmeReport(r){
   if(isNewFormatAlarme(r)){
     const reponses = parseReponses(r.raw.reponses);
     const { html: qaSectionsHtml, nextNum } = reponsesSectionsHtml(reponses, 2);
-    const localisation = r.raw.localisation||r.raw.localisation_autre||'—';
+    const localisation = locFull(r.raw)||'—';
     const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(localisation)) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.raw.statut_cloture||null))
