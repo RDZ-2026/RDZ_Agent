@@ -1,3 +1,4 @@
+<!-- RDZ · alarme-rapport · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · alarme-rapport · v3 · 2026-09-27 · correctif : un bouton de
      réponse « Choix » dont le libellé contient une apostrophe (ex. « la
      centrale d'alarme (CERTAS, PROTECTAS, ...) ») ne réagissait plus au
@@ -428,6 +429,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 </script>
 
 <script>
+function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 /* ===================== Intervention alarme (nouveau module) — logique =====================
    Repart de zéro par rapport à alarme-agent.html : plus de saisie de n° de
    transmetteur, s'ouvre depuis journal-de-bord.html (site déjà connu, comme
@@ -473,7 +475,7 @@ function resetForm(){
   photos = []; renderPhotos();
   document.getElementById('rapport-err').innerHTML = '';
   const now = new Date();
-  document.getElementById('f-date').value = now.toISOString().slice(0,10);
+  document.getElementById('f-date').value = ymdLocal(now);
   document.getElementById('f-heure').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';

@@ -1,3 +1,4 @@
+<!-- RDZ · ouverture-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · ouverture-agent · v3 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -227,6 +228,7 @@ textarea.field-input{min-height:84px;font-family:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
+function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 // ═══ RDZSync v3 — brique commune, collée telle quelle (voir rdz-sync-v3.js) ═══
 (function (global) {
   'use strict';
@@ -363,7 +365,7 @@ const AGENT_ID = localStorage.getItem('rdz_agent_id');
 const AGENT_NOM = localStorage.getItem('rdz_agent_nom');
 if (!AGENT_ID) { window.location.href = 'mobile.html'; }
 
-function today() { return new Date().toISOString().split('T')[0]; }
+function today() { return ymdLocal(); }
 function nowHM() {
   const d = new Date();
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');

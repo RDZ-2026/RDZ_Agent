@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-type-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-type-agent · v1 · 2026-09-28
      Moteur AGENT unique et générique pour tous les types de rapports que
      Laurent crée lui-même dans rapport-types-config.html (ex. "Création de
@@ -428,6 +429,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 </script>
 
 <script>
+function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 /* ===================== Rapport (type personnalisé) — logique =====================
    S'ouvre depuis journal-de-bord.html (site déjà connu, comme
    rapport-standard.html / alarme-rapport.html) avec en plus ?type=<slug>,
@@ -486,7 +488,7 @@ function resetForm(){
   photos = []; renderPhotos();
   document.getElementById('rapport-err').innerHTML = '';
   const now = new Date();
-  document.getElementById('f-date').value = now.toISOString().slice(0,10);
+  document.getElementById('f-date').value = ymdLocal(now);
   document.getElementById('f-heure').value = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';

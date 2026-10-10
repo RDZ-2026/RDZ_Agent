@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · checklist-evenement-agent · v3 · 2026-08-02 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -250,6 +251,7 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <div class="print-doc" id="print-doc"></div>
 
 <script>
+function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 // ═══ RDZSync v3 — brique commune, collée telle quelle (voir rdz-sync-v3.js) ═══
 (function (global) {
   'use strict';
@@ -403,14 +405,14 @@ let pendingPhoto = { depart: null, fin: null };
 let pendingPhotoDataUrl = { depart: null, fin: null };
 
 function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
-function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); }
-function in7DaysStr(){ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); }
+function todayStr(){ return ymdLocal(); }
+function yesterdayStr(){ const d=new Date(); d.setDate(d.getDate()-1); return ymdLocal(d); }
+function in7DaysStr(){ const d=new Date(); d.setDate(d.getDate()+7); return ymdLocal(d); }
 // Antériorité maximale (retour Laurent 2026-09-28 : pas d'événements passés
 // "ad vitam aeternam") — un événement passé sans rapport disparaît de toute
 // façon de cette liste au-delà de 15 jours, même s'il n'a toujours pas de
 // rapport clôturé.
-function pastWindowStr(){ const d=new Date(); d.setDate(d.getDate()-15); return d.toISOString().slice(0,10); }
+function pastWindowStr(){ const d=new Date(); d.setDate(d.getDate()-15); return ymdLocal(d); }
 function toast(msg, err){
   const t = document.createElement('div');
   t.className = 'toast' + (err?' err':'');
@@ -473,7 +475,7 @@ function dayLabel(dateStr){
   if (dateStr===todayStr()) return "Aujourd'hui";
   const d = new Date(dateStr+'T12:00:00Z');
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-  if (dateStr===tomorrow.toISOString().slice(0,10)) return 'Demain';
+  if (dateStr===ymdLocal(tomorrow)) return 'Demain';
   return d.toLocaleDateString('fr-CH',{weekday:'long', day:'2-digit', month:'2-digit', year: dateStr < yesterdayStr() ? 'numeric' : undefined});
 }
 function renderEventsList(){
