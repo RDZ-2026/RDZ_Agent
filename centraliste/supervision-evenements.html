@@ -1,3 +1,4 @@
+<!-- RDZ · supervision-evenements · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -275,6 +276,7 @@
 <div class="lb-overlay" id="lb-overlay" onclick="this.classList.remove('open')"><img id="lb-img" src=""></div>
 
 <script>
+function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -596,7 +598,7 @@ loadAll();
 // ═══ ORDRE DE SERVICE (repris à l'identique de evenements.html) ═══
 function fmtOds(d){ if(!d) return ''; const [y,m,dd]=d.split('-'); return `${dd}.${m}.${y}`; }
 function fmtFullOds(d){ if(!d) return ''; return new Date(d+'T00:00:00').toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); }
-function todayOds(){ return new Date().toISOString().split('T')[0]; }
+function todayOds(){ return ymdLocal(); }
 
 function printHeaderOds(){
   return `<table style="width:100%;margin-bottom:0"><tr>

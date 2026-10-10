@@ -1,3 +1,4 @@
+<!-- v26 · 2026-10-10 · rapport imprimable : date du bandeau en heure locale (un rapport enregistré entre minuit et 2 h affichait la veille) ; pour les rapports standard / personnalisés, date et heure = celles saisies par l'agent (date_rapport / heure_rapport) au lieu de l'heure d'enregistrement. -->
 <!-- v25 · 2026-10-09 · nature « Alarmes » (et ses types INCENDIE / INTRUSION / TECHNIQUE / Autre) proposée aussi pour les rapports standard et personnalisés (ex. rapport d'alarme personnalisé REGM) : Modifier, Classer, Analyser avec Claude. -->
 <!-- v24 · 2026-10-09 · la précision de localisation (localisation_autre) est ajoutée à la localisation partout (rapport imprimable, détail, liste, message Claude) : « Localisation — précision ». Mise en page inchangée. -->
 <!-- v23 · 2026-10-08 · rapport imprimable : les sauts de ligne, lignes vides et retraits saisis (constats, mesures prises, résultat, réponses texte) sont conservés tels quels (white-space:pre-wrap dans rpFieldO) ; le prompt "Analyser avec Claude" demande aussi de garder des retours à la ligne (\n) pour les énumérations. -->
@@ -922,6 +923,33 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
    Laurent 2026-10-09) : la "précision" saisie par l'agent
    (localisation_autre) était perdue dès qu'une localisation était choisie
    dans la liste. Les deux sont désormais réunies : "Hall — porte B2". */
+/* Date/heure réelles d'un rapport du journal (retour Laurent 2026-10-10) :
+   l'agent saisit la date et l'heure de l'événement (date_rapport /
+   heure_rapport) — c'est elle qui doit figurer sur le rapport, pas l'heure
+   d'enregistrement (created_at, qui peut tomber bien plus tard, voire le
+   lendemain). Repli sur created_at pour les anciens rapports. */
+function rapportTs(raw){
+  if(raw && raw.date_rapport && raw.heure_rapport){
+    const [y,m,d] = String(raw.date_rapport).split('-').map(Number);
+    const [hh,mi] = String(raw.heure_rapport).split(':').map(Number);
+    const dt = new Date(y, (m||1)-1, d||1, hh||0, mi||0, 0, 0);
+    if(!isNaN(dt.getTime())){
+      // Anciens rapports saisis entre minuit et 2 h avant le correctif du
+      // 2026-10-10 : le formulaire proposait la date UTC (la veille). Motif
+      // exact du défaut : heure < 02:00, date saisie = date UTC de
+      // l'enregistrement mais ≠ date locale → on remet le bon jour (+1).
+      if(raw.created_at && hh < 2){
+        const ca = new Date(raw.created_at);
+        if(raw.date_rapport === ca.toISOString().slice(0,10) && raw.date_rapport !== localYMD(ca)) dt.setDate(dt.getDate()+1);
+      }
+      return dt.toISOString();
+    }
+  }
+  return raw ? raw.created_at : null;
+}
+/* Date LOCALE (Genève) au format AAAA-MM-JJ — toISOString() donnait la date
+   UTC : un rapport enregistré entre minuit et 2 h affichait la veille. */
+function localYMD(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function locFull(o){
   if(!o) return '';
   const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
@@ -1138,7 +1166,7 @@ async function loadData(){
 
     const std = (entrees||[]).map(r=>({
       id:r.id, kind:'standard', site:r.site_nom||'', agent:r.agent_nom||'',
-      ts:r.created_at, raw:r, photos:(photosByEntree[r.id]||[]).filter(p=>p.url)
+      ts:rapportTs(r), raw:r, photos:(photosByEntree[r.id]||[]).filter(p=>p.url)
     }));
     const alm = (alarmes||[]).map(r=>({
       id:r.id, kind:'alarme', site:r.site_nom||'', agent:r.agent_nom||'',
@@ -1892,7 +1920,7 @@ async function downloadPack(){
   statusEl.textContent = 'Création du ZIP…';
   barEl.style.width = '95%';
   const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE' });
-  const date = new Date().toISOString().slice(0,10);
+  const date = localYMD(new Date());
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'rdz-rapports-analyse-' + date + '.zip';
@@ -2337,7 +2365,7 @@ function downloadClassifyMessage(){
   if(!items.length){ toast('Aucun rapport sélectionné'); return; }
   const text = buildClassifyPromptLines(items).join('\n');
   const blob = new Blob([text], { type:'text/plain;charset=utf-8' });
-  const date = new Date().toISOString().slice(0,10);
+  const date = localYMD(new Date());
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'rdz-classification-' + date + '.txt';
@@ -2478,7 +2506,7 @@ function rpClotureRow(selKey){
   }).join('')}</div>`;
 }
 function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
-  const dateTxt = meta.created_at ? rpFmtDate(new Date(meta.created_at).toISOString().slice(0,10)) : '—';
+  const dateTxt = meta.created_at ? rpFmtDate(localYMD(meta.created_at)) : '—';
   const heureTxt = meta.created_at ? fmtTime(meta.created_at) : '—';
   /* meta.timeFields (optionnel) : pour une intervention alarme, on veut voir
      dans le bandeau non seulement l'heure de l'alarme mais aussi l'heure
