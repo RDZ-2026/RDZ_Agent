@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-11 · liste des événements en ordre chronologique : passés (sans rapport) / hier en haut, puis aujourd'hui, puis à venir. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · checklist-evenement-agent · v3 · 2026-08-02 -->
 <!DOCTYPE html>
@@ -443,7 +444,9 @@ async function loadEvents(){
       .gte('date', pastWindowStr())
       .lte('date', in7DaysStr());
     if(SITE_ID) q = q.or('site_id.eq.'+SITE_ID+',site_id.is.null');
-    const { data, error } = await q.order('date', { ascending: false }).order('heure_debut');
+    // Ordre chronologique (retour Laurent 2026-10-11) : le plus ancien (passé sans
+    // rapport / hier) en haut, puis aujourd'hui, puis les événements à venir.
+    const { data, error } = await q.order('date', { ascending: true }).order('heure_debut', { ascending: true });
     if(error) throw error;
     // Ne garde que les événements avec une véritable mission de sécurité (au moins
     // un agent demandé) — retour Laurent 2026-09-28 : un événement purement
