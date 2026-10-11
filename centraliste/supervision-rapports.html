@@ -1,3 +1,4 @@
+<!-- v29 · 2026-10-11 · nouveau statut « ✉️ À envoyer au client » (après « À revoir », avant « Transmis au client » / « Validé ») — NON verrouillé : modifiable librement, reste dans la vue À valider. Nécessite migration-statut-a-envoyer.sql. -->
 <!-- v28 · 2026-10-11 · tableau : colonne « Aperçu » retirée pour libérer la place (boutons Détail / Supprimer de nouveau visibles). La recherche continue de porter sur le texte du rapport. -->
 <!-- v27 · 2026-10-11 · tableau (vues À valider et Tous les rapports) : nouvelle colonne « Nature / Type d'action » à côté du statut. -->
 <!-- v26 · 2026-10-10 · rapport imprimable : date du bandeau en heure locale (un rapport enregistré entre minuit et 2 h affichait la veille) ; pour les rapports standard / personnalisés, date et heure = celles saisies par l'agent (date_rapport / heure_rapport) au lieu de l'heure d'enregistrement. -->
@@ -732,6 +733,7 @@ const RAPPORT_STATUTS = [
   {k:'en_cours', label:'En cours',            icon:'⏳', color:'#1a5a8a', bg:'#f0f6ff', bd:'#bcd6f0'},
   {k:'termine',  label:'Terminé',             icon:'✔',  color:'#1e6b1e', bg:'#f0f8f0', bd:'#bfe0bf'},
   {k:'a_revoir', label:'À revoir',            icon:'🔁', color:'#b45c00', bg:'#fff8f0', bd:'#f5d9b8'},
+  {k:'a_envoyer', label:'À envoyer au client', icon:'✉️', color:'#6b21a8', bg:'#faf5ff', bd:'#e9d5ff'},  // v29 — non verrouillé
   {k:'transmis', label:'Transmis au client',  icon:'📤', color:'#ffffff', bg:'#142130', bd:'#142130', locked:true},
   {k:'valide',   label:'Validé',              icon:'🔒', color:'#ffffff', bg:'#16834a', bd:'#16834a', locked:true}
 ];
