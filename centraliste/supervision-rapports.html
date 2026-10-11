@@ -1,3 +1,4 @@
+<!-- v27 · 2026-10-11 · tableau (vues À valider et Tous les rapports) : nouvelle colonne « Nature / Type d'action » à côté du statut. -->
 <!-- v26 · 2026-10-10 · rapport imprimable : date du bandeau en heure locale (un rapport enregistré entre minuit et 2 h affichait la veille) ; pour les rapports standard / personnalisés, date et heure = celles saisies par l'agent (date_rapport / heure_rapport) au lieu de l'heure d'enregistrement. -->
 <!-- v25 · 2026-10-09 · nature « Alarmes » (et ses types INCENDIE / INTRUSION / TECHNIQUE / Autre) proposée aussi pour les rapports standard et personnalisés (ex. rapport d'alarme personnalisé REGM) : Modifier, Classer, Analyser avec Claude. -->
 <!-- v24 · 2026-10-09 · la précision de localisation (localisation_autre) est ajoutée à la localisation partout (rapport imprimable, détail, liste, message Claude) : « Localisation — précision ». Mise en page inchangée. -->
@@ -84,6 +85,9 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--re
 .view-tab.on .n{background:var(--red);color:#fff}
 .view-hint{font-size:12px;color:#64748b;margin:-6px 0 12px}
 .st-badge{font-size:11px;font-weight:bold;padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-block;border:1px solid transparent}
+.classif{min-width:150px;max-width:230px}
+.classif .nat{font-weight:bold;font-size:12.5px;color:var(--ink)}
+.classif .typ{font-size:11.5px;color:#64748b;line-height:1.35;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .miss{display:inline-block;margin-top:4px;font-size:10.5px;font-weight:bold;color:#b45c00;background:#fff8f0;border:1px solid #f5d9b8;border-radius:999px;padding:2px 8px;white-space:nowrap}
 tr.site-group td{background:#eef2f6!important;border-top:2px solid #cfd8e3;font-weight:bold;font-size:13px;color:#142130;padding:8px 10px}
 tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-left:6px}
@@ -439,10 +443,10 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
           <thead>
             <tr>
               <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
-              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Site</th><th>Agent</th><th>Aperçu</th><th>Photos</th><th></th>
+              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Nature / Type d'action</th><th>Site</th><th>Agent</th><th>Aperçu</th><th>Photos</th><th></th>
             </tr>
           </thead>
-          <tbody id="list-body"><tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr></tbody>
+          <tbody id="list-body"><tr><td colspan="10"><div class="state-msg">Chargement…</div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1125,7 +1129,7 @@ let RAPPORT_TYPES = {};  // id -> {nom, icone} — types de rapports personnalis
 
 /* ---------- Chargement ---------- */
 async function loadData(){
-  document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr>';
+  document.getElementById('list-body').innerHTML = '<tr><td colspan="10"><div class="state-msg">Chargement…</div></td></tr>';
   try{
     const [{data:entrees, error:e1}, {data:alarmes, error:e2}, {data:photosAll, error:e3}, {data:rtypes, error:e4}] = await Promise.all([
       sb.from('journal_entrees').select('*').order('created_at',{ascending:false}).limit(500),
@@ -1178,7 +1182,7 @@ async function loadData(){
     populateSiteFilter();
     render();
   }catch(err){
-    document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Erreur de chargement (réseau ?).</div></td></tr>';
+    document.getElementById('list-body').innerHTML = '<tr><td colspan="10"><div class="state-msg">Erreur de chargement (réseau ?).</div></td></tr>';
     console.error(err);
   }
 }
@@ -1275,7 +1279,15 @@ function rowHtml(r){
       <td><input type="checkbox" ${isSel?'checked':''} onchange="toggleRow('${r.id}',this.checked)"></td>
       <td style="white-space:nowrap">${fmtDateShort(r.ts)}<br><span style="color:#999;font-size:11.5px">${fmtTime(r.ts)}</span></td>
       <td><span class="tag ${r.kind}">${kindLbl}</span></td>
-      <td>${statutBadgeHtml(r)}${miss.length?`<br><span class="miss" title="Classification à compléter (Modifier ou 🏷️ Classer)">⚠ ${esc(miss.join(' + '))}</span>`:''}</td>
+      <td>${statutBadgeHtml(r)}</td>
+      <td class="classif">${(()=>{
+        const nat = r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '');
+        const typ = r.raw.type_action || '';
+        let h = nat ? `<div class="nat">${esc(nat)}</div>` : '';
+        if(typ) h += `<div class="typ" title="${esc(typ)}">${esc(typ)}</div>`;
+        if(miss.length) h += `<span class="miss" title="Classification à compléter (Modifier ou 🏷️ Classer)">⚠ ${esc(miss.join(' + '))}</span>`;
+        return h || '—';
+      })()}</td>
       <td>${esc(r.site||'—')}</td>
       <td>${esc(r.agent||'—')}</td>
       <td class="snip">${esc(reportSnippet(r))||'<i>Sans description</i>'}</td>
@@ -1298,7 +1310,7 @@ function render(){
   document.getElementById('fcount').textContent = filteredData.length + ' rapport(s)';
   const tbody = document.getElementById('list-body');
   if(!filteredData.length){
-    tbody.innerHTML = '<tr><td colspan="9"><div class="state-msg">' + (currentView==='avalider' ? '✅ Aucun rapport en attente de validation.' : 'Aucun rapport ne correspond à ces filtres.') + '</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="state-msg">' + (currentView==='avalider' ? '✅ Aucun rapport en attente de validation.' : 'Aucun rapport ne correspond à ces filtres.') + '</div></td></tr>';
     updateSelToolbar(); return;
   }
 
@@ -1312,7 +1324,7 @@ function render(){
       const list = groups[k];
       const allSel = list.every(r=>selectedIds.has(r.id));
       return `<tr class="site-group"><td><input type="checkbox" ${allSel?'checked':''} onchange="toggleGroup(${gi},this.checked)" title="Sélectionner tout le site"></td>
-        <td colspan="8">📍 ${esc(k||'Site inconnu')}<span class="gcount">${list.length} rapport(s)</span></td></tr>` + list.map(rowHtml).join('');
+        <td colspan="9">📍 ${esc(k||'Site inconnu')}<span class="gcount">${list.length} rapport(s)</span></td></tr>` + list.map(rowHtml).join('');
     }).join('');
     window._groupIds = keys.map(k=>groups[k].map(r=>r.id));
   } else {
