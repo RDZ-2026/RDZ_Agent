@@ -1,3 +1,4 @@
+<!-- v53 · 2026-10-11 · créneaux du planning Agendrix (frise par agent + tuile « Agents en service ») relus à l'heure du planning : plus de décalage de +2 h (l'heure est stockée « murale » en UTC par planning-agendrix.html). -->
 <!-- v52 · 2026-10-11 · Rapport direction : nouvelle section finale « Frise d'activité par agent » — une frise temporelle par agent sur la journée de service (ou la période) sélectionnée : créneau prévu au planning (Agendrix) en bandeau clair + un point par action (rapports, alarmes, validations de consignes, ouvertures, comptages, badges, véhicules…), couleur = type d'action. Clic sur un point → rapport RDZ / détail ; clic sur le nom → liste des actions de l'agent. -->
 <!-- v51 · 2026-10-11 · (1) Journée de service / Vue complète : filtres Catégorie, Agent et Site à SÉLECTION MULTIPLE (cases à cocher dans un menu ; rien de coché = tout). (2) Rapport direction : graphiques des modules de comptage (comptage_releves) dans la carte du site concerné, un graphique par module — un point par relevé sur une journée, total par jour sur une période ; clic sur un point → liste des relevés → rapport RDZ du relevé, avec bouton « Détail / Modifier ». (3) Relevé de comptage : rapport RDZ imprimable + modification (compteurs, listes, note) directement ici. (4) Aperçu d'un rapport : bouton « ✏️ Détail / Modifier » pour passer du rapport RDZ à la fiche modifiable. -->
 <!-- v50 · 2026-10-10 · (1) rapports PERSONNALISÉS (rapport-types-config → rapport-type-agent, journal_entrees.rapport_type_id + reponses) affichés correctement : nom du type dans le titre, questions/réponses groupées par catégorie dans le détail et dans le rapport imprimable (au lieu de « Situation — / Actions — » vides). (2) sauts de ligne conservés dans les rapports imprimables (comme supervision-rapports v23). (3) nouveau type « Comptage » (comptage_releves, modules de comptage-agent.html — ex. régulation parking HLT) dans la liste et les filtres, avec lien vers supervision-comptages.html. -->
@@ -2047,7 +2048,13 @@ async function loadAgendrixShiftsOnce(){
   try{
     const { data, error } = await sb.from('agendrix_pointages').select('agent_nom,site,debut_prevu,fin_prevu');
     if(error) throw error;
-    agendrixShifts = (data||[]).map(r=>({ agent:r.agent_nom, site:r.site, debut:new Date(r.debut_prevu), fin:new Date(r.fin_prevu) }))
+    // v53 — planning-agendrix.html enregistre l'heure du planning comme une heure
+    // « murale » codée en UTC (excelSerialToUTCDate, affichage en timeZone:'UTC') :
+    // 19:00 au planning = « …T19:00:00Z » en base. La relire telle quelle donnait
+    // +2 h (été) / +1 h (hiver) à Genève. On reconstruit donc l'heure locale à
+    // partir des composantes UTC → même horaire que dans Planning / PDSA.
+    const wall = v=>{ const d = new Date(v); return isNaN(d) ? d : new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()); };
+    agendrixShifts = (data||[]).map(r=>({ agent:r.agent_nom, site:r.site, debut:wall(r.debut_prevu), fin:wall(r.fin_prevu) }))
       .filter(s=>!isNaN(s.debut) && !isNaN(s.fin));
   }catch(e){
     console.warn('Chargement planning Agendrix impossible :', e.message);
