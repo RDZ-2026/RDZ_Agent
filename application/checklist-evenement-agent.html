@@ -1,4 +1,4 @@
-<!-- RDZ · checklist-evenement-agent · 2026-10-11 · liste des événements en ordre chronologique : passés (sans rapport) / hier en haut, puis aujourd'hui, puis à venir. -->
+<!-- RDZ · checklist-evenement-agent · 2026-10-11 · bouton ← Retour sur la liste des événements (revient au journal de bord). Liste des événements en ordre chronologique : passés (sans rapport) / hier en haut, puis aujourd'hui, puis à venir. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · checklist-evenement-agent · v3 · 2026-08-02 -->
 <!DOCTYPE html>
@@ -131,6 +131,7 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <!-- ÉCRAN 1 : SÉLECTION ÉVÉNEMENT -->
 <div class="screen" id="s-list">
   <div class="topbar">
+    <button class="tb-back" onclick="goBackFromList()" title="Retour">←</button>
     <div><div class="tb-title">📅 Gestion d'événements</div><div class="tb-sub" id="tb-sub">Hier → J+7</div></div>
   </div>
   <div class="body" id="events-list"><div class="state-msg">⏳ Chargement…</div></div>
@@ -420,6 +421,13 @@ function toast(msg, err){
   t.textContent = msg;
   document.getElementById('toasts').appendChild(t);
   setTimeout(()=>t.remove(), 2600);
+}
+// Retour depuis la liste des événements (retour Laurent 2026-10-11) : revient à la
+// page précédente (journal de bord, sur le site déjà choisi) ; si la page a été
+// ouverte directement (pas d'historique), ouvre le journal de bord.
+function goBackFromList(){
+  if(document.referrer && history.length > 1) history.back();
+  else window.location.href = 'journal-de-bord.html';
 }
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
