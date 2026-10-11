@@ -1,3 +1,5 @@
+<!-- v52 · 2026-10-11 · Rapport direction : nouvelle section finale « Frise d'activité par agent » — une frise temporelle par agent sur la journée de service (ou la période) sélectionnée : créneau prévu au planning (Agendrix) en bandeau clair + un point par action (rapports, alarmes, validations de consignes, ouvertures, comptages, badges, véhicules…), couleur = type d'action. Clic sur un point → rapport RDZ / détail ; clic sur le nom → liste des actions de l'agent. -->
+<!-- v51 · 2026-10-11 · (1) Journée de service / Vue complète : filtres Catégorie, Agent et Site à SÉLECTION MULTIPLE (cases à cocher dans un menu ; rien de coché = tout). (2) Rapport direction : graphiques des modules de comptage (comptage_releves) dans la carte du site concerné, un graphique par module — un point par relevé sur une journée, total par jour sur une période ; clic sur un point → liste des relevés → rapport RDZ du relevé, avec bouton « Détail / Modifier ». (3) Relevé de comptage : rapport RDZ imprimable + modification (compteurs, listes, note) directement ici. (4) Aperçu d'un rapport : bouton « ✏️ Détail / Modifier » pour passer du rapport RDZ à la fiche modifiable. -->
 <!-- v50 · 2026-10-10 · (1) rapports PERSONNALISÉS (rapport-types-config → rapport-type-agent, journal_entrees.rapport_type_id + reponses) affichés correctement : nom du type dans le titre, questions/réponses groupées par catégorie dans le détail et dans le rapport imprimable (au lieu de « Situation — / Actions — » vides). (2) sauts de ligne conservés dans les rapports imprimables (comme supervision-rapports v23). (3) nouveau type « Comptage » (comptage_releves, modules de comptage-agent.html — ex. régulation parking HLT) dans la liste et les filtres, avec lien vers supervision-comptages.html. -->
 <!-- v49 · 2026-10-10 · rapport imprimable : date du bandeau en heure locale (plus de « veille » pour un rapport enregistré entre minuit et 2 h) ; rapports standard / personnalisés datés à la date et l'heure saisies par l'agent (date_rapport / heure_rapport). -->
 <!-- RDZ · supervision-journal · v48 · 2026-10-09 · la précision de localisation (localisation_autre) est ajoutée à la localisation dans les rapports imprimables et le détail : « Localisation — précision ». Mise en page inchangée. -->
@@ -362,6 +364,18 @@ main{flex:1;padding:18px}
 .ffield select,.ffield input{border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:8px 9px;font-size:13px;font-family:var(--font);color:var(--ink);background:#fff}
 .ffield select:focus,.ffield input:focus{outline:none;border-color:var(--red)}
 .filterbar .reset{align-self:flex-end}
+/* v51 — menus à sélection multiple */
+.msel{position:relative}
+.msel-btn{width:100%;text-align:left;border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:8px 28px 8px 9px;font-size:13px;font-family:var(--font);color:var(--ink);background:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.msel-btn:after{content:"▾";position:absolute;right:9px;top:50%;transform:translateY(-50%);color:#888}
+.msel.on .msel-btn{border-color:var(--red);background:#fff7f7;font-weight:bold}
+.msel-pop{display:none;position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:100%;max-width:340px;max-height:320px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.18);padding:6px}
+.msel.open .msel-pop{display:block}
+.msel-pop label{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:13px;border-radius:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:normal;color:var(--ink)}
+.msel-pop label:hover{background:#f5f7fa}
+.msel-pop input{width:16px;height:16px;margin:0;flex-shrink:0}
+.msel-acts{display:flex;justify-content:space-between;gap:8px;padding:4px 8px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+.msel-acts button{background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:2px 0;font-family:var(--font)}
 .factive{font-size:11.5px;color:var(--red);font-weight:bold;margin-top:2px}
 
 .view-tabs{display:flex;gap:8px;margin-bottom:12px}
@@ -415,6 +429,23 @@ main{flex:1;padding:18px}
 .tl-dot{position:absolute;top:14px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15);cursor:pointer;transform:translateX(-50%);transition:transform .12s}
 .tl-dot:hover{transform:translateX(-50%) scale(1.35);z-index:5}
 .tl-empty{font-size:12px;color:#999;text-align:center;padding:8px 0}
+/* v52 — frise d'activité par agent (Rapport direction) */
+.ag-tl{background:#fff;border:1px solid var(--line-soft);border-radius:12px;padding:14px 16px 10px;margin-bottom:14px}
+.ag-row{display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line-soft)}
+.ag-row:last-of-type{border-bottom:none}
+.ag-name{font-size:12.5px;font-weight:bold;color:var(--ink);cursor:pointer;line-height:1.3}
+.ag-name small{display:block;font-weight:normal;color:#888;font-size:11px}
+.ag-name:hover{color:var(--red)}
+.ag-track{position:relative;height:26px}
+.ag-line{position:absolute;top:12px;left:0;right:0;height:2px;background:#eef1f4}
+.ag-shift{position:absolute;top:6px;height:14px;background:#e6f0fa;border:1px solid #c9dcef;border-radius:7px}
+.ag-dot{position:absolute;top:7px;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.18);cursor:pointer;transform:translateX(-50%)}
+.ag-dot:hover{transform:translateX(-50%) scale(1.4);z-index:5}
+.ag-axis{position:relative;height:18px;margin-left:182px}
+.ag-axis span{position:absolute;font-size:10px;color:#999;transform:translateX(-50%);white-space:nowrap}
+.ag-legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:11px;color:#555}
+.ag-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+@media(max-width:720px){.ag-row{grid-template-columns:1fr}.ag-axis{margin-left:0}}
 
 .summary{font-size:13px;color:#666;margin:2px 2px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 
@@ -544,21 +575,15 @@ table{background:#fff;border-collapse:separate!important;border-spacing:0!import
         </div>
         <div class="ffield">
           <label>Catégorie</label>
-          <select id="flt-kind" onchange="applyFilters()">
-            <option value="">Toutes</option>
-          </select>
+          <div class="msel" id="flt-kind" data-all="Toutes"><button type="button" class="msel-btn" onclick="toggleMsel('flt-kind',event)">Toutes</button><div class="msel-pop"></div></div>
         </div>
         <div class="ffield">
           <label>Agent</label>
-          <select id="flt-agent" onchange="applyFilters()">
-            <option value="">Tous les agents</option>
-          </select>
+          <div class="msel" id="flt-agent" data-all="Tous les agents"><button type="button" class="msel-btn" onclick="toggleMsel('flt-agent',event)">Tous les agents</button><div class="msel-pop"></div></div>
         </div>
         <div class="ffield grow">
           <label>Site</label>
-          <select id="flt-site" onchange="applyFilters()">
-            <option value="">Tous les sites</option>
-          </select>
+          <div class="msel" id="flt-site" data-all="Tous les sites"><button type="button" class="msel-btn" onclick="toggleMsel('flt-site',event)">Tous les sites</button><div class="msel-pop"></div></div>
         </div>
         <button class="btn btn-sec reset" onclick="resetFilters()">✕ Réinitialiser</button>
         <button class="btn" onclick="refresh()">🔄 Actualiser</button>
@@ -633,6 +658,7 @@ table{background:#fff;border-collapse:separate!important;border-spacing:0!import
   <div class="report-inner">
     <div class="report-toolbar">
       <button class="btn" onclick="window.print()">🖨 Imprimer</button>
+      <button class="btn btn-sec" id="btn-report-detail" style="display:none" onclick="reportToDetail()">✏️ Détail / Modifier</button>
       <div style="flex:1"></div>
       <button class="btn btn-sec" onclick="closeReport()">✕ Fermer l'aperçu</button>
     </div>
@@ -1291,11 +1317,54 @@ function buildChangementPileReport(r){
   return rpParkShell('Rapport de changement de pile', badge, body, meta);
 }
 
-const REPORTABLE = { parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport, rapport_standard: buildStandardReport, alarme: buildAlarmeReport, changement_pile: buildChangementPileReport };
+/* v51 — rapport RDZ d'un relevé de comptage (modules comptage-agent.html). */
+function comptageValeurs(r){ return Array.isArray(r.valeurs) ? r.valeurs : (()=>{ try{ return JSON.parse(r.valeurs||'[]'); }catch(_){ return []; } })(); }
+function comptageTs(r){
+  if(r.date_releve){
+    const [y,m,d] = String(r.date_releve).split('-').map(Number);
+    const [hh,mi] = String(r.heure_releve||'00:00').split(':').map(Number);
+    const dt = new Date(y,(m||1)-1,d||1,hh||0,mi||0,0,0);
+    if(!isNaN(dt.getTime())) return dt.toISOString();
+  }
+  return r.created_at || null;
+}
+function buildComptageReleveReport(r){
+  const vals = comptageValeurs(r);
+  const counters = vals.filter(v=>v.type==='compteur'), lists = vals.filter(v=>v.type!=='compteur');
+  let n = 1, body = '';
+  if(counters.length) body += rpSec((n++)+' — Comptage', `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">${counters.map(v=>rpFieldO(esc(v.libelle), '<span style="font-size:20px;font-weight:800">'+esc(v.valeur==null?0:v.valeur)+'</span>')).join('')}</div>`);
+  body += rpSec((n++)+' — Informations', `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">${lists.map(v=>rpFieldO(esc(v.libelle), esc(v.valeur||'—'))).join('')}${rpFieldO('Module', esc(r.type_nom||'—'))}</div>${rpFieldO('Note', esc(r.note||'—'))}`);
+  body += rpSec((n++)+' — Photo', r.photo_url
+    ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${rpPhotoBoxO('Photo jointe', r.photo_url)}</div>`
+    : `<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>`);
+  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:comptageTs(r) };
+  return rpRdzShell('Relevé de comptage', esc(r.type_nom||'Comptage'), body, meta);
+}
+/* Options des listes (choix) des modules de comptage, pour l'édition. */
+let COMPTAGE_CHAMP_OPTIONS = {};
+async function loadComptageChamps(){
+  try{ const { data } = await sb.from('comptage_champs').select('id,options'); COMPTAGE_CHAMP_OPTIONS = {};
+    (data||[]).forEach(c=>{ let o=c.options; if(typeof o==='string'){ try{ o=JSON.parse(o); }catch(_){ o=null; } } if(Array.isArray(o)) COMPTAGE_CHAMP_OPTIONS[c.id]=o.map(String); });
+  }catch(e){ console.warn('comptage_champs:', e.message||e); }
+}
 
+const REPORTABLE = { comptage_releve: buildComptageReleveReport, parking: buildParkingReport, ouverture: buildOuvertureReport, biblio_comptage: buildBiblioComptageReport, biblio_filtrage: buildBiblioFiltrageReport, rapport_standard: buildStandardReport, alarme: buildAlarmeReport, changement_pile: buildChangementPileReport };
+
+/* v51 — depuis l'aperçu d'un rapport RDZ, revenir à la fiche (détail +
+   modification) de la même entrée. */
+window.__reportIdx = null;
+function setReportIdx(idx){
+  window.__reportIdx = idx;
+  const b = document.getElementById('btn-report-detail'); if(b) b.style.display = (idx==null ? 'none' : '');
+}
+function reportToDetail(){
+  const idx = window.__reportIdx; if(idx==null) return;
+  closeReport(); openDetail(idx);
+}
 function openReport(idx){
   const items = window.__renderedItems; const e = items[idx]; if(!e) return;
   const fn = REPORTABLE[e.kind]; if(!fn) return;
+  setReportIdx(idx);
   document.getElementById('report-content').innerHTML = fn(e.raw);
   closeModal();
   const rv = document.getElementById('report-view');
@@ -1685,16 +1754,9 @@ const SOURCES = [
     // paramétrés dans comptage-config.html — ex. régulation parking HLT). Consultation
     // ici ; tableau de bord, modification et suppression dans supervision-comptages.html.
     async fetch(){ const {data,error}=await sb.from('comptage_releves').select('*').order('date_releve',{ascending:false}).order('heure_releve',{ascending:false}).limit(500); if(error) throw error; return data||[]; },
-    expand(r){
-      let ts = r.created_at || null;
-      if(r.date_releve){
-        const [y,m,d] = String(r.date_releve).split('-').map(Number);
-        const [hh,mi] = String(r.heure_releve||'00:00').split(':').map(Number);
-        const dt = new Date(y,(m||1)-1,d||1,hh||0,mi||0,0,0);
-        if(!isNaN(dt.getTime())) ts = dt.toISOString();
-      }
-      return [{ ts, sub:'', kind:'comptage_releve', raw:r }];
-    },
+    expand(r){ return [{ ts:comptageTs(r), sub:'', kind:'comptage_releve', raw:r }]; },
+    fields(){ return [ {k:'valeurs', l:'Relevé', t:'valeurs'}, {k:'note', l:'Notes', t:'textarea'} ]; },
+    async save(r,p){ const {error}=await sb.from('comptage_releves').update({ valeurs:p.valeurs, note:p.note||null }).eq('id',r.id); if(error) throw error; },
     site(r){ return r.site_nom||''; }, agent(r){ return r.agent_nom||''; },
     title(r){ return `${r.type_nom||'Comptage'} — ${r.site_nom||''}`; },
     snippet(r){
@@ -1821,7 +1883,7 @@ async function refresh(){
   list.innerHTML = '<div class="state-msg">Chargement…</div>';
   allEntries = [];
   try{
-    await Promise.all([loadJournalPhotosByEntree(), loadRapportTypes()]);
+    await Promise.all([loadJournalPhotosByEntree(), loadRapportTypes(), loadComptageChamps()]);
     await Promise.all([
       ...SOURCES.map(async src=>{
         try{
@@ -1888,23 +1950,55 @@ function getScopeEntries(){
   return allEntries;
 }
 
+/* v51 — menus à sélection multiple (Catégorie / Agent / Site).
+   MSEL[id] = Set des valeurs cochées ; Set vide = « tout » (aucun filtre).
+   Les options sont reconstruites à chaque refresh / changement de période à
+   partir des données présentes ; une valeur cochée qui n'existe plus dans le
+   périmètre est retirée (pas de filtre « caché » invisible). */
+const MSEL = { 'flt-kind': new Set(), 'flt-agent': new Set(), 'flt-site': new Set() };
+const MSEL_OPTS = { 'flt-kind': [], 'flt-agent': [], 'flt-site': [] };
+function setMselOptions(id, options){
+  MSEL_OPTS[id] = options;
+  const keep = new Set(options.map(o=>o.value));
+  [...MSEL[id]].forEach(v=>{ if(!keep.has(v)) MSEL[id].delete(v); });
+  renderMsel(id);
+}
+function renderMsel(id){
+  const root = document.getElementById(id); if(!root) return;
+  const sel = MSEL[id], opts = MSEL_OPTS[id];
+  const pop = root.querySelector('.msel-pop');
+  pop.innerHTML = `<div class="msel-acts"><button type="button" onclick="mselAll('${id}')">✓ Tout (aucun filtre)</button></div>` +
+    (opts.length ? opts.map((o,i)=>`<label><input type="checkbox" ${sel.has(o.value)?'checked':''} onchange="mselToggle('${id}',${i},this.checked)"> ${esc(o.label)}</label>`).join('')
+      : '<div style="padding:8px;color:#999;font-size:12.5px">Aucune valeur sur cette période.</div>');
+  const btn = root.querySelector('.msel-btn');
+  if(!sel.size) btn.textContent = root.dataset.all;
+  else if(sel.size===1){ const o = opts.find(x=>sel.has(x.value)); btn.textContent = o ? o.label : '1 sélectionné'; }
+  else btn.textContent = sel.size + ' sélectionnés';
+  root.classList.toggle('on', sel.size>0);
+}
+function toggleMsel(id, ev){
+  if(ev) ev.stopPropagation();
+  document.querySelectorAll('.msel.open').forEach(m=>{ if(m.id!==id) m.classList.remove('open'); });
+  document.getElementById(id).classList.toggle('open');
+}
+function mselToggle(id, i, checked){
+  const o = MSEL_OPTS[id][i]; if(!o) return;
+  if(checked) MSEL[id].add(o.value); else MSEL[id].delete(o.value);
+  renderMsel(id); applyFilters();
+}
+function mselAll(id){ MSEL[id].clear(); renderMsel(id); applyFilters(); }
+document.addEventListener('click', ev=>{ if(!ev.target.closest('.msel')) document.querySelectorAll('.msel.open').forEach(m=>m.classList.remove('open')); });
+
 function populateFilterOptions(){
   const scope = getScopeEntries();
 
-  const kindSel = document.getElementById('flt-kind');
-  const curKind = kindSel.value;
-  const kindsPresent = [...new Set(scope.map(e=>e.kind))];
-  kindSel.innerHTML = '<option value="">Toutes</option>' +
-    kindsPresent
-      .sort((a,b)=>(KINDS[a]?.label||a).localeCompare(KINDS[b]?.label||b,'fr'))
-      .map(k=>`<option value="${esc(k)}">${esc(KINDS[k]?.icon||'')} ${esc(KINDS[k]?.label||k)}</option>`).join('');
-  kindSel.value = kindsPresent.includes(curKind) ? curKind : '';
+  const kindsPresent = [...new Set(scope.map(e=>e.kind))]
+    .sort((a,b)=>(KINDS[a]?.label||a).localeCompare(KINDS[b]?.label||b,'fr'));
+  setMselOptions('flt-kind', kindsPresent.map(k=>({ value:k, label:`${KINDS[k]?.icon||''} ${KINDS[k]?.label||k}` })));
 
   // Agent : regroupement par clé canonique (voir normalizeName ci-dessus), affichage
   // de la variante la plus fréquente pour chaque groupe.
-  const agentSel = document.getElementById('flt-agent');
-  const curAgent = agentSel.value;
-  const agentGroups = {}; // clé canonique -> { variants: {texte: count} }
+  const agentGroups = {};
   scope.forEach(e=>{
     let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){}
     a = a.trim(); if(!a) return;
@@ -1914,18 +2008,12 @@ function populateFilterOptions(){
   });
   const agentOptions = Object.entries(agentGroups).map(([key, variants])=>{
     const label = Object.entries(variants).sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0],'fr'))[0][0];
-    return { key, label };
+    return { value:key, label };
   }).sort((a,b)=>a.label.localeCompare(b.label,'fr'));
-  agentSel.innerHTML = '<option value="">Tous les agents</option>' +
-    agentOptions.map(o=>`<option value="${esc(o.key)}">${esc(o.label)}</option>`).join('');
-  agentSel.value = agentOptions.some(o=>o.key===curAgent) ? curAgent : '';
+  setMselOptions('flt-agent', agentOptions);
 
-  const siteSel = document.getElementById('flt-site');
-  const curSite = siteSel.value;
   const sitesPresent = [...new Set(scope.map(e=>{ try{ return e.src.site(e.raw)||''; }catch(_){ return ''; } }).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
-  siteSel.innerHTML = '<option value="">Tous les sites</option>' +
-    sitesPresent.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
-  siteSel.value = sitesPresent.includes(curSite) ? curSite : '';
+  setMselOptions('flt-site', sitesPresent.map(x=>({ value:x, label:x })));
 }
 
 /* ---------- Vue "Journée de service" ----------
@@ -2040,13 +2128,11 @@ function onServiceDayChange(){
 }
 
 function getFilteredEntries(){
-  const kind = document.getElementById('flt-kind').value;
-  const agentKey = document.getElementById('flt-agent').value; // clé canonique normalizeName()
-  const site = document.getElementById('flt-site').value;
+  const kinds = MSEL['flt-kind'], agentKeys = MSEL['flt-agent'], siteSet = MSEL['flt-site']; // Set vide = tout
   const common = e=>{
-    if(kind && e.kind!==kind) return false;
-    if(agentKey){ let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){} if(normalizeName(a)!==agentKey) return false; }
-    if(site){ let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} if(s!==site) return false; }
+    if(kinds.size && !kinds.has(e.kind)) return false;
+    if(agentKeys.size){ let a=''; try{ a = e.src.agent(e.raw)||''; }catch(_){} if(!agentKeys.has(normalizeName(a))) return false; }
+    if(siteSet.size){ let s=''; try{ s = e.src.site(e.raw)||''; }catch(_){} if(!siteSet.has(s)) return false; }
     return true;
   };
   if(viewMode==='service'){
@@ -2075,9 +2161,7 @@ function getFilteredEntries(){
 function applyFilters(){ render(); }
 
 function resetFilters(){
-  document.getElementById('flt-kind').value = '';
-  document.getElementById('flt-agent').value = '';
-  document.getElementById('flt-site').value = '';
+  Object.values(MSEL).forEach(set=>set.clear());
   if(viewMode==='service') document.getElementById('flt-serviceday').value = serviceDate();
   else { document.getElementById('flt-from').value = ''; document.getElementById('flt-to').value = ''; }
   populateFilterOptions(); // le jour peut avoir changé (vue service) -> périmètre à recalculer
@@ -2095,7 +2179,7 @@ function render(){
   // La sélection de journée de service n'est pas comptée comme un "filtre" au sens du
   // badge ci-dessous (c'est la nature même de cette vue) — seuls Catégorie/Agent/Site
   // (et Du/Au en Vue complète) déclenchent le badge "· filtré".
-  const filterActive = document.getElementById('flt-kind').value || document.getElementById('flt-agent').value || document.getElementById('flt-site').value
+  const filterActive = MSEL['flt-kind'].size || MSEL['flt-agent'].size || MSEL['flt-site'].size
     || (viewMode==='full' && (document.getElementById('flt-from').value || document.getElementById('flt-to').value));
 
   let dayLabel = '';
@@ -2235,6 +2319,17 @@ function startEdit(idx){
   const box = document.getElementById('detail-view');
   box.innerHTML = `
     ${fields.map(f=>{
+      if(f.t==='valeurs'){
+        const vals = comptageValeurs(r);
+        return `<div class="efield"><label>${esc(f.l)}</label>` + vals.map((v,i)=>{
+          if(v.type==='compteur') return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1;font-size:13px">${esc(v.libelle)}</span><input type="number" min="0" style="width:90px" id="ef-val-${i}" value="${esc(v.valeur==null?0:v.valeur)}"></div>`;
+          const opts = COMPTAGE_CHAMP_OPTIONS[v.champ_id] || [];
+          const all = (v.valeur && !opts.includes(v.valeur)) ? [...opts, v.valeur] : opts;
+          return `<div style="margin-bottom:8px"><div style="font-size:12px;color:#666;margin-bottom:3px">${esc(v.libelle)}</div>` + (all.length
+            ? `<select id="ef-val-${i}"><option value="">— Non renseigné —</option>${all.map(o=>`<option value="${esc(o)}" ${v.valeur===o?'selected':''}>${esc(o)}</option>`).join('')}</select>`
+            : `<input type="text" id="ef-val-${i}" value="${esc(v.valeur||'')}">`) + `</div>`;
+        }).join('') + `</div>`;
+      }
       if(f.t==='origines'){
         const entrees = r[f.k]||{};
         return `<div class="efield"><label>${esc(f.l)}</label>` +
@@ -2252,6 +2347,14 @@ async function saveEdit(idx){
   const r = e.raw; const fields = e.src.fields(r);
   const payload = {};
   fields.forEach(f=>{
+    if(f.t==='valeurs'){
+      payload[f.k] = comptageValeurs(r).map((v,i)=>{
+        const el = document.getElementById('ef-val-'+i);
+        if(!el) return v;
+        return Object.assign({}, v, { valeur: v.type==='compteur' ? Math.max(0, parseInt(el.value)||0) : (el.value||null) });
+      });
+      return;
+    }
     if(f.t==='origines'){
       const entrees = {};
       biblioOrigines.forEach(o=>{ const el = document.getElementById('ef-entree-'+o.label); if(el) entrees[o.label] = parseInt(el.value)||0; });
@@ -2483,6 +2586,7 @@ function siteGroupName(rawSite){
 }
 function siteHasContent(siteData){
   if(siteData.activity.length) return true;
+  if(siteData.siteEntries.some(e=>e.kind==='comptage_releve')) return true;
   if(doorGaugeKeywordFor(siteData.site) && siteData.siteEntries.some(e=>e.kind==='ouverture')) return true;
   if(siteData.siteEntries.some(e=>e.kind==='changement_pile')) return true;
   if(siteNameIncludes(siteData.site,'MDP') && siteData.siteEntries.some(e=>e.kind==='biblio_comptage' || e.kind==='biblio_filtrage')) return true;
@@ -2683,6 +2787,60 @@ function mdpBiblioHtml(siteData, skey){
   if(comptageSeries.length) html += chartBlock(comptageLabel, multiSeriesLineChartHtml(comptageSeries, comptageLines, (key,idx)=>`showBiblioDrilldown('${skey}','comptage',${idx})`, ''));
   if(filtrageSeries.length) html += chartBlock(filtrageLabel, multiSeriesLineChartHtml(filtrageSeries, filtrageLines, (key,idx)=>`showBiblioDrilldown('${skey}','filtrage',${idx})`, ''));
   return html;
+}
+
+/* ---------- v51 · Modules de comptage (comptage_releves) ----------
+   Un graphique par module présent sur le site (ex. « Mission régulation
+   parking HDLT » pour HLT), une courbe par compteur du module. Journée
+   unique : un point par relevé ; période : TOTAL par jour (comme le
+   filtrage bibliothèque). Clic sur un point → relevé(s) → rapport RDZ du
+   relevé (bouton « Détail / Modifier » pour corriger). */
+window.__dirModuleComptageSeries = {}; // skey -> { moduleIndex: series }
+function comptageModuleSeries(items, singleDay){
+  const labels = [];
+  items.forEach(e=>comptageValeurs(e.raw).forEach(v=>{ if(v.type==='compteur' && !labels.includes(v.libelle)) labels.push(v.libelle); }));
+  const valsOf = e=>{ const o={}; comptageValeurs(e.raw).forEach(v=>{ if(v.type==='compteur') o[v.libelle]=(parseInt(v.valeur)||0); }); return o; };
+  let series;
+  if(singleDay){
+    series = items.map(e=>({ label: fmtTime(e.ts), counts: valsOf(e), entries:[e] }));
+  } else {
+    const byDay = {};
+    items.forEach(e=>{
+      const day = fmtDateShort(e.ts);
+      if(!byDay[day]){ byDay[day] = { label:day, counts:{}, entries:[], _ts:e.ts }; labels.forEach(l=>byDay[day].counts[l]=0); }
+      byDay[day].entries.push(e);
+      const c = valsOf(e); labels.forEach(l=> byDay[day].counts[l] += (c[l]||0));
+    });
+    series = Object.values(byDay).sort((a,b)=>new Date(a._ts)-new Date(b._ts));
+  }
+  series.labels = labels;
+  return series;
+}
+function showModuleComptageDrilldown(skey, mi, idx){
+  const m = window.__dirModuleComptageSeries[skey] && window.__dirModuleComptageSeries[skey][mi];
+  const s = m && m.series[idx]; if(!s) return;
+  showEntryListPopup('🧮 ' + m.nom, `${s.label} (${s.entries.length} relevé${s.entries.length>1?'s':''})`, s.entries);
+}
+function showModuleComptageAll(skey, mi){
+  const m = window.__dirModuleComptageSeries[skey] && window.__dirModuleComptageSeries[skey][mi]; if(!m) return;
+  const all = m.series.flatMap(x=>x.entries);
+  showEntryListPopup('🧮 ' + m.nom, `Relevés (${all.length})`, all);
+}
+function comptageModulesHtml(siteData, skey){
+  const items = siteData.siteEntries.filter(e=>e.kind==='comptage_releve').slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  if(!items.length) return '';
+  const singleDay = isDirectionSingleDay();
+  const byModule = {};
+  items.forEach(e=>{ const k = e.raw.type_nom || 'Comptage'; (byModule[k] = byModule[k]||[]).push(e); });
+  window.__dirModuleComptageSeries[skey] = [];
+  return Object.keys(byModule).sort((a,b)=>a.localeCompare(b,'fr')).map(nom=>{
+    const series = comptageModuleSeries(byModule[nom], singleDay);
+    const mi = window.__dirModuleComptageSeries[skey].push({ nom, series }) - 1;
+    const lines = series.labels.map(l=>({ name:l, color:colorForLabel(l), get:p=>(p.counts||{})[l]||0 }));
+    const label = `${nom} — ${singleDay ? 'par relevé' : 'total par jour'} (${byModule[nom].length} relevé${byModule[nom].length>1?'s':''})`;
+    const chart = multiSeriesLineChartHtml(series, lines, (key,idx)=>`showModuleComptageDrilldown('${skey}',${mi},${idx})`, '');
+    return chartBlock('🧮 ' + label, chart || `<div style="font-size:12.5px;color:#888;padding:6px 0">Tous les compteurs sont à 0 sur la période. <a href="#" onclick="showModuleComptageAll('${skey}',${mi});return false;">Voir les relevés</a></div>`);
+  }).join('');
 }
 
 /* ---------- Parking DLCC : jauges + évolution d'occupation par zone (DLCC 80 places /
@@ -3184,6 +3342,7 @@ function siteCardHtml(siteData){
     ${changementPileHtml(siteData, skey)}
     ${mdpBiblioHtml(siteData, skey)}
     ${dlccParkingHtml(siteData, skey)}
+    ${comptageModulesHtml(siteData, skey)}
     ${parkGuardHtml(siteData, skey)}
     ${evenementsPeriodHtml(siteData, skey)}
     ${siteRegistersHtml(siteData, skey)}
@@ -3234,6 +3393,7 @@ function openListItemDetail(list, i){
   if(e && REPORTABLE[e.kind]){
     try{
       const html = REPORTABLE[e.kind](e.raw);
+      setReportIdx(i);
       document.getElementById('report-content').innerHTML = html;
       closeModal();
       const rv = document.getElementById('report-view');
@@ -3362,7 +3522,94 @@ function renderDirectionReport(){
     ${vehiclesSectionHtml(entries)}
     ${externalBadgesCardHtml(entries)}
     ${internalBadgesUnreturnedCardHtml(entries)}
+    ${agentTimelinesHtml(entries)}
   `;
+}
+
+/* ---------- v52 · Frise d'activité par agent ----------
+   Pour chaque agent ayant agi (ou prévu au planning Agendrix) sur la période du
+   Rapport direction : une ligne temporelle avec son créneau prévu (bandeau clair)
+   et un point par action enregistrée, à l'heure de l'action. Agents regroupés par
+   clé canonique (normalizeName, comme le filtre Agent). Les fiches « Événement »
+   sont exclues : leur champ agent liste les agents DÉSIGNÉS, ce n'est pas une
+   action menée. */
+window.__dirAgentLists = {};
+function agentTimelineBounds(){
+  if(dirMode==='day') return serviceDayBounds(document.getElementById('dir-serviceday').value || serviceDate());
+  const from = document.getElementById('dir-from').value, to = document.getElementById('dir-to').value;
+  if(!from && !to) return null;
+  // Même découpage que getDirectionEntries() en mode période : jours calendaires (00:00 → 24:00).
+  const start = new Date((from || to)+'T00:00:00'); const end = new Date((to || from)+'T00:00:00'); end.setDate(end.getDate()+1);
+  return { start, end };
+}
+function agentTimelinesHtml(entries){
+  window.__dirAgentLists = {};
+  const b = agentTimelineBounds();
+  const title = `<h3 style="margin:26px 0 12px;font-size:15px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink)">🕐 Frise d'activité par agent</h3>`;
+  if(!b) return title + '<div class="ag-tl"><div class="tl-empty">Choisissez une journée de service (ou une période Du/Au) pour afficher la frise.</div></div>';
+  const span = b.end - b.start;
+  const multiDay = span > 25*3600*1000;
+  const siteFilter = document.getElementById('dir-site').value;
+
+  const agents = {}; // key -> {label variants, list, shifts}
+  const add = (key, label)=>{ if(!agents[key]) agents[key] = { labels:{}, list:[], shifts:[] }; agents[key].labels[label] = (agents[key].labels[label]||0)+1; return agents[key]; };
+  entries.forEach(e=>{
+    if(e.kind==='evenement') return;
+    const d = new Date(e.ts); if(isNaN(d) || d<b.start || d>=b.end) return;
+    let a=''; try{ a = (e.src.agent(e.raw)||'').trim(); }catch(_){}
+    if(!a) return;
+    add(normalizeName(a), a).list.push(e);
+  });
+  (agendrixShifts||[]).forEach(sh=>{
+    if(siteFilter && sh.site!==siteFilter) return;
+    if(sh.fin<=b.start || sh.debut>=b.end || !sh.agent) return;
+    add(normalizeName(sh.agent), sh.agent).shifts.push(sh);
+  });
+
+  const keys = Object.keys(agents);
+  if(!keys.length) return title + '<div class="ag-tl"><div class="tl-empty">Aucune action d\'agent sur cette période.</div></div>';
+  const pct = d => Math.max(0, Math.min(100, ((d - b.start)/span)*100));
+  const labelOf = k => Object.entries(agents[k].labels).sort((x,y)=>y[1]-x[1] || x[0].localeCompare(y[0],'fr'))[0][0];
+  keys.sort((x,y)=>{
+    const fx = agents[x].list.length ? Math.min(...agents[x].list.map(e=>new Date(e.ts))) : (agents[x].shifts[0]?.debut||Infinity);
+    const fy = agents[y].list.length ? Math.min(...agents[y].list.map(e=>new Date(e.ts))) : (agents[y].shifts[0]?.debut||Infinity);
+    return fx - fy || labelOf(x).localeCompare(labelOf(y),'fr');
+  });
+
+  const kindsUsed = new Set();
+  const rows = keys.map((k,ki)=>{
+    const ag = agents[k];
+    ag.list.sort((x,y)=>new Date(x.ts)-new Date(y.ts));
+    const lk = 'ag'+ki; window.__dirAgentLists[lk] = ag.list;
+    const shifts = ag.shifts.map(sh=>{
+      const l = pct(sh.debut), r = pct(sh.fin);
+      return `<div class="ag-shift" style="left:${l}%;width:${Math.max(.5,r-l)}%" title="Prévu au planning : ${esc(fmtTime(sh.debut))} → ${esc(fmtTime(sh.fin))}${sh.site?' · '+esc(sh.site):''}"></div>`;
+    }).join('');
+    const dots = ag.list.map((e,i)=>{
+      const def = KINDS[e.kind] || { label:e.kind, color:'#888', icon:'' }; kindsUsed.add(e.kind);
+      let t=''; try{ t = e.src.title(e.raw); }catch(_){ t = def.label; }
+      const tip = `${multiDay?fmtDateShort(e.ts)+' ':''}${fmtTime(e.ts)} · ${def.label} · ${t}`;
+      return `<div class="ag-dot" style="left:${pct(new Date(e.ts))}%;background:${def.color}" title="${esc(tip)}" onclick="openListItemDetail(window.__dirAgentLists['${lk}'],${i})"></div>`;
+    }).join('');
+    const sub = `${ag.list.length} action${ag.list.length>1?'s':''}` + (ag.shifts.length ? ` · prévu ${ag.shifts.map(sh=>fmtTime(sh.debut)+'→'+fmtTime(sh.fin)).join(', ')}` : '');
+    return `<div class="ag-row">
+      <div class="ag-name" onclick="${ag.list.length?`showEntryListPopup('🕐 Frise d\'activité','${esc(labelOf(k)).replace(/'/g,"\\'")}',window.__dirAgentLists['${lk}'])`:''}" title="Voir la liste des actions">${esc(labelOf(k))}<small>${esc(sub)}</small></div>
+      <div class="ag-track"><div class="ag-line"></div>${shifts}${dots}</div>
+    </div>`;
+  }).join('');
+
+  const marks = (multiDay ? [0,25,50,75,100] : [0,12.5,25,37.5,50,62.5,75,87.5,100]).map(p=>{
+    const t = new Date(b.start.getTime() + span*p/100);
+    return `<span style="left:${p}%">${multiDay ? fmtDateShort(t)+' ' : ''}${fmtTime(t)}</span>`;
+  }).join('');
+  const legend = [...kindsUsed].map(k=>{ const d = KINDS[k]||{label:k,color:'#888'}; return `<span><i style="background:${d.color}"></i>${esc(d.label)}</span>`; }).join('')
+    + (keys.some(k=>agents[k].shifts.length) ? `<span><i style="background:#e6f0fa;border:1px solid #c9dcef;border-radius:3px;width:16px"></i>Créneau prévu au planning</span>` : '');
+  return title + `<div class="ag-tl">
+    <div class="ag-axis">${marks}</div>
+    ${rows}
+    <div class="ag-legend">${legend}</div>
+    <div style="font-size:11px;color:#999;margin-top:6px">Clic sur un point : rapport / détail de l'action · clic sur un nom : liste de ses actions.</div>
+  </div>`;
 }
 
 /* ---------- Version imprimable du rapport direction ---------- */
