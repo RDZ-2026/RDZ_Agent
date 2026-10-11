@@ -1,3 +1,4 @@
+<!-- RDZ · fleet-agent · 2026-10-11 · correctif heure des prises / restitutions de véhicule : l'heure saisie était enregistrée comme heure UTC (+2 h en été, +1 h en hiver à l'affichage). Voir migration-fleet-heures.sql pour corriger les mouvements déjà enregistrés. -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1505,7 +1506,11 @@ async function saveMvEntry(){
       vehicle_id:currentVeh.id,
       type:mvType,
       agent_name:agName,
-      datetime:document.getElementById('mv-datetime').value||new Date().toISOString(),
+      // Correctif 2026-10-11 : la valeur d'un champ datetime-local (« 2026-10-11T19:00 »)
+      // n'a pas de fuseau ; envoyée telle quelle, la base la prenait pour de l'heure
+      // UTC → +2 h (été) / +1 h (hiver) à l'affichage. new Date(valeur) la lit comme
+      // heure LOCALE (Genève) et toISOString() l'envoie avec le bon fuseau.
+      datetime:(()=>{ const v=document.getElementById('mv-datetime').value; const d=v?new Date(v):new Date(); return isNaN(d)?new Date().toISOString():d.toISOString(); })(),
       cleanliness:mvClean,
       photo_dashboard:photoUrl||null,
       notes:document.getElementById('mv-notes').value.trim()||null,
