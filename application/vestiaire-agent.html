@@ -1,0 +1,516 @@
+<!-- RDZ · vestiaire-agent · v1 · 2026-10-12 -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8B1A1A">
+<title>RDZ — Mon vestiaire</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!--
+  Mon vestiaire — agent, identifié par nom + code PIN (session partagée avec
+  l'application agent et le planning : rdz_agent_id / rdz_agent_nom /
+  rdz_agent_pin_hash). L'agent voit sa dotation, fait une demande d'articles
+  (taille, quantité, motif) et suit ses demandes.
+  Boucle de remontée : stk_demandes (via RDZSync) → stock-gestion.html
+  (Vestiaire → Demandes agents) → bon de commande → validation supervision.
+-->
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;
+  --report-red:#C8102E;
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+  --bg:#f5f4f2; --muted:#6b6b6b; --sh:0 2px 8px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg)}
+body{font-family:var(--font);color:var(--ink);min-height:100vh;font-size:14px}
+button,input,select,textarea{font-family:inherit;font-size:15px}
+.hidden{display:none!important}
+.top{position:sticky;top:0;z-index:20;background:var(--red);border-bottom:3px solid var(--red-dark);padding:12px 14px;display:flex;align-items:center;gap:10px;color:#fff}
+.top .t{flex:1;min-width:0}
+.top .n{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.top .s{font-size:11px;color:rgba(255,255,255,.7)}
+.tb{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;font-weight:700;padding:8px 11px;border-radius:var(--radius-ui);text-decoration:none;cursor:pointer;white-space:nowrap}
+.tabs{position:sticky;top:57px;z-index:15;display:grid;grid-template-columns:1fr 1fr 1fr;background:#fff;border-bottom:1px solid var(--line)}
+.tab{padding:12px 4px;border:none;background:none;font-weight:700;font-size:13px;color:var(--muted);border-bottom:3px solid transparent;cursor:pointer;position:relative}
+.tab.on{color:var(--red);border-bottom-color:var(--red)}
+.tab .b{background:var(--red);color:#fff;border-radius:9px;font-size:10px;padding:1px 6px;margin-left:4px}
+main{padding:14px 14px 90px;max-width:620px;margin:0 auto}
+.sec{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px}
+.box{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:13px;margin-bottom:12px;box-shadow:var(--sh)}
+.fl{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px}
+.fl:first-child{margin-top:0}
+.fi{width:100%;background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px}
+.fi:focus{outline:none;border-color:var(--red)}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{padding:9px 13px;border-radius:20px;border:1.5px solid var(--line);font-size:13px;font-weight:700;cursor:pointer;background:#fff;color:var(--ink)}
+.chip.sel{border-color:var(--red);background:var(--red);color:#fff}
+.arts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.art{background:#fff;border:1.5px solid var(--line);border-radius:var(--radius-ui);padding:12px 10px;text-align:left;cursor:pointer;min-height:64px}
+.art .i{font-size:22px}.art .l{font-size:13px;font-weight:700;margin-top:4px}
+.art.sel{border-color:var(--red);background:#fdf5f5}
+.qty{display:flex;align-items:center;gap:10px}
+.qb{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:700;cursor:pointer}
+.qv{min-width:30px;text-align:center;font-weight:800;font-size:18px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border:none;border-radius:var(--radius-ui);font-size:14px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer;background:var(--red);color:#fff;margin-top:10px}
+.btn:disabled{opacity:.45}
+.btn.g{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.list{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);box-shadow:var(--sh);margin-bottom:12px}
+.item{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--line-soft)}
+.item:last-child{border-bottom:none}
+.item .grow{flex:1;min-width:0}
+.item .nm{font-size:14px;font-weight:700}
+.item .sb{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}
+.item .ic{font-size:22px;width:28px;text-align:center}
+.del{background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;padding:4px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:10px;white-space:nowrap}
+.p-ok{background:#dcfce7;color:#166534}.p-warn{background:#fef3c7;color:#92400e}.p-bad{background:#fee2e2;color:#991b1b}.p-info{background:#dbeafe;color:#1e40af}.p-mut{background:#eee;color:#555}.p-pur{background:#ede9fe;color:#5b21b6}
+.empty{text-align:center;padding:26px 14px;color:var(--muted);font-size:13px;line-height:1.5}
+.note{background:#eff6ff;border-left:4px solid #1d4ed8;padding:10px 12px;font-size:12.5px;line-height:1.45;margin-bottom:12px}
+.okbox{background:#dcfce7;border-left:4px solid var(--ok);padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px;font-weight:700;color:#166534}
+.warnbox{background:#fef3c7;border-left:4px solid var(--warn);padding:10px 12px;font-size:12.5px;margin-bottom:12px}
+#toasts{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:999;width:calc(100% - 24px);max-width:400px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.toast{background:var(--ink);color:#fff;padding:10px 14px;border-radius:6px;font-size:13px;text-align:center}
+.toast.err{background:#991b1b}.toast.ok{background:#15803d}
+.auth{min-height:100vh;background:var(--red);display:flex;flex-direction:column}
+.auth-top{padding:30px 22px 22px;color:#fff;text-align:center}
+.auth-top .n{font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.auth-top .s{font-size:12px;color:rgba(255,255,255,.75);margin-top:4px}
+.auth-body{flex:1;background:var(--bg);border-radius:16px 16px 0 0;padding:22px 16px 30px}
+.auth-in{max-width:420px;margin:0 auto}
+.auth-title{font-size:20px;font-weight:700}
+.auth-sub{font-size:13px;color:var(--muted);margin:4px 0 16px;line-height:1.45}
+.pick{display:flex;justify-content:space-between;align-items:center;width:100%;background:#fff;border:1px solid var(--line);border-left:4px solid var(--red);border-radius:var(--radius-ui);padding:15px;font-size:15px;font-weight:700;margin-bottom:8px;cursor:pointer;text-align:left}
+.pin-name{font-size:19px;font-weight:700;text-align:center}
+.pin-msg{font-size:13px;color:var(--muted);text-align:center;margin-top:6px;min-height:18px}
+.pin-msg.err{color:#b91c1c;font-weight:700}
+.dots{display:flex;gap:16px;justify-content:center;margin:20px 0 24px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink)}.dot.on{background:var(--ink)}
+.keypad{display:grid;grid-template-columns:repeat(3,74px);gap:12px 20px;justify-content:center}
+.key{width:74px;height:74px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:26px;font-weight:700;cursor:pointer}
+.key.fn{background:none;border:none;font-size:13px;color:var(--muted)}
+.link{display:block;margin:22px auto 0;background:none;border:none;color:var(--muted);text-decoration:underline;font-size:13px;cursor:pointer}
+</style>
+</head>
+<body>
+
+<section id="scr-auth" class="auth hidden">
+  <div class="auth-top"><div class="n">RDZ Security Management</div><div class="s">Mon vestiaire</div></div>
+  <div class="auth-body"><div class="auth-in" id="auth-in"></div></div>
+</section>
+
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="t"><div class="n">👕 Mon vestiaire</div><div class="s" id="top-sub"></div></div>
+    <a class="tb" href="planning-agent.html">Planning</a>
+    <a class="tb" href="mobile.html">Appli</a>
+  </header>
+  <nav class="tabs">
+    <button class="tab" data-t="dotation" onclick="tab('dotation')">Ma dotation</button>
+    <button class="tab" data-t="demander" onclick="tab('demander')">Demander</button>
+    <button class="tab" data-t="demandes" onclick="tab('demandes')">Mes demandes</button>
+  </nav>
+  <main id="main"></main>
+</div>
+<div id="toasts"></div>
+
+<script>
+/* ═══ RDZSync v4 — copie de référence, collée telle quelle (voir application/rdz-sync-v4.js) ═══ */
+(function (global) {
+  'use strict';
+
+  var Q_TEXT = 'rdz_sync_queue';
+  var Q_PHOTO = 'rdz_sync_photo_queue';
+  var Q_LOG = 'rdz_sync_log';
+  var LOG_MAX = 30;
+
+  var _client = null;
+  var _onChange = null;
+  var _flushingText = false;
+  var _flushingPhotos = false;
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
+
+  function notify() {
+    var st = getStatus();
+    if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} }
+    renderBadge(st);
+  }
+
+  function uidSync() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(',');
+    var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+
+  function pushLog(entry) {
+    var log = readLS(Q_LOG);
+    log.unshift(entry);
+    if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX);
+    writeLS(Q_LOG, log);
+  }
+
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      if (typeof c.effectiveType === 'string') return null;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  function ensureBadge() {
+    var b = document.getElementById('rdz-sync-badge');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'rdz-sync-badge';
+    b.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:99999;' +
+      'font:600 12.5px Arial,Helvetica,sans-serif;color:#fff;' +
+      'background:#b8860b;padding:8px 12px;border-radius:2px;line-height:1.5;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;cursor:pointer;max-width:260px;';
+    b.title = 'Cliquer pour forcer la synchronisation';
+    b.onclick = function () { flushText(); flushPhotos(true); };
+    document.body.appendChild(b);
+    return b;
+  }
+  function renderBadge(st) {
+    if (typeof document === 'undefined' || !document.body) return;
+    var b = ensureBadge();
+    var parts = [];
+    if (st.textPending > 0) parts.push('⏳ ' + st.textPending + ' donnée(s) en attente de réseau');
+    if (st.photoPending > 0) parts.push('📷 ' + st.photoPending + ' photo(s) en attente de WiFi');
+    if (parts.length === 0) { b.style.display = 'none'; return; }
+    b.innerHTML = parts.join('<br>');
+    b.style.display = 'block';
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    }
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') {
+        c.addEventListener('change', tryAutoPhotos);
+      }
+    } catch (e) {}
+    if (typeof document !== 'undefined') {
+      var start = function () { notify(); flushText(); tryAutoPhotos(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    }
+    return API;
+  }
+
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var textEntry = {
+      id: uidSync(),
+      module: item.module || 'inconnu',
+      table: item.table,
+      op: item.op || 'insert',
+      onConflict: item.onConflict || null,
+      row: Object.assign({}, item.row || {}),
+      photoField: item.photoField || null,
+      bucket: item.bucket || null,
+      pendingPhotos: item.photos || [],
+      ts: new Date().toISOString(),
+      tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry); writeLS(Q_TEXT, q);
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true;
+    var q = readLS(Q_TEXT); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingText = false; return; }
+      var it = q[i];
+      var qb = _client.from(it.table);
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({
+                id: uidSync(), module: it.module, table: it.table, rowId: rowId,
+                bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+              });
+            });
+            writeLS(Q_PHOTO, pq);
+            tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function () {
+        var cur = readLS(Q_TEXT);
+        var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_TEXT, cur); }
+        _flushingText = false;
+      });
+    }
+    next();
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingPhotos = true;
+    var q = readLS(Q_PHOTO); var i = 0;
+
+    function next() {
+      if (i >= q.length) { _flushingPhotos = false; return; }
+      var p = q[i];
+      var path = p.module + '/' + Date.now() + '_' + p.name;
+      var blob = dataUrlToBlob(p.dataUrl);
+      _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+          var url = pub && pub.data ? pub.data.publicUrl : null;
+          var patch = {}; patch[p.field] = url;
+          return _client.from(p.table).update(patch).eq('id', p.rowId);
+        })
+        .then(function (res) {
+          if (res && res.error) throw res.error;
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) cur.splice(idx, 1);
+          writeLS(Q_PHOTO, cur);
+          pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          i++; next();
+        })
+        .catch(function () {
+          var cur = readLS(Q_PHOTO);
+          var idx = cur.findIndex(function (x) { return x.id === p.id; });
+          if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; writeLS(Q_PHOTO, cur); }
+          _flushingPhotos = false;
+        });
+    }
+    next();
+  }
+
+  function getStatus() {
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: readLS(Q_PHOTO).length,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = {
+    init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
+  };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+const SUPABASE_URL='https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+RDZSync.init({client:sb,onChange:()=>{if(ME&&T==='demandes')render();}});
+
+const LS_ID='rdz_agent_id', LS_NOM='rdz_agent_nom', LS_HASH='rdz_agent_pin_hash';
+const MOTIFS=[['premiere_dotation','Première dotation'],['usure','Usé / à renouveler'],['taille','Taille inadaptée'],['perte','Perdu'],['autre','Autre']];
+const MOTIF_L=Object.fromEntries(MOTIFS);
+const ST={en_attente:['En attente','p-warn','Votre demande a été transmise au responsable matériel.'],
+  retenue:['Acceptée','p-info','Ajoutée au prochain bon de commande.'],
+  commandee:['Commandée','p-pur','Commande passée auprès du fournisseur.'],
+  a_remettre:['Prête','p-ok','Disponible : à retirer auprès du responsable matériel.'],
+  remise:['Remise','p-mut',''],refusee:['Refusée','p-bad',''],annulee:['Annulée','p-mut','']};
+
+let ME=null, T='dotation';
+let C={articles:[],variantes:[],detentions:[],unites:[],demandes:[],loaded:false};
+let F={aid:'',vid:'',q:1,motif:'',com:'',cart:[]};
+
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function toast(m,t){const e=document.createElement('div');e.className='toast '+(t||'');e.textContent=m;$('toasts').appendChild(e);setTimeout(()=>e.remove(),3000);}
+function fullName(a){return [a.nom,a.prenom].filter(Boolean).join(' ')||'—';}
+function dt(ts){return ts?new Date(ts).toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'}):'';}
+
+// ═══ IDENTIFICATION (même PIN que l'application) ═══
+async function hashPin(pin){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('RDZ-PIN-2026-'+pin));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+function showAuth(html){$('app').classList.add('hidden');$('scr-auth').classList.remove('hidden');$('auth-in').innerHTML=html;}
+async function identList(msg){
+  showAuth(`<div class="auth-title">Qui êtes-vous ?</div><div class="auth-sub">Sélectionnez votre nom puis saisissez votre code PIN habituel.</div>${msg?`<div class="warnbox">${esc(msg)}</div>`:''}<div id="ident-list"><div class="empty">Chargement…</div></div>`);
+  try{const {data,error}=await sb.from('agents').select('id,nom,prenom').eq('actif',true).order('nom');if(error)throw error;
+    $('ident-list').innerHTML=(data||[]).map(a=>`<button class="pick" onclick="pickAgent('${esc(a.id)}')">${esc(fullName(a))}<span>›</span></button>`).join('')||'<div class="empty">Aucun agent.</div>';
+  }catch(e){$('ident-list').innerHTML=`<div class="empty">Connexion impossible.<br>${esc(e.message)}<br><br><button class="btn g" onclick="identList()">Réessayer</button></div>`;}
+}
+let PIN={buf:'',a:null};
+async function pickAgent(id){
+  try{const {data,error}=await sb.from('agents').select('id,nom,prenom,pin_hash,actif').eq('id',id).single();if(error)throw error;
+    if(!data.pin_hash)return identList('Créez d\'abord votre code PIN dans l\'application RDZ Agent.');
+    PIN={buf:'',a:data};pinScreen('Entrez votre code PIN');}catch(e){toast('Erreur : '+e.message,'err');}
+}
+function pinScreen(msg,err){
+  showAuth(`<div class="pin-name">${esc(fullName(PIN.a))}</div><div class="pin-msg ${err?'err':''}">${esc(msg)}</div>
+    <div class="dots">${[0,1,2,3].map(i=>`<div class="dot ${i<PIN.buf.length?'on':''}"></div>`).join('')}</div>
+    <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k=>k===''?'<div></div>':k==='del'?'<button class="key fn" onclick="pinKey(null)">Effacer</button>':`<button class="key" onclick="pinKey('${k}')">${k}</button>`).join('')}</div>
+    <button class="link" onclick="identList()">Ce n'est pas moi</button>`);
+}
+async function pinKey(k){
+  if(k===null){PIN.buf=PIN.buf.slice(0,-1);return pinScreen('Entrez votre code PIN');}
+  if(PIN.buf.length>=4)return;PIN.buf+=k;
+  if(PIN.buf.length<4)return pinScreen('Entrez votre code PIN');
+  const h=await hashPin(PIN.buf);
+  if(h===PIN.a.pin_hash){localStorage.setItem(LS_ID,PIN.a.id);localStorage.setItem(LS_NOM,fullName(PIN.a));localStorage.setItem(LS_HASH,h);enter(PIN.a);}
+  else{PIN.buf='';pinScreen('Code incorrect, réessayez',true);}
+}
+function enter(a){
+  ME={id:String(a.id),nom:fullName(a)};
+  $('scr-auth').classList.add('hidden');$('app').classList.remove('hidden');$('top-sub').textContent=ME.nom;
+  try{C=Object.assign(C,JSON.parse(localStorage.getItem('stk_vest_cache_'+ME.id)||'{}'));}catch(e){}
+  tab(T);load();
+}
+async function init(){
+  const id=localStorage.getItem(LS_ID),h=localStorage.getItem(LS_HASH);
+  if(!id)return identList();
+  try{const {data,error}=await sb.from('agents').select('id,nom,prenom,pin_hash,actif').eq('id',id).single();if(error)throw error;
+    if(!data||data.actif===false){[LS_ID,LS_NOM,LS_HASH].forEach(k=>localStorage.removeItem(k));return identList('Votre accès a été désactivé.');}
+    if(data.pin_hash&&data.pin_hash===h)return enter(data);
+    PIN={buf:'',a:data};pinScreen('Votre code a changé, merci de le ressaisir');
+  }catch(e){ // hors réseau : session déjà ouverte sur cet appareil
+    const nom=localStorage.getItem(LS_NOM);if(nom&&h)return enter({id,nom,prenom:''});
+    identList('Connexion impossible pour le moment.');
+  }
+}
+
+// ═══ DONNÉES ═══
+async function load(){
+  try{
+    const r=await Promise.all([
+      sb.from('stk_articles').select('id,nom,icon,categorie,domaine,suivi,actif').eq('actif',true).order('ordre').order('nom'),
+      sb.from('stk_variantes').select('id,article_id,taille,ordre,actif').eq('actif',true).order('ordre'),
+      sb.from('stk_detentions').select('*').eq('agent_id',ME.id),
+      sb.from('stk_unites').select('id,article_id,numero,etat,mission,date_mouvement').eq('agent_id',ME.id).eq('statut','sorti'),
+      sb.from('stk_demandes').select('*').eq('agent_id',ME.id).order('created_at',{ascending:false}).limit(60)
+    ]);
+    const e=r.find(x=>x.error);if(e)throw e.error;
+    const [articles,variantes,detentions,unites,demandes]=r.map(x=>x.data||[]);
+    C={articles,variantes,detentions,unites,demandes,loaded:true,at:new Date().toISOString()};
+    try{localStorage.setItem('stk_vest_cache_'+ME.id,JSON.stringify(C));}catch(_){}
+  }catch(e){if(!C.loaded)toast('Hors réseau : '+e.message,'err');else toast('Hors réseau — dernières données connues','err');}
+  render();
+}
+const art=id=>C.articles.find(a=>a.id===id);
+const vari=id=>C.variantes.find(v=>v.id===id);
+function vLabel(vid,fallback){const v=vari(vid);const a=v&&art(v.article_id);return a?a.nom+(v.taille!=='Unique'?' — taille '+v.taille:''):(fallback||'Article');}
+function vIcon(vid){const v=vari(vid);const a=v&&art(v.article_id);return (a&&a.icon)||'👕';}
+// demandes encore dans la file hors-ligne (pas encore arrivées au serveur)
+function pendingDem(){let q=[];try{q=JSON.parse(localStorage.getItem('rdz_sync_queue')||'[]');}catch(e){}return q.filter(x=>x.table==='stk_demandes'&&x.row&&x.row.agent_id===ME.id).map(x=>Object.assign({},x.row,{_local:true}));}
+
+// ═══ RENDU ═══
+function tab(t){T=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));render();window.scrollTo(0,0);}
+function render(){
+  if(!ME)return;
+  const ready=C.demandes.filter(d=>d.statut==='a_remettre').length;
+  const b=document.querySelector('.tab[data-t="demandes"]');b.innerHTML='Mes demandes'+(ready?`<span class="b">${ready}</span>`:'');
+  if(!C.loaded&&!C.articles.length){$('main').innerHTML='<div class="empty">Chargement…</div>';return;}
+  $('main').innerHTML=T==='demander'?rDemander():T==='demandes'?rDemandes():rDotation();
+}
+function rDotation(){
+  const ready=C.demandes.filter(d=>d.statut==='a_remettre');
+  const vest=C.detentions.filter(d=>{const v=vari(d.variante_id);const a=v&&art(v.article_id);return !a||a.domaine==='vestiaire';});
+  const mat=C.detentions.filter(d=>!vest.includes(d));
+  let h=ready.length?`<div class="okbox">📦 ${ready.length} article(s) vous attend(ent) : à retirer auprès du responsable matériel.</div>`:'';
+  h+=`<div class="sec">Vestiaire</div>`+(vest.length?`<div class="list">${vest.map(d=>`<div class="item"><div class="ic">${vIcon(d.variante_id)}</div><div class="grow"><div class="nm">${esc(vLabel(d.variante_id))}</div><div class="sb">${d.type==='mission'?'Pour la mission '+esc(d.mission||''):'Dotation personnelle'} · depuis le ${dt(d.date_sortie)}</div></div><div class="nm">×${d.quantite}</div></div>`).join('')}</div>`:'<div class="box empty">Aucune dotation vestiaire enregistrée.</div>');
+  if(mat.length||C.unites.length){
+    h+=`<div class="sec">Matériel confié</div><div class="list">${mat.map(d=>`<div class="item"><div class="ic">${vIcon(d.variante_id)}</div><div class="grow"><div class="nm">${esc(vLabel(d.variante_id))}</div><div class="sb">${d.mission?'Mission '+esc(d.mission):'Dotation'}</div></div><div class="nm">×${d.quantite}</div></div>`).join('')}
+      ${C.unites.map(u=>{const a=art(u.article_id);return `<div class="item"><div class="ic">${esc(a?.icon||'📦')}</div><div class="grow"><div class="nm">${esc(a?.nom||'Matériel')} n° ${esc(u.numero)}</div><div class="sb">${u.mission?'Mission '+esc(u.mission)+' · ':''}depuis le ${dt(u.date_mouvement)}</div></div></div>`;}).join('')}</div>`;
+  }
+  h+=`<div class="note">Une erreur dans votre dotation ? Signalez-la au responsable matériel. Pour un article usé ou une taille inadaptée, faites une demande dans l'onglet <b>Demander</b>.</div>`;
+  return h;
+}
+function rDemander(){
+  const arts=C.articles.filter(a=>a.domaine==='vestiaire');
+  const a=art(F.aid);const vs=a?C.variantes.filter(v=>v.article_id===a.id).sort((x,y)=>x.ordre-y.ordre):[];
+  if(a&&vs.length===1)F.vid=vs[0].id;
+  let h=`<div class="box"><label class="fl">1. Article</label>
+    ${arts.length?`<div class="arts">${arts.map(x=>`<button class="art ${x.id===F.aid?'sel':''}" onclick="F.aid='${x.id}';F.vid='';render()"><div class="i">${esc(x.icon||'👕')}</div><div class="l">${esc(x.nom)}</div></button>`).join('')}</div>`:'<div class="empty">Le catalogue vestiaire est vide.</div>'}
+    ${a&&vs.length>1?`<label class="fl">2. Taille</label><div class="chips">${vs.map(v=>`<span class="chip ${v.id===F.vid?'sel':''}" onclick="F.vid='${v.id}';render()">${esc(v.taille)}</span>`).join('')}</div>`:''}
+    ${a?`<label class="fl">${vs.length>1?'3':'2'}. Quantité</label><div class="qty"><button class="qb" onclick="F.q=Math.max(1,F.q-1);render()">−</button><span class="qv">${F.q}</span><button class="qb" onclick="F.q=Math.min(10,F.q+1);render()">+</button></div>
+      <label class="fl">Motif</label><div class="chips">${MOTIFS.map(([k,l])=>`<span class="chip ${F.motif===k?'sel':''}" onclick="F.motif='${k}';render()">${l}</span>`).join('')}</div>
+      <label class="fl">Précision (facultatif)</label><input class="fi" maxlength="200" placeholder="Ex. le polo M est trop court" value="${esc(F.com)}" oninput="F.com=this.value">
+      <button class="btn g" onclick="addCart()">➕ Ajouter à ma demande</button>`:''}
+  </div>`;
+  if(F.cart.length)h+=`<div class="sec">Ma demande</div><div class="list">${F.cart.map((c,i)=>`<div class="item"><div class="ic">${vIcon(c.vid)}</div><div class="grow"><div class="nm">${esc(vLabel(c.vid))} ×${c.q}</div><div class="sb">${esc(MOTIF_L[c.motif])}${c.com?' · '+esc(c.com):''}</div></div><button class="del" onclick="F.cart.splice(${i},1);render()">✕</button></div>`).join('')}</div>
+    <button class="btn" onclick="send()">📨 Envoyer ma demande (${F.cart.length})</button>`;
+  return h;
+}
+function addCart(){
+  if(!F.vid)return toast('Choisissez la taille','err');
+  if(!F.motif)return toast('Choisissez un motif','err');
+  F.cart.push({vid:F.vid,q:F.q,motif:F.motif,com:(F.com||'').trim()});
+  F.aid='';F.vid='';F.q=1;F.motif='';F.com='';render();
+}
+function send(){
+  F.cart.forEach(c=>{const v=vari(c.vid);const a=v&&art(v.article_id);
+    RDZSync.save({module:'vestiaire-agent',table:'stk_demandes',row:{
+      created_at:new Date().toISOString(),agent_id:ME.id,agent_nom:ME.nom,article_id:a?a.id:null,variante_id:c.vid,
+      article_nom:a?a.nom:null,taille:v?v.taille:null,quantite:c.q,motif:c.motif,commentaire:c.com||null,statut:'en_attente'}});});
+  const n=F.cart.length;F.cart=[];
+  toast('📨 Demande envoyée'+(navigator.onLine?'':' (hors réseau — partira dès le retour du réseau)'),'ok');
+  setTimeout(load,1500);tab('demandes');
+}
+function rDemandes(){
+  const pend=pendingDem();
+  const list=pend.concat(C.demandes);
+  if(!list.length)return `<div class="empty">Aucune demande pour le moment.<br><br><button class="btn" onclick="tab('demander')">Faire une demande</button></div>`;
+  return `<div class="list">${list.map(d=>{const s=d._local?['Envoi en attente de réseau','p-warn','']:(ST[d.statut]||[d.statut,'p-mut','']);
+    return `<div class="item"><div class="ic">${vIcon(d.variante_id)}</div><div class="grow"><div class="nm">${esc(vLabel(d.variante_id,(d.article_nom||'')+' '+(d.taille||'')))} ×${d.quantite}</div>
+      <div class="sb">${dt(d.created_at)} · ${esc(MOTIF_L[d.motif]||d.motif)}${d.commentaire?' · « '+esc(d.commentaire)+' »':''}</div>
+      ${s[2]||d.reponse?`<div class="sb">${esc(d.reponse||s[2])}</div>`:''}</div>
+      <div style="text-align:right"><span class="pill ${s[1]}">${esc(s[0])}</span>${d.statut==='en_attente'&&!d._local?`<br><button class="del" style="font-size:12px;text-decoration:underline" onclick="cancelDem('${d.id}')">Annuler</button>`:''}</div></div>`;}).join('')}</div>
+    <button class="btn g" onclick="load().then(()=>toast('À jour','ok'))">⟳ Actualiser</button>`;
+}
+async function cancelDem(id){
+  if(!confirm('Annuler cette demande ?'))return;
+  try{const {data,error}=await sb.from('stk_demandes').update({statut:'annulee',updated_at:new Date().toISOString()}).eq('id',id).eq('agent_id',ME.id).eq('statut','en_attente').select('id');
+    if(error)throw error;toast(data&&data.length?'Demande annulée':'Cette demande a déjà été traitée',data&&data.length?'ok':'err');load();}
+  catch(e){toast('Réseau requis pour annuler','err');}
+}
+init();
+</script>
+</body>
+</html>
