@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent · v14 · 2026-10-14 · ouvert à tous les agents -->
+<!-- RDZ · planning-agent · v15 · 2026-10-14 · + demandes de tenue / matériel -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -162,6 +162,10 @@ main.with-compose{padding-bottom:170px;}
 .pdsa-box.dark .pd-step.wait{background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);}
 .pd-step.done{background:var(--ok-bg);color:var(--ok);}
 .pdsa-box.dark .pd-step.done{background:rgba(22,163,74,.2);color:#86efac;}
+.eq-qty{display:flex;align-items:center;gap:12px;}
+.eq-qty > button:not(.btn){width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:700;}
+.eq-qty b{font-size:18px;min-width:22px;text-align:center;}
+select.finp{appearance:auto;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -503,13 +507,15 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v14 · 14.10.2026';
+const APP_VERSION = 'v15 · 14.10.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
 let AGENT = null;        // fiche agents (RDZ_Agent)
 let SHIFTS = [];
 let ABS = { list:[], balance:null, loaded:false };
+let EQ = { loaded:false, linked:false, articles:[], dotations:[], demandes:[] };  // tenues & matériel
+let EQF = { lines:[], article:'', taille:'', qty:1, motif:'', preset:'' };
 let CHANGES = [];        // journal des modifications (serveur)
 let UNREAD = new Set();  // ids de modifications non encore vues sur cet appareil
 let VIEW = { tab:'home', detail:null, planMode:'upcoming', allChanges:false };
@@ -652,7 +658,7 @@ async function pinDigit(d){
     setTimeout(()=>{ el.classList.remove('shake'); pinBuf=''; dots(0); },400);
   }
 }
-function logout(){ closeSheet(); MSGS=[]; GROUPS=[]; GMSGS=[]; VIEW.groupId=null; MSG_DRAFT=''; if(MSG_POLL){ clearInterval(MSG_POLL); MSG_POLL=null; } const cp=document.getElementById('compose'); if(cp) cp.remove(); clearLocal(); AGENT=null; SHIFTS=[]; ABS={list:[],balance:null,loaded:false}; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
+function logout(){ closeSheet(); EQ={ loaded:false, linked:false, articles:[], dotations:[], demandes:[] }; MSGS=[]; GROUPS=[]; GMSGS=[]; VIEW.groupId=null; MSG_DRAFT=''; if(MSG_POLL){ clearInterval(MSG_POLL); MSG_POLL=null; } const cp=document.getElementById('compose'); if(cp) cp.remove(); clearLocal(); AGENT=null; SHIFTS=[]; ABS={list:[],balance:null,loaded:false}; CHANGES=[]; UNREAD=new Set(); VIEW={tab:'home',detail:null,planMode:'upcoming'}; showIdent(); }
 
 // ── Données planning ─────────────────────────────────────────
 function mapShift(r){
@@ -690,7 +696,7 @@ async function reload(manual){
     ]);
     if(msgs) setMessages(msgs);
     if(gfeed) setGroupFeed(gfeed);
-    await loadPdsa();
+    await Promise.all([loadPdsa(), loadEquipment()]);
     SHIFTS = (rows||[]).map(mapShift).filter(s=>s.status && s.status!==HIDDEN_STATUS);
     if(chg) setChanges(chg);
     if(abs){
@@ -834,6 +840,7 @@ function renderHome(){
   if(toDecl) h += `<div class="validate-bar"><span>${toDecl} service${toDecl>1?'s':''} terminé${toDecl>1?'s':''} : vérifiez vos heures</span><button class="btn btn-red btn-sm" onclick="go('temps')">Vérifier</button></div>`;
   h += renderStats(up);
   h += renderLeaveCard();
+  h += renderEquipCard();
   h += renderChangesBlock();
   const rest = up.slice(1,4);
   if(rest.length){
@@ -997,6 +1004,103 @@ function absChip(a){
   return `<span class="chip ${c}">${esc(l)}</span>`;
 }
 function jours(n){ n=Number(n)||0; const v=Number.isInteger(n)? n : n.toFixed(1).replace('.',','); return v+' jour'+(Math.abs(n)>1?'s':''); }
+// ── Tenues & matériel (lié à stock-admin) ────────────────────
+const EQ_PRESETS = ['Usure','Perte / vol','Changement de taille','Première dotation','Autre'];
+async function loadEquipment(){
+  if(!AGENT) return;
+  try{
+    const r = await agentRpc('rdz_agent_stock_catalog', { p_agent_id:String(AGENT.id), p_pin_hash:localStorage.getItem(LS_HASH)||'' });
+    EQ = { loaded:true, linked:!!r.linked, articles:r.articles||[], dotations:r.dotations||[], demandes:r.demandes||[] };
+  }catch(e){ /* module non installé ou hors ligne : la carte reste masquée */ }
+}
+function eqStatusChip(st){
+  return st==='acceptee'? '<span class="chip ok">Acceptée</span>' : st==='refusee'? '<span class="chip bad">Refusée</span>'
+       : st==='annulee'? '<span class="chip muted">Annulée</span>' : '<span class="chip warn">En attente</span>';
+}
+function renderEquipCard(){
+  if(!EQ.loaded) return '';
+  const recent = EQ.demandes.filter(d=>d.statut==='en_attente' || (d.decided_at && Date.now()-new Date(d.decided_at) < 21*864e5)).slice(0,5);
+  const pend = EQ.demandes.filter(d=>d.statut==='en_attente').length;
+  const nbDot = EQ.dotations.reduce((n,d)=>n+(Number(d.quantite)||0),0);
+  return `<div class="sec-title">Tenue &amp; équipement</div><div class="leave">
+    <div class="leave-top"><span class="grp-av" style="background:var(--red)">${I.user}</span>
+      <div class="leave-txt"><div class="t">Ma dotation</div><div class="s">${nbDot? nbDot+' article'+(nbDot>1?'s':'')+' remis' : 'Aucun article enregistré'}${pend? ' · '+pend+' demande'+(pend>1?'s':'')+' en attente' : ''}</div></div>
+      ${EQ.dotations.length? `<button class="sec-link" onclick="openDotation()">Voir</button>` : ''}</div>
+    ${recent.length? `<div class="leave-list">${recent.map(d=>`<div class="lv">
+        <div class="lv-main"><b>${esc(d.quantite)} × ${esc(d.article)}${d.taille?' · '+esc(d.taille):''}</b><span>${esc(new Date(d.created_at).toLocaleDateString('fr-CH',{day:'numeric',month:'short'}))}${d.reponse? ' · « '+esc(d.reponse)+' »' : ''}</span></div>
+        ${eqStatusChip(d.statut)}
+        ${d.statut==='en_attente'? `<button class="lv-x" onclick="cancelEq('${esc(d.id)}')">Annuler</button>` : ''}
+      </div>`).join('')}</div>` : ''}
+    <button class="btn btn-red btn-block" onclick="openEquipForm()">Demander une tenue / du matériel</button>
+  </div>`;
+}
+function openDotation(){
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Ma dotation</h2><div class="sub">Articles qui vous ont été remis par RDZ.</div>
+    <div class="sheet-list">${EQ.dotations.map(d=>`<div><span><b>${esc(d.article)}</b>${d.taille?' · '+esc(d.taille):''}</span><span>× ${esc(d.quantite)}</span></div>`).join('')}</div>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Fermer</button></div></div>`;
+}
+function openEquipForm(){ EQF = { lines:[], article:'', taille:'', qty:1, motif:'', preset:'' }; renderEquipForm(); }
+function eqArticle(id){ return EQ.articles.find(a=>String(a.id)===String(id)); }
+function eqSet(k,v){ EQF[k]=v; if(k==='article'){ EQF.taille=''; EQF.qty=1; } renderEquipForm(); }
+function eqAddLine(){
+  const a=eqArticle(EQF.article); if(!a) return renderEquipForm('Choisissez un article.');
+  if((a.tailles||[]).length && !EQF.taille) return renderEquipForm('Choisissez une taille.');
+  const ex = EQF.lines.find(l=>l.article_id===String(a.id) && l.taille===(EQF.taille||''));
+  if(ex) ex.quantite=Math.min(10, ex.quantite+EQF.qty);
+  else EQF.lines.push({ article_id:String(a.id), nom:a.nom, taille:EQF.taille||'', quantite:EQF.qty });
+  EQF.article=''; EQF.taille=''; EQF.qty=1; renderEquipForm();
+}
+function eqDelLine(i){ EQF.lines.splice(i,1); renderEquipForm(); }
+function renderEquipForm(err){
+  if(!EQ.articles.length){
+    $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet"><h2>Demande de matériel</h2><div class="sub">Aucun article n'est disponible pour le moment.</div><button class="btn btn-ghost btn-block" onclick="closeSheet()">Fermer</button></div></div>`; return;
+  }
+  const cats = [...new Set(EQ.articles.map(a=>a.categorie||'Autres'))];
+  const a = eqArticle(EQF.article);
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>Demande de matériel</h2>
+    <div class="sub">Votre responsable reçoit la demande dans le stock RDZ et vous répond ici.</div>
+    ${!EQ.linked? '<div class="req-sum warn">Votre fiche n’est pas encore créée dans le stock RDZ : votre demande sera bien envoyée, votre responsable la reliera.</div>' : ''}
+    <label class="fl" for="eq-art">Article</label>
+    <select class="finp" id="eq-art" onchange="eqSet('article',this.value)">
+      <option value="">Choisir…</option>
+      ${cats.map(c=>`<optgroup label="${esc(c)}">${EQ.articles.filter(x=>(x.categorie||'Autres')===c).map(x=>`<option value="${esc(x.id)}" ${String(x.id)===String(EQF.article)?'selected':''}>${esc(x.nom)}</option>`).join('')}</optgroup>`).join('')}
+    </select>
+    ${a && (a.tailles||[]).length? `<label class="fl">Taille</label><div class="presets">${a.tailles.map((t,i)=>`<button class="${EQF.taille===t.taille?'on':''}" onclick="eqSet('taille',eqArticle(EQF.article).tailles[${i}].taille)">${esc(t.taille)}${t.dispo?'':' · rupture'}</button>`).join('')}</div>` : ''}
+    ${a? `<label class="fl">Quantité</label><div class="eq-qty"><button onclick="eqSet('qty',Math.max(1,EQF.qty-1))">−</button><b>${EQF.qty}</b><button onclick="eqSet('qty',Math.min(10,EQF.qty+1))">+</button>
+        <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="eqAddLine()">${I.plus}Ajouter</button></div>` : ''}
+    ${EQF.lines.length? `<label class="fl">Ma demande</label><div class="sheet-list">${EQF.lines.map((l,i)=>`<div><span><b>${l.quantite} × ${esc(l.nom)}</b>${l.taille?' · '+esc(l.taille):''}</span><button class="lv-x" onclick="eqDelLine(${i})">Retirer</button></div>`).join('')}</div>` : ''}
+    <label class="fl">Motif</label>
+    <div class="presets">${EQ_PRESETS.map((p,i)=>`<button class="${EQF.preset===p?'on':''}" onclick="EQF.preset=EQF.preset===EQ_PRESETS[${i}]?'':EQ_PRESETS[${i}];renderEquipForm()">${esc(p)}</button>`).join('')}</div>
+    <textarea class="finp" style="margin-top:8px" maxlength="250" placeholder="Précisions (facultatif)" oninput="EQF.motif=this.value">${esc(EQF.motif)}</textarea>
+    ${err? `<div class="req-err">${esc(err)}</div>` : ''}
+    <button class="btn btn-red btn-block" id="eq-btn" style="margin-top:16px" onclick="submitEquip()" ${EQF.lines.length||a?'':'disabled'}>Envoyer la demande</button>
+    <button class="btn btn-ghost btn-block" onclick="closeSheet()">Annuler</button>
+  </div></div>`;
+}
+async function submitEquip(){
+  // un article sélectionné mais pas encore « Ajouté » est pris en compte
+  if(EQF.article){ const a=eqArticle(EQF.article); if(a && (!(a.tailles||[]).length || EQF.taille)) eqAddLine(); else if(a) return renderEquipForm('Choisissez une taille ou retirez l’article sélectionné.'); }
+  if(!EQF.lines.length) return renderEquipForm('Ajoutez au moins un article.');
+  const motif = [EQF.preset, (EQF.motif||'').trim()].filter(Boolean).join(' — ');
+  const btn=$('eq-btn'); if(btn){ btn.disabled=true; btn.textContent='Envoi…'; }
+  try{
+    await agentRpc('rdz_agent_stock_request', { p_agent_id:String(AGENT.id), p_pin_hash:localStorage.getItem(LS_HASH)||'',
+      p_items:EQF.lines.map(l=>({ article_id:l.article_id, taille:l.taille||null, quantite:l.quantite })), p_motif:motif });
+    closeSheet(); toast('Demande envoyée à votre responsable');
+    await loadEquipment(); render();
+  }catch(e){ renderEquipForm(e.message||'Envoi impossible'); }
+}
+async function cancelEq(id){
+  if(!confirm('Annuler cette demande ?')) return;
+  try{
+    const ok = await agentRpc('rdz_agent_stock_cancel', { p_agent_id:String(AGENT.id), p_pin_hash:localStorage.getItem(LS_HASH)||'', p_id:id });
+    toast(ok? 'Demande annulée' : 'Cette demande a déjà été traitée', !ok);
+  }catch(e){ toast(e.message||'Annulation impossible', true); }
+  await loadEquipment(); render();
+}
+
 function renderLeaveCard(){
   const b = ABS.balance, t = todayISO();
   // Demandes à afficher : en attente + à venir/en cours, puis dernières traitées
