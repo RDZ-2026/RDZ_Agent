@@ -1,4 +1,4 @@
-<!-- RDZ · feuille-route-agent · v3 · 2026-10-14 -->
+<!-- RDZ · feuille-route-agent · v4 · 2026-10-14 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -114,6 +114,7 @@
   .ck-btn.pas_fait.on { background: #dc2626; border-color: #dc2626; color: #fff; }
   .ck-btn.na.on { background: #6b6b6b; border-color: #6b6b6b; color: #fff; }
   .ck-comment { margin-top: 8px; }
+  .ck-add-comment { display: inline-block; margin-top: 8px; background: none; border: none; padding: 4px 0; font-size: 12px; font-weight: 700; color: var(--rdz-gray); text-decoration: underline; cursor: pointer; font-family: Arial, Helvetica, sans-serif; }
   .ck-warn { display: none; margin-top: 6px; font-size: 11px; font-weight: 700; color: #ea580c; }
   .ck-item.need-comment .ck-warn { display: block; }
   .ck-general { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 12px; margin-top: 6px; }
@@ -805,9 +806,10 @@ function ckItemHtml(t) {
       <button class="ck-btn pas_fait${on('pas_fait')}" onclick="setCheck(this,'pas_fait')">✗ Pas fait</button>
       <button class="ck-btn na${on('na')}" onclick="setCheck(this,'na')">N/A</button>
     </div>
+    <button class="ck-add-comment" style="display:${showC ? 'none' : 'inline-block'}" onclick="openCheckComment(this)">💬 Ajouter un commentaire</button>
     <div class="ck-comment" style="display:${showC ? 'block' : 'none'}">
-      <div class="real-time-lbl">Commentaire${st === 'pas_fait' ? ' (obligatoire)' : ''} <span class="save-ok">✓</span></div>
-      <textarea class="note-input" placeholder="Pourquoi ce n'est pas fait ? Ce qui a été constaté…"
+      <div class="real-time-lbl">Commentaire${st === 'pas_fait' ? ' (obligatoire)' : ' (optionnel)'} <span class="save-ok">✓</span></div>
+      <textarea class="note-input" placeholder="${st === 'pas_fait' ? "Pourquoi ce n'est pas fait ? Ce qui a été constaté…" : 'Remarque sur cette tâche…'}"
         oninput="ckLiveComment(this)" onchange="saveCheckComment(this)">${escHtml(comment)}</textarea>
     </div>
     <div class="ck-warn">⚠ Commentaire obligatoire pour « Pas fait »</div>
@@ -909,6 +911,15 @@ function setCheck(btn, status) {
     const ta = fresh.querySelector('textarea');
     if (ta && !ta.value.trim()) ta.focus();
   }
+}
+
+function openCheckComment(btn) {
+  const item = btn.closest('.ck-item');
+  btn.style.display = 'none';
+  const box = item.querySelector('.ck-comment');
+  box.style.display = 'block';
+  const ta = box.querySelector('textarea');
+  if (ta) ta.focus();
 }
 
 function ckLiveComment(ta) {
