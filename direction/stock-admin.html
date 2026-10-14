@@ -327,6 +327,21 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--gray-light);height:
   <div id="dot-list"></div>
 </div>
 
+<!-- DEMANDES AGENTS (depuis planning-agent.html) -->
+<div class="panel" id="panel-dem">
+  <div class="phdr">
+    <div><div class="ptitle">📨 Demandes des agents</div><div class="psub">Envoyées depuis l'application planning agent. Accepter = dotation automatique (stock décrémenté + historique).</div></div>
+    <select class="fc" id="dem-filter" style="width:auto" onchange="rDem()">
+      <option value="en_attente">En attente</option>
+      <option value="">Toutes (60 derniers jours)</option>
+      <option value="acceptee">Acceptées</option>
+      <option value="refusee">Refusées</option>
+    </select>
+  </div>
+  <div class="g4 mb20" id="dem-kpi"></div>
+  <div class="card"><div style="overflow-x:auto"><table class="tbl" id="dem-tbl"></table></div></div>
+</div>
+
 <!-- HISTORIQUE VESTIAIRE -->
 <div class="panel" id="panel-hvest">
   <div class="phdr"><div><div class="ptitle">📜 Historique vestiaire</div></div></div>
@@ -779,6 +794,8 @@ async function loadAll(){
     BADGES.nr=attr.length;
     BADGES.anr=acces.filter(a=>a.statut==='actif').length;
     BADGES.inv=inventaires.filter(i=>i.statut==='termine').length;
+    try{ DB.demandes = await sb.rpc('stock_demandes_list',{p_days:60}); }catch(e){ DB.demandes=[]; console.warn('Demandes agents indisponibles', e); }
+    BADGES.dem=(DB.demandes||[]).filter(d=>d.statut==='en_attente').length;
     document.getElementById('nb-m')&&(document.getElementById('nb-m').textContent=BADGES.m);
     document.getElementById('nb-a')&&(document.getElementById('nb-a').textContent=BADGES.a);
     document.getElementById('nb-nr')&&(document.getElementById('nb-nr').textContent=BADGES.nr);
@@ -798,7 +815,7 @@ function calcAlerts(){
   return n;
 }
 async function refresh(){await loadAll();renderPanel();toast('🔄 Données actualisées');}
-function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,accesnonret:rAccesNonRet,vest:rVest,dot:rDot,hvest:rHvest,inv:rInv,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
+function renderPanel(){({dash:rDash,stock:rStock,nonret:rNonRet,hmat:rHmat,maint:rMaint,acces:rAcces,accesnonret:rAccesNonRet,vest:rVest,dot:rDot,dem:rDem,hvest:rHvest,inv:rInv,alert:rAlert,audit:rAudit,cfg:rCfg}[PANEL]||rDash)();}
 const GROUPS={
   materiel:{label:'Matériel',pages:[
     {id:'stock',icon:'📦',lbl:'Stock'},
@@ -814,6 +831,7 @@ const GROUPS={
   ]},
   vestiaire:{label:'Vestiaire',pages:[
     {id:'vest',icon:'👕',lbl:'Stock tenues'},
+    {id:'dem',icon:'📨',lbl:'Demandes agents',bdg:'nb-dem'},
     {id:'dot',icon:'👮',lbl:'Dotations'},
     {id:'hvest',icon:'📜',lbl:'Historique'},
     {id:'inv',icon:'🔄',lbl:'Inventaires',bdg:'nb-inv'}
@@ -827,7 +845,7 @@ const GROUPS={
   ]}
 };
 let CURRENT_GROUP=null;
-let BADGES={nr:0,anr:0,m:0,a:0,inv:0};
+let BADGES={nr:0,anr:0,m:0,a:0,inv:0,dem:0};
 
 function goHome(){
   CURRENT_GROUP=null;
@@ -868,12 +886,13 @@ function updateGroupBadges(){
   document.getElementById('nb-m')&&(document.getElementById('nb-m').textContent=BADGES.m);
   document.getElementById('nb-a')&&(document.getElementById('nb-a').textContent=BADGES.a);
   document.getElementById('nb-inv')&&(document.getElementById('nb-inv').textContent=BADGES.inv);
+  document.getElementById('nb-dem')&&(document.getElementById('nb-dem').textContent=BADGES.dem);
   const d1=document.getElementById('grp-materiel-desc'),d2=document.getElementById('grp-maintenance-desc'),
         d3=document.getElementById('grp-acces-desc'),d4=document.getElementById('grp-vestiaire-desc'),d5=document.getElementById('grp-rapports-desc');
   if(d1)d1.textContent=(DB.stock?DB.stock.length:0)+' article(s) · '+BADGES.nr+' non retourné(s)';
   if(d2)d2.textContent=BADGES.m+' en cours';
   if(d3)d3.textContent=BADGES.anr+' non retourné(s)';
-  if(d4)d4.textContent=BADGES.inv+' à valider';
+  if(d4)d4.textContent=(BADGES.dem? BADGES.dem+' demande(s) agent · ' : '')+BADGES.inv+' à valider';
   if(d5)d5.textContent=BADGES.a+' alerte(s)';
 }
 
@@ -1174,6 +1193,54 @@ function rVest(){
 }
 
 // ═══ DOTATIONS ═══
+// ═══ DEMANDES AGENTS ═══
+function rDem(){
+  const all = DB.demandes||[];
+  const f = document.getElementById('dem-filter')?.value ?? 'en_attente';
+  const list = f? all.filter(d=>d.statut===f) : all;
+  const since30 = Date.now()-30*864e5;
+  const pend = all.filter(d=>d.statut==='en_attente');
+  const shortage = pend.filter(d=>d.stock_dispo!=null && d.stock_dispo<d.quantite).length;
+  document.getElementById('dem-kpi').innerHTML=`
+    <div class="sbox ${pend.length?'camber':'cgreen'}"><div class="snum" style="color:var(--${pend.length?'amber':'green'})">${pend.length}</div><div class="slbl">En attente</div></div>
+    <div class="sbox ${shortage?'cred':'cgreen'}"><div class="snum" style="color:var(--${shortage?'red':'green'})">${shortage}</div><div class="slbl">Stock insuffisant</div></div>
+    <div class="sbox cgreen"><div class="snum" style="color:var(--green)">${all.filter(d=>d.statut==='acceptee'&&new Date(d.decided_at)>since30).length}</div><div class="slbl">Acceptées (30 j)</div></div>
+    <div class="sbox cred"><div class="snum" style="color:var(--red)">${all.filter(d=>d.statut==='refusee'&&new Date(d.decided_at)>since30).length}</div><div class="slbl">Refusées (30 j)</div></div>`;
+  const stBadge = d => d.statut==='en_attente'?'<span class="badge bwarn">En attente</span>':d.statut==='acceptee'?'<span class="badge bok">Acceptée</span>':d.statut==='refusee'?'<span class="badge balert">Refusée</span>':'<span class="badge bgray">Annulée</span>';
+  const esc2 = v => String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  document.getElementById('dem-tbl').innerHTML = list.length? `<thead><tr><th>Date</th><th>Agent</th><th>Article</th><th>Taille</th><th>Qté</th><th>Stock</th><th>Motif</th><th>Statut</th><th></th></tr></thead><tbody>${list.map(d=>{
+    const low = d.stock_dispo!=null && d.stock_dispo<d.quantite;
+    return `<tr>
+      <td style="white-space:nowrap">${fmt(d.created_at)}</td>
+      <td><strong>${esc2(d.agent_nom)}</strong>${d.stock_agent_id?'':'<div style="font-size:11px;color:var(--red)">⚠️ absent de Configuration → Agents</div>'}</td>
+      <td>${esc2(d.article_nom)}${d.categorie?`<div style="font-size:11px;color:var(--gray-mid)">${esc2(d.categorie)}</div>`:''}</td>
+      <td>${esc2(d.taille||'—')}</td>
+      <td>${d.quantite}</td>
+      <td>${d.stock_dispo==null?'—':`<span class="badge ${low?'balert':'bok'}">${d.stock_dispo}</span>`}</td>
+      <td style="max-width:220px">${esc2(d.motif||'')}${d.reponse?`<div style="font-size:11px;color:var(--gray-mid);margin-top:3px">Réponse : ${esc2(d.reponse)}</div>`:''}</td>
+      <td>${stBadge(d)}${d.decided_at&&d.statut!=='en_attente'?`<div style="font-size:11px;color:var(--gray-mid)">${fmt(d.decided_at)}</div>`:''}</td>
+      <td style="white-space:nowrap">${d.statut==='en_attente'?`<button class="btn btn-p btn-sm" onclick="decideDem('${d.id}',true)" ${low?'title="Stock insuffisant"':''}>✅ Accepter</button> <button class="btn btn-g btn-sm" onclick="decideDem('${d.id}',false)">✖ Refuser</button>`:''}</td>
+    </tr>`;}).join('')}</tbody>` : `<tbody><tr><td style="padding:30px;text-align:center;color:var(--gray-mid)">Aucune demande ${f==='en_attente'?'en attente':''}.</td></tr></tbody>`;
+}
+async function decideDem(id, accept){
+  const d=(DB.demandes||[]).find(x=>x.id===id); if(!d) return;
+  let note='';
+  if(accept){
+    if(!confirm(`Accepter et attribuer ${d.quantite} × ${d.article_nom}${d.taille?' (taille '+d.taille+')':''} à ${d.agent_nom} ?\n\nLe stock sera décrémenté et la dotation mise à jour.`)) return;
+  } else {
+    note = prompt(`Refuser la demande de ${d.agent_nom} (${d.article_nom}${d.taille?' '+d.taille:''}).\nMotif communiqué à l'agent :`, '');
+    if(note===null) return;
+  }
+  try{
+    await sb.rpc('stock_demande_decider',{p_id:id,p_accept:accept,p_note:note,p_par:'Admin'});
+    await loadAll(); rDem(); updateGroupBadges();
+    toast(accept? '✅ Demande acceptée — dotation enregistrée' : 'Demande refusée');
+  }catch(e){
+    let msg=e.message; try{ msg=JSON.parse(e.message).message||msg; }catch(_){}
+    toast('❌ '+msg);
+  }
+}
+
 function rDot(){
   const c=DB.agents.filter(a=>dotSt(a)==='complet').length;
   const p=DB.agents.filter(a=>dotSt(a)==='partiel').length;
