@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · application · v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -441,13 +441,25 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
 
       <!-- Vue principale -->
       <div id="main-list">
+        <!-- Planning : ouvre la vue agent planning-agent.html (même répertoire application/). -->
+        <div class="section-h">Planning</div>
+
+        <a class="group-btn" href="planning-agent.html">
+          <span class="ic">📅</span>
+          <span class="txt">
+            <span class="t">Mon planning</span>
+            <span class="d">Consultez vos services planifiés.</span>
+          </span>
+          <span class="chev">›</span>
+        </a>
+
         <!-- Vacation : mêmes fichiers que le menu principal, aucune duplication -->
-        <div class="section-h">Vacation</div>
+        <div class="section-h spaced">Vacation</div>
 
         <a class="group-btn" href="#" onclick="showPosteMenu();return false;">
           <span class="ic">▶</span>
           <span class="txt">
-            <span class="t">Prise de poste</span>
+            <span class="t">Prise de service</span>
             <span class="d">Démarrer la vacation : prise de véhicule et validation des consignes.</span>
           </span>
           <span class="chev">›</span>
@@ -465,7 +477,7 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
         <a class="group-btn" href="fin-de-service.html">
           <span class="ic">✓</span>
           <span class="txt">
-            <span class="t">Fin de poste</span>
+            <span class="t">Fin de service</span>
             <span class="d">Valider tous les éléments de service et vérifier que tout est bien envoyé.</span>
           </span>
           <span class="chev">›</span>
@@ -476,7 +488,7 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
              pas besoin de dupliquer le HTML. -->
         <div class="section-h spaced">Outil terrain</div>
         <!-- v5.2 : feuille de route active (arrivée / départ en un geste), juste
-             au-dessus du Rapport — tout l'outil terrain au même endroit. -->
+             au-dessus du Journal de bord — tout l'outil terrain au même endroit. -->
         <div id="fdr-card-wrap"></div>
         <div id="outil-terrain-list"></div>
 
@@ -495,12 +507,12 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
         <div class="foot">RDZ · Outil terrain · v5</div>
       </div>
 
-      <!-- Sous-menu "Prise de poste" : mêmes 3 destinations que dans mobile.html
+      <!-- Sous-menu "Prise de service" : mêmes 3 destinations que dans mobile.html
            (Consignes/événements/constats, Matériel & clés, Prise de véhicule),
            pilotées par POSTE_ITEMS ci-dessous. -->
       <div id="poste-list" class="hidden">
         <button class="back-btn" onclick="backToMain();return false;">‹ Retour</button>
-        <div class="section-h">Prise de poste</div>
+        <div class="section-h">Prise de service</div>
         <div id="poste-items-list"></div>
       </div>
     </main>
@@ -702,11 +714,11 @@ init();
 // (disabled:true, pas de lien actif) en attendant que memo-sites.html soit prêt.
 // Pour l'activer : passer disabled à false et renseigner href: 'memo-sites.html'.
 const OUTIL_TERRAIN_ITEMS = [
-  { icon: '📓', name: 'Rapport', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' },
+  { icon: '📓', name: 'Journal de bord', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' },
   { icon: '📇', name: 'MEMO SITES', desc: "Fiches Mémo des sites RDZ", disabled: true }
 ];
 
-// Sous-menu "Prise de poste" : consignes + véhicule (bouton "Matériel & clés"
+// Sous-menu "Prise de service" : consignes + véhicule (bouton "Matériel & clés"
 // retiré le 01.10.2026 à la demande de Laurent).
 const POSTE_ITEMS = [
   { icon: '📊', name: 'Consignes, événements & constats', desc: "Vue du jour, par site sélectionné", href: 'prise-de-poste.html' },
