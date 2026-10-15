@@ -1,0 +1,925 @@
+<!-- RDZ · radio-agent · v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. Nécessite migration-radio.sql (base RDZ_Agent). -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111c2e">
+<title>RDZ — Radio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;      /* UI applicative */
+  --report-red:#C8102E;                    /* rapports imprimables */
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+/* Charte « application » 2026-10 (mêmes valeurs que application.html) + 2 tokens propres à la radio */
+:root{
+  --rdz-red:#d71920; --rdz-navy:#111c2e; --rdz-navy2:#1a2b42;
+  --rdz-text:#172033; --rdz-muted:#64748b; --rdz-border:#e1e8f0; --rdz-bg:#f3f6fa; --rdz-soft:#f8fafc;
+  --talk:#e6a11a;   /* bouton en cours d'enregistrement */
+  --mine:#e7eef8;   /* bulle de mes vocaux */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:Inter,"Segoe UI",var(--font);background:#dfe6ed;color:var(--rdz-text);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid rgba(215,25,32,.25);outline-offset:2px}
+.app{max-width:640px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--rdz-bg);box-shadow:0 0 48px rgba(15,23,42,.12)}
+.hidden{display:none!important}
+
+/* En-tête */
+header{flex:none;background:radial-gradient(circle at 90% -25%,rgba(215,25,32,.30),transparent 34%),linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy2));
+  border-bottom:3px solid var(--rdz-red);color:#fff;padding:max(10px,env(safe-area-inset-top)) 12px 10px 12px;display:flex;align-items:center;gap:8px;min-height:62px}
+.hd-back{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:26px;line-height:1;text-decoration:none;background:rgba(255,255,255,.08);flex:none}
+.hd-title{flex:1;min-width:0}
+.hd-name{font-size:17px;font-weight:800;letter-spacing:-.015em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd-sub{font-size:11.5px;color:#d3dce7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+.dot.on{background:#34d399}.dot.off{background:#f59e0b}
+.sos-btn{position:relative;overflow:hidden;flex:none;height:42px;padding:0 17px;border-radius:21px;background:var(--rdz-red);color:#fff;font-weight:900;font-size:16px;letter-spacing:.06em;
+  box-shadow:0 0 0 2px rgba(255,255,255,.25);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
+.sos-btn::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35);transform-origin:left;transform:scaleX(var(--p,0))}
+.sos-btn span{position:relative}
+
+/* Contenu */
+.view{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.pad{padding:14px 14px 24px}
+.section-h{display:flex;align-items:center;gap:9px;margin:4px 2px 9px;font-size:11px;text-transform:uppercase;letter-spacing:.075em;color:#69788d;font-weight:850}
+.section-h::after{content:"";height:1px;background:#d8e0e9;flex:1}
+.section-h.spaced{margin-top:20px}
+.card-list{background:#fff;border:1px solid var(--rdz-border);border-radius:14px;overflow:hidden;box-shadow:0 7px 22px rgba(15,23,42,.055)}
+.row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-bottom:1px solid var(--rdz-border);background:#fff}
+.row:last-child{border-bottom:0}
+.row:active{background:var(--rdz-soft)}
+.row-main{flex:1;min-width:0}
+.row-t{font-weight:750;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-d{font-size:13px;color:var(--rdz-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.row-d.unread{color:var(--rdz-text);font-weight:650}
+.row-side{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--rdz-muted);flex:none}
+.badge{min-width:21px;height:21px;padding:0 6px;border-radius:11px;background:var(--rdz-red);color:#fff;font-size:12px;font-weight:800;display:inline-grid;place-items:center}
+.av{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;background:#eef2f7;color:var(--rdz-navy2);position:relative}
+.av.grp{border-radius:13px;background:linear-gradient(145deg,#dff1ff,#cbe7ff);color:#1d4f86}
+.av.all{border-radius:13px;background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy2));color:#fff}
+.av .on-dot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#22c55e;border:2px solid #fff}
+.add-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1.5px dashed #c5d1de;color:var(--rdz-navy2);font-weight:750;font-size:14px;background:#fff}
+.search{width:100%;padding:11px 13px;margin-bottom:12px;border:1px solid var(--rdz-border);border-radius:11px;font:inherit;font-size:15px;background:#fff;color:var(--rdz-text)}
+.state-msg{text-align:center;color:var(--rdz-muted);font-size:14px;padding:34px 18px;line-height:1.5}
+.state-msg b{display:block;color:var(--rdz-text);font-size:16px;margin-bottom:6px}
+.banner{border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.45;margin-bottom:12px}
+.banner.warn{background:#fff8e7;border:1px solid #f0d594;color:#6b5414}
+.banner.err{background:#fdecec;border:1px solid #f3b4b4;color:#8b1a1a}
+
+/* Conversation */
+.msgs{padding:14px 12px 18px;display:flex;flex-direction:column;gap:12px;min-height:100%}
+.day{align-self:center;font-size:11.5px;font-weight:700;color:var(--rdz-muted);background:#e6ecf3;padding:3px 10px;border-radius:10px}
+.msg{max-width:88%;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.msg.mine{align-self:flex-end;align-items:flex-end}
+.msg-from{font-size:12px;font-weight:800;color:var(--rdz-navy2);padding-left:6px}
+.bubble{display:flex;align-items:center;gap:10px;padding:8px 12px 8px 8px;border-radius:18px;background:#fff;border:1px solid var(--rdz-border);position:relative;box-shadow:0 2px 8px rgba(15,23,42,.04)}
+.msg.mine .bubble{background:var(--mine);border-color:transparent}
+.vplay{flex:none;width:38px;height:38px;border-radius:50%;background:var(--rdz-navy2);color:#fff;display:grid;place-items:center}
+.wave{display:flex;align-items:center;gap:2px;height:28px;width:140px}
+.wave i{flex:1;border-radius:2px;background:#cfd8e3;min-height:3px}
+.wave i.on{background:var(--rdz-red)}
+.vdur{font-variant-numeric:tabular-nums;font-size:13px;color:var(--rdz-muted);min-width:30px}
+.dot-new{position:absolute;top:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:var(--rdz-red);border:2px solid var(--rdz-bg)}
+.meta{font-size:11.5px;color:var(--rdz-muted);padding:0 6px}
+.meta .ok{color:var(--ok);font-weight:700}
+.meta .wait{color:#b45309;font-weight:700}
+.sys{align-self:center;font-size:12.5px;color:var(--rdz-muted);text-align:center;max-width:92%}
+.sos-card{align-self:stretch;display:flex;gap:12px;align-items:center;text-align:left;padding:12px 14px;border-radius:14px;background:#fdecee;border:1px solid #f3a9b0;color:var(--rdz-text)}
+.sos-card .sic{flex:none;width:38px;height:38px;border-radius:50%;background:var(--rdz-red);color:#fff;display:grid;place-items:center;font-weight:900}
+.sos-card b{color:var(--rdz-red)}
+.sos-card small{color:var(--rdz-muted)}
+.sos-card.closed{background:#fff;border-color:var(--rdz-border)}
+.sos-card.closed .sic{background:#94a3b8}
+.sos-card.closed b{color:var(--rdz-text)}
+
+/* Push-to-talk */
+.dock{flex:none;background:#fff;border-top:1px solid var(--rdz-border);padding:10px 16px max(12px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:8px}
+.rec-status{min-height:20px;font-size:14px;color:var(--rdz-muted);text-align:center}
+.rec-status b{color:var(--rdz-text)}
+.dock.recording .rec-status{color:var(--rdz-text);font-weight:650}
+.dock.cancel .rec-status{color:var(--rdz-red)}
+.rec-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--rdz-red);margin-right:6px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.ptt{position:relative;width:108px;height:108px;border-radius:50%;color:#fff;
+  background:repeating-radial-gradient(circle at 50% 50%,rgba(255,255,255,.07) 0 2px,transparent 2px 7px),linear-gradient(145deg,var(--rdz-navy2),var(--rdz-navy));
+  box-shadow:inset 0 -6px 0 rgba(0,0,0,.3),0 8px 20px rgba(15,23,42,.18);display:grid;place-items:center;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;transition:transform .08s}
+.ptt-ring{position:absolute;inset:-9px;border-radius:50%;border:4px solid var(--talk);opacity:0;transform:scale(calc(1 + var(--lvl,0) * .32));pointer-events:none}
+.dock.recording .ptt{background:repeating-radial-gradient(circle at 50% 50%,rgba(0,0,0,.07) 0 2px,transparent 2px 7px),var(--talk);color:#1a1300;transform:scale(.96)}
+.dock.recording .ptt-ring{opacity:.9}
+.dock.cancel .ptt{background:#f1f5f9;color:var(--rdz-red)}
+.dock.cancel .ptt-ring{opacity:0}
+.ptt-hint{font-size:11.5px;color:var(--rdz-muted);text-align:center}
+
+/* Onglets */
+.tabbar{flex:none;display:grid;grid-template-columns:repeat(3,1fr);background:#fff;border-top:1px solid var(--rdz-border);padding-bottom:env(safe-area-inset-bottom)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 10px;font-size:12px;font-weight:700;color:var(--rdz-muted);position:relative}
+.tab.active{color:var(--rdz-red)}
+.tab .badge{position:absolute;top:3px;left:calc(50% + 6px);min-width:18px;height:18px;font-size:10.5px}
+
+/* Feuilles, toasts */
+.sheet-bg{position:fixed;inset:0;z-index:40;background:rgba(10,16,28,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:640px;max-height:88%;overflow:auto;background:#fff;border-radius:18px 18px 0 0;padding:18px 16px max(18px,env(safe-area-inset-bottom))}
+.sheet h3{font-size:20px;font-weight:850;margin-bottom:4px}
+.sheet p{color:var(--rdz-muted);font-size:14px;margin-bottom:14px;line-height:1.45}
+.field{display:block;margin-bottom:12px}
+.field span{display:block;font-size:13px;font-weight:750;margin-bottom:6px}
+.field input{width:100%;font:inherit;padding:11px 12px;border-radius:10px;border:1px solid var(--rdz-border);background:var(--rdz-soft);color:var(--rdz-text)}
+.pick{display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--rdz-border);cursor:pointer}
+.pick input{width:20px;height:20px;accent-color:var(--rdz-red);flex:none}
+.err{color:var(--rdz-red);font-size:13.5px;min-height:18px;margin:8px 0}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;padding:13px 16px;border-radius:12px;background:var(--rdz-red);color:#fff;font-weight:800;font-size:15px}
+.btn.ghost{background:#eef2f7;color:var(--rdz-text)}
+.btn+.btn{margin-top:8px}
+.btn:disabled{opacity:.6}
+.toast-wrap{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;justify-content:center;padding:calc(env(safe-area-inset-top) + 8px) 10px 0;pointer-events:none}
+.toast{pointer-events:auto;width:100%;max-width:600px;display:flex;gap:12px;align-items:center;text-align:left;padding:11px 13px;border-radius:15px;background:#fff;color:var(--rdz-text);
+  border:1px solid var(--rdz-border);box-shadow:0 12px 32px rgba(15,23,42,.2);animation:drop .25s ease-out}
+.toast .av{width:38px;height:38px;font-size:13px}
+.toast small{display:block;color:var(--rdz-muted);font-size:12.5px}
+.toast.plain{justify-content:center;font-size:14px}
+@keyframes drop{from{transform:translateY(-14px);opacity:0}}
+
+/* Écran d'alerte */
+.ov{position:fixed;inset:0;z-index:50;overflow:auto;background:var(--rdz-red);color:#fff;padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 20px)}
+.ov.calm{background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy2))}
+.ov-in{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:13px}
+.beacon{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:34px;font-weight:900;position:relative;margin-top:6px}
+.beacon::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid rgba(255,255,255,.6);animation:ping 1.6s ease-out infinite}
+.ov.calm .beacon::after{display:none}
+@keyframes ping{to{transform:scale(1.7);opacity:0}}
+.ov h2{font-size:32px;line-height:1.05;font-weight:900;letter-spacing:-.02em}
+.ov p{font-size:16px;line-height:1.45;opacity:.95}
+.pos{background:rgba(0,0,0,.2);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:5px}
+.pos-c{font-variant-numeric:tabular-nums;font-size:17px;font-weight:800}
+.pos small{opacity:.88;font-size:13px}
+.pos a{color:#fff;font-weight:800}
+.ov h3{font-size:16px;font-weight:850;margin-top:4px}
+.acks{list-style:none;display:flex;flex-direction:column;gap:7px}
+.acks li{background:rgba(255,255,255,.13);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;font-size:14.5px}
+.acks li b{display:block}
+.acks time{opacity:.8;font-size:12.5px;white-space:nowrap}
+.acks .empty{background:transparent;border:1px dashed rgba(255,255,255,.45);opacity:.85}
+.ov-actions{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.btn-w{width:100%;padding:15px 16px;border-radius:14px;background:#fff;color:#1a1a1a;font-weight:850;font-size:16.5px}
+.btn-w.go{color:var(--rdz-red)}
+.btn-w.sec{background:rgba(255,255,255,.16);color:#fff;font-weight:700}
+.tels{display:flex;gap:8px;flex-wrap:wrap}
+.tels a{flex:1;min-width:90px;text-align:center;background:#fff;color:var(--rdz-red);font-weight:900;border-radius:12px;padding:12px 8px;text-decoration:none}
+.unsent{background:#fff3cd;color:#6b5414;border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700}
+
+/* Écran d'accès */
+.gate{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:30px 24px;text-align:center}
+.gate p{color:var(--rdz-muted);line-height:1.5;max-width:380px}
+.gate .btn{max-width:320px}
+.spinner{width:30px;height:30px;border:3px solid #d5dde7;border-top-color:var(--rdz-red);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header id="hd"></header>
+  <main class="view" id="view"><div class="gate"><div class="spinner"></div><p>Connexion à la radio…</p></div></main>
+  <div id="foot"></div>
+</div>
+<div id="sheet"></div>
+<div id="overlay"></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ============================================================================
+   RDZ · Radio (radio-agent.html)
+   Boucle de remontée :
+     capture  → vocaux, écoutes, alertes SOS + position + réponses
+     tables   → radio_canaux / radio_messages / radio_ecoutes / radio_alertes /
+                radio_alerte_reponses (+ bucket radio-vocaux) — base RDZ_Agent
+     relecture→ cette même page pour la centrale (connexion PIN comme les agents)
+                ; module de supervision direction (historique, export) À CONSTRUIRE.
+   Exception RDZSync (assumée, voir Principe directeur) : la radio est une
+   communication en temps réel. Les vocaux ne doivent pas attendre le WiFi comme
+   des photos, et un SOS ne doit jamais dormir dans une file : envois directs,
+   avec une petite file locale propre au module (rdz_radio_attente) qui renvoie
+   automatiquement les vocaux dès le retour du réseau, et un SOS réessayé en
+   boucle toutes les 4 s avec affichage des numéros d'urgence.
+   ============================================================================ */
+'use strict';
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const BUCKET = 'radio-vocaux';
+const LS_PENDING = 'rdz_radio_attente';
+const MENU_URL = 'application.html';
+const HOLD_MS = 1500;          // durée d'appui pour déclencher un SOS
+const MAX_REC_S = 60;          // durée max d'un vocal
+const ALERT_DAYS = 7;          // historique d'alertes affiché
+
+/* ---------- Utilitaires ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTime = t => new Date(t).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'});
+const fmtDur = s => { s = Math.max(0, Math.round(s || 0)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); };
+const initials = n => String(n||'?').split(/\s+/).filter(Boolean).map(w => w[0]).slice(0,2).join('').toUpperCase();
+const fullName = a => [a.nom, a.prenom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
+function uuid(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2,'0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+function dayLabel(t){
+  const d = new Date(t), n = new Date(); const k = x => x.toDateString();
+  if (k(d) === k(n)) return "Aujourd'hui";
+  const y = new Date(n); y.setDate(n.getDate()-1); if (k(d) === k(y)) return 'Hier';
+  return d.toLocaleDateString('fr-CH', {weekday:'long', day:'numeric', month:'long'});
+}
+
+/* ---------- État ---------- */
+let me = null;                       // {id, nom}
+const agentsById = new Map();        // id → {id, nom, actif}
+const canaux = new Map();            // id → canal
+const msgs = new Map();              // canal_id → [messages]
+const ecoutes = new Map();           // message_id → Set(agent_id)
+const alertes = new Map();           // id → alerte
+const reponses = new Map();          // alerte_id → [réponses]
+let online = new Set();              // agents avec la radio ouverte (présence)
+let connected = false;
+const ui = {tab:'canaux', conv:null, search:''};
+
+const activeAgents = () => [...agentsById.values()].filter(a => a.actif !== false);
+const agentName = (id, fallback) => (agentsById.get(id) || {}).nom || fallback || 'Agent';
+const tousCanal = () => [...canaux.values()].find(c => c.tous);
+function canalMembers(c){ return c.tous ? activeAgents().map(a => a.id) : (c.membres || []); }
+function canalName(c){
+  if (c.type === 'direct') return agentName((c.membres||[]).find(x => x !== me.id));
+  return c.nom || 'Groupe';
+}
+function canalSub(c){
+  if (c.type === 'direct') { const o = (c.membres||[]).find(x => x !== me.id); return online.has(o) ? 'Radio ouverte' : 'Message privé'; }
+  const m = canalMembers(c); const on = m.filter(id => id !== me.id && online.has(id)).length;
+  return `${m.length} membres · ${on} avec la radio ouverte`;
+}
+const listOf = id => { if (!msgs.has(id)) msgs.set(id, []); return msgs.get(id); };
+const heardSet = id => { if (!ecoutes.has(id)) ecoutes.set(id, new Set()); return ecoutes.get(id); };
+const isUnread = m => m.type === 'vocal' && m.auteur_id !== me.id && !heardSet(m.id).has(me.id);
+const unreadOf = c => listOf(c.id).filter(isUnread).length;
+const lastTs = c => { const l = listOf(c.id); return l.length ? l[l.length-1].cree_le : c.cree_le; };
+function setState(id, st){ const m = findMsg(id); if (m) m._state = st; return m; }
+function addMsg(m){
+  const l = listOf(m.canal_id); const i = l.findIndex(x => x.id === m.id);
+  if (i >= 0) { l[i] = Object.assign({}, l[i], m, {_blobUrl: l[i]._blobUrl || m._blobUrl}); return false; }
+  l.push(m); l.sort((a,b) => new Date(a.cree_le) - new Date(b.cree_le)); return true;
+}
+
+/* ---------- Icônes ---------- */
+function svg(inner, s, fill){ return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'} aria-hidden="true">${inner}</svg>`; }
+const ic = {
+  mic: s => svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', s),
+  play: s => svg('<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>', s, true),
+  pause: s => svg('<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>', s, true),
+  radio: s => svg('<path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2"/><circle cx="12" cy="12" r="2"/>', s),
+  users: s => svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>', s),
+  alert: s => svg('<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>', s),
+  plus: s => svg('<path d="M12 5v14M5 12h14"/>', s),
+};
+
+/* ---------- Accès (même identité que application.html) ---------- */
+function showGate(text, retry){
+  $('#hd').innerHTML = `<a class="hd-back" href="${MENU_URL}" aria-label="Retour au menu">‹</a><div class="hd-title"><div class="hd-name">Radio</div><div class="hd-sub">RDZ Security Management</div></div>`;
+  $('#foot').innerHTML = '';
+  $('#view').innerHTML = `<div class="gate"><p>${esc(text)}</p>
+    ${retry ? '<button class="btn" onclick="location.reload()">Réessayer</button>' : ''}
+    <a class="btn ghost" href="${MENU_URL}" style="text-decoration:none">Ouvrir le menu</a></div>`;
+}
+async function boot(){
+  const id = localStorage.getItem('rdz_agent_id'), hash = localStorage.getItem('rdz_agent_pin_hash');
+  if (!id) return showGate("Identifiez-vous d'abord depuis le menu de l'application (nom + code PIN).");
+  try {
+    const { data, error } = await sb.from('agents').select('id,nom,prenom,actif,pin_hash').eq('id', id).single();
+    if (error || !data) throw error || new Error('introuvable');
+    if (data.actif === false) return showGate('Votre accès a été désactivé. Contactez votre responsable.');
+    if (data.pin_hash && data.pin_hash !== hash) return showGate('Votre code PIN a changé : reconnectez-vous depuis le menu.');
+    me = { id: String(data.id), nom: fullName(data) };
+  } catch (e) { return showGate('Connexion impossible pour le moment. Vérifiez le réseau.', true); }
+  try { await loadAll(); }
+  catch (e) {
+    const missing = /radio_|relation|does not exist|schema cache/i.test((e && (e.message || e.details)) || '');
+    return showGate(missing ? 'La radio n\u2019est pas encore installée sur la base (migration-radio.sql à lancer).' : 'Impossible de charger la radio. Vérifiez le réseau.', true);
+  }
+  loadPendingIntoUi();
+  render();
+  subscribeRealtime();
+  resumeAlerts();
+  flushPending();
+  setInterval(() => { if (!document.hidden) loadAll().then(refreshAll).catch(() => {}); }, 60000);
+  setInterval(flushPending, 15000);
+  window.addEventListener('online', () => { flushPending(); loadAll().then(refreshAll).catch(() => {}); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAll().then(refreshAll).catch(() => {}); });
+}
+
+/* ---------- Chargement ---------- */
+async function inChunks(ids, size, fn){ const out = []; for (let i = 0; i < ids.length; i += size) { const r = await fn(ids.slice(i, i+size)); if (r.error) throw r.error; out.push(...(r.data || [])); } return out; }
+async function loadAll(){
+  const [ag, ca] = await Promise.all([
+    sb.from('agents').select('id,nom,prenom,actif'),
+    sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}}`)
+  ]);
+  if (ag.error) throw ag.error; if (ca.error) throw ca.error;
+  agentsById.clear(); (ag.data || []).forEach(a => agentsById.set(String(a.id), {id:String(a.id), nom:fullName(a), actif:a.actif}));
+  const keep = new Set((ca.data || []).map(c => c.id));
+  [...canaux.keys()].forEach(k => { if (!keep.has(k)) canaux.delete(k); });
+  (ca.data || []).forEach(c => canaux.set(c.id, c));
+  const ids = [...canaux.keys()];
+  if (ids.length) {
+    const m = await sb.from('radio_messages').select('*').in('canal_id', ids).order('cree_le', {ascending:false}).limit(500);
+    if (m.error) throw m.error;
+    (m.data || []).forEach(x => addMsg(Object.assign({}, x, {_state:null})));
+    const mids = (m.data || []).map(x => x.id);
+    const ec = await inChunks(mids, 100, part => sb.from('radio_ecoutes').select('message_id,agent_id').in('message_id', part));
+    ec.forEach(e => heardSet(e.message_id).add(String(e.agent_id)));
+  }
+  const since = new Date(Date.now() - ALERT_DAYS*864e5).toISOString();
+  const al = await sb.from('radio_alertes').select('*').or(`statut.eq.active,declenchee_le.gte."${since}"`).order('declenchee_le', {ascending:false}).limit(60);
+  if (al.error) throw al.error;
+  (al.data || []).forEach(a => alertes.set(a.id, Object.assign({}, alertes.get(a.id), a)));
+  const aids = (al.data || []).map(a => a.id);
+  const rp = await inChunks(aids, 60, part => sb.from('radio_alerte_reponses').select('*').in('alerte_id', part).order('cree_le'));
+  const byA = new Map(); rp.forEach(r => { if (!byA.has(r.alerte_id)) byA.set(r.alerte_id, []); byA.get(r.alerte_id).push(r); });
+  aids.forEach(id => reponses.set(id, byA.get(id) || []));
+}
+async function loadCanal(id){
+  const { data } = await sb.from('radio_messages').select('*').eq('canal_id', id).order('cree_le', {ascending:false}).limit(80);
+  (data || []).forEach(x => addMsg(Object.assign({}, x, {_state:null})));
+  const mids = (data || []).map(x => x.id);
+  if (mids.length) { const ec = await inChunks(mids, 100, p => sb.from('radio_ecoutes').select('message_id,agent_id').in('message_id', p)); ec.forEach(e => heardSet(e.message_id).add(String(e.agent_id))); }
+}
+
+/* ---------- Temps réel ---------- */
+let dbChan = null, presChan = null, everConnected = false;
+function subscribeRealtime(){
+  dbChan = sb.channel('rdz-radio-db')
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_messages'}, p => onMessage(p.new))
+    .on('postgres_changes', {event:'*', schema:'public', table:'radio_canaux'}, p => onCanal(p.new))
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_ecoutes'}, p => onEcoute(p.new))
+    .on('postgres_changes', {event:'*', schema:'public', table:'radio_alertes'}, p => onAlerte(p.new, p.eventType))
+    .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_alerte_reponses'}, p => onReponse(p.new))
+    .subscribe(st => {
+      const was = connected; connected = st === 'SUBSCRIBED';
+      if (connected !== was) { renderHeaderSub(); if (connected && everConnected) loadAll().then(refreshAll).catch(() => {}); if (connected) everConnected = true; }
+    });
+  presChan = sb.channel('rdz-radio-presence', {config:{presence:{key:me.id}}});
+  presChan.on('presence', {event:'sync'}, () => {
+    online = new Set(Object.keys(presChan.presenceState()));
+    renderHeaderSub();
+    if (!ui.conv && ui.tab === 'equipe') renderView();
+  }).subscribe(async st => { if (st === 'SUBSCRIBED') { try { await presChan.track({nom: me.nom}); } catch (e) {} } });
+}
+async function onMessage(m){
+  if (!m || !m.canal_id) return;
+  if (!canaux.has(m.canal_id)) {
+    const { data } = await sb.from('radio_canaux').select('*').eq('id', m.canal_id).maybeSingle();
+    if (!data || data.archive || !(data.tous || (data.membres || []).includes(me.id))) return;
+    canaux.set(data.id, data);
+  }
+  const isNew = addMsg(Object.assign({}, m, {_state:null}));
+  if (!isNew || m.auteur_id === me.id) { refreshConv(m.canal_id); return; }
+  if (m.type === 'vocal') {
+    chirp(); vibrate([60, 40, 60]);
+    if (ui.conv !== m.canal_id) notify(m.auteur_id, m.auteur_nom || agentName(m.auteur_id), `Message vocal ${fmtDur(m.duree_s)} · ${canalName(canaux.get(m.canal_id))}`, () => openConv(m.canal_id));
+  }
+  refreshConv(m.canal_id);
+}
+function onCanal(c){
+  if (!c || !c.id) return;
+  const mine = !c.archive && (c.tous || (c.membres || []).includes(me.id));
+  if (mine) canaux.set(c.id, c); else canaux.delete(c.id);
+  if (!mine && ui.conv === c.id) { ui.conv = null; render(); return; }
+  if (!ui.conv) requestRender();
+}
+function onEcoute(e){ if (!e) return; heardSet(e.message_id).add(String(e.agent_id)); const f = findMsg(e.message_id); if (f) refreshConv(f.canal_id); }
+function onAlerte(a, ev){
+  if (!a || !a.id) return;
+  const before = alertes.get(a.id);
+  alertes.set(a.id, Object.assign({}, before, a));
+  if (!reponses.has(a.id)) reponses.set(a.id, []);
+  if (ev === 'INSERT' && a.agent_id !== me.id && a.statut === 'active') {
+    stopPlayback(); overlay = {alertId:a.id}; muted = false; startSiren(); vibrate([500,200,500,200,500,200,500]);
+  }
+  if (a.statut === 'cloturee' && overlay && overlay.alertId === a.id) stopSiren();
+  if (overlay && overlay.alertId === a.id) renderOverlay();
+  if (!ui.conv) requestRender();
+}
+function onReponse(r){
+  if (!r) return; const l = reponses.get(r.alerte_id) || []; if (!l.some(x => x.id === r.id)) l.push(r); reponses.set(r.alerte_id, l);
+  const a = alertes.get(r.alerte_id);
+  if (a && a.agent_id === me.id && r.agent_id !== me.id) { chirp(); vibrate(80); }
+  if (overlay && overlay.alertId === r.alerte_id) renderOverlay();
+  if (!ui.conv && ui.tab === 'alertes') renderView();
+}
+function findMsg(id){ for (const l of msgs.values()) { const m = l.find(x => x.id === id); if (m) return m; } return null; }
+
+/* ---------- Rendu ---------- */
+let pendingRender = false;
+function requestRender(){ if (rec || sosHold) { pendingRender = true; return; } render(); }
+function flushRender(){ if (pendingRender && !rec && !sosHold) { pendingRender = false; render(); } }
+function refreshAll(){ if (rec || sosHold) { pendingRender = true; return; } if (ui.conv && !canaux.has(ui.conv)) ui.conv = null; render(); if (overlay) renderOverlay(); }
+function render(){ renderHeader(); renderView(); renderFoot(); updateTitle(); }
+function updateTitle(){ const n = [...canaux.values()].reduce((s,c) => s + unreadOf(c), 0); document.title = (n ? `(${n}) ` : '') + 'RDZ — Radio'; }
+
+function renderHeader(){
+  const h = $('#hd');
+  const back = ui.conv ? `<button class="hd-back" data-act="back" aria-label="Retour aux canaux">‹</button>` : `<a class="hd-back" href="${MENU_URL}" aria-label="Retour au menu">‹</a>`;
+  const name = ui.conv ? esc(canalName(canaux.get(ui.conv))) : 'Radio';
+  h.innerHTML = `${back}<div class="hd-title"><div class="hd-name">${name}</div><div class="hd-sub" id="hdSub"></div></div>
+    <button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
+  renderHeaderSub();
+}
+function renderHeaderSub(){
+  const s = $('#hdSub'); if (!s) return;
+  const link = connected ? '<span class="dot on"></span>Connecté' : '<span class="dot off"></span>Reconnexion…';
+  s.innerHTML = ui.conv && canaux.get(ui.conv) ? `${link} · ${esc(canalSub(canaux.get(ui.conv)))}` : `${link} · ${esc(me.nom)}`;
+}
+function renderFoot(){
+  const f = $('#foot');
+  if (ui.conv) {
+    f.innerHTML = `<div class="dock" id="dock">
+      <div class="rec-status" id="recStatus"></div>
+      <button class="ptt" id="ptt" aria-label="Maintenir pour enregistrer un message vocal"><span class="ptt-ring" id="pttRing"></span>${ic.mic(40)}</button>
+      <div class="ptt-hint">Maintenez pour parler, relâchez pour envoyer · sur ordinateur : barre d'espace</div></div>`;
+    recUI();
+  } else {
+    const u = [...canaux.values()].reduce((s,c) => s + unreadOf(c), 0);
+    const act = [...alertes.values()].some(a => a.statut === 'active');
+    const tab = (id, label, icon, badge) => `<button class="tab ${ui.tab === id ? 'active' : ''}" data-act="tab" data-tab="${id}">${icon}${label}${badge || ''}</button>`;
+    f.innerHTML = `<nav class="tabbar">${tab('canaux','Canaux',ic.radio(23), u ? `<span class="badge">${u}</span>` : '')}${tab('equipe','Équipe',ic.users(23))}${tab('alertes','Alertes',ic.alert(23), act ? '<span class="badge">!</span>' : '')}</nav>`;
+  }
+}
+function renderView(){
+  const v = $('#view');
+  if (ui.conv) { v.innerHTML = convHTML(canaux.get(ui.conv)); v.scrollTop = v.scrollHeight; return; }
+  if (ui.tab === 'canaux') v.innerHTML = canauxHTML();
+  else if (ui.tab === 'equipe') { v.innerHTML = equipeHTML(); const s = $('#search'); if (s) { s.value = ui.search; s.oninput = () => { ui.search = s.value; $('#teamList').innerHTML = teamRows(); }; } }
+  else v.innerHTML = alertesHTML();
+}
+function avatar(id, name){ return `<span class="av">${esc(initials(name || agentName(id)))}${online.has(id) ? '<span class="on-dot"></span>' : ''}</span>`; }
+
+function canauxHTML(){
+  const list = [...canaux.values()].sort((a,b) => (b.tous ? 1 : 0) - (a.tous ? 1 : 0) || new Date(lastTs(b)) - new Date(lastTs(a)));
+  const rows = list.map(c => {
+    const l = listOf(c.id), last = l[l.length-1], u = unreadOf(c);
+    let prev = 'Aucun message pour l\u2019instant';
+    if (last) {
+      const who = last.auteur_id === me.id ? 'Vous' : (agentName(last.auteur_id, last.auteur_nom)).split(' ').slice(-1)[0];
+      prev = last.type === 'sos' ? `Alerte SOS · ${last.auteur_id === me.id ? 'vous' : agentName(last.auteur_id, last.auteur_nom)}` : last.type === 'info' ? (last.texte || '') : `${who} · vocal ${fmtDur(last.duree_s)}`;
+    }
+    const av = c.type === 'direct' ? avatar((c.membres||[]).find(x => x !== me.id)) : `<span class="av grp ${c.tous ? 'all' : ''}">${ic.users(21)}</span>`;
+    return `<button class="row" data-act="open" data-id="${c.id}">${av}
+      <span class="row-main"><span class="row-t">${esc(canalName(c))}</span><span class="row-d ${u ? 'unread' : ''}">${esc(prev)}</span></span>
+      <span class="row-side">${last ? fmtTime(last.cree_le) : ''}${u ? `<span class="badge">${u}</span>` : ''}</span></button>`;
+  }).join('');
+  return `<div class="pad">
+    <button class="add-btn" data-act="new-group">${ic.plus(18)} Nouveau groupe</button>
+    <div class="section-h">Groupes et messages privés</div>
+    ${rows ? `<div class="card-list">${rows}</div>` : `<div class="state-msg"><b>Aucun canal</b>Créez un groupe ou ouvrez l'onglet Équipe pour écrire à un collègue.</div>`}
+  </div>`;
+}
+function teamRows(){
+  const q = ui.search.trim().toLowerCase();
+  const list = activeAgents().filter(a => a.id !== me.id && (!q || a.nom.toLowerCase().includes(q)))
+    .sort((a,b) => (online.has(b.id) ? 1 : 0) - (online.has(a.id) ? 1 : 0) || a.nom.localeCompare(b.nom));
+  if (!list.length) return `<div class="state-msg">Aucun agent ne correspond à « ${esc(ui.search)} ».</div>`;
+  return `<div class="card-list">${list.map(a => `<button class="row" data-act="direct" data-id="${a.id}">${avatar(a.id, a.nom)}
+    <span class="row-main"><span class="row-t">${esc(a.nom)}</span><span class="row-d">${online.has(a.id) ? 'Radio ouverte' : 'Radio fermée : recevra le vocal à l\u2019ouverture'}</span></span></button>`).join('')}</div>`;
+}
+function equipeHTML(){ return `<div class="pad"><input class="search" id="search" type="search" placeholder="Rechercher un collègue" autocomplete="off"><div class="section-h">Envoyer un vocal privé</div><div id="teamList">${teamRows()}</div></div>`; }
+function alertesHTML(){
+  const list = [...alertes.values()].sort((a,b) => new Date(b.declenchee_le) - new Date(a.declenchee_le));
+  if (!list.length) return `<div class="state-msg"><b>Aucune alerte ces ${ALERT_DAYS} derniers jours</b>En cas de problème, maintenez le bouton SOS 1,5 seconde : tous vos collègues reçoivent l'alerte avec votre position.</div>`;
+  return `<div class="pad"><div class="section-h">Alertes des ${ALERT_DAYS} derniers jours</div><div class="card-list">${list.map(a => {
+    const n = (reponses.get(a.id) || []).length, live = a.statut === 'active';
+    return `<button class="row" data-act="view-alert" data-id="${a.id}"><span class="av" style="background:${live ? 'var(--rdz-red)' : '#eef2f7'};color:${live ? '#fff' : '#94a3b8'}">${ic.alert(21)}</span>
+      <span class="row-main"><span class="row-t">${a.agent_id === me.id ? 'Votre alerte' : esc(a.agent_nom || agentName(a.agent_id))}</span>
+      <span class="row-d">${new Date(a.declenchee_le).toLocaleDateString('fr-CH')} à ${fmtTime(a.declenchee_le)} · ${n} réponse${n > 1 ? 's' : ''}</span></span>
+      <span class="row-side"><span class="badge" style="background:${live ? 'var(--rdz-red)' : '#94a3b8'}">${live ? 'En cours' : 'Clôturée'}</span></span></button>`; }).join('')}</div></div>`;
+}
+
+function waveBars(id){
+  let h = 2166136261; for (const ch of id) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } let x = (h >>> 0) || 1; const out = [];
+  for (let i = 0; i < 26; i++) { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; const r = (x % 1000) / 1000; out.push(Math.round(18 + (r*.6 + .4) * Math.sin(Math.PI*(i+1)/27) * 82)); }
+  return out.map(v => `<i style="height:${v}%"></i>`).join('');
+}
+function msgHTML(c, m){
+  if (m.type === 'info') return `<div class="sys">${esc(m.texte)} · ${fmtTime(m.cree_le)}</div>`;
+  if (m.type === 'sos') {
+    const a = alertes.get(m.alerte_id), live = a && a.statut === 'active';
+    return `<button class="sos-card ${live ? '' : 'closed'}" data-act="view-alert" data-id="${m.alerte_id}"><span class="sic">!</span>
+      <span><b>Alerte SOS · ${m.auteur_id === me.id ? 'vous' : esc(agentName(m.auteur_id, m.auteur_nom))}</b><br><small>${fmtTime(m.cree_le)} · ${live ? 'en cours, touchez pour voir la position' : 'clôturée'}</small></span></button>`;
+  }
+  const mine = m.auteur_id === me.id, playing = pb && pb.msgId === m.id;
+  let meta = fmtTime(m.cree_le);
+  if (mine) {
+    if (m._state === 'sending') meta += ' · Envoi…';
+    else if (m._state === 'pending') meta += ' · <span class="wait">En attente de réseau, renvoi automatique</span>';
+    else {
+      const rc = canalMembers(c).filter(x => x !== me.id), n = rc.filter(x => heardSet(m.id).has(x)).length;
+      meta += c.type === 'direct' ? (n ? ' · <span class="ok">Écouté</span>' : ' · Envoyé') : ` · ${n ? `<span class="ok">Écouté par ${n} sur ${rc.length}</span>` : `Envoyé à ${rc.length}`}`;
+    }
+  }
+  return `<div class="msg ${mine ? 'mine' : ''}">
+    ${!mine && c.type !== 'direct' ? `<div class="msg-from">${esc(agentName(m.auteur_id, m.auteur_nom))}</div>` : ''}
+    <div class="bubble"><button class="vplay" data-act="play" data-id="${m.id}" aria-label="${playing ? 'Arrêter' : 'Écouter'} le vocal">${playing ? ic.pause(18) : ic.play(18)}</button>
+      <span class="wave" data-wave="${m.id}">${waveBars(m.id)}</span><span class="vdur">${fmtDur(m.duree_s)}</span>
+      ${isUnread(m) ? '<span class="dot-new" title="Pas encore écouté"></span>' : ''}</div>
+    <div class="meta">${meta}</div></div>`;
+}
+function convHTML(c){
+  if (!c) return '';
+  const l = listOf(c.id);
+  if (!l.length) return `<div class="msgs"><div class="state-msg"><b>Aucun message</b>Maintenez le bouton en bas pour enregistrer votre premier vocal.</div></div>`;
+  let out = '', day = '';
+  l.forEach(m => { const d = dayLabel(m.cree_le); if (d !== day) { day = d; out += `<div class="day">${esc(d)}</div>`; } out += msgHTML(c, m); });
+  return `<div class="msgs">${out}</div>`;
+}
+function refreshConv(id){
+  updateTitle();
+  if (ui.conv === id) {
+    const v = $('#view'), atBottom = v.scrollHeight - v.scrollTop - v.clientHeight < 90;
+    v.innerHTML = convHTML(canaux.get(id)); if (atBottom) v.scrollTop = v.scrollHeight; syncPlay(); renderHeaderSub();
+  } else if (!ui.conv) requestRender();
+}
+
+/* ---------- Sons, vibrations, notifications internes ---------- */
+let actx = null;
+function ac(){ try { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; actx = new C(); } if (actx.state === 'suspended') actx.resume(); return actx; } catch (e) { return null; } }
+function tone(f, start, len, vol){ const c = ac(); if (!c || c.state !== 'running') return; const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; const t = c.currentTime + start;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || .08, t + .01); g.gain.linearRampToValueAtTime(0, t + len); o.connect(g).connect(c.destination); o.start(t); o.stop(t + len + .02); }
+const chirp = () => { tone(1250, 0, .07); tone(1650, .09, .08); };
+const vibrate = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+let siren = null, muted = false;
+function startSiren(){
+  if (siren || muted) return; const c = ac(); if (!c || c.state !== 'running') return;
+  const o = c.createOscillator(), g = c.createGain(); o.type = 'sawtooth'; g.gain.value = .05; const t = c.currentTime;
+  for (let i = 0; i < 90; i++) { const s = t + i*.8; o.frequency.setValueAtTime(700, s); o.frequency.linearRampToValueAtTime(1250, s + .4); o.frequency.linearRampToValueAtTime(700, s + .8); }
+  o.connect(g).connect(c.destination); o.start(); siren = o;
+}
+function stopSiren(){ if (siren) { try { siren.stop(); } catch (e) {} siren = null; } }
+let toastTimer = null;
+function notify(id, title, body, onClick){
+  const w = $('#toasts');
+  w.innerHTML = `<button class="toast" id="toastBtn">${avatar(id, title)}<span><b>${esc(title)}</b><small>${esc(body)}</small></span></button>`;
+  $('#toastBtn').onclick = () => { w.innerHTML = ''; onClick && onClick(); };
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { w.innerHTML = ''; }, 6000);
+}
+function toast(text){ const w = $('#toasts'); w.innerHTML = `<div class="toast plain" role="status">${esc(text)}</div>`; clearTimeout(toastTimer); toastTimer = setTimeout(() => { w.innerHTML = ''; }, 3500); }
+
+/* ---------- Lecture ---------- */
+let pb = null; const player = new Audio(); player.preload = 'auto';
+function audioUrl(m){ if (m._blobUrl) return m._blobUrl; if (!m.audio_path) return null; return sb.storage.from(BUCKET).getPublicUrl(m.audio_path).data.publicUrl; }
+function togglePlay(id){
+  if (pb && pb.msgId === id) { stopPlayback(); return; }
+  stopPlayback();
+  const m = findMsg(id); if (!m) return; const url = audioUrl(m);
+  if (!url) { toast('Ce vocal n\u2019est pas disponible.'); return; }
+  const p = {msgId:id, dur:Number(m.duree_s) || 1, t0:performance.now()}; pb = p;
+  player.src = url; player.onended = () => endPlayback(p);
+  player.onerror = () => { if (pb === p) { endPlayback(p); toast('Lecture impossible (réseau ou format audio).'); } };
+  player.play().catch(() => { if (pb === p) { endPlayback(p); toast('Lecture bloquée : touchez à nouveau le bouton.'); } });
+  if (m.auteur_id !== me.id && !heardSet(id).has(me.id)) {
+    heardSet(id).add(me.id); updateTitle();
+    const dot = document.querySelector(`[data-wave="${id}"]`)?.parentElement?.querySelector('.dot-new'); if (dot) dot.remove();
+    sb.from('radio_ecoutes').upsert({message_id:id, agent_id:me.id}, {onConflict:'message_id,agent_id', ignoreDuplicates:true}).then(() => {}, () => {});
+  }
+  syncPlay(); requestAnimationFrame(frame);
+}
+function frame(){
+  const p = pb; if (!p) return;
+  const d = isFinite(player.duration) && player.duration > 0 ? player.duration : p.dur;
+  setProg(p.msgId, Math.min(1, player.currentTime / d)); requestAnimationFrame(frame);
+}
+function setProg(id, v){ const w = document.querySelector(`[data-wave="${id}"]`); if (!w) return; const b = w.children, n = Math.round(v * b.length); for (let i = 0; i < b.length; i++) b[i].classList.toggle('on', i < n); }
+function endPlayback(p){ if (pb !== p) return; pb = null; setProg(p.msgId, 0); syncPlay(); }
+function stopPlayback(){ if (!pb) return; const p = pb; pb = null; try { player.pause(); } catch (e) {} setProg(p.msgId, 0); syncPlay(); }
+function syncPlay(){ document.querySelectorAll('.vplay').forEach(b => { const on = pb && pb.msgId === b.dataset.id; b.innerHTML = on ? ic.pause(18) : ic.play(18); }); }
+
+/* ---------- Enregistrement push-to-talk ---------- */
+let rec = null;
+function pickMime(){
+  const c = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+  for (const m of c) { try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
+  return '';
+}
+function recUI(){
+  const dock = $('#dock'), st = $('#recStatus'); if (!dock || !st) return;
+  if (!rec) { dock.classList.remove('recording', 'cancel'); const c = canaux.get(ui.conv); st.innerHTML = c ? `Parler à <b>${esc(canalName(c))}</b>` : ''; $('#pttRing')?.style.setProperty('--lvl', 0); return; }
+  dock.classList.add('recording'); dock.classList.toggle('cancel', !!rec.cancel);
+  const s = rec.ready ? (performance.now() - rec.t0) / 1000 : 0;
+  st.innerHTML = rec.cancel ? 'Relâchez pour annuler' : rec.ready ? `<span class="rec-dot"></span>${fmtDur(s)} · glissez vers le haut pour annuler` : 'Ouverture du micro…';
+}
+async function startRec(){
+  if (rec || !ui.conv) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { toast('Ce téléphone ne permet pas d\u2019enregistrer depuis le navigateur.'); return; }
+  stopPlayback(); ac();
+  const r = {t0:performance.now(), cancel:false, ready:false, released:false, conv:ui.conv, lvl:0, chunks:[]}; rec = r; recUI();
+  try {
+    r.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
+  } catch (e) {
+    rec = null; recUI(); flushRender();
+    toast('Micro refusé : autorisez le micro pour ce site dans les réglages du navigateur.'); return;
+  }
+  if (r.released) { r.stream.getTracks().forEach(t => t.stop()); rec = null; recUI(); flushRender(); toast('Micro prêt : maintenez le bouton pendant que vous parlez.'); return; }
+  const mime = pickMime();
+  try { r.mr = mime ? new MediaRecorder(r.stream, {mimeType:mime}) : new MediaRecorder(r.stream); }
+  catch (e) { r.mr = new MediaRecorder(r.stream); }
+  r.mr.ondataavailable = e => { if (e.data && e.data.size) r.chunks.push(e.data); };
+  r.mr.start();
+  const c = ac(); if (c) { try { const src = c.createMediaStreamSource(r.stream); r.an = c.createAnalyser(); r.an.fftSize = 512; src.connect(r.an); r.buf = new Uint8Array(r.an.fftSize); } catch (e) {} }
+  r.ready = true; r.t0 = performance.now(); tone(900, 0, .05, .05); vibrate(30); loop(r);
+}
+function loop(r){
+  if (rec !== r) return;
+  let lvl = .3;
+  if (r.an) { r.an.getByteTimeDomainData(r.buf); let s = 0; for (let i = 0; i < r.buf.length; i++) { const d = (r.buf[i] - 128) / 128; s += d*d; } lvl = Math.min(1, Math.sqrt(s / r.buf.length) * 4); }
+  r.lvl = r.lvl * .6 + lvl * .4; $('#pttRing')?.style.setProperty('--lvl', r.lvl.toFixed(3)); recUI();
+  if ((performance.now() - r.t0) / 1000 >= MAX_REC_S) { stopRec(); toast('Durée maximale atteinte (1 minute) : vocal envoyé.'); return; }
+  requestAnimationFrame(() => loop(r));
+}
+function stopRec(){
+  const r = rec; if (!r) return; r.released = true;
+  if (!r.ready) return;                       // micro en cours d'ouverture : startRec nettoie
+  rec = null;
+  const dur = (performance.now() - r.t0) / 1000, discard = r.cancel || dur < .7;
+  r.mr.onstop = () => {
+    r.stream.getTracks().forEach(t => t.stop()); recUI();
+    if (discard) { toast(r.cancel ? 'Vocal annulé.' : 'Maintenez le bouton pendant que vous parlez.'); flushRender(); return; }
+    const type = r.mr.mimeType || (r.chunks[0] && r.chunks[0].type) || 'audio/webm';
+    sendVoice(r.conv, new Blob(r.chunks, {type}), type, Math.max(1, Math.round(dur)));
+    flushRender();
+  };
+  try { r.mr.stop(); } catch (e) { r.mr.onstop(); }
+}
+
+/* ---------- Envoi des vocaux (+ file locale si pas de réseau) ---------- */
+function extFor(mime){ return /mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm'; }
+async function uploadAndInsert(row, path, blob, mime){
+  const up = await sb.storage.from(BUCKET).upload(path, blob, {contentType: mime.split(';')[0], upsert:true});
+  if (up.error) throw up.error;
+  const ins = await sb.from('radio_messages').upsert(row, {onConflict:'id', ignoreDuplicates:true});
+  if (ins.error) throw ins.error;
+}
+async function sendVoice(canalId, blob, mime, dur){
+  const id = uuid(), path = `${canalId}/${id}.${extFor(mime)}`;
+  const row = {id, canal_id:canalId, auteur_id:me.id, auteur_nom:me.nom, type:'vocal', audio_path:path, audio_mime:mime, duree_s:dur, cree_le:new Date().toISOString()};
+  const local = Object.assign({}, row, {_state:'sending', _blobUrl:URL.createObjectURL(blob)});
+  addMsg(local); refreshConv(canalId); chirp();
+  try { await uploadAndInsert(row, path, blob, mime); setState(id, null); }
+  catch (e) {
+    setState(id, 'pending');
+    try { const dataUrl = await blobToDataUrl(blob); const l = readPending(); l.push({row, path, mime, dataUrl}); writePending(l); }
+    catch (err) { toast('Vocal non conservé : mémoire du téléphone pleine.'); }
+  }
+  refreshConv(canalId);
+}
+function blobToDataUrl(b){ return new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
+function readPending(){ try { return JSON.parse(localStorage.getItem(LS_PENDING) || '[]'); } catch (e) { return []; } }
+function writePending(l){ localStorage.setItem(LS_PENDING, JSON.stringify(l)); }
+function loadPendingIntoUi(){ readPending().forEach(p => { if (p.row.auteur_id === me.id) addMsg(Object.assign({}, p.row, {_state:'pending', _blobUrl:p.dataUrl})); }); }
+let flushing = false;
+async function flushPending(){
+  if (flushing || !me) return; const list = readPending(); if (!list.length) return; flushing = true;
+  const keep = [];
+  for (const p of list) {
+    try { const blob = await (await fetch(p.dataUrl)).blob(); await uploadAndInsert(p.row, p.path, blob, p.mime); setState(p.row.id, null); refreshConv(p.row.canal_id); }
+    catch (e) { keep.push(p); }
+  }
+  try { writePending(keep); } catch (e) {}
+  flushing = false;
+}
+
+/* ---------- Canaux : ouvrir, privé, nouveau groupe ---------- */
+async function openConv(id){
+  stopPlayback(); ui.conv = id; $('#sheet').innerHTML = ''; render();
+  loadCanal(id).then(() => refreshConv(id)).catch(() => {});
+}
+function back(){ stopPlayback(); ui.conv = null; render(); }
+async function openDirect(otherId){
+  let c = [...canaux.values()].find(x => x.type === 'direct' && (x.membres||[]).length === 2 && x.membres.includes(otherId));
+  if (!c) {
+    const { data, error } = await sb.from('radio_canaux').select('*').eq('type', 'direct').eq('archive', false).contains('membres', [me.id, otherId]);
+    if (error) { toast('Pas de réseau : réessayez dans un instant.'); return; }
+    c = (data || []).find(x => x.membres.length === 2);
+    if (!c) {
+      const row = {id:uuid(), type:'direct', tous:false, membres:[me.id, otherId], cree_par:me.id, cree_par_nom:me.nom};
+      const ins = await sb.from('radio_canaux').insert(row);
+      if (ins.error) { toast('Pas de réseau : réessayez dans un instant.'); return; }
+      c = Object.assign({cree_le:new Date().toISOString(), archive:false}, row);
+    }
+    canaux.set(c.id, c);
+  }
+  openConv(c.id);
+}
+function groupSheet(){
+  const list = activeAgents().filter(a => a.id !== me.id).sort((a,b) => a.nom.localeCompare(b.nom));
+  $('#sheet').innerHTML = `<div class="sheet-bg" data-act="sheet-bg"><div class="sheet" role="dialog" aria-modal="true">
+    <h3>Nouveau groupe</h3><p>Les collègues cochés recevront tous les vocaux de ce groupe.</p>
+    <label class="field"><span>Nom du groupe</span><input id="gName" maxlength="40" placeholder="Par exemple : Événement Palexpo" autocomplete="off"></label>
+    <input class="search" id="gSearch" type="search" placeholder="Rechercher un collègue" autocomplete="off">
+    <div id="gList">${list.map(a => `<label class="pick" data-n="${esc(a.nom.toLowerCase())}"><input type="checkbox" value="${a.id}">${avatar(a.id, a.nom)}<span class="row-t">${esc(a.nom)}</span></label>`).join('')}</div>
+    <div class="err" id="gErr" role="alert"></div>
+    <button class="btn" data-act="create-group" id="gBtn">Créer le groupe</button><button class="btn ghost" data-act="close-sheet">Annuler</button></div></div>`;
+  $('#gSearch').oninput = e => { const q = e.target.value.trim().toLowerCase(); document.querySelectorAll('#gList .pick').forEach(p => p.classList.toggle('hidden', !!q && !p.dataset.n.includes(q))); };
+}
+async function createGroup(){
+  const name = ($('#gName').value || '').trim(), sel = [...document.querySelectorAll('#gList input:checked')].map(x => x.value);
+  if (!name) { $('#gErr').textContent = 'Donnez un nom au groupe.'; $('#gName').focus(); return; }
+  if (!sel.length) { $('#gErr').textContent = 'Cochez au moins un collègue.'; return; }
+  const btn = $('#gBtn'); btn.disabled = true; btn.textContent = 'Création…';
+  const row = {id:uuid(), nom:name, type:'groupe', tous:false, membres:[me.id, ...sel], cree_par:me.id, cree_par_nom:me.nom};
+  const { error } = await sb.from('radio_canaux').insert(row);
+  if (error) { btn.disabled = false; btn.textContent = 'Créer le groupe'; $('#gErr').textContent = 'Création impossible sans réseau. Réessayez.'; return; }
+  canaux.set(row.id, Object.assign({cree_le:new Date().toISOString(), archive:false}, row));
+  sb.from('radio_messages').insert({canal_id:row.id, auteur_id:me.id, auteur_nom:me.nom, type:'info', texte:`${me.nom} a créé le groupe avec ${sel.length} collègue${sel.length > 1 ? 's' : ''}`}).then(() => {}, () => {});
+  openConv(row.id);
+}
+
+/* ---------- SOS ---------- */
+let sosHold = null, overlay = null, myWatch = null, lastPosSent = 0;
+function myActiveAlert(){ return [...alertes.values()].find(a => a.agent_id === me.id && a.statut === 'active'); }
+function startSosHold(btn, e){
+  const mine = myActiveAlert(); if (mine) { overlay = {alertId:mine.id}; renderOverlay(); return; }
+  if (sosHold) return; ac();
+  try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+  const h = {t0:performance.now()}; sosHold = h;
+  const step = () => {
+    if (sosHold !== h) return; const p = Math.min(1, (performance.now() - h.t0) / HOLD_MS); btn.style.setProperty('--p', p);
+    if (p >= 1) { sosHold = null; btn.style.setProperty('--p', 0); vibrate([90, 40, 90]); triggerSOS(); flushRender(); return; }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  const end = () => {
+    btn.removeEventListener('pointerup', end); btn.removeEventListener('pointercancel', end);
+    if (sosHold === h) { sosHold = null; btn.style.setProperty('--p', 0); toast('Maintenez SOS 1,5 seconde pour déclencher l\u2019alerte.'); flushRender(); }
+  };
+  btn.addEventListener('pointerup', end); btn.addEventListener('pointercancel', end);
+}
+function retryUntilOk(fn, onFail){ const go = async () => { try { await fn(); return true; } catch (e) { onFail && onFail(); setTimeout(go, 4000); return false; } }; return go(); }
+async function triggerSOS(){
+  stopPlayback();
+  const a = {id:uuid(), agent_id:me.id, agent_nom:me.nom, statut:'active', declenchee_le:new Date().toISOString(), _unsent:true};
+  alertes.set(a.id, a); reponses.set(a.id, []); overlay = {alertId:a.id}; renderOverlay();
+  const t = tousCanal();
+  retryUntilOk(async () => {
+    const r1 = await sb.from('radio_alertes').upsert(stripLocal(a), {onConflict:'id'}); if (r1.error) throw r1.error;
+    if (t) { const r2 = await sb.from('radio_messages').upsert({id:a.id, canal_id:t.id, auteur_id:me.id, auteur_nom:me.nom, type:'sos', alerte_id:a.id, cree_le:a.declenchee_le}, {onConflict:'id', ignoreDuplicates:true}); if (r2.error) throw r2.error; }
+    a._unsent = false; if (a.lat != null) await pushPosition(a, true); renderOverlay();
+  }, () => { a._unsent = true; renderOverlay(); });
+  startWatch(a);
+}
+function stripLocal(o){ const c = {}; Object.keys(o).forEach(k => { if (k[0] !== '_') c[k] = o[k]; }); return c; }
+function startWatch(a){
+  if (!navigator.geolocation) { a._noGeo = true; renderOverlay(); return; }
+  stopWatch();
+  const ok = p => {
+    a.lat = p.coords.latitude; a.lng = p.coords.longitude; a.precision_m = Math.round(p.coords.accuracy); a.position_le = new Date().toISOString(); a._noGeo = false;
+    if (Date.now() - lastPosSent > 20000) pushPosition(a); if (overlay && overlay.alertId === a.id) renderOverlay();
+  };
+  const ko = () => { if (a.lat == null) { a._noGeo = true; if (overlay && overlay.alertId === a.id) renderOverlay(); } };
+  try { myWatch = navigator.geolocation.watchPosition(ok, ko, {enableHighAccuracy:true, maximumAge:5000, timeout:15000}); } catch (e) { ko(); }
+}
+function stopWatch(){ if (myWatch != null) { try { navigator.geolocation.clearWatch(myWatch); } catch (e) {} myWatch = null; } }
+async function pushPosition(a, force){
+  if (a._unsent && !force) return; lastPosSent = Date.now();
+  const r = await sb.from('radio_alertes').update({lat:a.lat, lng:a.lng, precision_m:a.precision_m, position_le:a.position_le}).eq('id', a.id);
+  if (r.error) lastPosSent = 0;
+}
+async function closeAlert(a){
+  const bySelf = a.agent_id === me.id;
+  if (!bySelf && !confirm(`Clôturer l'alerte de ${a.agent_nom || agentName(a.agent_id)} ? À faire seulement si la situation est réglée.`)) return;
+  const patch = {statut:'cloturee', cloturee_le:new Date().toISOString(), cloturee_par:me.id, cloturee_par_nom:me.nom};
+  const r = await sb.from('radio_alertes').update(patch).eq('id', a.id);
+  if (r.error) { toast('Pas de réseau : clôture impossible pour l\u2019instant. Réessayez.'); return; }
+  Object.assign(a, patch); if (bySelf) stopWatch(); stopSiren();
+  const t = tousCanal();
+  if (t) sb.from('radio_messages').insert({canal_id:t.id, auteur_id:me.id, auteur_nom:me.nom, type:'info', texte: bySelf ? `Fin d'alerte : ${me.nom} est en sécurité` : `Alerte de ${a.agent_nom || agentName(a.agent_id)} clôturée par ${me.nom}`}).then(() => {}, () => {});
+  renderOverlay(); requestRender();
+}
+async function respond(a, text){
+  stopSiren(); muted = true;
+  const row = {alerte_id:a.id, agent_id:me.id, agent_nom:me.nom, reponse:text};
+  const r = await sb.from('radio_alerte_reponses').insert(row);
+  if (r.error) { toast('Réponse non envoyée (pas de réseau). Réessayez ou appelez la centrale.'); return; }
+  const l = reponses.get(a.id) || []; if (!l.some(x => x.agent_id === me.id && x.reponse === text)) l.push(Object.assign({id:uuid(), cree_le:new Date().toISOString()}, row)); reponses.set(a.id, l);
+  renderOverlay();
+}
+function resumeAlerts(){
+  const mine = myActiveAlert(); if (mine) { overlay = {alertId:mine.id}; startWatch(mine); renderOverlay(); return; }
+  const recent = [...alertes.values()].filter(a => a.statut === 'active' && a.agent_id !== me.id && !(reponses.get(a.id) || []).some(r => r.agent_id === me.id) && Date.now() - new Date(a.declenchee_le) < 3*3600e3)
+    .sort((a,b) => new Date(b.declenchee_le) - new Date(a.declenchee_le))[0];
+  if (recent) { overlay = {alertId:recent.id}; muted = false; vibrate([500,200,500]); renderOverlay(); }
+}
+function posHTML(a){
+  if (a.lat == null) {
+    if (a.agent_id === me.id) return `<div class="pos"><div class="pos-c">${a._noGeo ? 'Position indisponible' : 'Localisation en cours…'}</div>${a._noGeo ? '<small>Activez la localisation du téléphone et autorisez-la pour ce site : la position sera envoyée dès qu\u2019elle sera trouvée.</small>' : ''}</div>`;
+    return `<div class="pos"><div class="pos-c">Position pas encore reçue</div><small>Elle s'affichera ici dès que le téléphone de votre collègue l'aura trouvée.</small></div>`;
+  }
+  const url = `https://www.google.com/maps?q=${a.lat.toFixed(6)},${a.lng.toFixed(6)}`;
+  return `<div class="pos"><div class="pos-c">${a.lat.toFixed(5)}, ${a.lng.toFixed(5)}</div>
+    <small>${a.precision_m ? `Précision environ ${a.precision_m} m · ` : ''}mise à jour à ${fmtTime(a.position_le || a.declenchee_le)}</small>
+    <a href="${url}" target="_blank" rel="noopener">Ouvrir dans Google Maps</a></div>`;
+}
+function acksHTML(a){
+  const l = reponses.get(a.id) || [];
+  const items = l.map(r => `<li><span><b>${r.agent_id === me.id ? 'Vous' : esc(r.agent_nom || agentName(r.agent_id))}</b>${esc(r.reponse)}</span><time>${fmtTime(r.cree_le)}</time></li>`).join('');
+  return `<h3>Réponses (${l.length})</h3><ul class="acks">${items || (a.statut === 'active' ? '<li class="empty">En attente des premières réponses…</li>' : '<li class="empty">Aucune réponse enregistrée.</li>')}</ul>`;
+}
+const TELS = `<div class="tels"><a href="tel:117">Police 117</a><a href="tel:144">Ambulance 144</a><a href="tel:118">Pompiers 118</a></div>`;
+function renderOverlay(){
+  const host = $('#overlay'); if (!overlay) { host.innerHTML = ''; return; }
+  const a = alertes.get(overlay.alertId); if (!a) { overlay = null; host.innerHTML = ''; return; }
+  const live = a.statut === 'active', closed = !live;
+  const when = `${new Date(a.declenchee_le).toLocaleDateString('fr-CH')} à ${fmtTime(a.declenchee_le)}`;
+  let html;
+  if (a.agent_id === me.id) {
+    html = live ? `<div class="ov" role="alertdialog" aria-label="Votre alerte"><div class="ov-in"><div class="beacon">!</div>
+        <h2>${a._unsent ? 'Envoi de l\u2019alerte…' : 'Alerte envoyée'}</h2>
+        ${a._unsent ? `<div class="unsent">Pas de réseau : l'alerte part automatiquement dès que possible. Si c'est urgent, appelez directement :</div>${TELS}` : `<p>Tous vos collègues ont reçu l'alerte et votre position (${when}).</p>`}
+        ${posHTML(a)}${acksHTML(a)}
+        <div class="ov-actions"><button class="btn-w" data-act="safe">Je suis en sécurité</button>
+        <button class="btn-w sec" data-act="hide-ov">Masquer (l'alerte reste active)</button></div></div></div>`
+      : `<div class="ov calm"><div class="ov-in"><div class="beacon">✓</div><h2>Alerte clôturée</h2>
+        <p>Déclenchée le ${when}, clôturée à ${fmtTime(a.cloturee_le)}${a.cloturee_par && a.cloturee_par !== me.id ? ` par ${esc(a.cloturee_par_nom || agentName(a.cloturee_par))}` : ''}.</p>
+        ${acksHTML(a)}<div class="ov-actions"><button class="btn-w" data-act="hide-ov">Fermer</button></div></div></div>`;
+  } else {
+    const nom = a.agent_nom || agentName(a.agent_id), mineAck = (reponses.get(a.id) || []).find(r => r.agent_id === me.id);
+    html = `<div class="ov ${closed ? 'calm' : ''}" role="alertdialog" aria-label="Alerte d'un collègue"><div class="ov-in"><div class="beacon">${closed ? '✓' : '!'}</div>
+      <h2>${closed ? 'Alerte terminée' : 'Alerte de ' + esc(nom)}</h2>
+      <p>${closed ? `${esc(nom)} · clôturée à ${fmtTime(a.cloturee_le)}${a.cloturee_par_nom ? ' par ' + esc(a.cloturee_par_nom) : ''}` : `Déclenchée le ${when}. Allez voir sa position et répondez.`}</p>
+      ${posHTML(a)}${acksHTML(a)}
+      <div class="ov-actions">
+        ${live && !mineAck ? `<button class="btn-w go" data-act="ack" data-text="J'arrive.">J'arrive</button><button class="btn-w sec" data-act="ack" data-text="Bien reçu, je suis la situation.">Bien reçu, je suis la situation</button><button class="btn-w sec" data-act="ack" data-text="Je ne peux pas intervenir.">Je ne peux pas intervenir</button>` : ''}
+        ${live && mineAck ? `<p>Votre réponse « ${esc(mineAck.reponse)} » a été envoyée.</p>` : ''}
+        ${live ? TELS : ''}
+        ${siren ? '<button class="btn-w sec" data-act="mute">Couper la sirène</button>' : ''}
+        ${live ? '<button class="btn-w sec" data-act="close-other">Clôturer l\u2019alerte (situation réglée)</button>' : ''}
+        <button class="btn-w sec" data-act="hide-ov">Fermer</button></div></div></div>`;
+  }
+  host.innerHTML = html;
+}
+
+/* ---------- Événements ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const act = t.dataset.act, cur = overlay && alertes.get(overlay.alertId);
+  switch (act) {
+    case 'tab': ui.tab = t.dataset.tab; render(); break;
+    case 'open': openConv(t.dataset.id); break;
+    case 'direct': openDirect(t.dataset.id); break;
+    case 'back': back(); break;
+    case 'play': togglePlay(t.dataset.id); break;
+    case 'new-group': groupSheet(); break;
+    case 'create-group': createGroup(); break;
+    case 'close-sheet': $('#sheet').innerHTML = ''; break;
+    case 'sheet-bg': if (e.target === t) $('#sheet').innerHTML = ''; break;
+    case 'view-alert': if (alertes.has(t.dataset.id)) { overlay = {alertId:t.dataset.id}; renderOverlay(); } break;
+    case 'hide-ov': overlay = null; stopSiren(); renderOverlay(); requestRender(); break;
+    case 'mute': muted = true; stopSiren(); renderOverlay(); break;
+    case 'safe': if (cur) closeAlert(cur); break;
+    case 'close-other': if (cur) closeAlert(cur); break;
+    case 'ack': if (cur) respond(cur, t.dataset.text); break;
+  }
+});
+document.addEventListener('pointerdown', e => {
+  // La sirène ne peut démarrer qu'après un premier geste sur l'écran (règle des navigateurs).
+  if (overlay && !siren && !muted && !e.target.closest('.ov-actions')) { const a = alertes.get(overlay.alertId); if (a && a.statut === 'active' && a.agent_id !== me.id && !(reponses.get(a.id) || []).some(r => r.agent_id === me.id)) { ac(); setTimeout(() => { startSiren(); renderOverlay(); }, 50); } }
+  const sos = e.target.closest('#sosBtn'); if (sos) { e.preventDefault(); startSosHold(sos, e); return; }
+  const ptt = e.target.closest('#ptt');
+  if (ptt) {
+    e.preventDefault(); try { ptt.setPointerCapture(e.pointerId); } catch (_) {}
+    const y0 = e.clientY;
+    const move = ev => { if (rec) { const c = (y0 - ev.clientY) > 70; if (c !== rec.cancel) { rec.cancel = c; recUI(); } } };
+    const up = () => { ptt.removeEventListener('pointermove', move); ptt.removeEventListener('pointerup', up); ptt.removeEventListener('pointercancel', up); stopRec(); };
+    ptt.addEventListener('pointermove', move); ptt.addEventListener('pointerup', up); ptt.addEventListener('pointercancel', up);
+    startRec();
+  }
+});
+document.addEventListener('contextmenu', e => { if (e.target.closest('#ptt,#sosBtn')) e.preventDefault(); });
+let spaceDown = false;
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || e.repeat || !ui.conv || overlay || $('#sheet').innerHTML) return;
+  if (e.target.closest('input,textarea')) return;
+  e.preventDefault(); spaceDown = true; startRec();
+});
+document.addEventListener('keyup', e => { if (e.code === 'Space' && spaceDown) { e.preventDefault(); spaceDown = false; stopRec(); } });
+
+boot();
+</script>
+</body>
+</html>
