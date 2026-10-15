@@ -1,4 +1,18 @@
-<!-- RDZ · questionnaires-agent · v2 · 2026-09-30
+<!-- RDZ · questionnaires-agent · v3 · 2026-10-15
+     v3 : CODE FORMATEUR + formation par site (migration-quiz-formation-sites-pin.sql).
+       - Après l'identification nom + PIN (fonction « questionnaires »), un code
+         formateur est demandé. Il est vérifié par le serveur (quiz_trainer_login),
+         jamais écrit dans cette page. Jeton gardé pour l'onglet seulement
+         (sessionStorage), verrouillage automatique après 15 min d'inactivité,
+         bouton « Verrouiller ».
+       - Partage : lien personnel sécurisé (quiz_links : un agent, un passage,
+         durée limitée) → Quiz_Agent_RDZ.html?lien=…
+       - Nouveaux écrans : Liens envoyés (suivi / annulation), Mises en situation
+         (grille cochée par le formateur), Habilitations par site (habilité / à
+         revoir / retiré, avec historique côté serveur).
+       - Éditeur : repère « sécurité prioritaire » et source de chaque question.
+       - Après validation d'une note : proposition directe de décision d'habilitation.
+     v2 · 2026-09-30
      Préparation des quiz de formation par un agent désigné.
      Accès : UNIQUEMENT l'identification habituelle d'application.html (nom +
      PIN). La page vérifie, dans la base principale, que l'agent connecté est
@@ -175,65 +189,27 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
 }
 </style>
 
-
-<style id="rdz-harmonisation-2026-10-01">
-@media screen{
-:root{
- --rdz-red:#d71920;--rdz-red-dark:#a90f16;--rdz-navy:#111c2e;--rdz-navy-2:#17263b;
- --rdz-text:#172033;--rdz-muted:#64748b;--rdz-border:#e2e8f0;--rdz-bg:#f4f7fb;
- --rdz-soft:#f8fafc;--rdz-radius:12px;--rdz-shadow:0 8px 24px rgba(15,23,42,.07);
-}
-html{background:var(--rdz-bg)}
-body{background:var(--rdz-bg)!important;color:var(--rdz-text)!important}
-header{
- position:sticky!important;top:0!important;z-index:1000!important;
- background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy-2))!important;
- border-bottom:3px solid var(--rdz-red)!important;
- box-shadow:0 7px 22px rgba(15,23,42,.15)!important;
-}
-header .top{max-width:1180px!important;margin:auto!important;min-height:58px!important}
-header .brand{color:#fff!important;font-weight:800!important;letter-spacing:.02em}
-header .sub{color:#cbd5e1!important}
-header a,header button.hl{
- border-radius:9px!important;border:1px solid rgba(255,255,255,.22)!important;
- background:rgba(255,255,255,.08)!important;color:#fff!important;
- text-decoration:none!important;box-shadow:none!important
-}
-header a:hover,header button.hl:hover{background:rgba(255,255,255,.15)!important}
-main,.wrap,.container{max-width:1180px}
-.card,.panel,.box,.quiz-card,.result-card,.question-card{
- background:#fff!important;border:1px solid var(--rdz-border)!important;
- border-radius:var(--rdz-radius)!important;box-shadow:var(--rdz-shadow)!important
-}
-h1,h2,h3{color:var(--rdz-text)}
-input,select,textarea{
- background:#fff!important;color:var(--rdz-text)!important;border:1px solid #cbd5e1!important;
- border-radius:9px!important;min-height:40px;outline:none
-}
-input:focus,select:focus,textarea:focus{
- border-color:var(--rdz-red)!important;box-shadow:0 0 0 3px rgba(215,25,32,.11)!important
-}
-button,.btn{
- border-radius:9px!important;font-weight:700;transition:transform .14s ease,box-shadow .14s ease,background .14s ease
-}
-button:hover,.btn:hover{transform:translateY(-1px)}
-button.primary,.btn.primary,.primary{
- background:var(--rdz-red)!important;border-color:var(--rdz-red)!important;color:#fff!important
-}
-button.primary:hover,.btn.primary:hover,.primary:hover{background:var(--rdz-red-dark)!important}
-table{background:#fff!important;border-radius:10px;overflow:hidden}
-th{background:#f1f5f9!important;color:#334155!important}
-td,th{border-color:var(--rdz-border)!important}
-.badge,.pill,.tag{border-radius:999px!important}
-.muted,.hint,.small{color:var(--rdz-muted)}
-@media(max-width:640px){
- header .top{min-height:54px!important;padding:7px 10px!important}
- main,.wrap,.container{padding-left:12px!important;padding-right:12px!important}
- .card,.panel,.box,.quiz-card,.result-card,.question-card{border-radius:11px!important}
-}
-}
+<style id="v3-formation">
+.code-box{max-width:380px;margin:30px auto;text-align:center}
+.code-box .ic{font-size:40px;margin-bottom:8px}
+.code-box input.f{text-align:center;font-size:20px;letter-spacing:3px;margin:12px 0}
+.tag.crit{background:#fff4e0;color:#7a4300;border:1px solid #e08a00}
+.src{font-size:11.5px;color:#888;font-style:italic;margin-top:4px}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line-soft);border-radius:var(--radius-ui);margin-bottom:6px;background:#fff;cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:var(--ok);flex-shrink:0;margin-top:1px}
+.chk.on{background:var(--ok-soft);border-color:#bfe3cb}
+.watch{background:#fff4e0;border:2px solid #e08a00;color:#7a4300;border-radius:var(--radius-ui);padding:10px 12px;margin-top:10px;font-size:13px}
+.situ{background:var(--blue-soft);border:1px solid #c7d9f0;border-radius:var(--radius-ui);padding:10px 12px;margin:8px 0 12px;font-size:13.5px}
+.hab-site{font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:16px 0 6px}
+.hab-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line-soft);border-radius:var(--radius-ui);padding:10px 12px;margin-bottom:6px}
+.hab-row .who{font-weight:bold}
+.hab-row small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.statut-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.statut-pick label{border:1px solid var(--line);border-radius:var(--radius-ui);padding:10px 6px;text-align:center;cursor:pointer;font-size:12.5px}
+.statut-pick input{display:none}
+.statut-pick input:checked+span{font-weight:bold}
+.statut-pick label:has(input:checked){border-color:var(--red);background:var(--red-soft)}
 </style>
-
 </head>
 <body>
 <div class="wrap">
@@ -245,6 +221,7 @@ td,th{border-color:var(--rdz-border)!important}
         <div class="sub">Préparation des quiz de formation</div>
       </div>
       <div class="hlinks">
+        <button class="hl hidden" id="lock-btn" onclick="lockTrainer()">🔒 Verrouiller</button>
         <a href="mobile.html">← Menu</a>
       </div>
     </div>
@@ -259,6 +236,19 @@ td,th{border-color:var(--rdz-border)!important}
       <h2>Accès réservé</h2>
       <div class="note" id="denied-msg">Cette page est réservée aux agents qui préparent les quiz.</div>
       <a class="btn btn-p" href="mobile.html">← Retour au menu</a>
+    </section>
+
+    <!-- CODE FORMATEUR -->
+    <section id="s-code" class="hidden">
+      <div class="card code-box">
+        <div class="ic">🔒</div>
+        <h2>Code formateur</h2>
+        <div class="lead" style="margin:6px 0 0">Connecté : <b id="code-who"></b>. Tapez le code formateur pour gérer les quiz et voir les résultats.</div>
+        <input class="f" id="code-input" type="password" autocomplete="off" inputmode="text" placeholder="••••••" onkeydown="if(event.key==='Enter')submitCode()">
+        <div id="code-err"></div>
+        <button class="btn btn-p btn-block" id="code-go" onclick="submitCode()">Ouvrir</button>
+        <div class="lead" style="margin:12px 0 0">Après 5 erreurs, l'accès est bloqué 15 minutes. Le module se verrouille seul après 15 minutes sans activité.</div>
+      </div>
     </section>
 
     <!-- ACCUEIL -->
@@ -276,6 +266,91 @@ td,th{border-color:var(--rdz-border)!important}
           <span class="d" style="display:block">Voir les résultats, corriger les questions ouvertes et valider les notes.</span></span>
         <span class="chev">›</span>
       </button>
+      <button class="group-btn" onclick="openLinks()">
+        <span class="ic">🔗</span>
+        <span><span class="t">Liens envoyés</span><span id="home-l-count"></span>
+          <span class="d" style="display:block">Suivre les liens personnels : en attente, ouverts, terminés, expirés. Annuler un lien.</span></span>
+        <span class="chev">›</span>
+      </button>
+      <button class="group-btn" onclick="openScenarios()">
+        <span class="ic">🎭</span>
+        <span><span class="t">Mises en situation</span>
+          <span class="d" style="display:block">Faire jouer un scénario sur site et cocher les actions réalisées par l'agent.</span></span>
+        <span class="chev">›</span>
+      </button>
+      <button class="group-btn" onclick="openHabs()">
+        <span class="ic">🎓</span>
+        <span><span class="t">Habilitations par site</span>
+          <span class="d" style="display:block">Qui est habilité sur quel site. Enregistrer une décision : habilité, à revoir ou retiré.</span></span>
+        <span class="chev">›</span>
+      </button>
+    </section>
+
+    <!-- LIENS ENVOYÉS -->
+    <section id="s-links" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Liens envoyés</h2>
+      <div class="lead">Un lien personnel ne sert qu'une fois, pour un seul agent, pendant la durée choisie. Les 60 derniers jours sont affichés.</div>
+      <div class="toolbar"><input class="f search" id="lk-search" placeholder="🔍 Agent ou quiz…" oninput="renderLinks()"></div>
+      <div class="pills" id="lk-pills" style="margin-bottom:12px">
+        <button class="pill on" data-f="">Tous</button>
+        <button class="pill" data-f="en_attente">En attente</button>
+        <button class="pill" data-f="ouvert">Ouverts</button>
+        <button class="pill" data-f="termine">Terminés</button>
+        <button class="pill" data-f="expire">Expirés</button>
+        <button class="pill" data-f="annule">Annulés</button>
+      </div>
+      <div id="lk-err"></div>
+      <div id="lk-body"></div>
+    </section>
+
+    <!-- MISES EN SITUATION : LISTE -->
+    <section id="s-scen" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Mises en situation</h2>
+      <div class="lead">Choisissez un scénario, lisez la situation à l'agent, puis cochez ce qu'il fait (ou dit qu'il ferait).</div>
+      <div class="toolbar"><select class="f" id="sc-site" style="max-width:240px" onchange="renderScenarios()"><option value="">Tous les sites</option></select></div>
+      <div id="sc-err"></div>
+      <div id="sc-body"></div>
+      <h2 style="margin-top:20px">Derniers comptes rendus</h2>
+      <div id="sc-reports"></div>
+    </section>
+
+    <!-- MISE EN SITUATION : GRILLE -->
+    <section id="s-scenrun" class="hidden">
+      <button class="back" onclick="openScenarios()">‹ Mises en situation</button>
+      <div class="meta" id="sr-site"></div>
+      <h2 id="sr-title"></h2>
+      <div class="situ" id="sr-situ"></div>
+      <div class="field"><label class="l" for="sr-agent">Agent évalué *</label>
+        <select class="f" id="sr-agent"><option value="">Chargement…</option></select></div>
+      <label class="l">Actions attendues — cochez celles réalisées</label>
+      <div id="sr-steps"></div>
+      <div class="watch hidden" id="sr-watch-box"><b>⚠ Point d'attention</b><div id="sr-watch"></div></div>
+      <div class="src" id="sr-src"></div>
+      <div class="field" style="margin-top:12px"><label class="l" for="sr-comment">Commentaire</label>
+        <textarea class="f" id="sr-comment" placeholder="Ce qui a été revu avec l'agent…"></textarea></div>
+      <div id="sr-err"></div>
+    </section>
+
+    <!-- HABILITATIONS -->
+    <section id="s-hab" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Habilitations par site</h2>
+      <div class="lead">Dernière décision enregistrée pour chaque agent sur chaque site. L'historique complet est conservé.</div>
+      <div class="toolbar">
+        <input class="f search" id="hb-search" placeholder="🔍 Agent…" oninput="renderHabs()">
+        <select class="f" id="hb-site" style="max-width:200px" onchange="renderHabs()"><option value="">Tous les sites</option></select>
+        <button class="btn btn-p" onclick="openHabModal({})">+ Décision</button>
+      </div>
+      <div class="pills" id="hb-pills" style="margin-bottom:6px">
+        <button class="pill on" data-f="">Tous</button>
+        <button class="pill" data-f="habilite">Habilités</button>
+        <button class="pill" data-f="a_revoir">À revoir</button>
+        <button class="pill" data-f="retire">Retirés</button>
+      </div>
+      <div id="hb-err"></div>
+      <div id="hb-body"></div>
     </section>
 
     <!-- LISTE DES QUESTIONNAIRES -->
@@ -362,6 +437,31 @@ td,th{border-color:var(--rdz-border)!important}
   <button class="btn btn-ok" id="corr-save" onclick="saveCorrection()">✓ Valider la note</button>
 </div></div>
 
+<!-- Barre collante de la mise en situation -->
+<div class="sticky hidden" id="sr-bar"><div class="in">
+  <button class="btn btn-ok" id="sr-save" onclick="saveScenarioReport()">✓ Enregistrer le compte rendu</button>
+</div></div>
+
+<!-- MODALE HABILITATION -->
+<div class="modal-bg" id="m-hab"><div class="modal">
+  <h3>Décision d'habilitation</h3>
+  <div id="hm-context" class="note hidden"></div>
+  <div class="field"><label class="l" for="hm-agent">Agent *</label><select class="f" id="hm-agent"><option value="">Chargement…</option></select></div>
+  <div class="field"><label class="l" for="hm-site">Site *</label><select class="f" id="hm-site"></select></div>
+  <div class="field"><label class="l">Décision *</label>
+    <div class="statut-pick">
+      <label><input type="radio" name="hm-statut" value="habilite"><span>✅ Habilité</span></label>
+      <label><input type="radio" name="hm-statut" value="a_revoir"><span>🔁 À revoir</span></label>
+      <label><input type="radio" name="hm-statut" value="retire"><span>⛔ Retiré</span></label>
+    </div></div>
+  <div class="field"><label class="l" for="hm-comment">Commentaire</label><textarea class="f" id="hm-comment" style="min-height:50px" placeholder="Ex. : points critiques revus ensemble le …"></textarea></div>
+  <div id="hm-err"></div>
+  <div class="foot">
+    <button class="btn btn-g" onclick="closeModal('m-hab')">Plus tard</button>
+    <button class="btn btn-p" id="hm-save" onclick="saveHab()">✓ Enregistrer</button>
+  </div>
+</div></div>
+
 <!-- MODALE QUESTION -->
 <div class="modal-bg" id="m-question"><div class="modal">
   <h3 id="mq-title">Nouvelle question</h3>
@@ -391,6 +491,8 @@ td,th{border-color:var(--rdz-border)!important}
     <div class="field"><label class="l" for="mq-pts">Points</label><input class="f" id="mq-pts" type="number" min="0.5" step="0.5" value="1"></div>
   </div>
   <div class="field"><label class="l" for="mq-exp">Explication (montrée à l'agent après le quiz)</label><textarea class="f" id="mq-exp" style="min-height:50px"></textarea></div>
+  <div class="field"><label class="l" for="mq-src">Source (CDC, annexe, notice)</label><input class="f" id="mq-src" placeholder="Ex. : CDC REGM du 17.09.2026 – annexe 3"></div>
+  <label class="chk" style="margin-bottom:4px"><input type="checkbox" id="mq-crit"><span><b>Sécurité prioritaire</b><br><small style="color:#777">Mise en avant dans le résultat de l'agent et dans la correction.</small></span></label>
   <div class="foot">
     <button class="btn btn-g" onclick="closeModal('m-question')">Annuler</button>
     <button class="btn btn-p" onclick="saveQuestion()">✓ Enregistrer la question</button>
@@ -401,6 +503,7 @@ td,th{border-color:var(--rdz-border)!important}
 <div class="modal-bg" id="m-share"><div class="modal">
   <h3>Partager le quiz</h3>
   <div style="font-weight:bold;margin-bottom:10px" id="sh-name"></div>
+  <div id="sh-public">
   <label class="l">Lien pour tous les agents (chacun choisit son nom)</label>
   <div class="linkbox" id="sh-link"></div>
   <div class="actions" style="margin-bottom:16px">
@@ -409,10 +512,23 @@ td,th{border-color:var(--rdz-border)!important}
     <button class="btn btn-g btn-sm" onclick="shareMail('sh-link')">✉️ Email</button>
     <button class="btn btn-g btn-sm hidden" id="sh-native" onclick="shareNative('sh-link')">📤 Partager…</button>
   </div>
-  <label class="l" for="sh-agent">Lien personnel pour un agent (nom déjà rempli)</label>
-  <select class="f" id="sh-agent" onchange="buildPersonalLink()"><option value="">— Choisir un agent —</option></select>
+  </div>
+  <div class="note hidden" id="sh-only-perso">Ce questionnaire s'ouvre <b>uniquement</b> avec un lien personnel.</div>
+  <label class="l" for="sh-agent">Lien personnel sécurisé (un agent, un seul passage)</label>
+  <select class="f" id="sh-agent" onchange="resetPersonalLink()"><option value="">— Choisir un agent —</option></select>
+  <div class="grid2" style="margin-top:8px">
+    <select class="f" id="sh-valid" onchange="resetPersonalLink()">
+      <option value="today">Aujourd'hui seulement (jusqu'à minuit)</option>
+      <option value="24">24 heures</option>
+      <option value="48" selected>48 heures</option>
+      <option value="168">7 jours</option>
+    </select>
+    <button class="btn btn-p" id="sh-create" onclick="createPersonalLink()">🔗 Créer le lien</button>
+  </div>
+  <div id="sh-err" style="margin-top:8px"></div>
   <div id="sh-perso" class="hidden">
     <div class="linkbox" id="sh-plink"></div>
+    <div class="lead" id="sh-pexp" style="margin-bottom:6px"></div>
     <div class="actions">
       <button class="btn btn-g btn-sm" onclick="copyLink('sh-plink')">📋 Copier</button>
       <button class="btn btn-g btn-sm" onclick="shareWhatsApp('sh-plink')">💬 WhatsApp</button>
@@ -477,11 +593,13 @@ function fDate(iso){ if(!iso) return '—'; const d=new Date(iso);
   return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
 function errText(e){ return (e && (e.message || e.error_description)) || String(e); }
 
-const SECTIONS = ['s-loading','s-denied','s-home','s-list','s-editor','s-results','s-corr'];
+const SECTIONS = ['s-loading','s-denied','s-code','s-home','s-list','s-editor','s-results','s-corr','s-links','s-scen','s-scenrun','s-hab'];
 function show(id){
   SECTIONS.forEach(s => $(s).classList.toggle('hidden', s!==id));
   $('ed-bar').classList.toggle('hidden', id!=='s-editor');
   $('corr-bar').classList.toggle('hidden', id!=='s-corr');
+  $('sr-bar').classList.toggle('hidden', id!=='s-scenrun');
+  $('lock-btn').classList.toggle('hidden', !trainerToken || id==='s-code' || id==='s-denied');
   window.scrollTo(0,0);
 }
 function openModal(id){ $(id).classList.add('open'); }
@@ -506,7 +624,8 @@ async function init(){
     if (!fns.includes(FONCTION_REQUISE)) return denied("Cette page est réservée aux agents qui préparent les quiz. Si vous devriez y avoir accès, demandez à la direction de cocher « Préparation des quiz » sur votre fiche.");
     me = { id: data.id, full_name: [data.nom, data.prenom].filter(Boolean).join(' ') || localStorage.getItem('rdz_agent_nom') || 'Agent' };
     $('who').textContent = me.full_name;
-    await goHome();
+    $('code-who').textContent = me.full_name;
+    await resumeOrAskCode();
   } catch(e){
     denied("Connexion impossible pour le moment (réseau ?). Réessayez dans un instant. Détail : " + errText(e));
   }
@@ -656,7 +775,8 @@ async function openEditor(id){
     const { data, error } = await sb.from('quiz_questions').select('*').eq('template_id', id).order('pos');
     if (error){ showErr('ed-err','Questions non chargées : '+errText(error)); edQs=[]; }
     else { edQs = (data||[]).map(q => ({ id:q.id, type:q.type, text:q.text, options:q.options||null,
-      correct_answers:q.correct_answers||null, points:q.points||1, explanation:q.explanation||'' }));
+      correct_answers:q.correct_answers||null, points:q.points||1, explanation:q.explanation||'',
+      source:q.source||'', is_critical:!!q.is_critical }));
       edOrigIds = edQs.map(q => q.id); }
   }
   renderEdQs();
@@ -688,8 +808,8 @@ function renderEdQs(){
       <div class="body">
         <div class="qt">${esc(q.text)}</div>
         <div class="meta" style="margin:6px 0 4px"><span class="tag">${TYPE_LABELS[q.type]||esc(q.type)}</span><span class="tag">${q.points} pt${q.points>1?'s':''}</span>
-          <span class="tag ${auto?'ok':'warn'}">${auto?'Corrigée automatiquement':'Correction manuelle'}</span></div>
-        ${detail}
+          <span class="tag ${auto?'ok':'warn'}">${auto?'Corrigée automatiquement':'Correction manuelle'}</span>${q.is_critical?'<span class="tag crit">⚠ Sécurité prioritaire</span>':''}</div>
+        ${detail}${q.source?`<div class="src">📄 ${esc(q.source)}</div>`:''}
         <div class="actions"><button class="btn btn-g btn-sm" data-qa="edit" data-i="${i}">✏️ Modifier</button>
           <button class="btn btn-bad btn-sm" data-qa="del" data-i="${i}">🗑</button></div>
       </div>
@@ -753,6 +873,8 @@ function openQuestion(i){
   $('mq-text').value = q ? q.text : '';
   $('mq-pts').value = q ? q.points : 1;
   $('mq-exp').value = q ? (q.explanation||'') : '';
+  $('mq-src').value = q ? (q.source||'') : '';
+  $('mq-crit').checked = !!(q && q.is_critical);
   document.querySelectorAll('input[name=mq-tf]').forEach(r => r.checked=false);
   mqType = q ? q.type : 'qcm';
   setQType(mqType, false);
@@ -787,7 +909,8 @@ function saveQuestion(){
     correct = [c.value==='true'];
   }
   const q = { id: mqIdx!==null ? edQs[mqIdx].id : uuid(), type: mqType, text, options, correct_answers: correct,
-              points, explanation: $('mq-exp').value.trim() };
+              points, explanation: $('mq-exp').value.trim(),
+              source: $('mq-src').value.trim(), is_critical: $('mq-crit').checked };
   if (mqIdx!==null) edQs[mqIdx]=q; else edQs.push(q);
   edDirty = true; closeModal('m-question'); renderEdQs();
 }
@@ -824,7 +947,8 @@ async function saveQuiz(status){
     // Questions : mise à jour en place (les identifiants sont conservés, les
     // réponses déjà données par les agents restent rattachées à leur question).
     const rows = edQs.map((q,i) => ({ id:q.id, template_id:tid, pos:i, type:q.type, text:q.text,
-      options:q.options, correct_answers:q.correct_answers, points:q.points, explanation:q.explanation||null }));
+      options:q.options, correct_answers:q.correct_answers, points:q.points, explanation:q.explanation||null,
+      source:q.source||null, is_critical:!!q.is_critical }));
     const up = await sb.from('quiz_questions').upsert(rows, { onConflict:'id' });
     if (up.error) throw up.error;
     const removed = edOrigIds.filter(id => !edQs.some(q => q.id===id));
@@ -847,7 +971,9 @@ async function openShare(id){
   shareQuizId = id;
   $('sh-name').textContent = t.title;
   $('sh-link').textContent = QUIZ_AGENT_URL + '?quiz=' + encodeURIComponent(id);
-  $('sh-perso').classList.add('hidden');
+  $('sh-public').classList.toggle('hidden', !!t.link_required);
+  $('sh-only-perso').classList.toggle('hidden', !t.link_required);
+  resetPersonalLink(); showErr('sh-err','');
   $('sh-native').classList.toggle('hidden', !navigator.share);
   const sel = $('sh-agent');
   sel.innerHTML = '<option value="">Chargement…</option>';
@@ -857,15 +983,6 @@ async function openShare(id){
     sel.innerHTML = '<option value="">— Choisir un agent —</option>' +
       list.map(a => `<option value="${esc(a.id)}">${esc(a.nom)} ${esc(a.prenom||'')}</option>`).join('');
   } catch(e){ sel.innerHTML = '<option value="">Liste des agents indisponible</option>'; }
-}
-function buildPersonalLink(){
-  const id = $('sh-agent').value;
-  if (!id){ $('sh-perso').classList.add('hidden'); return; }
-  const a = (annuaire||[]).find(x => x.id===id); if(!a) return;
-  const name = (a.nom+' '+(a.prenom||'')).trim();
-  $('sh-plink').textContent = QUIZ_AGENT_URL + '?quiz=' + encodeURIComponent(shareQuizId) +
-    '&agent=' + encodeURIComponent(a.id) + '&name=' + encodeURIComponent(name);
-  $('sh-perso').classList.remove('hidden');
 }
 function shareText(boxId){
   const t = templates.find(x => x.id===shareQuizId);
@@ -966,6 +1083,8 @@ async function openCorrection(sid){
 function renderCorrection(){
   let html = '';
   if (!corrSession.agent_id) html += `<div class="note">⚠ Cet agent a tapé son nom (« ${esc(corrSession.agent_name)} ») au lieu de le choisir dans la liste : la note ne pourra pas être inscrite automatiquement dans sa fiche RH. Pour la suite, envoyez-lui plutôt un <b>lien personnel</b> (bouton Partager).</div>`;
+  const critMissed = corrQs.filter(q => q.is_critical && q.type!=='open' && !((corrAns.find(x => x.question_id===q.id)||{}).is_correct));
+  if (critMissed.length) html += `<div class="watch" style="margin:0 0 12px"><b>⚠ ${critMissed.length} point(s) de sécurité prioritaire à revoir avec l'agent :</b><ul style="margin:6px 0 0 18px">${critMissed.map(q => `<li>${esc(q.text)}</li>`).join('')}</ul></div>`;
   corrQs.forEach((q,i) => {
     const a = corrAns.find(x => x.question_id===q.id);
     const given = a ? a.answer : null;
@@ -996,9 +1115,10 @@ function renderCorrection(){
     }
     html += `<div class="card">
       <div style="font-size:11px;font-weight:bold;color:#999;text-transform:uppercase;margin-bottom:4px">Question ${i+1} · ${pts} pt${pts>1?'s':''} · ${TYPE_LABELS[q.type]||esc(q.type)}</div>
-      <div style="font-weight:bold;margin-bottom:8px">${esc(q.text)}</div>
+      <div style="font-weight:bold;margin-bottom:8px">${esc(q.text)}${q.is_critical?' <span class="tag crit">⚠ Sécurité prioritaire</span>':''}</div>
       ${body}
       ${q.explanation ? `<div class="explain">💡 ${esc(q.explanation)}</div>` : ''}
+      ${q.source ? `<div class="src">📄 ${esc(q.source)}</div>` : ''}
     </div>`;
   });
   html += '<div class="score-box" id="corr-total"></div>';
@@ -1050,9 +1170,329 @@ async function saveCorrection(){
     }).eq('id', corrSession.id);
     if (r.error) throw r.error;
     toast(corrSession.agent_id ? 'Note validée ✓ — inscrite dans la fiche formation de l\'agent' : 'Note validée ✓ (agent non relié à une fiche RH)');
+    const tpl = templates.find(t => t.id===corrSession.template_id) || {};
+    const pass = (corrSession.quiz_templates && corrSession.quiz_templates.passing_score) || 70;
+    const done = corrSession;
     await openResults();
+    if (tpl.target_site) openHabModal({ agent_id: done.agent_id, agent_name: done.agent_name, site: tpl.target_site,
+      statut: (c.pct >= pass && !critMissedCount()) ? 'habilite' : 'a_revoir', session_id: done.id,
+      context: `Quiz « ${tpl.title} » : ${c.pct}% (seuil ${pass}%)` + (critMissedCount() ? ` · ${critMissedCount()} point(s) de sécurité prioritaire ratés` : '') });
   } catch(e){ showErr('corr-err','Enregistrement impossible : '+errText(e)); window.scrollTo(0,0); }
   finally { btn.disabled = false; }
+}
+
+/* ============================== v3 · CODE FORMATEUR ============================== */
+// Le code est vérifié par le serveur (quiz_trainer_login). Le jeton obtenu est
+// gardé pour cet onglet uniquement (sessionStorage) et exigé par toutes les
+// fonctions « formateur » (liens, mises en situation, habilitations).
+const TK_KEY = 'rdz_quiz_trainer_token';
+const IDLE_MIN = 15;
+let trainerToken = null;
+let idleTimer = null;
+const SITES_LIST = ['Barton','Bellevue','CTN','Collex','DLCC','HDLT','MDE','MDP','MSF','Moynier','Papeterie','Parkings','REGM','Rotschild','Seujet'];
+const STATUT_LBL = { habilite:'✅ Habilité', a_revoir:'🔁 À revoir', retire:'⛔ Retiré' };
+const STATUT_CLS = { habilite:'ok', a_revoir:'warn', retire:'bad' };
+const ETAT_LBL = { en_attente:['⏳ En attente',''], ouvert:['👀 Ouvert','blue'], termine:['✓ Terminé','ok'], expire:['⌛ Expiré','warn'], annule:['✕ Annulé','bad'] };
+
+function ssGet(k){ try { return sessionStorage.getItem(k); } catch(_) { return null; } }
+function ssSet(k,v){ try { v==null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k,v); } catch(_) {} }
+
+async function rpc(name, args){
+  const { data, error } = await sb.rpc(name, args);
+  if (error){
+    if (/SESSION_EXPIREE/.test(error.message||'')){ lockTrainer('Votre session formateur a expiré. Retapez le code.'); }
+    throw error;
+  }
+  return data;
+}
+async function resumeOrAskCode(){
+  const tk = ssGet(TK_KEY);
+  if (tk){
+    trainerToken = tk;
+    try { await rpc('quiz_link_list', { p_token: tk, p_days: 1 }); startIdle(); return goHome(); }
+    catch(_) { trainerToken = null; ssSet(TK_KEY, null); }
+  }
+  askCode('');
+}
+function askCode(msg){
+  trainerToken = null;
+  $('code-input').value = '';
+  showErr('code-err', msg || '');
+  show('s-code');
+  setTimeout(() => $('code-input').focus(), 50);
+}
+async function submitCode(){
+  const code = $('code-input').value.trim();
+  if (!code) return showErr('code-err', 'Tapez le code formateur.');
+  const b = $('code-go'); b.disabled = true; showErr('code-err','');
+  try {
+    const r = await rpc('quiz_trainer_login', { p_code: code, p_agent_name: me.full_name });
+    if (!r || !r.ok){
+      const e = r && r.error;
+      $('code-input').value = '';
+      if (e === 'CODE_BLOQUE') return showErr('code-err', 'Trop d\'essais : accès bloqué 15 minutes.');
+      if (e === 'CODE_NON_DEFINI') return showErr('code-err', 'Aucun code formateur n\'est encore défini. Demandez à la direction.');
+      const left = r && r.essais_restants;
+      return showErr('code-err', 'Code incorrect.' + (left != null ? (left ? ` Encore ${left} essai(s) avant blocage.` : ' Accès bloqué 15 minutes.') : ''));
+    }
+    trainerToken = r.token; ssSet(TK_KEY, r.token);
+    startIdle();
+    await goHome();
+  } catch(e){ showErr('code-err', 'Vérification impossible (réseau ?) : ' + errText(e)); }
+  finally { b.disabled = false; }
+}
+function lockTrainer(msg){
+  const tk = trainerToken;
+  trainerToken = null; ssSet(TK_KEY, null);
+  clearTimeout(idleTimer);
+  document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
+  if (tk) sb.rpc('quiz_trainer_logout', { p_token: tk }).then(()=>{}, ()=>{});
+  askCode(msg || '');
+}
+function startIdle(){
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { if (trainerToken) lockTrainer(`Module verrouillé après ${IDLE_MIN} minutes sans activité.`); }, IDLE_MIN*60*1000);
+}
+['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, () => { if (trainerToken) startIdle(); }, { passive:true }));
+
+function fillSiteSelect(sel, extra, withAll){
+  const cur = sel.value;
+  const all = [...new Set(SITES_LIST.concat(extra||[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  sel.innerHTML = (withAll ? '<option value="">Tous les sites</option>' : '<option value="">— Choisir un site —</option>') +
+    all.map(x => `<option>${esc(x)}</option>`).join('');
+  if (cur && all.includes(cur)) sel.value = cur;
+}
+async function fillAgentSelect(sel, keep){
+  sel.innerHTML = '<option value="">Chargement…</option>';
+  try {
+    const list = await loadAnnuaire();
+    sel.innerHTML = '<option value="">— Choisir un agent —</option>' +
+      list.map(a => `<option value="${esc(a.id)}">${esc(a.nom)} ${esc(a.prenom||'')}</option>`).join('');
+    if (keep && (keep.agent_id || keep.agent_name)){
+      if (keep.agent_id && list.some(a => String(a.id)===String(keep.agent_id))) sel.value = keep.agent_id;
+      else { sel.insertAdjacentHTML('beforeend', `<option value="name:${esc(keep.agent_name)}">${esc(keep.agent_name)} (hors liste)</option>`); sel.value = 'name:' + keep.agent_name; }
+    }
+  } catch(e){ sel.innerHTML = '<option value="">Liste des agents indisponible</option>'; }
+}
+function agentFrom(sel){
+  const v = sel.value; if (!v) return null;
+  if (v.startsWith('name:')) return { id: null, name: v.slice(5) };
+  const a = (annuaire||[]).find(x => String(x.id)===v);
+  return a ? { id: String(a.id), name: (a.nom + ' ' + (a.prenom||'')).trim() } : null;
+}
+
+/* ---- Partage : lien personnel sécurisé ---- */
+function resetPersonalLink(){ $('sh-perso').classList.add('hidden'); $('sh-create').disabled = false; }
+async function createPersonalLink(){
+  showErr('sh-err','');
+  const ag = agentFrom($('sh-agent'));
+  if (!ag) return showErr('sh-err', 'Choisissez l\'agent.');
+  const v = $('sh-valid').value;
+  let hours;
+  if (v === 'today'){ const end = new Date(); end.setHours(23,59,59,0); hours = Math.max(1, Math.ceil((end - Date.now())/3600e3)); }
+  else hours = parseInt(v, 10);
+  const b = $('sh-create'); b.disabled = true;
+  try {
+    const r = await rpc('quiz_link_create', { p_token: trainerToken, p_template_id: shareQuizId, p_agent_id: ag.id, p_agent_name: ag.name, p_hours: hours });
+    $('sh-plink').textContent = QUIZ_AGENT_URL + '?lien=' + encodeURIComponent(r.token);
+    $('sh-pexp').textContent = `Pour ${ag.name} · valable jusqu'au ${fDate(r.expires_at)} · un seul passage.`;
+    $('sh-perso').classList.remove('hidden');
+    toast('Lien créé ✓');
+  } catch(e){ b.disabled = false; showErr('sh-err', 'Création impossible : ' + errText(e)); }
+}
+
+/* ---- Liens envoyés ---- */
+let links = [], lkFilter = '';
+async function openLinks(){
+  show('s-links'); showErr('lk-err','');
+  $('lk-body').innerHTML = '<div class="spin"></div>';
+  try {
+    const [l] = await Promise.all([rpc('quiz_link_list', { p_token: trainerToken, p_days: 60 }), loadSessions()]);
+    links = l || []; renderLinks();
+  } catch(e){ $('lk-body').innerHTML=''; showErr('lk-err','Chargement impossible : '+errText(e)); }
+}
+$('lk-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  lkFilter = b.dataset.f;
+  $('lk-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b));
+  renderLinks();
+});
+function renderLinks(){
+  const q = $('lk-search').value.toLowerCase().trim();
+  const rows = links.filter(l => (!lkFilter || l.etat===lkFilter) &&
+    (!q || [l.agent_name, l.template_title, l.target_site].join(' ').toLowerCase().includes(q)));
+  if (!rows.length){ $('lk-body').innerHTML = '<div class="empty">Aucun lien dans cette catégorie.</div>'; return; }
+  $('lk-body').innerHTML = rows.map(l => {
+    const et = ETAT_LBL[l.etat] || [l.etat,''];
+    const sess = l.session_id && sessions.find(x => String(x.id)===String(l.session_id));
+    const canRevoke = l.etat==='en_attente' || l.etat==='ouvert';
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><div class="title">${esc(l.agent_name)}</div><div style="font-size:12.5px;color:#666">${esc(l.template_title||'Questionnaire supprimé')}</div></div>
+        <span class="tag ${et[1]}">${et[0]}</span>
+      </div>
+      <div class="meta">
+        ${l.target_site?`<span class="tag warn">📍 ${esc(l.target_site)}</span>`:''}
+        <span class="tag">Envoyé ${fDate(l.created_at)}${l.created_by?' par '+esc(l.created_by):''}</span>
+        ${l.used_at?`<span class="tag ok">Terminé ${fDate(l.used_at)}</span>`:`<span class="tag">Expire ${fDate(l.expires_at)}</span>`}
+      </div>
+      ${(sess || canRevoke) ? `<div class="actions">
+        ${sess?`<button class="btn btn-p btn-sm" data-lk="corr" data-sid="${esc(sess.id)}">✏️ Voir / corriger</button>`:''}
+        ${canRevoke?`<button class="btn btn-bad btn-sm" data-lk="revoke" data-id="${esc(l.id)}">✕ Annuler le lien</button>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+$('lk-body').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-lk]'); if(!b) return;
+  if (b.dataset.lk==='corr') return openCorrection(b.dataset.sid);
+  if (!confirm('Annuler ce lien ? L\'agent ne pourra plus l\'utiliser.')) return;
+  b.disabled = true;
+  try { await rpc('quiz_link_revoke', { p_token: trainerToken, p_link_id: b.dataset.id }); toast('Lien annulé'); await openLinks(); }
+  catch(err){ b.disabled = false; toast('Annulation impossible : '+errText(err), true); }
+});
+
+/* ---- Mises en situation ---- */
+let scenarios = [], curScen = null;
+async function openScenarios(){
+  show('s-scen'); showErr('sc-err','');
+  $('sc-body').innerHTML = '<div class="spin"></div>'; $('sc-reports').innerHTML = '';
+  try {
+    const [sc, rep] = await Promise.all([
+      rpc('quiz_scenarios_list', { p_token: trainerToken }),
+      rpc('quiz_scenario_reports_list', { p_token: trainerToken, p_days: 180 })
+    ]);
+    scenarios = sc || [];
+    fillSiteSelect($('sc-site'), scenarios.map(x => x.target_site), true);
+    renderScenarios(); renderReports(rep || []);
+  } catch(e){ $('sc-body').innerHTML=''; showErr('sc-err','Chargement impossible : '+errText(e)); }
+}
+function renderScenarios(){
+  const site = $('sc-site').value;
+  const rows = scenarios.filter(x => !site || x.target_site===site);
+  if (!rows.length){ $('sc-body').innerHTML = '<div class="empty">Aucune mise en situation pour ce site.</div>'; return; }
+  $('sc-body').innerHTML = rows.map(x => `<button class="group-btn" data-sc="${esc(x.id)}">
+      <span class="ic">🎭</span>
+      <span><span class="t">${esc(x.title)}</span>
+        <span class="d" style="display:block">${x.target_site?'📍 '+esc(x.target_site)+' · ':''}${(x.steps||[]).length} actions attendues</span>
+        <span class="d" style="display:block">${esc((x.situation||'').slice(0,140))}${(x.situation||'').length>140?'…':''}</span></span>
+      <span class="chev">›</span></button>`).join('');
+}
+$('sc-body').addEventListener('click', e => { const b = e.target.closest('[data-sc]'); if (b) runScenario(b.dataset.sc); });
+function renderReports(rows){
+  if (!rows.length){ $('sc-reports').innerHTML = '<div class="empty">Aucun compte rendu pour l\'instant.</div>'; return; }
+  $('sc-reports').innerHTML = rows.slice(0,30).map(r => `<div class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px"><div class="title">${esc(r.agent_name)}</div>
+      <span class="tag ${r.ok_count===r.total?'ok':'warn'}">${r.ok_count}/${r.total}</span></div>
+    <div style="font-size:12.5px;color:#666">${esc(r.scenario_title||'')}${r.target_site?' · 📍 '+esc(r.target_site):''} · ${fDate(r.created_at)}${r.trainer?' · par '+esc(r.trainer):''}</div>
+    ${(r.steps_missed||[]).length?`<div class="src" style="font-style:normal;color:var(--bad)">Manqué : ${(r.steps_missed||[]).map(esc).join(' · ')}</div>`:''}
+    ${r.comment?`<div class="explain">${esc(r.comment)}</div>`:''}
+  </div>`).join('');
+}
+function runScenario(id){
+  curScen = scenarios.find(x => String(x.id)===String(id)); if (!curScen) return;
+  show('s-scenrun'); showErr('sr-err','');
+  $('sr-site').innerHTML = curScen.target_site ? `<span class="tag warn">📍 ${esc(curScen.target_site)}</span>` : '';
+  $('sr-title').textContent = curScen.title;
+  $('sr-situ').textContent = curScen.situation || '';
+  $('sr-steps').innerHTML = (curScen.steps||[]).map((st,i) => `<label class="chk"><input type="checkbox" data-i="${i}"><span>${esc(st)}</span></label>`).join('');
+  $('sr-steps').querySelectorAll('input').forEach(c => c.addEventListener('change', () => c.closest('.chk').classList.toggle('on', c.checked)));
+  $('sr-watch').textContent = curScen.watch || '';
+  $('sr-watch-box').classList.toggle('hidden', !curScen.watch);
+  $('sr-src').textContent = curScen.source ? '📄 ' + curScen.source : '';
+  $('sr-comment').value = '';
+  fillAgentSelect($('sr-agent'));
+}
+async function saveScenarioReport(){
+  showErr('sr-err','');
+  const ag = agentFrom($('sr-agent'));
+  if (!ag){ window.scrollTo(0,0); return showErr('sr-err','Choisissez l\'agent évalué.'); }
+  const boxes = [...$('sr-steps').querySelectorAll('input')];
+  const steps = curScen.steps || [];
+  const ok = steps.filter((_,i) => boxes[i] && boxes[i].checked), miss = steps.filter((_,i) => !(boxes[i] && boxes[i].checked));
+  const b = $('sr-save'); b.disabled = true;
+  try {
+    const rid = await rpc('quiz_scenario_report_save', { p_token: trainerToken, p_scenario_id: curScen.id, p_agent_id: ag.id,
+      p_agent_name: ag.name, p_steps_ok: ok, p_steps_missed: miss, p_comment: $('sr-comment').value.trim() || null });
+    toast(`Compte rendu enregistré ✓ (${ok.length}/${steps.length})`);
+    const sc = curScen;
+    await openScenarios();
+    if (sc.target_site) openHabModal({ agent_id: ag.id, agent_name: ag.name, site: sc.target_site,
+      statut: miss.length ? 'a_revoir' : 'habilite', report_id: rid,
+      context: `Mise en situation « ${sc.title} » : ${ok.length}/${steps.length} actions réalisées.` });
+  } catch(e){ window.scrollTo(0,0); showErr('sr-err','Enregistrement impossible : '+errText(e)); }
+  finally { b.disabled = false; }
+}
+
+/* ---- Habilitations ---- */
+let habs = [], hbFilter = '', habCtx = {};
+async function openHabs(){
+  show('s-hab'); showErr('hb-err','');
+  $('hb-body').innerHTML = '<div class="spin"></div>';
+  try { habs = await rpc('quiz_habilitations_current', { p_token: trainerToken }) || [];
+    fillSiteSelect($('hb-site'), habs.map(h => h.target_site), true); renderHabs(); }
+  catch(e){ $('hb-body').innerHTML=''; showErr('hb-err','Chargement impossible : '+errText(e)); }
+}
+$('hb-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  hbFilter = b.dataset.f;
+  $('hb-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b));
+  renderHabs();
+});
+function renderHabs(){
+  const q = $('hb-search').value.toLowerCase().trim(), site = $('hb-site').value;
+  const rows = habs.filter(h => (!hbFilter || h.statut===hbFilter) && (!site || h.target_site===site) &&
+    (!q || (h.agent_name||'').toLowerCase().includes(q)));
+  if (!rows.length){ $('hb-body').innerHTML = '<div class="empty">Aucune habilitation dans cette catégorie. Appuyez sur « + Décision ».</div>'; return; }
+  const bySite = {};
+  rows.forEach(h => { (bySite[h.target_site] = bySite[h.target_site] || []).push(h); });
+  $('hb-body').innerHTML = Object.keys(bySite).sort((a,b)=>a.localeCompare(b,'fr')).map(st =>
+    `<div class="hab-site">📍 ${esc(st)} · ${bySite[st].filter(h=>h.statut==='habilite').length} habilité(s)</div>` +
+    bySite[st].map(h => `<div class="hab-row">
+      <div><div class="who">${esc(h.agent_name)}</div>
+        <small>${fDate(h.created_at)} · par ${esc(h.valide_par)}${h.commentaire?' · '+esc(h.commentaire):''}</small></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+        <span class="tag ${STATUT_CLS[h.statut]||''}">${STATUT_LBL[h.statut]||esc(h.statut)}</span>
+        <button class="btn btn-g btn-sm" data-hb="${esc(h.id)}">Modifier</button></div>
+    </div>`).join('')).join('');
+}
+$('hb-body').addEventListener('click', e => {
+  const b = e.target.closest('button[data-hb]'); if (!b) return;
+  const h = habs.find(x => String(x.id)===b.dataset.hb); if (!h) return;
+  openHabModal({ agent_id: h.agent_id, agent_name: h.agent_name, site: h.target_site, statut: h.statut });
+});
+function openHabModal(ctx){
+  habCtx = ctx || {};
+  showErr('hm-err','');
+  $('hm-context').classList.toggle('hidden', !habCtx.context);
+  $('hm-context').textContent = habCtx.context || '';
+  fillSiteSelect($('hm-site'), [habCtx.site], false);
+  if (habCtx.site) $('hm-site').value = habCtx.site;
+  document.querySelectorAll('input[name=hm-statut]').forEach(r => r.checked = (r.value === habCtx.statut));
+  $('hm-comment').value = '';
+  fillAgentSelect($('hm-agent'), habCtx.agent_name ? { agent_id: habCtx.agent_id, agent_name: habCtx.agent_name } : null);
+  openModal('m-hab');
+}
+async function saveHab(){
+  showErr('hm-err','');
+  const ag = agentFrom($('hm-agent')); const site = $('hm-site').value;
+  const st = document.querySelector('input[name=hm-statut]:checked');
+  if (!ag) return showErr('hm-err','Choisissez l\'agent.');
+  if (!site) return showErr('hm-err','Choisissez le site.');
+  if (!st) return showErr('hm-err','Choisissez la décision.');
+  const b = $('hm-save'); b.disabled = true;
+  try {
+    await rpc('quiz_habilitation_set', { p_token: trainerToken, p_agent_id: ag.id, p_agent_name: ag.name, p_site: site,
+      p_statut: st.value, p_commentaire: $('hm-comment').value.trim() || null,
+      p_session_id: habCtx.session_id ? String(habCtx.session_id) : null, p_report_id: habCtx.report_id || null });
+    closeModal('m-hab');
+    toast(`${ag.name} · ${site} : ${STATUT_LBL[st.value]} ✓`);
+    if (!$('s-hab').classList.contains('hidden')) await openHabs();
+  } catch(e){ showErr('hm-err','Enregistrement impossible : '+errText(e)); }
+  finally { b.disabled = false; }
+}
+function critMissedCount(){
+  return (corrQs||[]).filter(q => q.is_critical && q.type!=='open' && !((corrAns.find(x => x.question_id===q.id)||{}).is_correct)).length;
 }
 
 /* ============================== DÉMARRAGE ============================== */
