@@ -1,4 +1,4 @@
-<!-- RDZ · rapport-standard · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
+<!-- RDZ · rapport-standard · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-standard · v2 · 2026-08-09 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -46,6 +46,9 @@ textarea{min-height:96px;resize:vertical;line-height:1.45}
 .dictable{position:relative}
 .mic{position:absolute;right:6px;bottom:6px;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:7px 10px;font-size:13px;font-weight:bold;cursor:pointer}
 .mic.rec{background:#c0392b;animation:pulse 1s infinite}
+.dictable textarea{padding-bottom:44px}
+.dictable input[type=text]{padding-right:52px}
+.mic{touch-action:manipulation;-webkit-user-select:none;user-select:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 .photo-btns{display:flex;gap:10px;margin-bottom:10px}
 .photo-btns button{flex:1;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px;font-size:14px;font-weight:bold;cursor:pointer;color:var(--ink)}
@@ -206,6 +209,7 @@ textarea{min-height:110px!important}
         </label>
         <div class="dictable">
           <textarea id="f-situation" placeholder="Décrivez ou dictez la situation…"></textarea>
+          <button type="button" class="mic" data-target="f-situation">🎤 Dicter</button>
         </div>
       </div>
 
@@ -215,6 +219,7 @@ textarea{min-height:110px!important}
         </label>
         <div class="dictable">
           <textarea id="f-actions" placeholder="Décrivez ou dictez vos actions…"></textarea>
+          <button type="button" class="mic" data-target="f-actions">🎤 Dicter</button>
         </div>
       </div>
 
@@ -630,6 +635,7 @@ function renderPhotos(){
       <div class="pmeta">
         <div class="dictable">
           <input type="text" placeholder="Légende de la photo…" value="${esc(p.legende)}" oninput="photos[${i}].legende=this.value" id="leg-${i}">
+          <button type="button" class="mic" data-target="leg-${i}" style="bottom:4px">🎤</button>
         </div>
         <button type="button" class="rm" onclick="removePhoto(${i})">✕ Retirer</button>
       </div>
@@ -638,33 +644,51 @@ function renderPhotos(){
 }
 function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
 
-/* ---------- dictée (Web Speech API, best-effort) ---------- */
+/* ---------- dictée (Web Speech API, best-effort) ----------
+   2026-10-15 : boutons 🎤 rétablis. Démarrage au toucher (pointerdown) pour
+   ne pas faire perdre le focus au champ — sinon, dans les rapports à questions,
+   le re-rendu déclenché par onblur détruisait le bouton avant le clic. La cible
+   est retrouvée par son id à chaque résultat : la dictée continue même si le
+   formulaire est redessiné entre-temps. */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognizer = null, recTargetBtn = null;
+let recognizer = null, recTargetId = null;
 function bindMics(){
   document.querySelectorAll('.mic').forEach(btn=>{
     if(btn.dataset.bound) return; btn.dataset.bound='1';
     if(!SR){ btn.style.display='none'; return; }
-    btn.addEventListener('click', ()=>toggleDictation(btn));
+    btn.addEventListener('pointerdown', e=>{ e.preventDefault(); toggleDictation(btn.dataset.target); });
+    btn.addEventListener('click', e=>e.preventDefault());
+    if(recognizer && recTargetId===btn.dataset.target) setMicUI(btn.dataset.target, true);
   });
 }
-function toggleDictation(btn){
-  if(!SR) return;
-  if(recognizer && recTargetBtn===btn){ recognizer.stop(); return; }
-  if(recognizer){ try{recognizer.stop();}catch(e){} }
-  const el = document.getElementById(btn.dataset.target);
-  if(!el) return;
-  recognizer = new SR(); recognizer.lang='fr-FR'; recognizer.interimResults=false; recognizer.continuous=true;
-  recTargetBtn = btn; btn.classList.add('rec'); btn.textContent='● Stop';
-  recognizer.onresult = ev=>{
-    let txt=''; for(let k=ev.resultIndex;k<ev.results.length;k++){ if(ev.results[k].isFinal) txt+=ev.results[k][0].transcript; }
-    if(txt){ el.value = (el.value ? el.value.trim()+' ' : '') + txt.trim(); el.dispatchEvent(new Event('input')); }
-  };
-  recognizer.onerror = ()=>stopDictationUI(btn);
-  recognizer.onend = ()=>stopDictationUI(btn);
-  try{ recognizer.start(); }catch(e){ stopDictationUI(btn); }
+function micLabel(id){ return id.startsWith('leg-') ? '🎤' : '🎤 Dicter'; }
+function setMicUI(id, on){
+  document.querySelectorAll('.mic').forEach(b=>{
+    if(b.dataset.target!==id) return;
+    b.classList.toggle('rec', on); b.textContent = on ? '● Stop' : micLabel(id);
+  });
 }
-function stopDictationUI(btn){ btn.classList.remove('rec'); btn.textContent = btn.dataset.target.startsWith('leg-')?'🎤':'🎤 Dicter'; recognizer=null; recTargetBtn=null; }
+function toggleDictation(id){
+  if(!SR) return;
+  if(recognizer && recTargetId===id){ try{recognizer.stop();}catch(e){} return; }
+  if(recognizer){ try{recognizer.stop();}catch(e){} }
+  if(!document.getElementById(id)) return;
+  const r = new SR(); r.lang='fr-FR'; r.interimResults=false; r.continuous=true;
+  recognizer = r; recTargetId = id; setMicUI(id, true);
+  r.onresult = ev=>{
+    let txt=''; for(let k=ev.resultIndex;k<ev.results.length;k++){ if(ev.results[k].isFinal) txt+=ev.results[k][0].transcript; }
+    const el = document.getElementById(id);
+    if(txt && el){ el.value = (el.value ? el.value.trim()+' ' : '') + txt.trim(); el.dispatchEvent(new Event('input')); }
+  };
+  r.onerror = ev=>{
+    if(ev && (ev.error==='not-allowed' || ev.error==='service-not-allowed'))
+      alert("Le micro n'est pas autorisé pour cette page. Autorisez-le dans les réglages du navigateur, ou utilisez le micro du clavier.");
+    else if(ev && ev.error==='network')
+      alert("La dictée a besoin du réseau. Utilisez le micro du clavier ou tapez le texte.");
+  };
+  r.onend = ()=>{ if(recognizer===r){ recognizer=null; recTargetId=null; } setMicUI(id, false); };
+  try{ r.start(); }catch(e){ recognizer=null; recTargetId=null; setMicUI(id, false); }
+}
 
 /* ---------- enregistrement ---------- */
 function saveEntry(){
