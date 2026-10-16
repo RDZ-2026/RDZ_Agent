@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v3 · 2026-10-16 · chaque agent a SA ligne privée avec la centrale (type de canal 'centrale') ; « Tous les agents » et les canaux de poste ne sont plus visibles que du Centraliste… et les canaux de poste plus du tout (remplacés par les lignes). Le Centraliste voit la ligne de chaque agent en service, classée par poste. Équipe (privé entre agents) et groupes inchangés. Nécessite migration-radio-lignes.sql.
+<!-- RDZ · radio-agent · v3.1 · 2026-10-16 · « Supprimer la conversation » sur les messages privés (masquée pour soi seulement ; réapparaît si un nouveau vocal arrive ; rien n'est effacé en base). Nécessite migration-radio-masquer.sql.
+     v3 · 2026-10-16 · chaque agent a SA ligne privée avec la centrale (type de canal 'centrale') ; « Tous les agents » et les canaux de poste ne sont plus visibles que du Centraliste… et les canaux de poste plus du tout (remplacés par les lignes). Le Centraliste voit la ligne de chaque agent en service, classée par poste. Équipe (privé entre agents) et groupes inchangés. Nécessite migration-radio-lignes.sql.
      v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
      v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
      v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
@@ -322,8 +323,12 @@ function canalSub(c){
 const listOf = id => { if (!msgs.has(id)) msgs.set(id, []); return msgs.get(id); };
 const heardSet = id => { if (!ecoutes.has(id)) ecoutes.set(id, new Set()); return ecoutes.get(id); };
 const isUnread = m => m.type === 'vocal' && m.auteur_id !== me.id && !heardSet(m.id).has(me.id);
-const unreadOf = c => listOf(c.id).filter(isUnread).length;
-const lastTs = c => { const l = listOf(c.id); return l.length ? l[l.length-1].cree_le : c.cree_le; };
+// v3.1 : messages visibles = ceux postérieurs à « supprimer la conversation » (masques[moi]).
+const hiddenAt = c => (c && c.masques && me && c.masques[me.id]) || null;
+const msgsOf = c => { const h = hiddenAt(c), l = listOf(c.id); return h ? l.filter(m => new Date(m.cree_le) > new Date(h)) : l; };
+const hiddenEmpty = c => !!hiddenAt(c) && !msgsOf(c).length;
+const unreadOf = c => msgsOf(c).filter(isUnread).length;
+const lastTs = c => { const l = msgsOf(c); return l.length ? l[l.length-1].cree_le : (hiddenAt(c) || c.cree_le); };
 function setState(id, st){ const m = findMsg(id); if (m) m._state = st; return m; }
 function addMsg(m){
   const l = listOf(m.canal_id); const i = l.findIndex(x => x.id === m.id);
@@ -412,6 +417,17 @@ async function ensureLine(agentId){
 async function openLine(agentId){
   try { const c = await ensureLine(agentId); openConv(c.id); }
   catch (e) { toast('Pas de réseau : impossible d\u2019ouvrir la ligne pour l\u2019instant.'); }
+}
+// Supprimer une conversation privée : masquée pour moi seulement (RPC atomique).
+async function deleteConversation(){
+  const c = canaux.get(ui.conv); if (!c || c.type !== 'direct') return;
+  if (!confirm(`Supprimer la conversation avec ${canalName(c)} ?\n\nElle disparaît de votre radio. ${canalName(c)} garde la sienne, et elle réapparaîtra si un nouveau vocal arrive.`)) return;
+  const { error } = await sb.rpc('radio_masquer_conversation', {p_canal:c.id, p_agent:me.id});
+  if (error) { toast(/function|schema cache/i.test(error.message || '') ? 'Fonction absente : lancez migration-radio-masquer.sql.' : 'Suppression impossible sans réseau. Réessayez.'); return; }
+  c.masques = Object.assign({}, c.masques, {[me.id]: new Date().toISOString()});
+  if (pb) stopPlayback();
+  for (let i = autoQueue.length - 1; i >= 0; i--) { const m = findMsg(autoQueue[i]); if (m && m.canal_id === c.id) autoQueue.splice(i, 1); }
+  back(); toast('Conversation supprimée.');
 }
 function reload(){
   if (sessionOver) return;
@@ -555,7 +571,8 @@ function renderHeader(){
   const back = ui.conv ? `<button class="hd-back" data-act="back" aria-label="Retour aux canaux">‹</button>` : `<a class="hd-back" href="${MENU_URL}" aria-label="Retour au menu">‹</a>`;
   const name = ui.conv ? esc(canalName(canaux.get(ui.conv))) : 'Radio';
   const c = ui.conv && canaux.get(ui.conv);
-  const gear = c && isCustomGroup(c) ? `<button class="hd-back hd-gear" data-act="manage" aria-label="Gérer le groupe">⚙</button>` : '';
+  const gear = c && isCustomGroup(c) ? `<button class="hd-back hd-gear" data-act="manage" aria-label="Gérer le groupe">⚙</button>`
+    : c && c.type === 'direct' ? `<button class="hd-back hd-gear" data-act="del-conv" aria-label="Supprimer la conversation">🗑</button>` : '';
   h.innerHTML = `${back}<div class="hd-title"><div class="hd-name">${name}</div><div class="hd-sub" id="hdSub"></div></div>
     <button class="hd-back hd-gear ${autoOn() ? '' : 'off'}" data-act="autoplay" aria-label="${autoOn() ? 'Lecture automatique activée : toucher pour couper' : 'Lecture automatique coupée : toucher pour activer'}">${autoOn() ? '🔊' : '🔇'}</button>
     ${gear}<button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
@@ -592,7 +609,7 @@ function renderView(){
 function avatar(id, name){ return `<span class="av">${esc(initials(name || agentName(id)))}${online.has(id) ? '<span class="on-dot"></span>' : ''}</span>`; }
 
 function canalRow(c){
-    const l = listOf(c.id), last = l[l.length-1], u = unreadOf(c);
+    const l = msgsOf(c), last = l[l.length-1], u = unreadOf(c);
     let prev = c.type === 'centrale' && seesAll() ? (posteNomOf(c.ligne_agent) || 'Hors service') : 'Aucun message pour l\u2019instant';
     if (last) {
       const who = last.auteur_id === me.id ? 'Vous' : (agentName(last.auteur_id, last.auteur_nom)).split(' ').slice(-1)[0];
@@ -617,7 +634,7 @@ function canauxHTML(){
       .sort((a,b) => a.poste.localeCompare(b.poste) || a.nom.localeCompare(b.nom))
       .map(x => x.c ? canalRow(x.c) : `<button class="row" data-act="open-line" data-id="${x.id}">${avatar(x.id)}
           <span class="row-main"><span class="row-t">${esc(x.nom)}</span><span class="row-d">${esc(x.poste)} · aucun message</span></span><span class="row-side"></span></button>`).join('');
-    const others = [...canaux.values()].filter(c => c.type !== 'centrale' || (!svcAgents.includes(c.ligne_agent) && unreadOf(c) > 0))
+    const others = [...canaux.values()].filter(c => !hiddenEmpty(c) && (c.type !== 'centrale' || (!svcAgents.includes(c.ligne_agent) && unreadOf(c) > 0)))
       .sort((a,b) => (b.tous ? 1 : 0) - (a.tous ? 1 : 0) || byTime(a,b)).map(canalRow).join('');
     return `<div class="pad">${addBtn}
       <div class="section-h">Lignes des agents en service</div>
@@ -625,7 +642,7 @@ function canauxHTML(){
       <div class="section-h spaced">Autres canaux</div>
       ${others ? `<div class="card-list">${others}</div>` : '<div class="state-msg">Aucun autre canal.</div>'}</div>`;
   }
-  const list = [...canaux.values()].sort((a,b) => (b.type === 'centrale' ? 1 : 0) - (a.type === 'centrale' ? 1 : 0) || byTime(a,b));
+  const list = [...canaux.values()].filter(c => !hiddenEmpty(c)).sort((a,b) => (b.type === 'centrale' ? 1 : 0) - (a.type === 'centrale' ? 1 : 0) || byTime(a,b));
   const rows = list.map(canalRow).join('');
   return `<div class="pad">
     ${addBtn}
@@ -685,7 +702,7 @@ function msgHTML(c, m){
 }
 function convHTML(c){
   if (!c) return '';
-  const l = listOf(c.id);
+  const l = msgsOf(c);
   if (!l.length) return `<div class="msgs"><div class="state-msg"><b>Aucun message</b>Maintenez le bouton en bas pour enregistrer votre premier vocal.</div></div>`;
   let out = '', day = '';
   l.forEach(m => { const d = dayLabel(m.cree_le); if (d !== day) { day = d; out += `<div class="day">${esc(d)}</div>`; } out += msgHTML(c, m); });
@@ -1139,6 +1156,7 @@ document.addEventListener('click', e => {
     case 'tab': ui.tab = t.dataset.tab; render(); break;
     case 'open': openConv(t.dataset.id); break;
     case 'open-line': openLine(t.dataset.id); break;
+    case 'del-conv': deleteConversation(); break;
     case 'direct': openDirect(t.dataset.id); break;
     case 'back': back(); break;
     case 'play': togglePlay(t.dataset.id); break;
