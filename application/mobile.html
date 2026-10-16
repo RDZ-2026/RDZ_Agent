@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -1321,6 +1321,10 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     .rm-ov h2{font-size:30px;font-weight:900}
     .rm-ov .tels{display:flex;gap:8px;flex-wrap:wrap}
     .rm-ov .tels a{flex:1;min-width:90px;background:#fff;color:#d71920;font-weight:900;border-radius:12px;padding:13px 6px;text-decoration:none}
+    .rm-snd{position:fixed;left:16px;bottom:calc(30px + env(safe-area-inset-bottom));z-index:80;max-width:calc(100% - 120px);border:1px solid #e1e8f0;background:#fff;color:#172033;
+      border-radius:22px;padding:10px 14px;font:700 13px Inter,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 20px rgba(15,23,42,.16);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .rm-snd.lock{background:#fff8e7;border-color:#f0d594;color:#6b5414}
+    .rm-snd.play{background:#111c2e;color:#fff;border-color:#111c2e}
     .rm-ov button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:12px;padding:13px;font:700 15px Inter,"Segoe UI",Arial,sans-serif}`;
   document.head.appendChild(css);
   const host = el('screen-menu');
@@ -1328,6 +1332,61 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
   sosBtn.className = 'rm-sos'; sosBtn.style.display = 'none'; sosBtn.innerHTML = '<span>SOS</span>';
   sosBtn.setAttribute('aria-label', 'SOS : maintenir 1,5 seconde pour alerter tous les collègues en service');
   host.appendChild(sosBtn);
+
+  /* ---------- Lecture automatique sur le menu (v6) ----------
+     Même réglage que la radio (rdz_radio_autoplay, 🔊 par défaut). Le navigateur
+     exige un premier toucher sur la page avant de jouer du son : tant que ce n'est
+     pas fait, la pastille en bas à gauche le rappelle. Un vocal lu ici compte comme
+     écouté (radio_ecoutes) et disparaît de la pastille du bouton Radio.
+     Limite : uniquement page ouverte et écran allumé (règle des téléphones). */
+  const LS_AUTO = 'rdz_radio_autoplay', BUCKET = 'radio-vocaux';
+  const autoOn = () => localStorage.getItem(LS_AUTO) !== '0';
+  const player = new Audio(); player.preload = 'auto';
+  const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+  let unlocked = false, playing = null; const queue = [];
+  const snd = document.createElement('button'); snd.className = 'rm-snd'; snd.style.display = 'none'; host.appendChild(snd);
+  function renderSnd(){
+    if (!svc) { snd.style.display = 'none'; return; }
+    snd.style.display = '';
+    snd.classList.toggle('lock', autoOn() && !unlocked); snd.classList.toggle('play', !!playing);
+    snd.textContent = playing ? `🔊 ${playing.nom} · toucher pour arrêter`
+      : !autoOn() ? '🔇 Lecture auto coupée'
+      : !unlocked ? '🔊 Touchez ici pour activer le son radio'
+      : '🔊 Lecture auto activée';
+  }
+  function unlock(){
+    if (unlocked) return;
+    try { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } if (actx && actx.state === 'suspended') actx.resume(); } catch (e) {}
+    try {
+      player.muted = true; player.src = SILENT;
+      const p = player.play();
+      const ok = () => { try { player.pause(); } catch (e) {} player.muted = false; player.removeAttribute('src'); unlocked = true; renderSnd(); setTimeout(next, 100); };
+      if (p && p.then) p.then(ok, () => { player.muted = false; }); else ok();
+    } catch (e) { player.muted = false; }
+  }
+  function next(){
+    if (playing || !unlocked || !autoOn() || document.hidden || !svc) return;
+    const m = queue.shift(); if (!m) return;
+    if (!unread.has(m.id)) { next(); return; }              // déjà écouté ailleurs entre-temps
+    const url = sb.storage.from(BUCKET).getPublicUrl(m.audio_path).data.publicUrl;
+    playing = {id: m.id, nom: m.auteur_nom || 'Collègue'}; renderSnd();
+    player.src = url;
+    const done = () => { playing = null; renderSnd(); setTimeout(next, 450); };
+    player.onended = done; player.onerror = done;
+    player.play().then(() => {
+      unread.delete(m.id); renderBadge();
+      sb.from('radio_ecoutes').upsert({message_id: m.id, agent_id: me.id}, {onConflict: 'message_id,agent_id', ignoreDuplicates: true}).then(() => {}, () => {});
+    }, () => { playing = null; unlocked = false; queue.unshift(m); renderSnd(); });
+  }
+  snd.addEventListener('click', e => {
+    e.stopPropagation();
+    if (playing) { try { player.pause(); } catch (_) {} playing = null; queue.length = 0; renderSnd(); return; }
+    if (autoOn() && !unlocked) { unlock(); return; }
+    localStorage.setItem(LS_AUTO, autoOn() ? '0' : '1');
+    if (!autoOn()) queue.length = 0; else unlock();
+    renderSnd();
+  });
+  document.addEventListener('pointerdown', e => { if (e.target === snd) return; if (svc && autoOn() && !unlocked) unlock(); }, true);
 
   /* ---------- Règles d'accès (identiques à radio-agent.html) ---------- */
   const seesAll = () => !!(svc && postes.get(svc.poste_id) && postes.get(svc.poste_id).voit_tout);
@@ -1359,7 +1418,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
       postes.clear(); (po.data || []).forEach(p => postes.set(p.id, p));
       svc = (sv.data || [])[0] || null;
       if (!svc) { hideAll(); return; }
-      sosBtn.style.display = '';
+      sosBtn.style.display = ''; renderSnd();
       const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `membres.cs.{${me.id}}`;
       const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(filtre);
       if (ca.error) return;
@@ -1408,8 +1467,10 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     let c = canaux.get(m.canal_id);
     if (!c) { const { data } = await sb.from('radio_canaux').select('*').eq('id', m.canal_id).maybeSingle(); if (!canSee(data)) return; c = data; canaux.set(c.id, c); }
     if (!canSee(c)) return;
-    unread.add(m.id); renderBadge(); beep(); vib([60, 40, 60]);
-    toast(m.auteur_nom || 'Collègue', `Nouveau vocal · ${canalName(c)}`, RADIO + '?canal=' + encodeURIComponent(c.id));
+    unread.add(m.id); renderBadge(); vib([60, 40, 60]);
+    const auto = autoOn() && unlocked && !document.hidden && m.audio_path;
+    if (auto) { queue.push(m); setTimeout(next, 300); } else beep();
+    toast(m.auteur_nom || 'Collègue', `${auto ? 'Lecture du vocal' : 'Nouveau vocal'} · ${canalName(c)} · toucher pour répondre`, RADIO + '?canal=' + encodeURIComponent(c.id));
   }
   function onAlert(a, ev){
     if (!a || !svc) return;
@@ -1445,7 +1506,8 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     if (fresh) { vib([500,200,500,200,500]); beep(); setTimeout(beep, 400); setTimeout(beep, 800); }
   }
   function hideAlert(){ const d = el('rm-alert'); if (d) d.remove(); alertShown = null; }
-  function hideAll(){ svc = null; sosBtn.style.display = 'none'; unread.clear(); renderBadge(); hideAlert(); }
+  function hideAll(){ svc = null; sosBtn.style.display = 'none'; unread.clear(); renderBadge(); hideAlert();
+    try { player.pause(); } catch (e) {} playing = null; queue.length = 0; renderSnd(); }
 
   /* ---------- SOS depuis le menu ---------- */
   let hold = null;
