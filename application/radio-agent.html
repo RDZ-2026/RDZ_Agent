@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v3.1 · 2026-10-16 · « Supprimer la conversation » sur les messages privés (masquée pour soi seulement ; réapparaît si un nouveau vocal arrive ; rien n'est effacé en base). Nécessite migration-radio-masquer.sql.
+<!-- RDZ · radio-agent · v3.2 · 2026-10-16 · « Tous les agents » devient le canal d'ANNONCES de la centrale : tous les agents en service le reçoivent (lecture auto, accusés d'écoute) mais seuls les Centralistes y parlent ; les agents répondent sur leur ligne Centrale.
+     v3.1 · 2026-10-16 · « Supprimer la conversation » sur les messages privés (masquée pour soi seulement ; réapparaît si un nouveau vocal arrive ; rien n'est effacé en base). Nécessite migration-radio-masquer.sql.
      v3 · 2026-10-16 · chaque agent a SA ligne privée avec la centrale (type de canal 'centrale') ; « Tous les agents » et les canaux de poste ne sont plus visibles que du Centraliste… et les canaux de poste plus du tout (remplacés par les lignes). Le Centraliste voit la ligne de chaque agent en service, classée par poste. Équipe (privé entre agents) et groupes inchangés. Nécessite migration-radio-lignes.sql.
      v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
      v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
@@ -286,13 +287,15 @@ const inService = () => [...services.values()].filter(serviceOpen);
 function canSee(c){
   if (!c || c.archive) return false;
   if (c.poste_id) return false;
-  if (c.tous) return seesAll();
+  if (c.tous) return true;                     // v3.2 : canal d'annonces, reçu par tous les agents en service
   if (c.type === 'centrale') return seesAll() ? c.ligne_agent !== me.id : c.ligne_agent === me.id;
   return (c.membres || []).includes(me.id);
 }
 const centralistesEnService = () => inService().filter(s => (postes.get(s.poste_id) || {}).voit_tout).map(s => String(s.agent_id));
 const serviceOf = id => services.get(String(id));
 const posteNomOf = id => { const s = serviceOf(id); return s ? ((postes.get(s.poste_id) || {}).nom || s.poste_nom || '') : ''; };
+// v3.2 : dans « Tous les agents », seuls les Centralistes parlent ; les agents écoutent.
+const canTalk = c => !(c && c.tous && !seesAll());
 const myLine = () => [...canaux.values()].find(c => c.type === 'centrale' && c.ligne_agent === me.id);
 
 const activeAgents = () => [...agentsById.values()].filter(a => a.actif !== false);
@@ -446,7 +449,7 @@ async function loadAll(){
   services.clear(); (sv.data || []).forEach(s => services.set(String(s.agent_id), s));
   myService = services.get(me.id) || null;
   if (!myService) return;
-  const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `membres.cs.{${me.id}}`;
+  const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `tous.eq.true,membres.cs.{${me.id}}`;
   const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(filtre);
   if (ca.error) throw ca.error;
   agentsById.clear(); (ag.data || []).forEach(a => agentsById.set(String(a.id), {id:String(a.id), nom:fullName(a), actif:a.actif}));
@@ -585,6 +588,11 @@ function renderHeaderSub(){
 }
 function renderFoot(){
   const f = $('#foot');
+  if (ui.conv && !canTalk(canaux.get(ui.conv))) {
+    f.innerHTML = `<div class="dock" id="dock"><div class="rec-status"><b>Canal d'annonces de la centrale</b><br>Vous écoutez seulement. Pour répondre, utilisez votre ligne Centrale.</div>
+      <button class="btn" data-act="go-line" style="max-width:340px">📻 Répondre sur ma ligne Centrale</button></div>`;
+    return;
+  }
   if (ui.conv) {
     f.innerHTML = `<div class="dock" id="dock">
       <div class="rec-status" id="recStatus"></div>
@@ -642,7 +650,8 @@ function canauxHTML(){
       <div class="section-h spaced">Autres canaux</div>
       ${others ? `<div class="card-list">${others}</div>` : '<div class="state-msg">Aucun autre canal.</div>'}</div>`;
   }
-  const list = [...canaux.values()].filter(c => !hiddenEmpty(c)).sort((a,b) => (b.type === 'centrale' ? 1 : 0) - (a.type === 'centrale' ? 1 : 0) || byTime(a,b));
+  const rk = c => c.type === 'centrale' ? 2 : c.tous ? 1 : 0;
+  const list = [...canaux.values()].filter(c => !hiddenEmpty(c)).sort((a,b) => rk(b) - rk(a) || byTime(a,b));
   const rows = list.map(canalRow).join('');
   return `<div class="pad">
     ${addBtn}
@@ -823,7 +832,7 @@ function recUI(){
   st.innerHTML = rec.cancel ? 'Relâchez pour annuler' : rec.ready ? `<span class="rec-dot"></span>${fmtDur(s)} · glissez vers le haut pour annuler` : 'Ouverture du micro…';
 }
 async function startRec(){
-  if (rec || !ui.conv) return;
+  if (rec || !ui.conv || !canTalk(canaux.get(ui.conv))) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { toast('Ce téléphone ne permet pas d\u2019enregistrer depuis le navigateur.'); return; }
   stopPlayback(); ac();
   const r = {t0:performance.now(), cancel:false, ready:false, released:false, conv:ui.conv, lvl:0, chunks:[]}; rec = r; recUI();
@@ -1157,6 +1166,7 @@ document.addEventListener('click', e => {
     case 'open': openConv(t.dataset.id); break;
     case 'open-line': openLine(t.dataset.id); break;
     case 'del-conv': deleteConversation(); break;
+    case 'go-line': openLine(me.id); break;
     case 'direct': openDirect(t.dataset.id); break;
     case 'back': back(); break;
     case 'play': togglePlay(t.dataset.id); break;
