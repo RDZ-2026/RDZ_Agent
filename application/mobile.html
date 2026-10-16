@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -1268,6 +1268,233 @@ document.addEventListener('visibilitychange', ()=>{
 window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementById('screen-menu').classList.contains('on')) renderFdr(false); });
 })();
 
+</script>
+<script>
+/* ============================================================================
+   RADIO DANS LE MENU (v5.7 · 2026-10-16)
+   Quand l'agent est EN SERVICE (service ouvert dans radio_services, < 16 h) :
+     · bouton SOS flottant (appui 1,5 s) → crée l'alerte et ouvre radio-agent.html,
+       qui reprend l'alerte (écran rouge, position GPS, réponses). Sans réseau :
+       numéros d'urgence + nouvel essai toutes les 4 s.
+     · pastille rouge sur le bouton 📻 Radio = vocaux pas encore écoutés,
+       mise à jour en temps réel, avec bip + vibration + bandeau cliquable
+       (ouvre directement le bon canal : radio-agent.html?canal=ID).
+     · bandeau rouge si un collègue déclenche un SOS pendant qu'on est sur le menu.
+   Même règle d'accès que radio-agent.html (canSee) : Tous les agents, canal du
+   poste (tous les postes pour un poste « entend tout »), groupes dont l'agent est
+   membre, messages privés. Lecture seule ici, à part la création d'un SOS.
+   Hors service ou module radio non installé : rien ne s'affiche.
+   ============================================================================ */
+(function(){
+  'use strict';
+  const RADIO = 'radio-agent.html', SERVICE_MAX_H = 16, HOLD_MS = 1500, UNREAD_DAYS = 3;
+  let me = null, svc = null, chan = null, loading = false, again = false, alertShown = null, retryT = null;
+  const postes = new Map(), canaux = new Map(), unread = new Set(), names = new Map();
+  const el = id => document.getElementById(id);
+  const fmtT = t => new Date(t).toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'});
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c === 'x' ? r : (r&3|8)).toString(16); }));
+  const vib = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  let actx = null;
+  function beep(){ try { const C = window.AudioContext || window.webkitAudioContext; if (!C) return; actx = actx || new C(); if (actx.state === 'suspended') actx.resume();
+    [[1250,0],[1650,.09]].forEach(([f,s]) => { const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + s; o.frequency.value = f;
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.08,t+.01); g.gain.linearRampToValueAtTime(0,t+.08); o.connect(g).connect(actx.destination); o.start(t); o.stop(t+.1); }); } catch (e) {} }
+
+  /* ---------- Éléments d'interface ---------- */
+  const css = document.createElement('style');
+  css.textContent = `
+    #outil-terrain-list a[href="${RADIO}"] .ic{position:relative}
+    .rm-badge{position:absolute;top:-7px;right:-9px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#d71920;color:#fff;font:800 11.5px/20px Inter,"Segoe UI",Arial,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff}
+    .rm-sos{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:80;width:70px;height:70px;border-radius:50%;border:0;background:#d71920;color:#fff;
+      font:900 18px Inter,"Segoe UI",Arial,sans-serif;letter-spacing:.05em;box-shadow:0 0 0 4px rgba(215,25,32,.22),0 10px 24px rgba(0,0,0,.28);overflow:hidden;
+      user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;cursor:pointer}
+    .rm-sos::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35);transform-origin:bottom;transform:scaleY(var(--p,0))}
+    .rm-sos span{position:relative}
+    .rm-toast{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 8px);z-index:90;max-width:600px;margin:0 auto;display:flex;gap:11px;align-items:center;
+      background:#fff;color:#172033;border:1px solid #e1e8f0;border-radius:15px;padding:11px 13px;box-shadow:0 12px 30px rgba(15,23,42,.22);font:14px Inter,"Segoe UI",Arial,sans-serif;text-align:left;cursor:pointer}
+    .rm-toast small{display:block;color:#64748b;font-size:12.5px;margin-top:2px}
+    .rm-alert{position:fixed;left:0;right:0;top:0;z-index:95;background:#d71920;color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 14px;font:15px Inter,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .rm-alert b{display:block;font-size:17px;margin-bottom:3px}
+    .rm-alert .rm-row{display:flex;gap:8px;margin-top:10px}
+    .rm-alert a,.rm-alert button{flex:1;text-align:center;border:0;border-radius:11px;padding:11px;font:800 14px Inter,"Segoe UI",Arial,sans-serif;text-decoration:none;cursor:pointer}
+    .rm-alert a{background:#fff;color:#d71920}.rm-alert button{background:rgba(255,255,255,.18);color:#fff}
+    .rm-ov{position:fixed;inset:0;z-index:99;background:#d71920;color:#fff;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:24px 20px;font:16px Inter,"Segoe UI",Arial,sans-serif;text-align:center}
+    .rm-ov h2{font-size:30px;font-weight:900}
+    .rm-ov .tels{display:flex;gap:8px;flex-wrap:wrap}
+    .rm-ov .tels a{flex:1;min-width:90px;background:#fff;color:#d71920;font-weight:900;border-radius:12px;padding:13px 6px;text-decoration:none}
+    .rm-ov button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:12px;padding:13px;font:700 15px Inter,"Segoe UI",Arial,sans-serif}`;
+  document.head.appendChild(css);
+  const host = el('screen-menu');
+  const sosBtn = document.createElement('button');
+  sosBtn.className = 'rm-sos'; sosBtn.style.display = 'none'; sosBtn.innerHTML = '<span>SOS</span>';
+  sosBtn.setAttribute('aria-label', 'SOS : maintenir 1,5 seconde pour alerter tous les collègues en service');
+  host.appendChild(sosBtn);
+
+  /* ---------- Règles d'accès (identiques à radio-agent.html) ---------- */
+  const seesAll = () => !!(svc && postes.get(svc.poste_id) && postes.get(svc.poste_id).voit_tout);
+  const canSee = c => !!c && !c.archive && (c.tous || (c.membres || []).includes(me.id) || (!!c.poste_id && (seesAll() || c.poste_id === svc.poste_id)));
+  function canalName(c){
+    if (!c) return 'Radio';
+    if (c.type === 'direct') return 'Message privé';
+    return c.nom || 'Groupe';
+  }
+
+  /* ---------- Chargement ---------- */
+  async function chunks(ids, size, fn){ const out = []; for (let i = 0; i < ids.length; i += size) { const r = await fn(ids.slice(i, i+size)); if (r.error) throw r.error; out.push(...(r.data || [])); } return out; }
+  async function load(){
+    if (!me) return;
+    if (loading) { again = true; return; } loading = true;
+    try {
+      const since = new Date(Date.now() - SERVICE_MAX_H*3600e3).toISOString();
+      const [po, sv] = await Promise.all([
+        sb.from('radio_postes').select('*'),
+        sb.from('radio_services').select('*').eq('agent_id', me.id).is('fin', null).gte('debut', since).order('debut', {ascending:false}).limit(1)
+      ]);
+      if (po.error || sv.error) { hideAll(); return; }          // module radio absent ou pas de réseau
+      postes.clear(); (po.data || []).forEach(p => postes.set(p.id, p));
+      svc = (sv.data || [])[0] || null;
+      if (!svc) { hideAll(); return; }
+      sosBtn.style.display = '';
+      const pf = seesAll() ? 'poste_id.not.is.null' : `poste_id.eq.${svc.poste_id}`;
+      const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}},${pf}`);
+      if (ca.error) return;
+      canaux.clear(); (ca.data || []).forEach(c => canaux.set(c.id, c));
+      const ids = [...canaux.keys()];
+      unread.clear();
+      if (ids.length) {
+        const sinceM = new Date(Date.now() - UNREAD_DAYS*864e5).toISOString();
+        const m = await sb.from('radio_messages').select('id,canal_id,auteur_id,auteur_nom,cree_le').in('canal_id', ids).eq('type', 'vocal').neq('auteur_id', me.id).gte('cree_le', sinceM).order('cree_le', {ascending:false}).limit(300);
+        if (!m.error && (m.data || []).length) {
+          const mids = m.data.map(x => x.id);
+          const heard = new Set((await chunks(mids, 100, p => sb.from('radio_ecoutes').select('message_id').eq('agent_id', me.id).in('message_id', p))).map(e => e.message_id));
+          mids.forEach(id => { if (!heard.has(id)) unread.add(id); });
+        }
+      }
+      renderBadge();
+      await checkAlerts();
+      subscribe();
+    } catch (e) { /* réseau : on garde l'affichage actuel */ }
+    finally { loading = false; if (again) { again = false; load(); } }
+  }
+  async function checkAlerts(){
+    const since = new Date(Date.now() - 3*3600e3).toISOString();
+    const a = await sb.from('radio_alertes').select('*').eq('statut', 'active').neq('agent_id', me.id).gte('declenchee_le', since).order('declenchee_le', {ascending:false}).limit(5);
+    if (a.error || !(a.data || []).length) { hideAlert(); return; }
+    const r = await sb.from('radio_alerte_reponses').select('alerte_id').eq('agent_id', me.id).in('alerte_id', a.data.map(x => x.id));
+    const done = new Set(((r && r.data) || []).map(x => x.alerte_id));
+    const todo = a.data.find(x => !done.has(x.id));
+    if (todo) showAlert(todo, false); else hideAlert();
+  }
+
+  /* ---------- Temps réel ---------- */
+  function subscribe(){
+    if (chan) return;
+    chan = sb.channel('rdz-menu-radio')
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_messages'}, p => onMsg(p.new))
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_ecoutes'}, p => { const e = p.new; if (e && String(e.agent_id) === me.id && unread.delete(e.message_id)) renderBadge(); })
+      .on('postgres_changes', {event:'*', schema:'public', table:'radio_alertes'}, p => onAlert(p.new, p.eventType))
+      .on('postgres_changes', {event:'*', schema:'public', table:'radio_services'}, p => { if (p.new && String(p.new.agent_id) === me.id) load(); })
+      .on('postgres_changes', {event:'*', schema:'public', table:'radio_canaux'}, () => load())
+      .subscribe();
+  }
+  async function onMsg(m){
+    if (!m || !svc || m.type !== 'vocal' || String(m.auteur_id) === me.id) return;
+    let c = canaux.get(m.canal_id);
+    if (!c) { const { data } = await sb.from('radio_canaux').select('*').eq('id', m.canal_id).maybeSingle(); if (!canSee(data)) return; c = data; canaux.set(c.id, c); }
+    if (!canSee(c)) return;
+    unread.add(m.id); renderBadge(); beep(); vib([60, 40, 60]);
+    toast(m.auteur_nom || 'Collègue', `Nouveau vocal · ${canalName(c)}`, RADIO + '?canal=' + encodeURIComponent(c.id));
+  }
+  function onAlert(a, ev){
+    if (!a || !svc) return;
+    if (ev === 'INSERT' && a.statut === 'active' && String(a.agent_id) !== me.id) { showAlert(a, true); return; }
+    if (a.statut === 'cloturee' && alertShown === a.id) hideAlert();
+  }
+  function stop(){ try { if (chan) sb.removeChannel(chan); } catch (e) {} chan = null; me = null; hideAll(); }
+
+  /* ---------- Affichage ---------- */
+  function renderBadge(){
+    const a = document.querySelector(`#outil-terrain-list a[href="${RADIO}"]`); if (!a) return;
+    let b = a.querySelector('.rm-badge'); const n = unread.size;
+    if (!n || !svc) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'rm-badge'; a.querySelector('.ic').appendChild(b); }
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.setAttribute('aria-label', `${n} vocal${n > 1 ? 's' : ''} non écouté${n > 1 ? 's' : ''}`);
+  }
+  let toastT = null;
+  function toast(title, sub, href){
+    let t = el('rm-toast'); if (t) t.remove();
+    t = document.createElement('button'); t.id = 'rm-toast'; t.className = 'rm-toast';
+    t.innerHTML = `<span style="font-size:24px">📻</span><span><b>${esc(title)}</b><small>${esc(sub)}</small></span>`;
+    t.onclick = () => { location.href = href; };
+    host.appendChild(t); clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 6000);
+  }
+  function showAlert(a, fresh){
+    hideAlert(); alertShown = a.id;
+    const d = document.createElement('div'); d.id = 'rm-alert'; d.className = 'rm-alert'; d.setAttribute('role', 'alert');
+    d.innerHTML = `<b>🚨 Alerte SOS de ${esc(a.agent_nom || 'un collègue')}</b>Déclenchée à ${fmtT(a.declenchee_le)}. Ouvrez la radio pour voir sa position et répondre.
+      <div class="rm-row"><a href="${RADIO}">Voir et répondre</a><button type="button">Masquer</button></div>`;
+    d.querySelector('button').onclick = hideAlert;
+    host.appendChild(d);
+    if (fresh) { vib([500,200,500,200,500]); beep(); setTimeout(beep, 400); setTimeout(beep, 800); }
+  }
+  function hideAlert(){ const d = el('rm-alert'); if (d) d.remove(); alertShown = null; }
+  function hideAll(){ svc = null; sosBtn.style.display = 'none'; unread.clear(); renderBadge(); hideAlert(); }
+
+  /* ---------- SOS depuis le menu ---------- */
+  let hold = null;
+  sosBtn.addEventListener('contextmenu', e => e.preventDefault());
+  sosBtn.addEventListener('pointerdown', e => {
+    e.preventDefault(); if (hold || !svc) return;
+    try { sosBtn.setPointerCapture(e.pointerId); } catch (_) {}
+    const h = {t0: performance.now()}; hold = h;
+    const step = () => { if (hold !== h) return; const p = Math.min(1, (performance.now() - h.t0) / HOLD_MS); sosBtn.style.setProperty('--p', p);
+      if (p >= 1) { hold = null; sosBtn.style.setProperty('--p', 0); vib([90,40,90]); sendSOS(); return; } requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+  const release = () => { if (hold) { hold = null; sosBtn.style.setProperty('--p', 0); toast('SOS', 'Maintenez le bouton 1,5 seconde pour déclencher l\u2019alerte.', '#'); } };
+  sosBtn.addEventListener('pointerup', release); sosBtn.addEventListener('pointercancel', release);
+
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+  function sendSOS(){
+    const now = new Date().toISOString();
+    const row = {id: uuid(), agent_id: me.id, agent_nom: me.nom, statut: 'active', declenchee_le: now};
+    const tous = [...canaux.values()].find(c => c.tous);
+    const ov = document.createElement('div'); ov.className = 'rm-ov'; ov.setAttribute('role', 'alertdialog');
+    host.appendChild(ov);
+    const attempt = async () => {
+      ov.innerHTML = '<h2>Envoi de l\u2019alerte…</h2><p>Ouverture de la radio pour partager votre position.</p>';
+      try {
+        const r1 = await withTimeout(sb.from('radio_alertes').upsert(row, {onConflict: 'id'}), 5000); if (r1.error) throw r1.error;
+        if (tous) { const r2 = await withTimeout(sb.from('radio_messages').upsert({id: row.id, canal_id: tous.id, auteur_id: me.id, auteur_nom: me.nom, type: 'sos', alerte_id: row.id, cree_le: now}, {onConflict: 'id', ignoreDuplicates: true}), 5000); if (r2.error) throw r2.error; }
+        location.href = RADIO + '?alerte=' + encodeURIComponent(row.id);
+      } catch (e) {
+        ov.innerHTML = `<h2>Pas de réseau</h2><p>L'alerte repart automatiquement dès que possible. Si c'est urgent, appelez directement :</p>
+          <div class="tels"><a href="tel:117">Police 117</a><a href="tel:144">Ambulance 144</a><a href="tel:118">Pompiers 118</a></div>
+          <button type="button">Annuler l'alerte</button>`;
+        ov.querySelector('button').onclick = () => { clearTimeout(retryT); ov.remove(); };
+        retryT = setTimeout(() => { if (ov.isConnected) attempt(); }, 4000);
+      }
+    };
+    attempt();
+  }
+
+  /* ---------- Branchement sur le menu existant ---------- */
+  function start(){
+    const id = localStorage.getItem('rdz_agent_id'); if (!id) return;
+    if (me && me.id === String(id)) { load(); return; }
+    stop(); me = {id: String(id), nom: localStorage.getItem('rdz_agent_nom') || ''}; load();
+  }
+  const origEnter = window.enterMenu;
+  window.enterMenu = function(){ const r = origEnter.apply(this, arguments); start(); return r; };
+  const origLogout = window.logout;
+  if (origLogout) window.logout = function(){ stop(); return origLogout.apply(this, arguments); };
+  // Le rendu des cartes « Outil terrain » peut être refait : on repose la pastille.
+  const list = el('outil-terrain-list');
+  if (list && window.MutationObserver) new MutationObserver(() => { if (!list.querySelector('.rm-badge') && unread.size) renderBadge(); }).observe(list, {childList: true});
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && me) load(); });
+  window.addEventListener('pageshow', e => { if (e.persisted && me) load(); });     // retour arrière depuis la radio
+  if (host.classList.contains('on')) start();
+})();
 </script>
 </body>
 </html>
