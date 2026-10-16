@@ -1,0 +1,187 @@
+<!-- RDZ · radio-postes-config · v1 · 2026-10-16
+     Paramétrage de la radio (admin/). Deux rubriques :
+       · Postes : liste proposée à la prise de poste (prise-de-poste.html).
+         Ajout, renommage, ordre ↑↓, activation, et case « entend tous les
+         canaux » (Centraliste). Chaque poste a automatiquement son canal radio
+         (trigger SQL) ; désactiver un poste archive son canal.
+         Pas de suppression : les services passés gardent leur poste.
+       · Agents en service : qui est connecté à la radio, sur quel poste, depuis
+         quand ; bouton « Terminer le service » pour un agent qui a oublié sa
+         fin de service.
+     Tables : radio_postes / radio_services (migration-radio-postes.sql). -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RDZ — Paramétrage radio</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#8B1A1A; --red-dark:#6B1212;      /* UI applicative */
+  --report-red:#C8102E;                    /* rapports imprimables */
+  --ink:#1a1a1a; --paper:#ffffff;
+  --line:#d0d0d0; --line-soft:#e0e0e0;
+  --bg-meta:#f0f0f0; --bg-soft:#f7f7f7;
+  --ok:#1b7a3d; --warn:#b8860b; --danger:#8B1A1A;
+  --radius-ui:2px; --radius-card:10px; --radius-section:8px;
+  --font:Arial, Helvetica, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg-soft);color:var(--ink);-webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--red);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:50}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+header .brand{font-weight:bold;letter-spacing:.5px;font-size:14px;text-transform:uppercase}
+header .sub{font-size:12px;opacity:.9;margin-top:2px}
+header a.home{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:var(--radius-ui);white-space:nowrap}
+main{flex:1;padding:16px}
+.hidden{display:none!important}
+.screen-title{font-size:17px;font-weight:bold;margin:0 0 6px}
+.screen-hint{font-size:12.5px;color:#777;margin:0 0 16px;line-height:1.5}
+.back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:14px;font-family:var(--font)}
+.state-msg{text-align:center;color:#999;font-size:14px;padding:24px 10px;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section)}
+.err{background:#fdecea;border:1px solid #f5b5ae;color:var(--danger);border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px;line-height:1.5}
+.group-btn{display:flex;align-items:center;gap:14px;width:100%;background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:16px;margin-bottom:11px;text-align:left;cursor:pointer;color:inherit;box-shadow:0 1px 2px rgba(0,0,0,.04);font-family:var(--font)}
+.group-btn:active{border-color:var(--red)}
+.group-btn .ic{font-size:26px;width:36px;text-align:center;flex-shrink:0}
+.group-btn .txt{flex:1;min-width:0}
+.group-btn .t{display:block;font-weight:bold;font-size:15px}
+.group-btn .d{display:block;font-size:12.5px;color:#666;margin-top:3px;line-height:1.4}
+.group-btn .chev{margin-left:auto;color:#bbb;font-size:20px}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:bold;cursor:pointer;color:#555;font-family:var(--font)}
+.pill.on{background:var(--red);color:#fff;border-color:var(--red)}
+.list-item{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:12px 14px;margin-bottom:9px;display:flex;align-items:center;gap:10px}
+.list-item.off{opacity:.6}
+.li-main{flex:1;min-width:0}
+.li-t{font-weight:bold;font-size:14.5px}
+.li-d{font-size:12px;color:#777;margin-top:3px;line-height:1.4}
+.tag{display:inline-block;font-size:10.5px;font-weight:bold;padding:2px 8px;border-radius:10px;background:var(--bg-meta);color:#555;margin-left:6px;vertical-align:1px}
+.tag.all{background:#e8edf5;color:#1e3a5f}
+.tag.off{background:#fde8e8;color:var(--danger)}
+.arrows{display:flex;flex-direction:column;gap:3px}
+.ibtn{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:4px 8px;font-size:12px;cursor:pointer;font-family:var(--font);color:#444}
+.ibtn:disabled{opacity:.35;cursor:default}
+.btn{background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:11px 14px;font-size:13.5px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.btn:active{background:var(--red-dark)}
+.btn.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:7px 10px;font-size:12.5px}
+.form{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius-section);padding:14px;margin-bottom:14px}
+.form label{display:block;font-size:12px;font-weight:bold;color:#555;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+.form input[type=text]{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:var(--radius-ui);font-size:14px;font-family:var(--font);margin-bottom:10px}
+.check{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:12px;text-transform:none!important;letter-spacing:0!important;color:var(--ink)!important;font-weight:normal!important}
+.check input{width:18px;height:18px;accent-color:var(--red)}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap}
+.count{font-size:12px;color:#777;margin:-6px 0 12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="top"><div><div class="brand">RDZ Security Management SA</div><div class="sub">Paramétrage de la radio</div></div><a class="home" href="../index.html">← Accueil</a></div></header>
+  <main id="main"><div class="state-msg">Chargement…</div></main>
+</div>
+<script>
+'use strict';
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SERVICE_MAX_H = 16;   // même règle que radio-agent.html
+
+let postes = [], services = [], screen = 'home', editId = null, errMsg = '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDT = t => { const d = new Date(t); return d.toLocaleDateString('fr-CH') + ' à ' + d.toLocaleTimeString('fr-CH', {hour:'2-digit', minute:'2-digit'}); };
+
+async function load(){
+  errMsg = '';
+  const since = new Date(Date.now() - SERVICE_MAX_H*3600e3).toISOString();
+  const [p, s] = await Promise.all([
+    sb.from('radio_postes').select('*').order('ordre').order('nom'),
+    sb.from('radio_services').select('*').is('fin', null).order('debut', {ascending:false})
+  ]);
+  if (p.error || s.error) {
+    const m = (p.error || s.error).message || '';
+    errMsg = /radio_|relation|does not exist|schema cache/i.test(m) ? 'Tables radio introuvables : lancez migration-radio.sql puis migration-radio-postes.sql dans Supabase (base RDZ_Agent).' : 'Chargement impossible : ' + m;
+  } else {
+    postes = p.data || [];
+    services = (s.data || []).map(x => Object.assign(x, {_expire: new Date(x.debut) < new Date(since)}));
+  }
+  render();
+}
+
+function render(){
+  const m = document.getElementById('main');
+  const err = errMsg ? `<div class="err">${esc(errMsg)}</div>` : '';
+  const pills = `<div class="pills"><button class="pill ${screen==='postes'?'on':''}" onclick="go('postes')">📻 Postes</button><button class="pill ${screen==='services'?'on':''}" onclick="go('services')">👥 Agents en service</button></div>`;
+  if (screen === 'home') {
+    const active = services.filter(s => !s._expire).length;
+    m.innerHTML = `${err}<div class="screen-title">Radio</div><div class="screen-hint">Les postes proposés à la prise de poste décident des canaux radio de chaque agent pendant son service.</div>
+      <button class="group-btn" onclick="go('postes')"><span class="ic">📻</span><span class="txt"><span class="t">Postes</span><span class="d">${postes.filter(p=>p.actif).length} poste(s) actif(s) · ajouter, renommer, ordonner, poste qui entend tout</span></span><span class="chev">›</span></button>
+      <button class="group-btn" onclick="go('services')"><span class="ic">👥</span><span class="txt"><span class="t">Agents en service</span><span class="d">${active} agent(s) connecté(s) à la radio en ce moment</span></span><span class="chev">›</span></button>`;
+    return;
+  }
+  const back = `<button class="back-btn" onclick="go('home')">← Toutes les rubriques</button>`;
+  if (screen === 'postes') {
+    const editing = postes.find(p => p.id === editId);
+    const form = `<div class="form"><label for="pNom">${editing ? 'Modifier le poste' : 'Nouveau poste'}</label>
+      <input type="text" id="pNom" maxlength="40" placeholder="Par exemple : Hôpital de La Tour" value="${editing ? esc(editing.nom) : ''}">
+      <label class="check"><input type="checkbox" id="pAll" ${editing && editing.voit_tout ? 'checked' : ''}> Entend tous les canaux de tous les postes (ex. Centraliste)</label>
+      <div class="row-btns"><button class="btn" onclick="savePoste()">${editing ? 'Enregistrer' : '+ Ajouter le poste'}</button>${editing ? '<button class="btn sec" onclick="cancelEdit()">Annuler</button>' : ''}</div></div>`;
+    const list = postes.length ? postes.map((p, i) => `<div class="list-item ${p.actif ? '' : 'off'}">
+        <div class="arrows"><button class="ibtn" ${i===0?'disabled':''} onclick="move('${p.id}',-1)" aria-label="Monter">↑</button><button class="ibtn" ${i===postes.length-1?'disabled':''} onclick="move('${p.id}',1)" aria-label="Descendre">↓</button></div>
+        <div class="li-main"><div class="li-t">${esc(p.nom)}${p.voit_tout ? '<span class="tag all">Entend tout</span>' : ''}${p.actif ? '' : '<span class="tag off">Désactivé</span>'}</div>
+          <div class="li-d">${services.filter(s => s.poste_id === p.id && !s._expire).length} agent(s) en service sur ce poste</div></div>
+        <div class="row-btns"><button class="btn sec small" onclick="editPoste('${p.id}')">Modifier</button><button class="btn sec small" onclick="toggleActif('${p.id}')">${p.actif ? 'Désactiver' : 'Réactiver'}</button></div></div>`).join('')
+      : '<div class="state-msg">Aucun poste. Ajoutez-en un ci-dessus.</div>';
+    m.innerHTML = `${err}${back}${pills}<div class="screen-title">Postes</div><div class="screen-hint">Proposés dans cet ordre à la prise de poste. Chaque poste a son canal radio. Désactiver un poste le retire de la prise de poste et archive son canal.</div>${form}${list}`;
+    return;
+  }
+  const live = services.filter(s => !s._expire), old = services.filter(s => s._expire);
+  const row = s => `<div class="list-item"><div class="li-main"><div class="li-t">${esc(s.agent_nom || s.agent_id)}<span class="tag">${esc(s.poste_nom || '')}</span></div>
+      <div class="li-d">Depuis le ${fmtDT(s.debut)}${s.site_nom ? ' · ' + esc(s.site_nom) : ''}${s._expire ? ' · expiré (plus de ' + SERVICE_MAX_H + ' h, déjà sans accès radio)' : ''}</div></div>
+      <button class="btn sec small" onclick="closeService('${s.id}')">Terminer le service</button></div>`;
+  m.innerHTML = `${err}${back}${pills}<div class="screen-title">Agents en service</div>
+    <div class="screen-hint">Agents qui ont validé leur prise de service et pas encore leur fin de service. « Terminer le service » les déconnecte de la radio (agent qui a oublié sa fin de service).</div>
+    <div class="row-btns" style="margin-bottom:12px"><button class="btn sec small" onclick="load()">↻ Actualiser</button></div>
+    <div class="count">${live.length} agent(s) en service</div>
+    ${live.length ? live.map(row).join('') : '<div class="state-msg">Personne en service pour le moment.</div>'}
+    ${old.length ? `<div class="screen-title" style="margin-top:20px;font-size:15px">Services jamais fermés</div><div class="count">${old.length} service(s) de plus de ${SERVICE_MAX_H} h</div>${old.map(row).join('')}` : ''}`;
+}
+function go(s){ screen = s; editId = null; render(); window.scrollTo(0, 0); }
+function editPoste(id){ editId = id; render(); document.getElementById('pNom').focus(); }
+function cancelEdit(){ editId = null; render(); }
+async function savePoste(){
+  const nom = document.getElementById('pNom').value.trim(), voit_tout = document.getElementById('pAll').checked;
+  if (!nom) { errMsg = 'Donnez un nom au poste.'; render(); return; }
+  if (postes.some(p => p.nom.toLowerCase() === nom.toLowerCase() && p.id !== editId)) { errMsg = 'Un poste porte déjà ce nom.'; render(); return; }
+  const res = editId
+    ? await sb.from('radio_postes').update({nom, voit_tout}).eq('id', editId)
+    : await sb.from('radio_postes').insert({nom, voit_tout, ordre: postes.reduce((m, p) => Math.max(m, p.ordre || 0), 0) + 1});
+  if (res.error) { errMsg = 'Enregistrement impossible : ' + res.error.message; render(); return; }
+  editId = null; await load();
+}
+async function toggleActif(id){
+  const p = postes.find(x => x.id === id); if (!p) return;
+  if (p.actif && !confirm(`Désactiver le poste « ${p.nom} » ? Il ne sera plus proposé à la prise de poste et son canal radio sera archivé.`)) return;
+  const res = await sb.from('radio_postes').update({actif: !p.actif}).eq('id', id);
+  if (res.error) { errMsg = 'Modification impossible : ' + res.error.message; render(); return; }
+  await load();
+}
+async function move(id, dir){
+  const i = postes.findIndex(p => p.id === id), j = i + dir; if (i < 0 || j < 0 || j >= postes.length) return;
+  const list = postes.slice(); [list[i], list[j]] = [list[j], list[i]];
+  const res = await Promise.all(list.map((p, k) => p.ordre === k + 1 ? null : sb.from('radio_postes').update({ordre: k + 1}).eq('id', p.id)).filter(Boolean));
+  const bad = res.find(r => r.error); if (bad) { errMsg = 'Réordonnancement impossible : ' + bad.error.message; }
+  await load();
+}
+async function closeService(id){
+  const s = services.find(x => x.id === id); if (!s) return;
+  if (!confirm(`Terminer le service de ${s.agent_nom || 'cet agent'} (${s.poste_nom || ''}) ? Il sera déconnecté de la radio.`)) return;
+  const res = await sb.from('radio_services').update({fin: new Date().toISOString(), fin_motif: 'clôture admin', fin_par_nom: 'Administration'}).eq('id', id);
+  if (res.error) { errMsg = 'Clôture impossible : ' + res.error.message; render(); return; }
+  await load();
+}
+load();
+</script>
+</body>
+</html>
