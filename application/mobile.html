@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -1280,9 +1280,9 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
        mise à jour en temps réel, avec bip + vibration + bandeau cliquable
        (ouvre directement le bon canal : radio-agent.html?canal=ID).
      · bandeau rouge si un collègue déclenche un SOS pendant qu'on est sur le menu.
-   Même règle d'accès que radio-agent.html (canSee) : Tous les agents, canal du
-   poste (tous les postes pour un poste « entend tout »), groupes dont l'agent est
-   membre, messages privés. Lecture seule ici, à part la création d'un SOS.
+   Même règle d'accès que radio-agent.html v3 (canSee) : ligne privée avec la
+   centrale (le Centraliste voit toutes les lignes + « Tous les agents »), groupes
+   dont l'agent est membre, messages privés. Lecture seule ici, à part la création d'un SOS.
    Hors service ou module radio non installé : rien ne s'affiche.
    ============================================================================ */
 (function(){
@@ -1331,9 +1331,15 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
 
   /* ---------- Règles d'accès (identiques à radio-agent.html) ---------- */
   const seesAll = () => !!(svc && postes.get(svc.poste_id) && postes.get(svc.poste_id).voit_tout);
-  const canSee = c => !!c && !c.archive && (c.tous || (c.membres || []).includes(me.id) || (!!c.poste_id && (seesAll() || c.poste_id === svc.poste_id)));
+  function canSee(c){
+    if (!c || c.archive || c.poste_id) return false;
+    if (c.tous) return seesAll();
+    if (c.type === 'centrale') return seesAll() ? c.ligne_agent !== me.id : c.ligne_agent === me.id;
+    return (c.membres || []).includes(me.id);
+  }
   function canalName(c){
     if (!c) return 'Radio';
+    if (c.type === 'centrale') return seesAll() ? 'Ligne de l\u2019agent' : 'Centrale';
     if (c.type === 'direct') return 'Message privé';
     return c.nom || 'Groupe';
   }
@@ -1354,10 +1360,10 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
       svc = (sv.data || [])[0] || null;
       if (!svc) { hideAll(); return; }
       sosBtn.style.display = '';
-      const pf = seesAll() ? 'poste_id.not.is.null' : `poste_id.eq.${svc.poste_id}`;
-      const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}},${pf}`);
+      const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `membres.cs.{${me.id}}`;
+      const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(filtre);
       if (ca.error) return;
-      canaux.clear(); (ca.data || []).forEach(c => canaux.set(c.id, c));
+      canaux.clear(); (ca.data || []).filter(canSee).forEach(c => canaux.set(c.id, c));
       const ids = [...canaux.keys()];
       unread.clear();
       if (ids.length) {
