@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
+<!-- RDZ · radio-agent · v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
+     v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
      v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -140,6 +141,13 @@ header{flex:none;background:radial-gradient(circle at 90% -25%,rgba(215,25,32,.3
 .err{color:var(--rdz-red);font-size:13.5px;min-height:18px;margin:8px 0}
 .btn{display:flex;align-items:center;justify-content:center;width:100%;padding:13px 16px;border-radius:12px;background:var(--rdz-red);color:#fff;font-weight:800;font-size:15px}
 .btn.ghost{background:#eef2f7;color:var(--rdz-text)}
+.btn.danger{background:#fff;color:var(--rdz-red);border:1.5px solid var(--rdz-red)}
+.hd-gear{font-size:19px}
+.mrow{display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--rdz-border)}
+.mrow .row-t{flex:1;min-width:0}
+.mini-btn{flex:none;padding:7px 11px;border-radius:9px;border:1px solid var(--rdz-border);background:#fff;color:var(--rdz-red);font-size:13px;font-weight:750}
+.sheet .section-h{margin-top:16px}
+.inline{display:flex;gap:8px}.inline input{flex:1}.inline .btn{width:auto;padding:11px 14px}
 .btn+.btn{margin-top:8px}
 .btn:disabled{opacity:.6}
 .toast-wrap{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;justify-content:center;padding:calc(env(safe-area-inset-top) + 8px) 10px 0;pointer-events:none}
@@ -496,8 +504,10 @@ function renderHeader(){
   const h = $('#hd');
   const back = ui.conv ? `<button class="hd-back" data-act="back" aria-label="Retour aux canaux">‹</button>` : `<a class="hd-back" href="${MENU_URL}" aria-label="Retour au menu">‹</a>`;
   const name = ui.conv ? esc(canalName(canaux.get(ui.conv))) : 'Radio';
+  const c = ui.conv && canaux.get(ui.conv);
+  const gear = c && isCustomGroup(c) ? `<button class="hd-back hd-gear" data-act="manage" aria-label="Gérer le groupe">⚙</button>` : '';
   h.innerHTML = `${back}<div class="hd-title"><div class="hd-name">${name}</div><div class="hd-sub" id="hdSub"></div></div>
-    <button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
+    ${gear}<button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
   renderHeaderSub();
 }
 function renderHeaderSub(){
@@ -785,6 +795,82 @@ async function openDirect(otherId){
   }
   openConv(c.id);
 }
+/* ---------- Gestion d'un groupe créé (v2.2) ----------
+   Seuls les groupes créés par les agents sont gérables (pas « Tous les agents »
+   ni les canaux de poste, qui sont automatiques, ni les messages privés).
+   Gèrent le groupe : son créateur et le Centraliste (poste « entend tout »).
+   Tout membre peut quitter le groupe. « Supprimer » = archivage : le groupe
+   disparaît pour tout le monde mais l'historique reste en base. */
+const isCustomGroup = c => c && c.type === 'groupe' && !c.tous && !c.poste_id;
+const canManage = c => isCustomGroup(c) && (c.cree_par === me.id || seesAll());
+function manageSheet(){
+  const c = canaux.get(ui.conv); if (!isCustomGroup(c)) return;
+  const can = canManage(c), members = (c.membres || []).slice();
+  const memberRows = members.map(id => ({id, nom: id === me.id ? me.nom + ' (vous)' : agentName(id)})).sort((a,b) => a.nom.localeCompare(b.nom))
+    .map(m => `<div class="mrow">${avatar(m.id, m.nom)}<span class="row-t">${esc(m.nom)}</span>${can && m.id !== me.id ? `<button class="mini-btn" data-act="grp-remove" data-id="${m.id}">Retirer</button>` : ''}</div>`).join('');
+  const addable = activeAgents().filter(a => !members.includes(a.id)).sort((a,b) => a.nom.localeCompare(b.nom));
+  $('#sheet').innerHTML = `<div class="sheet-bg" data-act="sheet-bg"><div class="sheet" role="dialog" aria-modal="true">
+    <h3>${esc(c.nom || 'Groupe')}</h3>
+    <p>Créé par ${esc(c.cree_par === me.id ? 'vous' : (c.cree_par_nom || agentName(c.cree_par)))}${can ? '' : '. Seuls le créateur du groupe et le Centraliste peuvent le modifier.'}</p>
+    ${can ? `<label class="field"><span>Nom du groupe</span><div class="inline"><input id="gRename" maxlength="40" value="${esc(c.nom || '')}" autocomplete="off"><button class="btn ghost" data-act="grp-rename">Renommer</button></div></label>` : ''}
+    <div class="section-h">Membres (${members.length})</div>
+    <div>${memberRows || '<div class="state-msg">Aucun membre.</div>'}</div>
+    ${can ? `<div class="section-h">Ajouter des membres</div>
+      ${addable.length ? `<input class="search" id="gAddSearch" type="search" placeholder="Rechercher un collègue" autocomplete="off">
+      <div id="gAddList">${addable.map(a => `<label class="pick" data-n="${esc(a.nom.toLowerCase())}"><input type="checkbox" value="${a.id}">${avatar(a.id, a.nom)}<span class="row-t">${esc(a.nom)}</span></label>`).join('')}</div>
+      <div class="err" id="gAddErr" role="alert"></div>
+      <button class="btn" data-act="grp-add">Ajouter les collègues cochés</button>` : '<p>Tous les agents actifs sont déjà dans ce groupe.</p>'}` : ''}
+    <div class="section-h">Actions</div>
+    <button class="btn ghost" data-act="grp-leave">Quitter le groupe</button>
+    ${can ? '<button class="btn danger" data-act="grp-delete">Supprimer le groupe</button>' : ''}
+    <button class="btn ghost" data-act="close-sheet">Fermer</button></div></div>`;
+  const s = $('#gAddSearch');
+  if (s) s.oninput = () => { const q = s.value.trim().toLowerCase(); document.querySelectorAll('#gAddList .pick').forEach(p => p.classList.toggle('hidden', !!q && !p.dataset.n.includes(q))); };
+}
+async function updateGroup(c, patch, info){
+  const { error } = await sb.from('radio_canaux').update(patch).eq('id', c.id);
+  if (error) { toast('Modification impossible sans réseau. Réessayez.'); return false; }
+  Object.assign(c, patch);
+  if (info) {
+    const row = {canal_id:c.id, auteur_id:me.id, auteur_nom:me.nom, type:'info', texte:info};
+    sb.from('radio_messages').insert(row).then(() => {}, () => {});
+  }
+  return true;
+}
+const namesOf = ids => ids.map(id => agentName(id)).join(', ');
+async function grpRemove(id){
+  const c = canaux.get(ui.conv); if (!canManage(c)) return;
+  if (!confirm(`Retirer ${agentName(id)} du groupe « ${c.nom} » ?`)) return;
+  if (await updateGroup(c, {membres:(c.membres || []).filter(x => x !== id)}, `${me.nom} a retiré ${agentName(id)} du groupe`)) { renderHeaderSub(); manageSheet(); }
+}
+async function grpAdd(){
+  const c = canaux.get(ui.conv); if (!canManage(c)) return;
+  const sel = [...document.querySelectorAll('#gAddList input:checked')].map(x => x.value);
+  if (!sel.length) { $('#gAddErr').textContent = 'Cochez au moins un collègue.'; return; }
+  const list = [...new Set([...(c.membres || []), ...sel])];
+  if (await updateGroup(c, {membres:list}, `${me.nom} a ajouté ${namesOf(sel)} au groupe`)) { renderHeaderSub(); manageSheet(); toast(`${sel.length} collègue${sel.length > 1 ? 's' : ''} ajouté${sel.length > 1 ? 's' : ''}.`); }
+}
+async function grpRename(){
+  const c = canaux.get(ui.conv); if (!canManage(c)) return;
+  const nom = ($('#gRename').value || '').trim();
+  if (!nom || nom === c.nom) return;
+  const old = c.nom;
+  if (await updateGroup(c, {nom}, `${me.nom} a renommé le groupe « ${old} » en « ${nom} »`)) { renderHeader(); manageSheet(); }
+}
+async function grpLeave(){
+  const c = canaux.get(ui.conv); if (!isCustomGroup(c)) return;
+  if (!confirm(`Quitter le groupe « ${c.nom} » ? Vous ne recevrez plus ses vocaux.`)) return;
+  if (await updateGroup(c, {membres:(c.membres || []).filter(x => x !== me.id)}, `${me.nom} a quitté le groupe`)) {
+    canaux.delete(c.id);
+    $('#sheet').innerHTML = ''; back();
+  }
+}
+async function grpDelete(){
+  const c = canaux.get(ui.conv); if (!canManage(c)) return;
+  if (!confirm(`Supprimer le groupe « ${c.nom} » pour tous ses membres ? L'historique reste conservé pour la direction.`)) return;
+  if (await updateGroup(c, {archive:true}, null)) { canaux.delete(c.id); $('#sheet').innerHTML = ''; back(); toast('Groupe supprimé.'); }
+}
+
 function groupSheet(){
   const list = activeAgents().filter(a => a.id !== me.id).sort((a,b) => a.nom.localeCompare(b.nom));
   $('#sheet').innerHTML = `<div class="sheet-bg" data-act="sheet-bg"><div class="sheet" role="dialog" aria-modal="true">
@@ -945,6 +1031,12 @@ document.addEventListener('click', e => {
     case 'play': togglePlay(t.dataset.id); break;
     case 'new-group': groupSheet(); break;
     case 'create-group': createGroup(); break;
+    case 'manage': manageSheet(); break;
+    case 'grp-remove': grpRemove(t.dataset.id); break;
+    case 'grp-add': grpAdd(); break;
+    case 'grp-rename': grpRename(); break;
+    case 'grp-leave': grpLeave(); break;
+    case 'grp-delete': grpDelete(); break;
     case 'close-sheet': $('#sheet').innerHTML = ''; break;
     case 'sheet-bg': if (e.target === t) $('#sheet').innerHTML = ''; break;
     case 'view-alert': if (alertes.has(t.dataset.id)) { overlay = {alertId:t.dataset.id}; renderOverlay(); } break;
