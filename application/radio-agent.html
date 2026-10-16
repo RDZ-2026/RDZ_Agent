@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
+<!-- RDZ · radio-agent · v3 · 2026-10-16 · chaque agent a SA ligne privée avec la centrale (type de canal 'centrale') ; « Tous les agents » et les canaux de poste ne sont plus visibles que du Centraliste… et les canaux de poste plus du tout (remplacés par les lignes). Le Centraliste voit la ligne de chaque agent en service, classée par poste. Équipe (privé entre agents) et groupes inchangés. Nécessite migration-radio-lignes.sql.
+     v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
      v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
      v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
      v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. -->
@@ -276,25 +277,43 @@ const myPoste = () => myService && postes.get(myService.poste_id);
 const seesAll = () => !!(myPoste() && myPoste().voit_tout);
 const serviceOpen = s => s && !s.fin && (Date.now() - new Date(s.debut)) < SERVICE_MAX_H*3600e3;
 const inService = () => [...services.values()].filter(serviceOpen);
+/* v3 : qui voit quoi dans l'onglet Canaux
+   · Agent (poste normal) : SA ligne avec la centrale + ses groupes + ses messages privés.
+   · Centraliste (poste « entend tout ») : la ligne de chaque agent + « Tous les agents »
+     + ses groupes + ses messages privés.
+   · Canaux de poste : plus affichés (remplacés par les lignes privées). */
 function canSee(c){
   if (!c || c.archive) return false;
-  if (c.tous || (c.membres || []).includes(me.id)) return true;
-  return !!c.poste_id && (seesAll() || c.poste_id === myService.poste_id);
+  if (c.poste_id) return false;
+  if (c.tous) return seesAll();
+  if (c.type === 'centrale') return seesAll() ? c.ligne_agent !== me.id : c.ligne_agent === me.id;
+  return (c.membres || []).includes(me.id);
 }
+const centralistesEnService = () => inService().filter(s => (postes.get(s.poste_id) || {}).voit_tout).map(s => String(s.agent_id));
+const serviceOf = id => services.get(String(id));
+const posteNomOf = id => { const s = serviceOf(id); return s ? ((postes.get(s.poste_id) || {}).nom || s.poste_nom || '') : ''; };
+const myLine = () => [...canaux.values()].find(c => c.type === 'centrale' && c.ligne_agent === me.id);
 
 const activeAgents = () => [...agentsById.values()].filter(a => a.actif !== false);
 const agentName = (id, fallback) => (agentsById.get(id) || {}).nom || fallback || 'Agent';
 const tousCanal = () => [...canaux.values()].find(c => c.tous);
 function canalMembers(c){
+  if (c.type === 'centrale') return [...new Set([c.ligne_agent, ...centralistesEnService()])];
   if (c.tous) return inService().map(s => s.agent_id);
   if (c.poste_id) return inService().filter(s => s.poste_id === c.poste_id || (postes.get(s.poste_id) || {}).voit_tout).map(s => s.agent_id);
   return c.membres || [];
 }
 function canalName(c){
+  if (c.type === 'centrale') return seesAll() ? agentName(c.ligne_agent) : 'Centrale';
   if (c.type === 'direct') return agentName((c.membres||[]).find(x => x !== me.id));
   return c.nom || 'Groupe';
 }
 function canalSub(c){
+  if (c.type === 'centrale') {
+    if (seesAll()) { const p = posteNomOf(c.ligne_agent); return `${p ? p : 'Hors service'} · ligne privée${online.has(c.ligne_agent) ? ' · radio ouverte' : ''}`; }
+    const n = centralistesEnService().length;
+    return n ? `Ligne privée · ${n} centraliste${n > 1 ? 's' : ''} en service` : 'Aucun centraliste en service : vos vocaux seront écoutés à son arrivée';
+  }
   if (c.type === 'direct') { const o = (c.membres||[]).find(x => x !== me.id); return online.has(o) ? 'Radio ouverte' : 'Message privé'; }
   const m = canalMembers(c); const on = m.filter(id => id !== me.id && online.has(id)).length;
   if (c.tous || c.poste_id) return `${m.length} en service · ${on} avec la radio ouverte`;
@@ -357,6 +376,7 @@ async function boot(){
     return showGate(missing ? 'La radio n\u2019est pas encore installée sur la base (migration-radio.sql puis migration-radio-postes.sql à lancer).' : 'Impossible de charger la radio. Vérifiez le réseau.', true);
   }
   if (!myService) return showGate(NO_SERVICE, false, true);
+  if (!seesAll()) await ensureLine(me.id).catch(() => {});
   loadPendingIntoUi();
   render();
   subscribeRealtime();
@@ -375,6 +395,24 @@ async function boot(){
 }
 
 /* ---------- Chargement ---------- */
+// Ligne privée agent ↔ centrale : une par agent (index unique), créée à la demande.
+async function ensureLine(agentId){
+  let c = [...canaux.values()].find(x => x.type === 'centrale' && x.ligne_agent === agentId);
+  if (c) return c;
+  const row = {id:uuid(), type:'centrale', nom:'Centrale', tous:false, ligne_agent:agentId, membres:[agentId], cree_par:me.id, cree_par_nom:me.nom};
+  const ins = await sb.from('radio_canaux').insert(row);
+  if (ins.error) {
+    const { data, error } = await sb.from('radio_canaux').select('*').eq('type', 'centrale').eq('ligne_agent', agentId).maybeSingle();
+    if (error || !data) throw ins.error;
+    c = data;
+  } else c = Object.assign({cree_le:new Date().toISOString(), archive:false, poste_id:null}, row);
+  if (canSee(c)) canaux.set(c.id, c);
+  return c;
+}
+async function openLine(agentId){
+  try { const c = await ensureLine(agentId); openConv(c.id); }
+  catch (e) { toast('Pas de réseau : impossible d\u2019ouvrir la ligne pour l\u2019instant.'); }
+}
 function reload(){
   if (sessionOver) return;
   loadAll().then(() => { if (!myService) endSession(NO_SERVICE); else refreshAll(); }).catch(() => {});
@@ -392,13 +430,14 @@ async function loadAll(){
   services.clear(); (sv.data || []).forEach(s => services.set(String(s.agent_id), s));
   myService = services.get(me.id) || null;
   if (!myService) return;
-  const posteFilter = seesAll() ? 'poste_id.not.is.null' : `poste_id.eq.${myService.poste_id}`;
-  const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}},${posteFilter}`);
+  const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `membres.cs.{${me.id}}`;
+  const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(filtre);
   if (ca.error) throw ca.error;
   agentsById.clear(); (ag.data || []).forEach(a => agentsById.set(String(a.id), {id:String(a.id), nom:fullName(a), actif:a.actif}));
-  const keep = new Set((ca.data || []).map(c => c.id));
+  const visibles = (ca.data || []).filter(canSee);
+  const keep = new Set(visibles.map(c => c.id));
   [...canaux.keys()].forEach(k => { if (!keep.has(k)) canaux.delete(k); });
-  (ca.data || []).forEach(c => canaux.set(c.id, c));
+  visibles.forEach(c => canaux.set(c.id, c));
   const ids = [...canaux.keys()];
   if (ids.length) {
     const m = await sb.from('radio_messages').select('*').in('canal_id', ids).order('cree_le', {ascending:false}).limit(500);
@@ -552,23 +591,44 @@ function renderView(){
 }
 function avatar(id, name){ return `<span class="av">${esc(initials(name || agentName(id)))}${online.has(id) ? '<span class="on-dot"></span>' : ''}</span>`; }
 
-function canauxHTML(){
-  const rank = c => c.tous ? 3 : (c.poste_id && c.poste_id === myService.poste_id) ? 2 : c.poste_id ? 1 : 0;
-  const list = [...canaux.values()].sort((a,b) => rank(b) - rank(a) || new Date(lastTs(b)) - new Date(lastTs(a)));
-  const rows = list.map(c => {
+function canalRow(c){
     const l = listOf(c.id), last = l[l.length-1], u = unreadOf(c);
-    let prev = 'Aucun message pour l\u2019instant';
+    let prev = c.type === 'centrale' && seesAll() ? (posteNomOf(c.ligne_agent) || 'Hors service') : 'Aucun message pour l\u2019instant';
     if (last) {
       const who = last.auteur_id === me.id ? 'Vous' : (agentName(last.auteur_id, last.auteur_nom)).split(' ').slice(-1)[0];
-      prev = last.type === 'sos' ? `Alerte SOS · ${last.auteur_id === me.id ? 'vous' : agentName(last.auteur_id, last.auteur_nom)}` : last.type === 'info' ? (last.texte || '') : `${who} · vocal ${fmtDur(last.duree_s)}`;
+      const txt = last.type === 'sos' ? `Alerte SOS · ${last.auteur_id === me.id ? 'vous' : agentName(last.auteur_id, last.auteur_nom)}` : last.type === 'info' ? (last.texte || '') : `${who} · vocal ${fmtDur(last.duree_s)}`;
+      prev = c.type === 'centrale' && seesAll() && posteNomOf(c.ligne_agent) ? `${posteNomOf(c.ligne_agent)} · ${txt}` : txt;
     }
-    const av = c.type === 'direct' ? avatar((c.membres||[]).find(x => x !== me.id)) : `<span class="av grp ${c.tous || c.poste_id ? 'all' : ''}">${c.poste_id ? ic.radio(21) : ic.users(21)}</span>`;
+    const av = c.type === 'direct' ? avatar((c.membres||[]).find(x => x !== me.id))
+      : c.type === 'centrale' ? (seesAll() ? avatar(c.ligne_agent) : `<span class="av grp all">${ic.radio(21)}</span>`)
+      : `<span class="av grp ${c.tous ? 'all' : ''}">${ic.users(21)}</span>`;
     return `<button class="row" data-act="open" data-id="${c.id}">${av}
       <span class="row-main"><span class="row-t">${esc(canalName(c))}</span><span class="row-d ${u ? 'unread' : ''}">${esc(prev)}</span></span>
       <span class="row-side">${last ? fmtTime(last.cree_le) : ''}${u ? `<span class="badge">${u}</span>` : ''}</span></button>`;
-  }).join('');
+}
+function canauxHTML(){
+  const byTime = (a,b) => new Date(lastTs(b)) - new Date(lastTs(a));
+  const addBtn = `<button class="add-btn" data-act="new-group">${ic.plus(18)} Nouveau groupe</button>`;
+  if (seesAll()) {
+    // Centraliste : une ligne par agent en service (classées par poste), puis le reste.
+    const lines = [...canaux.values()].filter(c => c.type === 'centrale');
+    const svcAgents = inService().map(s => String(s.agent_id)).filter(id => id !== me.id && !(postes.get((serviceOf(id) || {}).poste_id) || {}).voit_tout);
+    const rowsSvc = svcAgents.map(id => ({id, nom:agentName(id), poste:posteNomOf(id), c:lines.find(c => c.ligne_agent === id)}))
+      .sort((a,b) => a.poste.localeCompare(b.poste) || a.nom.localeCompare(b.nom))
+      .map(x => x.c ? canalRow(x.c) : `<button class="row" data-act="open-line" data-id="${x.id}">${avatar(x.id)}
+          <span class="row-main"><span class="row-t">${esc(x.nom)}</span><span class="row-d">${esc(x.poste)} · aucun message</span></span><span class="row-side"></span></button>`).join('');
+    const others = [...canaux.values()].filter(c => c.type !== 'centrale' || (!svcAgents.includes(c.ligne_agent) && unreadOf(c) > 0))
+      .sort((a,b) => (b.tous ? 1 : 0) - (a.tous ? 1 : 0) || byTime(a,b)).map(canalRow).join('');
+    return `<div class="pad">${addBtn}
+      <div class="section-h">Lignes des agents en service</div>
+      ${rowsSvc ? `<div class="card-list">${rowsSvc}</div>` : '<div class="state-msg">Aucun agent en service pour le moment.</div>'}
+      <div class="section-h spaced">Autres canaux</div>
+      ${others ? `<div class="card-list">${others}</div>` : '<div class="state-msg">Aucun autre canal.</div>'}</div>`;
+  }
+  const list = [...canaux.values()].sort((a,b) => (b.type === 'centrale' ? 1 : 0) - (a.type === 'centrale' ? 1 : 0) || byTime(a,b));
+  const rows = list.map(canalRow).join('');
   return `<div class="pad">
-    <button class="add-btn" data-act="new-group">${ic.plus(18)} Nouveau groupe</button>
+    ${addBtn}
     <div class="section-h">Mes canaux · poste ${esc((myPoste() || {}).nom || myService.poste_nom || '')}</div>
     ${rows ? `<div class="card-list">${rows}</div>` : `<div class="state-msg"><b>Aucun canal</b>Créez un groupe ou ouvrez l'onglet Équipe pour écrire à un collègue.</div>`}
   </div>`;
@@ -1078,6 +1138,7 @@ document.addEventListener('click', e => {
   switch (act) {
     case 'tab': ui.tab = t.dataset.tab; render(); break;
     case 'open': openConv(t.dataset.id); break;
+    case 'open-line': openLine(t.dataset.id); break;
     case 'direct': openDirect(t.dataset.id); break;
     case 'back': back(); break;
     case 'play': togglePlay(t.dataset.id); break;
