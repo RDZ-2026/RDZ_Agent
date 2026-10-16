@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
+<!-- RDZ · radio-agent · v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
+     v2.2 · 2026-10-16 · gestion des groupes créés : renommer, ajouter / retirer des membres, supprimer (archivage), quitter le groupe. Gérable par le créateur du groupe et par le Centraliste.
      v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
      v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. -->
 <!DOCTYPE html>
@@ -143,6 +144,8 @@ header{flex:none;background:radial-gradient(circle at 90% -25%,rgba(215,25,32,.3
 .btn.ghost{background:#eef2f7;color:var(--rdz-text)}
 .btn.danger{background:#fff;color:var(--rdz-red);border:1.5px solid var(--rdz-red)}
 .hd-gear{font-size:19px}
+.hd-gear.off{opacity:.55}
+.unlock{display:block;width:100%;text-align:center;background:#fff8e7;border-bottom:1px solid #f0d594;color:#6b5414;font-size:13px;font-weight:700;padding:9px 12px}
 .mrow{display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid var(--rdz-border)}
 .mrow .row-t{flex:1;min-width:0}
 .mini-btn{flex:none;padding:7px 11px;border-radius:9px;border:1px solid var(--rdz-border);background:#fff;color:var(--rdz-red);font-size:13px;font-weight:750}
@@ -358,6 +361,12 @@ async function boot(){
   render();
   subscribeRealtime();
   resumeAlerts();
+  // v2.3 : ouverture directe depuis la notification du menu (mobile.html?…→ radio-agent.html?canal=ID)
+  try {
+    const q = new URLSearchParams(location.search), cid = q.get('canal');
+    if (cid && canaux.has(cid) && !overlay) openConv(cid);
+    if (q.get('canal') || q.get('alerte')) history.replaceState(null, '', location.pathname);
+  } catch (e) {}
   flushPending();
   setInterval(() => { if (!document.hidden) reload(); }, 60000);
   setInterval(() => { if (!sessionOver) flushPending(); }, 15000);
@@ -447,7 +456,9 @@ async function onMessage(m){
   const isNew = addMsg(Object.assign({}, m, {_state:null}));
   if (!isNew || m.auteur_id === me.id) { refreshConv(m.canal_id); return; }
   if (m.type === 'vocal') {
-    chirp(); vibrate([60, 40, 60]);
+    vibrate([60, 40, 60]);
+    if (autoOn() && audioUnlocked && !document.hidden) { autoQueue.push(m.id); setTimeout(tryAutoPlay, 350); }
+    else chirp();
     if (ui.conv !== m.canal_id) notify(m.auteur_id, m.auteur_nom || agentName(m.auteur_id), `Message vocal ${fmtDur(m.duree_s)} · ${canalName(canaux.get(m.canal_id))}`, () => openConv(m.canal_id));
   }
   refreshConv(m.canal_id);
@@ -507,6 +518,7 @@ function renderHeader(){
   const c = ui.conv && canaux.get(ui.conv);
   const gear = c && isCustomGroup(c) ? `<button class="hd-back hd-gear" data-act="manage" aria-label="Gérer le groupe">⚙</button>` : '';
   h.innerHTML = `${back}<div class="hd-title"><div class="hd-name">${name}</div><div class="hd-sub" id="hdSub"></div></div>
+    <button class="hd-back hd-gear ${autoOn() ? '' : 'off'}" data-act="autoplay" aria-label="${autoOn() ? 'Lecture automatique activée : toucher pour couper' : 'Lecture automatique coupée : toucher pour activer'}">${autoOn() ? '🔊' : '🔇'}</button>
     ${gear}<button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
   renderHeaderSub();
 }
@@ -530,10 +542,11 @@ function renderFoot(){
     f.innerHTML = `<nav class="tabbar">${tab('canaux','Canaux',ic.radio(23), u ? `<span class="badge">${u}</span>` : '')}${tab('equipe','Équipe',ic.users(23))}${tab('alertes','Alertes',ic.alert(23), act ? '<span class="badge">!</span>' : '')}</nav>`;
   }
 }
+function unlockBar(){ return autoOn() && !audioUnlocked ? '<button class="unlock" data-act="unlock">🔊 Touchez l\u2019écran pour activer la lecture automatique des vocaux</button>' : ''; }
 function renderView(){
   const v = $('#view');
-  if (ui.conv) { v.innerHTML = convHTML(canaux.get(ui.conv)); v.scrollTop = v.scrollHeight; return; }
-  if (ui.tab === 'canaux') v.innerHTML = canauxHTML();
+  if (ui.conv) { v.innerHTML = unlockBar() + convHTML(canaux.get(ui.conv)); v.scrollTop = v.scrollHeight; return; }
+  if (ui.tab === 'canaux') v.innerHTML = unlockBar() + canauxHTML();
   else if (ui.tab === 'equipe') { v.innerHTML = equipeHTML(); const s = $('#search'); if (s) { s.value = ui.search; s.oninput = () => { ui.search = s.value; $('#teamList').innerHTML = teamRows(); }; } }
   else v.innerHTML = alertesHTML();
 }
@@ -622,7 +635,7 @@ function refreshConv(id){
   updateTitle();
   if (ui.conv === id) {
     const v = $('#view'), atBottom = v.scrollHeight - v.scrollTop - v.clientHeight < 90;
-    v.innerHTML = convHTML(canaux.get(id)); if (atBottom) v.scrollTop = v.scrollHeight; syncPlay(); renderHeaderSub();
+    v.innerHTML = unlockBar() + convHTML(canaux.get(id)); if (atBottom) v.scrollTop = v.scrollHeight; syncPlay(); renderHeaderSub();
   } else if (!ui.conv) requestRender();
 }
 
@@ -652,8 +665,47 @@ function toast(text){ const w = $('#toasts'); w.innerHTML = `<div class="toast p
 
 /* ---------- Lecture ---------- */
 let pb = null; const player = new Audio(); player.preload = 'auto';
+
+/* ---------- Lecture automatique (v2.3) ----------
+   Un vocal reçu est lu tout de suite, à la suite des autres (file autoQueue),
+   si : l'interrupteur 🔊 est actif (rdz_radio_autoplay), la page est visible,
+   et le son a été déverrouillé par un premier toucher (règle des navigateurs).
+   Jamais pendant un enregistrement ni par-dessus un vocal en cours : la file
+   reprend juste après. Un vocal lu automatiquement compte comme écouté. */
+const LS_AUTO = 'rdz_radio_autoplay';
+const autoOn = () => localStorage.getItem(LS_AUTO) !== '0';
+let audioUnlocked = false; const autoQueue = [];
+const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+function unlockAudio(){
+  if (audioUnlocked) return; ac();
+  try {
+    player.muted = true; player.src = SILENT;
+    const p = player.play();
+    const done = () => { try { player.pause(); } catch (e) {} player.muted = false; player.removeAttribute('src'); audioUnlocked = true;
+      document.querySelectorAll('.unlock').forEach(b => b.remove()); setTimeout(tryAutoPlay, 100); };
+    if (p && p.then) p.then(done, () => { player.muted = false; }); else done();
+  } catch (e) { player.muted = false; }
+}
+function tryAutoPlay(){
+  if (!autoOn() || !audioUnlocked || pb || rec || document.hidden || sessionOver) return;
+  if (overlay && siren) return;                         // une alerte SOS sonne : priorité à la sirène
+  while (autoQueue.length) {
+    const id = autoQueue.shift(), m = findMsg(id);
+    if (m && m.auteur_id !== me.id && !heardSet(id).has(me.id)) {
+      togglePlay(id, true);
+      if (ui.conv !== m.canal_id) toast(`🔊 ${agentName(m.auteur_id, m.auteur_nom)} · ${canalName(canaux.get(m.canal_id))}`);
+      return;
+    }
+  }
+}
+function toggleAuto(){
+  localStorage.setItem(LS_AUTO, autoOn() ? '0' : '1');
+  if (!autoOn()) autoQueue.length = 0; else unlockAudio();
+  toast(autoOn() ? 'Lecture automatique activée.' : 'Lecture automatique coupée : les vocaux attendent que vous les écoutiez.');
+  renderHeader(); renderView();
+}
 function audioUrl(m){ if (m._blobUrl) return m._blobUrl; if (!m.audio_path) return null; return sb.storage.from(BUCKET).getPublicUrl(m.audio_path).data.publicUrl; }
-function togglePlay(id){
+function togglePlay(id, auto){
   if (pb && pb.msgId === id) { stopPlayback(); return; }
   stopPlayback();
   const m = findMsg(id); if (!m) return; const url = audioUrl(m);
@@ -661,7 +713,7 @@ function togglePlay(id){
   const p = {msgId:id, dur:Number(m.duree_s) || 1, t0:performance.now()}; pb = p;
   player.src = url; player.onended = () => endPlayback(p);
   player.onerror = () => { if (pb === p) { endPlayback(p); toast('Lecture impossible (réseau ou format audio).'); } };
-  player.play().catch(() => { if (pb === p) { endPlayback(p); toast('Lecture bloquée : touchez à nouveau le bouton.'); } });
+  player.play().catch(() => { if (pb === p) { endPlayback(p); if (auto) { audioUnlocked = false; renderView(); } else toast('Lecture bloquée : touchez à nouveau le bouton.'); } });
   if (m.auteur_id !== me.id && !heardSet(id).has(me.id)) {
     heardSet(id).add(me.id); updateTitle();
     const dot = document.querySelector(`[data-wave="${id}"]`)?.parentElement?.querySelector('.dot-new'); if (dot) dot.remove();
@@ -675,7 +727,7 @@ function frame(){
   setProg(p.msgId, Math.min(1, player.currentTime / d)); requestAnimationFrame(frame);
 }
 function setProg(id, v){ const w = document.querySelector(`[data-wave="${id}"]`); if (!w) return; const b = w.children, n = Math.round(v * b.length); for (let i = 0; i < b.length; i++) b[i].classList.toggle('on', i < n); }
-function endPlayback(p){ if (pb !== p) return; pb = null; setProg(p.msgId, 0); syncPlay(); }
+function endPlayback(p){ if (pb !== p) return; pb = null; setProg(p.msgId, 0); syncPlay(); setTimeout(tryAutoPlay, 450); }
 function stopPlayback(){ if (!pb) return; const p = pb; pb = null; try { player.pause(); } catch (e) {} setProg(p.msgId, 0); syncPlay(); }
 function syncPlay(){ document.querySelectorAll('.vplay').forEach(b => { const on = pb && pb.msgId === b.dataset.id; b.innerHTML = on ? ic.pause(18) : ic.play(18); }); }
 
@@ -728,10 +780,10 @@ function stopRec(){
   const dur = (performance.now() - r.t0) / 1000, discard = r.cancel || dur < .7;
   r.mr.onstop = () => {
     r.stream.getTracks().forEach(t => t.stop()); recUI();
-    if (discard) { toast(r.cancel ? 'Vocal annulé.' : 'Maintenez le bouton pendant que vous parlez.'); flushRender(); return; }
+    if (discard) { toast(r.cancel ? 'Vocal annulé.' : 'Maintenez le bouton pendant que vous parlez.'); flushRender(); setTimeout(tryAutoPlay, 800); return; }
     const type = r.mr.mimeType || (r.chunks[0] && r.chunks[0].type) || 'audio/webm';
     sendVoice(r.conv, new Blob(r.chunks, {type}), type, Math.max(1, Math.round(dur)));
-    flushRender();
+    flushRender(); setTimeout(tryAutoPlay, 800);
   };
   try { r.mr.stop(); } catch (e) { r.mr.onstop(); }
 }
@@ -1032,6 +1084,8 @@ document.addEventListener('click', e => {
     case 'new-group': groupSheet(); break;
     case 'create-group': createGroup(); break;
     case 'manage': manageSheet(); break;
+    case 'autoplay': toggleAuto(); break;
+    case 'unlock': unlockAudio(); break;
     case 'grp-remove': grpRemove(t.dataset.id); break;
     case 'grp-add': grpAdd(); break;
     case 'grp-rename': grpRename(); break;
@@ -1048,6 +1102,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('pointerdown', e => {
+  if (!audioUnlocked && autoOn() && me && !sessionOver) unlockAudio();
   // La sirène ne peut démarrer qu'après un premier geste sur l'écran (règle des navigateurs).
   if (overlay && !siren && !muted && !e.target.closest('.ov-actions')) { const a = alertes.get(overlay.alertId); if (a && a.statut === 'active' && a.agent_id !== me.id && !(reponses.get(a.id) || []).some(r => r.agent_id === me.id)) { ac(); setTimeout(() => { startSiren(); renderOverlay(); }, 50); } }
   const sos = e.target.closest('#sosBtn'); if (sos) { e.preventDefault(); startSosHold(sos, e); return; }
