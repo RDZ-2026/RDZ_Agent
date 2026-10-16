@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v3 · 2026-08-08 -->
+<!-- RDZ · prise-de-poste · v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
+     v3 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -124,6 +125,31 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 #rdz-sync-badge{border-radius:10px!important;box-shadow:0 8px 22px rgba(15,23,42,.18)!important}
 @media(min-width:700px){.filter-bar{flex-direction:row;justify-content:center;gap:14px}.filter-row{min-width:300px}.content{padding-top:24px}}
 @media(max-width:380px){.app-header-txt{padding-left:88px}.app-header-txt:before{width:76px}.app-header-name{font-size:10.5px}.back-btn{font-size:11px;padding:8px 9px}}
+  /* PRISE DE SERVICE (poste radio) — v4 */
+  .svc-zone { padding: 16px 16px 0; }
+  .svc-card { background: #fff; border: 1px solid var(--rdz-border); border-left: 4px solid var(--rdz-red); border-radius: 2px; padding: 14px; }
+  .svc-title { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--rdz-black); margin-bottom: 4px; }
+  .svc-sub { font-size: 12px; color: var(--rdz-gray); line-height: 1.5; margin-bottom: 12px; }
+  .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .svc-poste { background: var(--rdz-bg); border: 1.5px solid var(--rdz-border); border-radius: 2px; padding: 14px 8px; font-size: 13.5px; font-weight: 700; color: var(--rdz-black); cursor: pointer; text-align: center; font-family: inherit; }
+  .svc-poste.on { background: var(--rdz-red-light); border-color: var(--rdz-red); color: var(--rdz-red); }
+  .svc-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; padding: 13px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; font-family: inherit; }
+  .svc-btn:disabled { background: #bbb; }
+  .svc-btn.ghost { background: #fff; color: var(--rdz-gray); border: 1px solid var(--rdz-border); margin-top: 8px; text-transform: none; letter-spacing: 0; }
+  .svc-ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; border-radius: 2px; padding: 11px 12px; font-size: 12.5px; line-height: 1.5; margin-bottom: 10px; }
+  .svc-ok b { font-size: 13.5px; }
+  .svc-err { color: #b91c1c; font-size: 12px; margin-top: 8px; line-height: 1.5; }
+  a.svc-btn { text-align: center; text-decoration: none; }
+  /* habillage charte 2026 */
+  .svc-zone{max-width:760px;margin:0 auto;padding:18px 14px 0}
+  .svc-card{border:1px solid var(--rdz-border);border-left:4px solid var(--rdz-red);border-radius:var(--rdz-radius);box-shadow:var(--rdz-shadow)}
+  .svc-title{color:var(--rdz-text)}
+  .svc-poste{background:var(--rdz-soft);border:1.5px solid #cbd5e1;border-radius:10px;color:var(--rdz-text);min-height:52px}
+  .svc-poste.on{background:#fdecee;border-color:var(--rdz-red);color:var(--rdz-red)}
+  .svc-btn{border-radius:10px;box-shadow:0 5px 14px rgba(215,25,32,.18)}
+  .svc-btn:disabled{box-shadow:none}
+  .svc-btn.ghost{border-radius:10px;box-shadow:none;border:1px solid var(--rdz-border);color:#334155}
+  .svc-ok{border-radius:9px}
 </style>
 </head>
 <body>
@@ -149,6 +175,8 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
     <button class="today-btn" onclick="goToday()">Aujourd'hui</button>
   </div>
 </div>
+
+<div class="svc-zone" id="service-zone"></div>
 
 <div class="content" id="content">
   <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
@@ -681,6 +709,99 @@ async function render() {
   el.innerHTML = html;
 }
 
+// ── PRISE DE SERVICE : CHOIX DU POSTE → CONNEXION RADIO (v4) ─────────────────
+// Le nom + PIN disent QUI est l'agent ; le poste choisi ici dit OÙ il est
+// aujourd'hui, donc dans quels canaux de radio-agent.html il se trouve.
+// Valider ouvre un « service » (table radio_services) : tant qu'il est ouvert,
+// l'agent a accès à la radio ; fin-de-service.html le ferme.
+// Écriture DIRECTE (pas RDZSync), comme l'exception « collision en direct » :
+// la radio lit cet état partagé en temps réel et un seul service peut être
+// ouvert par agent (la fonction SQL ferme l'ancien et ouvre le nouveau d'un
+// coup). Sans réseau, message clair et bouton Réessayer.
+// Copie locale du service ouvert (rdz_radio_service) : sert à fin-de-service.html
+// pour le fermer via RDZSync si la fin de service se fait hors ligne.
+const LS_RADIO = 'rdz_radio_service';
+const RADIO_URL = 'radio-agent.html';
+const SERVICE_MAX_H = 16;   // même règle que radio-agent.html
+let radioPostes = [], radioService = null, radioPick = null, radioChanging = false, radioErr = '', radioBusy = false, radioState = 'loading';
+
+async function loadRadioService() {
+  try {
+    const since = new Date(Date.now() - SERVICE_MAX_H * 3600e3).toISOString();
+    const [{ data: p, error: pe }, { data: s, error: se }] = await Promise.all([
+      sb.from('radio_postes').select('*').eq('actif', true).order('ordre').order('nom'),
+      sb.from('radio_services').select('*').eq('agent_id', AGENT_ID).is('fin', null).gte('debut', since).order('debut', { ascending: false }).limit(1)
+    ]);
+    if (pe || se) throw pe || se;
+    radioPostes = p || [];
+    radioService = (s && s[0]) || null;
+    if (radioService) localStorage.setItem(LS_RADIO, JSON.stringify(radioService)); else localStorage.removeItem(LS_RADIO);
+    radioState = 'ok';
+  } catch (err) {
+    radioState = /radio_|relation|does not exist|schema cache/i.test((err && err.message) || '') ? 'missing' : 'offline';
+  }
+  renderRadioService();
+}
+
+function renderRadioService() {
+  const z = document.getElementById('service-zone');
+  if (radioState === 'missing') { z.innerHTML = ''; return; }   // module radio pas encore installé : on n'affiche rien
+  if (radioState === 'loading') { z.innerHTML = `<div class="svc-card"><div class="svc-sub" style="margin:0">Chargement de votre prise de service…</div></div>`; return; }
+  if (radioState === 'offline') {
+    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Ma prise de service</div>
+      <div class="svc-err" style="margin:0 0 10px">Pas de réseau : impossible de vérifier votre service radio pour l'instant.</div>
+      <button class="svc-btn ghost" onclick="loadRadioService()">↻ Réessayer</button></div>`;
+    return;
+  }
+  if (radioService && !radioChanging) {
+    const t = new Date(radioService.debut).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+    z.innerHTML = `<div class="svc-card">
+      <div class="svc-ok">✓ <b>En service · ${escHtml(radioService.poste_nom || '')}</b><br>Depuis ${t} — vous êtes connecté à la radio jusqu'à votre fin de service.</div>
+      <a class="svc-btn" href="${RADIO_URL}">📻 Ouvrir la radio</a>
+      <button class="svc-btn ghost" onclick="radioStartChange()">Changer de poste</button></div>`;
+    return;
+  }
+  if (!radioPostes.length) {
+    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Ma prise de service</div><div class="svc-sub" style="margin:0">Aucun poste n'est paramétré. Contactez votre responsable.</div></div>`;
+    return;
+  }
+  const chosen = radioPostes.find(p => p.id === radioPick);
+  z.innerHTML = `<div class="svc-card">
+    <div class="svc-title">📻 ${radioChanging ? 'Changer de poste' : 'Ma prise de service'}</div>
+    <div class="svc-sub">Quel poste prenez-vous ? En validant, vous êtes connecté à la radio sur les canaux de ce poste.</div>
+    <div class="svc-grid">${radioPostes.map(p => `<button class="svc-poste ${p.id === radioPick ? 'on' : ''}" onclick="radioChoose('${p.id}')">${escHtml(p.nom)}</button>`).join('')}</div>
+    <button class="svc-btn" id="svc-validate" ${chosen && !radioBusy ? '' : 'disabled'} onclick="radioValidate()">${radioBusy ? 'Enregistrement…' : chosen ? '✓ Valider ma prise de service · ' + escHtml(chosen.nom) : 'Choisissez votre poste'}</button>
+    ${radioChanging ? `<button class="svc-btn ghost" onclick="radioCancelChange()">Annuler</button>` : ''}
+    ${radioErr ? `<div class="svc-err">${escHtml(radioErr)}</div>` : ''}</div>`;
+}
+function radioChoose(id) { radioPick = id; radioErr = ''; renderRadioService(); }
+function radioStartChange() { radioChanging = true; radioPick = radioService ? radioService.poste_id : null; radioErr = ''; renderRadioService(); }
+function radioCancelChange() { radioChanging = false; radioErr = ''; renderRadioService(); }
+
+async function radioValidate() {
+  const poste = radioPostes.find(p => p.id === radioPick);
+  if (!poste || radioBusy) return;
+  if (radioChanging && radioService && radioService.poste_id === poste.id) { radioCancelChange(); return; }
+  radioBusy = true; radioErr = ''; renderRadioService();
+  const siteVal = document.getElementById('site-select').value;
+  const site = sites.find(s => s.id === siteVal);
+  const { data, error } = await sb.rpc('radio_prendre_service', {
+    p_agent_id: AGENT_ID, p_agent_nom: AGENT_NOM, p_poste_id: poste.id,
+    p_site_id: site ? site.id : null, p_site_nom: site ? site.nom : null
+  });
+  radioBusy = false;
+  if (error || !data) {
+    radioErr = 'Prise de service non enregistrée (pas de réseau ?). Vérifiez la connexion et réessayez.';
+    renderRadioService(); return;
+  }
+  radioService = Array.isArray(data) ? data[0] : data;
+  localStorage.setItem(LS_RADIO, JSON.stringify(radioService));
+  radioChanging = false;
+  renderRadioService();
+}
+
+renderRadioService();
+loadRadioService();
 loadAll();
 </script>
 </body>
