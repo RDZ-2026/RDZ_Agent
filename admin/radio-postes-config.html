@@ -1,4 +1,5 @@
-<!-- RDZ · radio-postes-config · v1 · 2026-10-16
+<!-- RDZ · radio-postes-config · v1.1 · 2026-10-16 · + case « Un seul agent à la fois » (radio_postes.exclusif). Nécessite migration-radio-exclusif.sql.
+     v1 · 2026-10-16
      Paramétrage de la radio (admin/). Deux rubriques :
        · Postes : liste proposée à la prise de poste (prise-de-poste.html).
          Ajout, renommage, ordre ↑↓, activation, et case « entend tous les
@@ -126,10 +127,11 @@ function render(){
     const form = `<div class="form"><label for="pNom">${editing ? 'Modifier le poste' : 'Nouveau poste'}</label>
       <input type="text" id="pNom" maxlength="40" placeholder="Par exemple : Hôpital de La Tour" value="${editing ? esc(editing.nom) : ''}">
       <label class="check"><input type="checkbox" id="pAll" ${editing && editing.voit_tout ? 'checked' : ''}> Entend tous les canaux de tous les postes (ex. Centraliste)</label>
+      <label class="check"><input type="checkbox" id="pExcl" ${editing && editing.exclusif ? 'checked' : ''}> Un seul agent à la fois sur ce poste (ex. Centraliste)</label>
       <div class="row-btns"><button class="btn" onclick="savePoste()">${editing ? 'Enregistrer' : '+ Ajouter le poste'}</button>${editing ? '<button class="btn sec" onclick="cancelEdit()">Annuler</button>' : ''}</div></div>`;
     const list = postes.length ? postes.map((p, i) => `<div class="list-item ${p.actif ? '' : 'off'}">
         <div class="arrows"><button class="ibtn" ${i===0?'disabled':''} onclick="move('${p.id}',-1)" aria-label="Monter">↑</button><button class="ibtn" ${i===postes.length-1?'disabled':''} onclick="move('${p.id}',1)" aria-label="Descendre">↓</button></div>
-        <div class="li-main"><div class="li-t">${esc(p.nom)}${p.voit_tout ? '<span class="tag all">Entend tout</span>' : ''}${p.actif ? '' : '<span class="tag off">Désactivé</span>'}</div>
+        <div class="li-main"><div class="li-t">${esc(p.nom)}${p.voit_tout ? '<span class="tag all">Entend tout</span>' : ''}${p.exclusif ? '<span class="tag all">1 seul agent</span>' : ''}${p.actif ? '' : '<span class="tag off">Désactivé</span>'}</div>
           <div class="li-d">${services.filter(s => s.poste_id === p.id && !s._expire).length} agent(s) en service sur ce poste</div></div>
         <div class="row-btns"><button class="btn sec small" onclick="editPoste('${p.id}')">Modifier</button><button class="btn sec small" onclick="toggleActif('${p.id}')">${p.actif ? 'Désactiver' : 'Réactiver'}</button></div></div>`).join('')
       : '<div class="state-msg">Aucun poste. Ajoutez-en un ci-dessus.</div>';
@@ -151,12 +153,12 @@ function go(s){ screen = s; editId = null; render(); window.scrollTo(0, 0); }
 function editPoste(id){ editId = id; render(); document.getElementById('pNom').focus(); }
 function cancelEdit(){ editId = null; render(); }
 async function savePoste(){
-  const nom = document.getElementById('pNom').value.trim(), voit_tout = document.getElementById('pAll').checked;
+  const nom = document.getElementById('pNom').value.trim(), voit_tout = document.getElementById('pAll').checked, exclusif = document.getElementById('pExcl').checked;
   if (!nom) { errMsg = 'Donnez un nom au poste.'; render(); return; }
   if (postes.some(p => p.nom.toLowerCase() === nom.toLowerCase() && p.id !== editId)) { errMsg = 'Un poste porte déjà ce nom.'; render(); return; }
   const res = editId
-    ? await sb.from('radio_postes').update({nom, voit_tout}).eq('id', editId)
-    : await sb.from('radio_postes').insert({nom, voit_tout, ordre: postes.reduce((m, p) => Math.max(m, p.ordre || 0), 0) + 1});
+    ? await sb.from('radio_postes').update({nom, voit_tout, exclusif}).eq('id', editId)
+    : await sb.from('radio_postes').insert({nom, voit_tout, exclusif, ordre: postes.reduce((m, p) => Math.max(m, p.ordre || 0), 0) + 1});
   if (res.error) { errMsg = 'Enregistrement impossible : ' + res.error.message; render(); return; }
   editId = null; await load();
 }
