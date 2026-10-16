@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. Nécessite migration-radio.sql (base RDZ_Agent). -->
+<!-- RDZ · radio-agent · v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
+     v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -203,7 +204,8 @@ header{flex:none;background:radial-gradient(circle at 90% -25%,rgba(215,25,32,.3
      capture  → vocaux, écoutes, alertes SOS + position + réponses
      tables   → radio_canaux / radio_messages / radio_ecoutes / radio_alertes /
                 radio_alerte_reponses (+ bucket radio-vocaux) — base RDZ_Agent
-     relecture→ cette même page pour la centrale (connexion PIN comme les agents)
+     relecture→ cette même page pour la centrale (poste « Centraliste » = tous les
+                canaux) ; admin/radio-postes-config.html (postes + agents en service)
                 ; module de supervision direction (historique, export) À CONSTRUIRE.
    Exception RDZSync (assumée, voir Principe directeur) : la radio est une
    communication en temps réel. Les vocaux ne doivent pas attendre le WiFi comme
@@ -222,6 +224,8 @@ const MENU_URL = 'application.html';
 const HOLD_MS = 1500;          // durée d'appui pour déclencher un SOS
 const MAX_REC_S = 60;          // durée max d'un vocal
 const ALERT_DAYS = 7;          // historique d'alertes affiché
+const PRISE_URL = 'prise-de-poste.html';
+const SERVICE_MAX_H = 16;      // un service oublié (pas de fin de service) expire après 16 h
 
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
@@ -254,11 +258,27 @@ const reponses = new Map();          // alerte_id → [réponses]
 let online = new Set();              // agents avec la radio ouverte (présence)
 let connected = false;
 const ui = {tab:'canaux', conv:null, search:''};
+const postes = new Map();            // id → poste {nom, voit_tout, actif}
+const services = new Map();          // agent_id → service ouvert {poste_id, poste_nom, debut…}
+let myService = null, sessionOver = false;
+const myPoste = () => myService && postes.get(myService.poste_id);
+const seesAll = () => !!(myPoste() && myPoste().voit_tout);
+const serviceOpen = s => s && !s.fin && (Date.now() - new Date(s.debut)) < SERVICE_MAX_H*3600e3;
+const inService = () => [...services.values()].filter(serviceOpen);
+function canSee(c){
+  if (!c || c.archive) return false;
+  if (c.tous || (c.membres || []).includes(me.id)) return true;
+  return !!c.poste_id && (seesAll() || c.poste_id === myService.poste_id);
+}
 
 const activeAgents = () => [...agentsById.values()].filter(a => a.actif !== false);
 const agentName = (id, fallback) => (agentsById.get(id) || {}).nom || fallback || 'Agent';
 const tousCanal = () => [...canaux.values()].find(c => c.tous);
-function canalMembers(c){ return c.tous ? activeAgents().map(a => a.id) : (c.membres || []); }
+function canalMembers(c){
+  if (c.tous) return inService().map(s => s.agent_id);
+  if (c.poste_id) return inService().filter(s => s.poste_id === c.poste_id || (postes.get(s.poste_id) || {}).voit_tout).map(s => s.agent_id);
+  return c.membres || [];
+}
 function canalName(c){
   if (c.type === 'direct') return agentName((c.membres||[]).find(x => x !== me.id));
   return c.nom || 'Groupe';
@@ -266,6 +286,7 @@ function canalName(c){
 function canalSub(c){
   if (c.type === 'direct') { const o = (c.membres||[]).find(x => x !== me.id); return online.has(o) ? 'Radio ouverte' : 'Message privé'; }
   const m = canalMembers(c); const on = m.filter(id => id !== me.id && online.has(id)).length;
+  if (c.tous || c.poste_id) return `${m.length} en service · ${on} avec la radio ouverte`;
   return `${m.length} membres · ${on} avec la radio ouverte`;
 }
 const listOf = id => { if (!msgs.has(id)) msgs.set(id, []); return msgs.get(id); };
@@ -293,12 +314,21 @@ const ic = {
 };
 
 /* ---------- Accès (même identité que application.html) ---------- */
-function showGate(text, retry){
+function showGate(text, retry, prise){
   $('#hd').innerHTML = `<a class="hd-back" href="${MENU_URL}" aria-label="Retour au menu">‹</a><div class="hd-title"><div class="hd-name">Radio</div><div class="hd-sub">RDZ Security Management</div></div>`;
   $('#foot').innerHTML = '';
   $('#view').innerHTML = `<div class="gate"><p>${esc(text)}</p>
     ${retry ? '<button class="btn" onclick="location.reload()">Réessayer</button>' : ''}
+    ${prise ? `<a class="btn" href="${PRISE_URL}" style="text-decoration:none">Faire ma prise de poste</a>` : ''}
     <a class="btn ghost" href="${MENU_URL}" style="text-decoration:none">Ouvrir le menu</a></div>`;
+}
+const NO_SERVICE = "Vous n'êtes pas en service. La radio s'ouvre automatiquement dès que vous validez votre prise de service (choix du poste) dans la prise de poste.";
+// Fin de service (ou service fermé ailleurs) : on coupe tout et on revient à l'écran d'accès.
+function endSession(text){
+  if (sessionOver) return; sessionOver = true;
+  try { sb.removeAllChannels(); } catch (e) {}
+  stopWatch(); stopSiren(); stopPlayback(); overlay = null; renderOverlay(); $('#sheet').innerHTML = '';
+  showGate(text, false, true);
 }
 async function boot(){
   const id = localStorage.getItem('rdz_agent_id'), hash = localStorage.getItem('rdz_agent_pin_hash');
@@ -313,27 +343,41 @@ async function boot(){
   try { await loadAll(); }
   catch (e) {
     const missing = /radio_|relation|does not exist|schema cache/i.test((e && (e.message || e.details)) || '');
-    return showGate(missing ? 'La radio n\u2019est pas encore installée sur la base (migration-radio.sql à lancer).' : 'Impossible de charger la radio. Vérifiez le réseau.', true);
+    return showGate(missing ? 'La radio n\u2019est pas encore installée sur la base (migration-radio.sql puis migration-radio-postes.sql à lancer).' : 'Impossible de charger la radio. Vérifiez le réseau.', true);
   }
+  if (!myService) return showGate(NO_SERVICE, false, true);
   loadPendingIntoUi();
   render();
   subscribeRealtime();
   resumeAlerts();
   flushPending();
-  setInterval(() => { if (!document.hidden) loadAll().then(refreshAll).catch(() => {}); }, 60000);
-  setInterval(flushPending, 15000);
-  window.addEventListener('online', () => { flushPending(); loadAll().then(refreshAll).catch(() => {}); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadAll().then(refreshAll).catch(() => {}); });
+  setInterval(() => { if (!document.hidden) reload(); }, 60000);
+  setInterval(() => { if (!sessionOver) flushPending(); }, 15000);
+  window.addEventListener('online', () => { flushPending(); reload(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) reload(); });
 }
 
 /* ---------- Chargement ---------- */
+function reload(){
+  if (sessionOver) return;
+  loadAll().then(() => { if (!myService) endSession(NO_SERVICE); else refreshAll(); }).catch(() => {});
+}
 async function inChunks(ids, size, fn){ const out = []; for (let i = 0; i < ids.length; i += size) { const r = await fn(ids.slice(i, i+size)); if (r.error) throw r.error; out.push(...(r.data || [])); } return out; }
 async function loadAll(){
-  const [ag, ca] = await Promise.all([
+  const since = new Date(Date.now() - SERVICE_MAX_H*3600e3).toISOString();
+  const [ag, po, sv] = await Promise.all([
     sb.from('agents').select('id,nom,prenom,actif'),
-    sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}}`)
+    sb.from('radio_postes').select('*'),
+    sb.from('radio_services').select('*').is('fin', null).gte('debut', since)
   ]);
-  if (ag.error) throw ag.error; if (ca.error) throw ca.error;
+  if (ag.error) throw ag.error; if (po.error) throw po.error; if (sv.error) throw sv.error;
+  postes.clear(); (po.data || []).forEach(p => postes.set(p.id, p));
+  services.clear(); (sv.data || []).forEach(s => services.set(String(s.agent_id), s));
+  myService = services.get(me.id) || null;
+  if (!myService) return;
+  const posteFilter = seesAll() ? 'poste_id.not.is.null' : `poste_id.eq.${myService.poste_id}`;
+  const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(`tous.eq.true,membres.cs.{${me.id}},${posteFilter}`);
+  if (ca.error) throw ca.error;
   agentsById.clear(); (ag.data || []).forEach(a => agentsById.set(String(a.id), {id:String(a.id), nom:fullName(a), actif:a.actif}));
   const keep = new Set((ca.data || []).map(c => c.id));
   [...canaux.keys()].forEach(k => { if (!keep.has(k)) canaux.delete(k); });
@@ -347,8 +391,8 @@ async function loadAll(){
     const ec = await inChunks(mids, 100, part => sb.from('radio_ecoutes').select('message_id,agent_id').in('message_id', part));
     ec.forEach(e => heardSet(e.message_id).add(String(e.agent_id)));
   }
-  const since = new Date(Date.now() - ALERT_DAYS*864e5).toISOString();
-  const al = await sb.from('radio_alertes').select('*').or(`statut.eq.active,declenchee_le.gte."${since}"`).order('declenchee_le', {ascending:false}).limit(60);
+  const sinceA = new Date(Date.now() - ALERT_DAYS*864e5).toISOString();
+  const al = await sb.from('radio_alertes').select('*').or(`statut.eq.active,declenchee_le.gte."${sinceA}"`).order('declenchee_le', {ascending:false}).limit(60);
   if (al.error) throw al.error;
   (al.data || []).forEach(a => alertes.set(a.id, Object.assign({}, alertes.get(a.id), a)));
   const aids = (al.data || []).map(a => a.id);
@@ -372,6 +416,8 @@ function subscribeRealtime(){
     .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_ecoutes'}, p => onEcoute(p.new))
     .on('postgres_changes', {event:'*', schema:'public', table:'radio_alertes'}, p => onAlerte(p.new, p.eventType))
     .on('postgres_changes', {event:'INSERT', schema:'public', table:'radio_alerte_reponses'}, p => onReponse(p.new))
+    .on('postgres_changes', {event:'*', schema:'public', table:'radio_services'}, p => onService(p.new))
+    .on('postgres_changes', {event:'*', schema:'public', table:'radio_postes'}, p => { if (p.new && p.new.id) { postes.set(p.new.id, p.new); requestRender(); } })
     .subscribe(st => {
       const was = connected; connected = st === 'SUBSCRIBED';
       if (connected !== was) { renderHeaderSub(); if (connected && everConnected) loadAll().then(refreshAll).catch(() => {}); if (connected) everConnected = true; }
@@ -387,7 +433,7 @@ async function onMessage(m){
   if (!m || !m.canal_id) return;
   if (!canaux.has(m.canal_id)) {
     const { data } = await sb.from('radio_canaux').select('*').eq('id', m.canal_id).maybeSingle();
-    if (!data || data.archive || !(data.tous || (data.membres || []).includes(me.id))) return;
+    if (!canSee(data)) return;
     canaux.set(data.id, data);
   }
   const isNew = addMsg(Object.assign({}, m, {_state:null}));
@@ -400,9 +446,20 @@ async function onMessage(m){
 }
 function onCanal(c){
   if (!c || !c.id) return;
-  const mine = !c.archive && (c.tous || (c.membres || []).includes(me.id));
+  const mine = canSee(c);
   if (mine) canaux.set(c.id, c); else canaux.delete(c.id);
   if (!mine && ui.conv === c.id) { ui.conv = null; render(); return; }
+  if (!ui.conv) requestRender();
+}
+function onService(s){
+  if (!s || !s.agent_id) return;
+  const aid = String(s.agent_id);
+  if (aid === me.id) {
+    if (s.fin && myService && s.id === myService.id) { endSession('Fin de service enregistrée : vous êtes déconnecté de la radio.'); return; }
+    if (!s.fin && myService && s.id !== myService.id) { location.reload(); return; }   // changement de poste
+  }
+  if (serviceOpen(s)) services.set(aid, s); else if (services.get(aid) && services.get(aid).id === s.id) services.delete(aid);
+  renderHeaderSub();
   if (!ui.conv) requestRender();
 }
 function onEcoute(e){ if (!e) return; heardSet(e.message_id).add(String(e.agent_id)); const f = findMsg(e.message_id); if (f) refreshConv(f.canal_id); }
@@ -446,7 +503,7 @@ function renderHeader(){
 function renderHeaderSub(){
   const s = $('#hdSub'); if (!s) return;
   const link = connected ? '<span class="dot on"></span>Connecté' : '<span class="dot off"></span>Reconnexion…';
-  s.innerHTML = ui.conv && canaux.get(ui.conv) ? `${link} · ${esc(canalSub(canaux.get(ui.conv)))}` : `${link} · ${esc(me.nom)}`;
+  s.innerHTML = ui.conv && canaux.get(ui.conv) ? `${link} · ${esc(canalSub(canaux.get(ui.conv)))}` : `${link} · ${esc(me.nom)} · ${esc((myPoste() || {}).nom || myService.poste_nom || '')}`;
 }
 function renderFoot(){
   const f = $('#foot');
@@ -473,7 +530,8 @@ function renderView(){
 function avatar(id, name){ return `<span class="av">${esc(initials(name || agentName(id)))}${online.has(id) ? '<span class="on-dot"></span>' : ''}</span>`; }
 
 function canauxHTML(){
-  const list = [...canaux.values()].sort((a,b) => (b.tous ? 1 : 0) - (a.tous ? 1 : 0) || new Date(lastTs(b)) - new Date(lastTs(a)));
+  const rank = c => c.tous ? 3 : (c.poste_id && c.poste_id === myService.poste_id) ? 2 : c.poste_id ? 1 : 0;
+  const list = [...canaux.values()].sort((a,b) => rank(b) - rank(a) || new Date(lastTs(b)) - new Date(lastTs(a)));
   const rows = list.map(c => {
     const l = listOf(c.id), last = l[l.length-1], u = unreadOf(c);
     let prev = 'Aucun message pour l\u2019instant';
@@ -481,26 +539,27 @@ function canauxHTML(){
       const who = last.auteur_id === me.id ? 'Vous' : (agentName(last.auteur_id, last.auteur_nom)).split(' ').slice(-1)[0];
       prev = last.type === 'sos' ? `Alerte SOS · ${last.auteur_id === me.id ? 'vous' : agentName(last.auteur_id, last.auteur_nom)}` : last.type === 'info' ? (last.texte || '') : `${who} · vocal ${fmtDur(last.duree_s)}`;
     }
-    const av = c.type === 'direct' ? avatar((c.membres||[]).find(x => x !== me.id)) : `<span class="av grp ${c.tous ? 'all' : ''}">${ic.users(21)}</span>`;
+    const av = c.type === 'direct' ? avatar((c.membres||[]).find(x => x !== me.id)) : `<span class="av grp ${c.tous || c.poste_id ? 'all' : ''}">${c.poste_id ? ic.radio(21) : ic.users(21)}</span>`;
     return `<button class="row" data-act="open" data-id="${c.id}">${av}
       <span class="row-main"><span class="row-t">${esc(canalName(c))}</span><span class="row-d ${u ? 'unread' : ''}">${esc(prev)}</span></span>
       <span class="row-side">${last ? fmtTime(last.cree_le) : ''}${u ? `<span class="badge">${u}</span>` : ''}</span></button>`;
   }).join('');
   return `<div class="pad">
     <button class="add-btn" data-act="new-group">${ic.plus(18)} Nouveau groupe</button>
-    <div class="section-h">Groupes et messages privés</div>
+    <div class="section-h">Mes canaux · poste ${esc((myPoste() || {}).nom || myService.poste_nom || '')}</div>
     ${rows ? `<div class="card-list">${rows}</div>` : `<div class="state-msg"><b>Aucun canal</b>Créez un groupe ou ouvrez l'onglet Équipe pour écrire à un collègue.</div>`}
   </div>`;
 }
 function teamRows(){
   const q = ui.search.trim().toLowerCase();
-  const list = activeAgents().filter(a => a.id !== me.id && (!q || a.nom.toLowerCase().includes(q)))
-    .sort((a,b) => (online.has(b.id) ? 1 : 0) - (online.has(a.id) ? 1 : 0) || a.nom.localeCompare(b.nom));
-  if (!list.length) return `<div class="state-msg">Aucun agent ne correspond à « ${esc(ui.search)} ».</div>`;
+  const list = inService().filter(s => String(s.agent_id) !== me.id).map(s => ({id:String(s.agent_id), nom:agentName(String(s.agent_id), s.agent_nom), poste:(postes.get(s.poste_id) || {}).nom || s.poste_nom || '', debut:s.debut}))
+    .filter(a => !q || a.nom.toLowerCase().includes(q) || a.poste.toLowerCase().includes(q))
+    .sort((a,b) => a.poste.localeCompare(b.poste) || a.nom.localeCompare(b.nom));
+  if (!list.length) return `<div class="state-msg">${q ? `Aucun agent en service ne correspond à « ${esc(ui.search)} ».` : 'Aucun autre agent en service pour le moment.'}</div>`;
   return `<div class="card-list">${list.map(a => `<button class="row" data-act="direct" data-id="${a.id}">${avatar(a.id, a.nom)}
-    <span class="row-main"><span class="row-t">${esc(a.nom)}</span><span class="row-d">${online.has(a.id) ? 'Radio ouverte' : 'Radio fermée : recevra le vocal à l\u2019ouverture'}</span></span></button>`).join('')}</div>`;
+    <span class="row-main"><span class="row-t">${esc(a.nom)}</span><span class="row-d">${esc(a.poste)} · depuis ${fmtTime(a.debut)}${online.has(a.id) ? ' · radio ouverte' : ''}</span></span></button>`).join('')}</div>`;
 }
-function equipeHTML(){ return `<div class="pad"><input class="search" id="search" type="search" placeholder="Rechercher un collègue" autocomplete="off"><div class="section-h">Envoyer un vocal privé</div><div id="teamList">${teamRows()}</div></div>`; }
+function equipeHTML(){ return `<div class="pad"><input class="search" id="search" type="search" placeholder="Rechercher un collègue ou un poste" autocomplete="off"><div class="section-h">Agents en service · vocal privé</div><div id="teamList">${teamRows()}</div></div>`; }
 function alertesHTML(){
   const list = [...alertes.values()].sort((a,b) => new Date(b.declenchee_le) - new Date(a.declenchee_le));
   if (!list.length) return `<div class="state-msg"><b>Aucune alerte ces ${ALERT_DAYS} derniers jours</b>En cas de problème, maintenez le bouton SOS 1,5 seconde : tous vos collègues reçoivent l'alerte avec votre position.</div>`;
