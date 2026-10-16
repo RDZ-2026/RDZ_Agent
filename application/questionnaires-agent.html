@@ -1,4 +1,13 @@
-<!-- RDZ · questionnaires-agent · v3 · 2026-10-15
+<!-- RDZ · questionnaires-agent · v3.2 · 2026-10-16
+     v3.2 : CODE FORMATEUR SEUL, sans nom (demande de Guillaume). Les liens,
+       corrections et habilitations sont signés « Formateur ».
+     v3.1 · 2026-10-16
+     v3.1 : accès par CODE FORMATEUR SEUL (demande de Guillaume). Plus de
+       contrôle de la fiche agent ni de la fonction « questionnaires » :
+       toute personne qui connaît le code formateur entre. Le nom du
+       formateur est demandé avec le code (traçabilité : liens, corrections,
+       habilitations). Le nom de l'application agent est pré-rempli s'il existe.
+     v3 · 2026-10-15
      v3 : CODE FORMATEUR + formation par site (migration-quiz-formation-sites-pin.sql).
        - Après l'identification nom + PIN (fonction « questionnaires »), un code
          formateur est demandé. Il est vérifié par le serveur (quiz_trainer_login),
@@ -243,8 +252,8 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
       <div class="card code-box">
         <div class="ic">🔒</div>
         <h2>Code formateur</h2>
-        <div class="lead" style="margin:6px 0 0">Connecté : <b id="code-who"></b>. Tapez le code formateur pour gérer les quiz et voir les résultats.</div>
-        <input class="f" id="code-input" type="password" autocomplete="off" inputmode="text" placeholder="••••••" onkeydown="if(event.key==='Enter')submitCode()">
+        <div class="lead" style="margin:6px 0 12px">Tapez le code formateur pour gérer les quiz et voir les résultats.</div>
+        <input class="f" id="code-input" type="password" autocomplete="off" inputmode="text" placeholder="Code formateur" onkeydown="if(event.key==='Enter')submitCode()">
         <div id="code-err"></div>
         <button class="btn btn-p btn-block" id="code-go" onclick="submitCode()">Ouvrir</button>
         <div class="lead" style="margin:12px 0 0">Après 5 erreurs, l'accès est bloqué 15 minutes. Le module se verrouille seul après 15 minutes sans activité.</div>
@@ -611,24 +620,10 @@ document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', 
 // mobile.html / tous les modules agent) et la revérifie dans la base principale.
 function denied(msg){ $('denied-msg').textContent = msg; show('s-denied'); }
 async function init(){
-  const id = localStorage.getItem('rdz_agent_id');
-  const hash = localStorage.getItem('rdz_agent_pin_hash');
-  if (!id) return denied("Identifiez-vous d'abord dans l'application (votre nom puis votre code PIN), puis ouvrez « Préparation des quiz » depuis le menu.");
-  try {
-    const { data, error } = await sbMain.from('agents').select('*').eq('id', id).maybeSingle();
-    if (error) throw error;
-    if (!data) return denied("Agent introuvable. Revenez au menu et identifiez-vous à nouveau.");
-    if (data.actif === false) return denied("Votre accès a été désactivé. Contactez votre responsable.");
-    if (!data.pin_hash || data.pin_hash !== hash) return denied("Votre code d'accès a changé. Revenez au menu et ressaisissez votre PIN.");
-    const fns = Array.isArray(data.fonctions) ? data.fonctions : [];
-    if (!fns.includes(FONCTION_REQUISE)) return denied("Cette page est réservée aux agents qui préparent les quiz. Si vous devriez y avoir accès, demandez à la direction de cocher « Préparation des quiz » sur votre fiche.");
-    me = { id: data.id, full_name: [data.nom, data.prenom].filter(Boolean).join(' ') || localStorage.getItem('rdz_agent_nom') || 'Agent' };
-    $('who').textContent = me.full_name;
-    $('code-who').textContent = me.full_name;
-    await resumeOrAskCode();
-  } catch(e){
-    denied("Connexion impossible pour le moment (réseau ?). Réessayez dans un instant. Détail : " + errText(e));
-  }
+  // v3.2 : accès par code formateur seul, sans nom.
+  me = { id: null, full_name: 'Formateur' };
+  $('who').textContent = 'Formateur';
+  await resumeOrAskCode();
 }
 
 /* ============================== ACCUEIL ============================== */
@@ -1226,7 +1221,7 @@ async function submitCode(){
   if (!code) return showErr('code-err', 'Tapez le code formateur.');
   const b = $('code-go'); b.disabled = true; showErr('code-err','');
   try {
-    const r = await rpc('quiz_trainer_login', { p_code: code, p_agent_name: me.full_name });
+    const r = await rpc('quiz_trainer_login', { p_code: code, p_agent_name: 'Formateur' });
     if (!r || !r.ok){
       const e = r && r.error;
       $('code-input').value = '';
@@ -1235,7 +1230,7 @@ async function submitCode(){
       const left = r && r.essais_restants;
       return showErr('code-err', 'Code incorrect.' + (left != null ? (left ? ` Encore ${left} essai(s) avant blocage.` : ' Accès bloqué 15 minutes.') : ''));
     }
-    trainerToken = r.token; ssSet(TK_KEY, r.token);
+    trainerToken = r.token; ssSet(TK_KEY, r.token); 
     startIdle();
     await goHome();
   } catch(e){ showErr('code-err', 'Vérification impossible (réseau ?) : ' + errText(e)); }
