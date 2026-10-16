@@ -1,4 +1,4 @@
-<!-- RDZ · radio-agent · v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
+<!-- RDZ · radio-agent · v2.1 · 2026-10-16 · retour vers mobile.html (menu de l'application). v2 · 2026-10-16 · accès lié au service : canaux selon le POSTE choisi à la prise de poste (Centraliste = tous les canaux), aucun accès hors service, déconnexion automatique à la fin de service. Nécessite migration-radio.sql puis migration-radio-postes.sql (base RDZ_Agent).
      v1 · 2026-10-15 · messages vocaux push-to-talk (canaux, privés, groupes) + SOS géolocalisé. -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -220,7 +220,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const BUCKET = 'radio-vocaux';
 const LS_PENDING = 'rdz_radio_attente';
-const MENU_URL = 'application.html';
+const MENU_URL = 'mobile.html';
 const HOLD_MS = 1500;          // durée d'appui pour déclencher un SOS
 const MAX_REC_S = 60;          // durée max d'un vocal
 const ALERT_DAYS = 7;          // historique d'alertes affiché
