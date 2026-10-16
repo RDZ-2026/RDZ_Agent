@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v4.1 · 2026-10-16 · poste « un seul agent à la fois » (radio_postes.exclusif, ex. Centraliste) : affiché « Occupé par X » et non sélectionnable ; contrôle final dans radio_prendre_service. Nécessite migration-radio-exclusif.sql.
+<!-- RDZ · prise-de-poste · v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
+     v4.1 · 2026-10-16 · poste « un seul agent à la fois » (radio_postes.exclusif, ex. Centraliste) : affiché « Occupé par X » et non sélectionnable ; contrôle final dans radio_prendre_service. Nécessite migration-radio-exclusif.sql.
      v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
      v3 · 2026-08-08 -->
 <!DOCTYPE html>
@@ -820,8 +821,15 @@ async function radioValidate() {
   renderRadioService();
 }
 
-renderRadioService();
-loadRadioService();
+// v4.2 : radio en pause tant qu'elle n'est pas terminée → bloc « Ma prise de service »
+// masqué (aucun choix de poste demandé). Pour réactiver : passer RADIO_ACTIVE à true.
+const RADIO_ACTIVE = false;
+if (RADIO_ACTIVE) {
+  renderRadioService();
+  loadRadioService();
+} else {
+  document.getElementById('service-zone').style.display = 'none';
+}
 loadAll();
 </script>
 </body>
