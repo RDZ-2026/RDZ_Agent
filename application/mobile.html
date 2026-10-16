@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -702,6 +702,9 @@ init();
 // (disabled:true, pas de lien actif) en attendant que memo-sites.html soit prêt.
 // Pour l'activer : passer disabled à false et renseigner href: 'memo-sites.html'.
 const OUTIL_TERRAIN_ITEMS = [
+  // v5.6 : radio (vocaux + SOS). Accessible seulement en service : la page elle-même
+  // renvoie vers la prise de service si l'agent n'a pas choisi son poste.
+  { icon: '📻', name: 'Radio', desc: "Messages vocaux avec vos collègues en service et bouton SOS.", href: 'radio-agent.html' },
   { icon: '📓', name: 'Rapport', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' },
   { icon: '📇', name: 'MEMO SITES', desc: "Fiches Mémo des sites RDZ", disabled: true }
 ];
