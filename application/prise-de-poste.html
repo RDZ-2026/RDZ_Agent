@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
+<!-- RDZ · prise-de-poste · v4.1 · 2026-10-16 · poste « un seul agent à la fois » (radio_postes.exclusif, ex. Centraliste) : affiché « Occupé par X » et non sélectionnable ; contrôle final dans radio_prendre_service. Nécessite migration-radio-exclusif.sql.
+     v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
      v3 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -132,6 +133,8 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
   .svc-sub { font-size: 12px; color: var(--rdz-gray); line-height: 1.5; margin-bottom: 12px; }
   .svc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .svc-poste { background: var(--rdz-bg); border: 1.5px solid var(--rdz-border); border-radius: 2px; padding: 14px 8px; font-size: 13.5px; font-weight: 700; color: var(--rdz-black); cursor: pointer; text-align: center; font-family: inherit; }
+  .svc-poste small { display: block; font-size: 11px; font-weight: 600; margin-top: 4px; color: var(--rdz-gray); }
+  .svc-poste:disabled { opacity: .55; cursor: not-allowed; background: #eef2f7; }
   .svc-poste.on { background: var(--rdz-red-light); border-color: var(--rdz-red); color: var(--rdz-red); }
   .svc-btn { display: block; width: 100%; background: var(--rdz-red); color: #fff; border: none; padding: 13px; border-radius: 2px; font-size: 13px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; font-family: inherit; }
   .svc-btn:disabled { background: #bbb; }
@@ -723,6 +726,7 @@ async function render() {
 const LS_RADIO = 'rdz_radio_service';
 const RADIO_URL = 'radio-agent.html';
 const SERVICE_MAX_H = 16;   // même règle que radio-agent.html
+let radioOccupe = {};   // poste_id → service ouvert d'un AUTRE agent, pour les postes exclusifs
 let radioPostes = [], radioService = null, radioPick = null, radioChanging = false, radioErr = '', radioBusy = false, radioState = 'loading';
 
 async function loadRadioService() {
@@ -730,11 +734,17 @@ async function loadRadioService() {
     const since = new Date(Date.now() - SERVICE_MAX_H * 3600e3).toISOString();
     const [{ data: p, error: pe }, { data: s, error: se }] = await Promise.all([
       sb.from('radio_postes').select('*').eq('actif', true).order('ordre').order('nom'),
-      sb.from('radio_services').select('*').eq('agent_id', AGENT_ID).is('fin', null).gte('debut', since).order('debut', { ascending: false }).limit(1)
+      sb.from('radio_services').select('*').is('fin', null).gte('debut', since).order('debut', { ascending: false })
     ]);
     if (pe || se) throw pe || se;
     radioPostes = p || [];
-    radioService = (s && s[0]) || null;
+    const ouverts = s || [];
+    radioService = ouverts.find(x => String(x.agent_id) === String(AGENT_ID)) || null;
+    radioOccupe = {};
+    radioPostes.filter(x => x.exclusif).forEach(x => {
+      const o = ouverts.find(v => v.poste_id === x.id && String(v.agent_id) !== String(AGENT_ID));
+      if (o) radioOccupe[x.id] = o;
+    });
     if (radioService) localStorage.setItem(LS_RADIO, JSON.stringify(radioService)); else localStorage.removeItem(LS_RADIO);
     radioState = 'ok';
   } catch (err) {
@@ -769,12 +779,16 @@ function renderRadioService() {
   z.innerHTML = `<div class="svc-card">
     <div class="svc-title">📻 ${radioChanging ? 'Changer de poste' : 'Ma prise de service'}</div>
     <div class="svc-sub">Quel poste prenez-vous ? En validant, vous êtes connecté à la radio sur les canaux de ce poste.</div>
-    <div class="svc-grid">${radioPostes.map(p => `<button class="svc-poste ${p.id === radioPick ? 'on' : ''}" onclick="radioChoose('${p.id}')">${escHtml(p.nom)}</button>`).join('')}</div>
+    <div class="svc-grid">${radioPostes.map(p => {
+      const o = radioOccupe[p.id];
+      if (o) return `<button class="svc-poste" disabled title="Un seul agent à la fois sur ce poste">${escHtml(p.nom)}<small>Occupé · ${escHtml(o.agent_nom || 'un agent')} depuis ${new Date(o.debut).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}</small></button>`;
+      return `<button class="svc-poste ${p.id === radioPick ? 'on' : ''}" onclick="radioChoose('${p.id}')">${escHtml(p.nom)}</button>`;
+    }).join('')}</div>
     <button class="svc-btn" id="svc-validate" ${chosen && !radioBusy ? '' : 'disabled'} onclick="radioValidate()">${radioBusy ? 'Enregistrement…' : chosen ? '✓ Valider ma prise de service · ' + escHtml(chosen.nom) : 'Choisissez votre poste'}</button>
     ${radioChanging ? `<button class="svc-btn ghost" onclick="radioCancelChange()">Annuler</button>` : ''}
     ${radioErr ? `<div class="svc-err">${escHtml(radioErr)}</div>` : ''}</div>`;
 }
-function radioChoose(id) { radioPick = id; radioErr = ''; renderRadioService(); }
+function radioChoose(id) { if (radioOccupe[id]) return; radioPick = id; radioErr = ''; renderRadioService(); }
 function radioStartChange() { radioChanging = true; radioPick = radioService ? radioService.poste_id : null; radioErr = ''; renderRadioService(); }
 function radioCancelChange() { radioChanging = false; radioErr = ''; renderRadioService(); }
 
@@ -791,6 +805,12 @@ async function radioValidate() {
   });
   radioBusy = false;
   if (error || !data) {
+    const msg = (error && error.message) || '';
+    if (msg.includes('POSTE_OCCUPE')) {
+      // Quelqu'un a pris le poste entre l'affichage et la validation : on recharge l'état.
+      radioErr = msg.replace(/^.*POSTE_OCCUPE:\s*/, '') + '. Un seul agent à la fois sur ce poste : choisissez-en un autre ou contactez votre responsable.';
+      radioPick = null; await loadRadioService(); return;
+    }
     radioErr = 'Prise de service non enregistrée (pas de réseau ?). Vérifiez la connexion et réessayez.';
     renderRadioService(); return;
   }
