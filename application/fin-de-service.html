@@ -1,4 +1,5 @@
-<!-- RDZ · fin-de-service · v9 · 2026-09-24 (RDZSync v5 : progression photos, interruption/reprise, vérification serveur) -->
+<!-- RDZ · fin-de-service · v10 · 2026-10-16 · la confirmation de fin de service ferme aussi le service radio (radio_services) : l'agent est déconnecté de radio-agent.html. Hors ligne : fermeture mise en file RDZSync. Nécessite migration-radio-postes.sql.
+     v9 · 2026-09-24 (RDZSync v5 : progression photos, interruption/reprise, vérification serveur) -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -730,7 +731,7 @@ function render() {
 
   html += `<div class="end-block">
     <button class="end-btn" onclick="confirmEndOfService()">🔒 Confirmer la fin de service — Déconnexion</button>
-    <div class="end-note">Vous serez déconnecté de l'application sur cet appareil. L'agent suivant devra ressaisir son nom et son code PIN.</div>
+    <div class="end-note">Vous serez déconnecté de l'application et de la radio sur cet appareil. L'agent suivant devra ressaisir son nom et son code PIN.</div>
   </div>`;
 
   document.getElementById('content').innerHTML = html;
@@ -801,7 +802,31 @@ function confirmEndOfService() {
   endOfServiceLogout();
 }
 
-function endOfServiceLogout() {
+// ── RADIO (v10) : fermer le service ouvert à la prise de poste ────────────────
+// Essai direct (3 s max) pour que la radio déconnecte l'agent tout de suite ;
+// sinon fermeture mise dans la file RDZSync à partir de la ligne COMPLÈTE gardée
+// par prise-de-poste.html (rdz_radio_service) — jamais un row partiel (piège n°9).
+// Filet de sécurité côté radio : un service oublié expire de toute façon après 16 h.
+async function closeRadioService() {
+  let row = null;
+  try { row = JSON.parse(localStorage.getItem('rdz_radio_service') || 'null'); } catch (e) {}
+  const patch = { fin: new Date().toISOString(), fin_motif: 'fin de service', fin_par_nom: AGENT_NOM };
+  try {
+    const q = sb.from('radio_services').update(patch).eq('agent_id', AGENT_ID).is('fin', null);
+    const res = await Promise.race([q, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))]);
+    if (res && res.error) throw res.error;
+  } catch (e) {
+    if (row && row.id && String(row.agent_id) === String(AGENT_ID)) {
+      RDZSync.save({ module: 'fin-de-service', table: 'radio_services', op: 'upsert', onConflict: 'id', row: Object.assign({}, row, patch) });
+    }
+  }
+  localStorage.removeItem('rdz_radio_service');
+}
+
+async function endOfServiceLogout() {
+  const btn = document.querySelector('.end-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Déconnexion…'; }
+  await closeRadioService();
   // On retire uniquement l'identité de l'agent connecté. On ne touche JAMAIS aux
   // files RDZSync (rdz_sync_queue / rdz_sync_photo_queue / rdz_sync_log) : elles
   // sont partagées par appareil, pas par agent, et doivent survivre au changement
