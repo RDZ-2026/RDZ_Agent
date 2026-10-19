@@ -1,3 +1,4 @@
+<!-- v30 · 2026-10-19 · impression/PDF : un rapport tient sur UNE page A4 par défaut. Juste avant l'impression, chaque rapport (.rp-doc) est mesuré ; s'il dépasse un peu une page, il est d'abord resserré (espaces entre sections, marges, hauteur des photos — .rp-compact), puis réduit légèrement (zoom, jamais sous 80 %). S'il ne tient toujours pas, rien n'est forcé : mise en page normale sur plusieurs pages (règles v19 inchangées). -->
 <!-- v29 · 2026-10-11 · nouveau statut « ✉️ À envoyer au client » (après « À revoir », avant « Transmis au client » / « Validé ») — NON verrouillé : modifiable librement, reste dans la vue À valider. Nécessite migration-statut-a-envoyer.sql. -->
 <!-- v28 · 2026-10-11 · tableau : colonne « Aperçu » retirée pour libérer la place (boutons Détail / Supprimer de nouveau visibles). La recherche continue de porter sur le texte du rapport. -->
 <!-- v27 · 2026-10-11 · tableau (vues À valider et Tous les rapports) : nouvelle colonne « Nature / Type d'action » à côté du statut. -->
@@ -161,6 +162,21 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
 .report-view.open{display:block}
 .report-view .report-inner{max-width:820px;margin:0 auto}
 .report-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+/* v30 : mode resserré, posé par fitDocsOnePage() juste avant l'impression
+   (retiré après). Les styles du rapport étant en ligne, !important est requis. */
+.rp-doc.rp-compact > div:first-child{padding:1.1rem 2rem!important}
+.rp-doc.rp-compact > div:first-child > div:first-child{margin:-1.1rem -2rem 1rem!important}
+.rp-doc.rp-compact > div:nth-child(3){padding:1rem 1.5rem!important}
+.rp-doc.rp-compact .rp-sec{margin-bottom:.9rem!important}
+.rp-doc.rp-compact .rp-sec-h{padding:.5rem 1rem!important}
+.rp-doc.rp-compact .rp-sec > div:last-child{padding:.8rem 1rem .7rem!important}
+.rp-doc.rp-compact .rp-block{margin-bottom:1rem!important}
+.rp-doc.rp-compact .rp-block:not(:last-child){padding-bottom:1rem!important}
+.rp-doc.rp-compact .rp-photo > div:last-child{min-height:120px!important}
+.rp-doc.rp-compact .rp-photo img{max-height:230px!important}
+.rp-doc.rp-compact .rp-photo-row{gap:12px!important}
+.rp-doc.rp-compact .rp-photo-row + .rp-photo-row{margin-top:12px!important}
+.rp-doc.rp-compact .rp-foot{padding:.7rem 2rem!important}
 @media print{
   body > *:not(.report-view){display:none!important}
   .report-view{display:block!important;position:static!important;background:none!important;overflow:visible!important;margin:0;max-width:100%;padding:0}
@@ -1796,6 +1812,33 @@ function buildReportFileName(entries){ // entries : [{site, ts, nature}]
    d'impression (A4 − marges 12 mm = 186 mm) juste avant l'impression,
    et on pose .rp-keep ou .rp-split. Branché sur "beforeprint", donc
    valable pour le bouton Imprimer / PDF, l'export groupé ET Ctrl/Cmd+P. */
+/* ---------- Un rapport = une page par défaut (v30) ----------
+   Pour chaque rapport (.rp-doc), mesuré à la largeur d'impression :
+   1) tient déjà sur une page → rien ne change ;
+   2) sinon, mode resserré (.rp-compact : moins d'espace entre les sections,
+      photos un peu moins hautes) → re-mesure ;
+   3) sinon, légère réduction (zoom) si elle reste lisible (≥ 80 %) ;
+   4) sinon, on n'insiste pas : mise en page normale sur plusieurs pages.
+   Appelée au début de tagPrintBlocks (donc aussi pour Ctrl/Cmd+P et
+   l'export groupé, où chaque rapport a sa propre page). */
+const ONE_PAGE_MIN_ZOOM = 0.8;
+function resetOnePageFit(root){
+  (root || document).querySelectorAll('.rp-doc').forEach(doc=>{ doc.classList.remove('rp-compact'); doc.style.zoom = ''; });
+}
+function fitDocsOnePage(root, pageH){
+  root.querySelectorAll('.rp-doc').forEach(doc=>{
+    doc.classList.remove('rp-compact'); doc.style.zoom = '';
+    if(doc.getBoundingClientRect().height <= pageH) return;           // 1) tient déjà
+    doc.classList.add('rp-compact');
+    const h = doc.getBoundingClientRect().height;
+    if(h <= pageH) return;                                            // 2) tient resserré
+    const z = Math.floor((pageH / h) * 1000) / 1000;
+    if(z >= ONE_PAGE_MIN_ZOOM){ doc.style.zoom = String(z); return; } // 3) tient réduit
+    doc.classList.remove('rp-compact');                               // 4) plusieurs pages
+  });
+}
+window.addEventListener('afterprint', ()=>resetOnePageFit(document.getElementById('report-content')));
+
 function tagPrintBlocks(){
   const root = document.getElementById('report-content');
   if(!root || !root.innerHTML) return;
@@ -1806,6 +1849,7 @@ function tagPrintBlocks(){
   document.body.removeChild(probe);
   const prevW = root.style.width;
   root.style.width = '186mm';
+  fitDocsOnePage(root, pageH);
   root.querySelectorAll('.rp-sec,.rp-block').forEach(el=>{
     el.classList.remove('rp-keep','rp-split');
     el.classList.add(el.getBoundingClientRect().height <= pageH ? 'rp-keep' : 'rp-split');
@@ -1813,7 +1857,17 @@ function tagPrintBlocks(){
   root.style.width = prevW;
 }
 window.addEventListener('beforeprint', tagPrintBlocks);
-function printReport(){
+/* v30 : les photos doivent être chargées avant la mesure (sinon leur hauteur
+   compte pour 0 et le calcul « tient sur une page » serait faux). */
+function waitReportImages(maxMs){
+  const root = document.getElementById('report-content');
+  const imgs = root ? Array.from(root.querySelectorAll('img')).filter(i=>!i.complete) : [];
+  if(!imgs.length) return Promise.resolve();
+  const all = Promise.all(imgs.map(i=>new Promise(res=>{ i.addEventListener('load',res,{once:true}); i.addEventListener('error',res,{once:true}); })));
+  return Promise.race([all, new Promise(res=>setTimeout(res, maxMs||4000))]);
+}
+async function printReport(){
+  await waitReportImages(4000);
   const prev = document.title;
   if(REPORT_FILE_NAME) document.title = REPORT_FILE_NAME;
   const restore = ()=>{ document.title = prev; window.removeEventListener('afterprint', restore); };
