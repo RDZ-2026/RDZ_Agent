@@ -1,4 +1,4 @@
-<!-- RDZ · RouteOps_Supervision · v2 · 2026-10-14 -->
+<!-- RDZ · RouteOps_Supervision · v3 · 2026-10-19 — feuilles mixtes (missions + checklist) -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -293,6 +293,7 @@ input[type=date]#nav-date:focus{outline:none;border-color:var(--accent);box-shad
 .ck-acked{font-size:12px;font-weight:600;color:var(--green)}
 .ck-acked-after{font-size:11px;font-weight:700;color:var(--orange)}
 .ck-unack{font-size:11px;color:var(--text3);text-decoration:underline;background:none;border:none;cursor:pointer;font-family:var(--font)}
+.ck-mixed-title{padding:7px 14px;background:var(--rdz-anthracite);color:#fff;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-top:2px solid var(--rdz-red)}
 .ck-loading{padding:14px;font-size:12px;color:var(--text3);text-align:center}
 </style>
 </head>
@@ -614,7 +615,7 @@ function buildJournee(){
 }
 
 function renderSheetCard(sh){
-  if(isChecklistSheet(sh)) return renderChecklistCard(sh)
+  if(isChecklistOnly(sh)) return renderChecklistCard(sh)
   const calc=calcSheetTimes(sh)
   const catL={
     'patrouille-semaine':'Patrouille · Semaine',
@@ -713,9 +714,10 @@ function renderSheetCard(sh){
         <tbody>${rows}</tbody>
       </table>
     </div>
+    ${isChecklistSheet(sh)?`<div class="ck-mixed-title">✔ Checklist</div><div id="ckbody-${sh.id}">${renderChecklistBody(sh)}</div>`:''}
     ${obsHtml}
     <div class="sc-foot">
-      <div class="sc-stat">Missions&nbsp;<strong>${calc.length}</strong></div>
+      <div class="sc-stat">Missions&nbsp;<strong>${calc.filter(r=>!r.kind).length}</strong></div>
       <div class="sc-stat">Travail&nbsp;<strong>${h}h${String(mn).padStart(2,'0')}</strong></div>
       <div class="sc-stat">FDS&nbsp;<strong>${endService}</strong></div>
       ${sh.note?`<div class="sc-stat" style="margin-left:auto;font-style:italic;color:var(--text3);font-size:11px">${sh.note}</div>`:''}
@@ -801,7 +803,7 @@ function printSheets(sheets,date){
   </style></head><body>`)
 
   sheets.forEach(sh=>{
-    if(isChecklistSheet(sh)){ w.document.write(printChecklistPage(sh,date)); return }
+    if(isChecklistOnly(sh)){ w.document.write(printChecklistPage(sh,date)); return }
     const calc=calcSheetTimes(sh)
     const catL={'patrouille-semaine':'Patrouille · Semaine','patrouille-we':'Patrouille · WE','mdp-semaine':'MDP · Semaine','mdp-we':'MDP · WE','regm-semaine':'REGM · Semaine','regm-we':'REGM · WE','regm-jour':'REGM · Jour','special':'Spécial'}[sh.cat]||sh.cat
     const lastMissionEnd=calc.filter(r=>r.endTime).pop()?.endTime||'—'
@@ -862,7 +864,7 @@ function printSheets(sheets,date){
         <tbody>${rows}</tbody>
       </table>
       <div class="totaux">
-        <div class="tot-item"><span class="tot-label">Missions</span><span class="tot-val">${calc.length}</span></div>
+        <div class="tot-item"><span class="tot-label">Missions</span><span class="tot-val">${calc.filter(r=>!r.kind).length}</span></div>
         <div class="tot-item"><span class="tot-label">Travail effectif</span><span class="tot-val">${h2}h${String(mn2).padStart(2,'0')}</span></div>
         <div class="tot-item"><span class="tot-label">Début service</span><span class="tot-val">${sh.startTime}</span></div>
         <div class="tot-item"><span class="tot-label">Fin de service</span><span class="tot-val">${endService}</span></div>
@@ -873,6 +875,7 @@ function printSheets(sheets,date){
         <div class="bloc"><strong>🔒 Horaires fixes</strong>Non modifiables sur le terrain — contacter le REGM si problème</div>
       </div>
       ${sh.observations?`<div style="margin-top:8px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:7px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#92400e;margin-bottom:3px">📌 Observations / Consignes</div><div style="font-size:11px;color:#1a1a2e;line-height:1.5">${sh.observations.replace(/\n/g,'<br>')}</div></div>`:''}
+      ${isChecklistSheet(sh)?printChecklistBlock(sh):''}
       <div class="sigs-row">
         <div class="sig-box"><div class="sig-label">Agent</div><div class="sig-line"></div></div>
         <div class="sig-box"><div class="sig-label">Contrôleur</div><div class="sig-line"></div></div>
@@ -898,7 +901,10 @@ let CK_DATE = null
 const ACK_NAME_KEY = 'rdz_sup_ack_nom'
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+// Feuille horaire seule, checklist seule, ou mixte (missions d'abord, checklist ensuite — RouteOps v15)
 function isChecklistSheet(sh){ return Array.isArray(sh.tasks)&&sh.tasks.some(t=>t&&(t.kind==='section'||t.kind==='check')) }
+function hasMissions(sh){ return Array.isArray(sh.tasks)&&sh.tasks.some(t=>t&&!t.kind&&t.mId) }
+function isChecklistOnly(sh){ return isChecklistSheet(sh)&&!hasMissions(sh) }
 function checklistItems(sh){ return sh.tasks.filter(t=>t&&t.kind==='check'&&t.id) }
 function checklistGroups(sh){
   const groups=[];let cur=null
@@ -1080,11 +1086,18 @@ function ackSheet(sheetId,on){
   })
 }
 
-function printChecklistPage(sh,date){
+// Bloc checklist imprimé sous les missions d'une feuille mixte
+function printChecklistBlock(sh){
   const map=CK[sh.id]||{}
   const st=checklistStats(sh,map)
-  const catL={'regm-jour':'REGM · Jour'}[sh.cat]||sh.cat||''
-  const groups=checklistGroups(sh).map(g=>`<div class="ck-p-grp${g.ponctuel?' ponctuel':''}">
+  const ack=map['_ack']
+  const gen=((map['_comment']||{}).comment||'').trim()
+  return `<div style="margin-top:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1a2e45">✔ Checklist — ${st.done}/${st.total}${st.pasFait?' · '+st.pasFait+' pas fait':''}${ack&&ack.ack_at?' · pris en compte par '+esc(ack.ack_by||'')+' '+fmtStamp(ack.ack_at):''}</div>
+    ${printChecklistGroups(sh,map)}
+    ${gen?`<div style="margin-top:6px;border:1.5px solid #1a2e45;border-radius:6px;padding:6px 9px;font-size:10.5px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#1d4ed8;margin-bottom:2px">Commentaires / anomalies</div>${esc(gen).replace(/\n/g,'<br>')}</div>`:''}`
+}
+function printChecklistGroups(sh,map){
+  return checklistGroups(sh).map(g=>`<div class="ck-p-grp${g.ponctuel?' ponctuel':''}">
       ${g.title?`<div class="ck-p-title">${esc(g.title)}${g.ponctuel?' — PONCTUEL':''}</div>`:''}
       ${g.checks.map(t=>{
         const r=map[t.id]||{}; const s=r.status||'none'; const cm=(r.comment||'').trim()
@@ -1092,6 +1105,13 @@ function printChecklistPage(sh,date){
           <div style="flex:1">${esc(t.label)}${cm?`<div class="ck-p-cmt">${esc(cm)}</div>`:(s==='pas_fait'?'<div class="ck-p-cmt">⚠ commentaire manquant</div>':'')}</div></div>`
       }).join('')}
     </div>`).join('')
+}
+
+function printChecklistPage(sh,date){
+  const map=CK[sh.id]||{}
+  const st=checklistStats(sh,map)
+  const catL={'regm-jour':'REGM · Jour'}[sh.cat]||sh.cat||''
+  const groups=printChecklistGroups(sh,map)
   const gen=((map['_comment']||{}).comment||'').trim()
   const ack=map['_ack']
   const agents=[...new Set(Object.values(map).filter(r=>r.check_id!=='_ack').map(r=>r.agent_nom).filter(Boolean))]
