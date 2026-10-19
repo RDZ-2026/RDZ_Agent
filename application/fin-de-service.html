@@ -1,4 +1,5 @@
-<!-- RDZ · fin-de-service · v10 · 2026-10-16 · la confirmation de fin de service ferme aussi le service radio (radio_services) : l'agent est déconnecté de radio-agent.html. Hors ligne : fermeture mise en file RDZSync. Nécessite migration-radio-postes.sql.
+<!-- RDZ · fin-de-service · v11 · 2026-10-19 · la confirmation de fin de service referme aussi le service de l'agent (services_agents, ouvert par « Je prends mon service » dans prise-de-poste.html) → voyant rouge dans mobile.html. Via RDZSync (hors ligne OK). Nécessite migration-services-agents.sql.
+     v10 · 2026-10-16 · la confirmation de fin de service ferme aussi le service radio (radio_services) : l'agent est déconnecté de radio-agent.html. Hors ligne : fermeture mise en file RDZSync. Nécessite migration-radio-postes.sql.
      v9 · 2026-09-24 (RDZSync v5 : progression photos, interruption/reprise, vérification serveur) -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -823,9 +824,32 @@ async function closeRadioService() {
   localStorage.removeItem('rdz_radio_service');
 }
 
+// ── SERVICE AGENT (v11) : fermer le service ouvert par « Je prends mon service » ──
+// La ligne complète est gardée par prise-de-poste.html (rdz_service_agent) : on la
+// renvoie entière avec fin renseignée, en upsert sur id via RDZSync (jamais un row
+// partiel, piège n°9). Passer par la file garantit l'ordre : si la prise de service
+// était elle-même encore en attente de réseau, la fin part bien APRÈS elle.
+// En plus, essai direct (3 s max) pour refermer un éventuel service ouvert depuis
+// un autre téléphone. Filet de sécurité : un service oublié expire après 16 h.
+async function closeAgentService() {
+  const finIso = new Date().toISOString();
+  const patch = { fin: finIso, fin_motif: 'fin de service' };
+  let row = null;
+  try { row = JSON.parse(localStorage.getItem('rdz_service_agent') || 'null'); } catch (e) {}
+  if (row && row.id && !row.fin && String(row.agent_id) === String(AGENT_ID)) {
+    RDZSync.save({ module: 'fin-de-service', table: 'services_agents', op: 'upsert', onConflict: 'id', row: Object.assign({}, row, patch) });
+  }
+  localStorage.removeItem('rdz_service_agent');
+  try {
+    const q = sb.from('services_agents').update(patch).eq('agent_id', String(AGENT_ID)).is('fin', null);
+    await Promise.race([q, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))]);
+  } catch (e) { /* hors ligne : la ligne locale est déjà en file RDZSync */ }
+}
+
 async function endOfServiceLogout() {
   const btn = document.querySelector('.end-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Déconnexion…'; }
+  await closeAgentService();
   await closeRadioService();
   // On retire uniquement l'identité de l'agent connecté. On ne touche JAMAIS aux
   // files RDZSync (rdz_sync_queue / rdz_sync_photo_queue / rdz_sync_log) : elles
