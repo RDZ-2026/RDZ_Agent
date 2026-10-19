@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
+<!-- RDZ · prise-de-poste · v4.3 · 2026-10-19 · + bouton « Je prends mon service » en bas de page : ouvre un service (table services_agents, RDZSync, hors réseau OK) → voyant vert à côté du nom dans mobile.html ; avertit si des consignes du site ne sont pas encore validées. Nécessite migration-services-agents.sql.
+     v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
      v4.1 · 2026-10-16 · poste « un seul agent à la fois » (radio_postes.exclusif, ex. Centraliste) : affiché « Occupé par X » et non sélectionnable ; contrôle final dans radio_prendre_service. Nécessite migration-radio-exclusif.sql.
      v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
      v3 · 2026-08-08 -->
@@ -154,6 +155,11 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
   .svc-btn:disabled{box-shadow:none}
   .svc-btn.ghost{border-radius:10px;box-shadow:none;border:1px solid var(--rdz-border);color:#334155}
   .svc-ok{border-radius:9px}
+  /* v4.3 : bouton « Je prends mon service » */
+  .start-zone{max-width:760px;margin:0 auto;padding:0 14px 40px}
+  .start-zone .svc-btn{font-size:14px;padding:15px}
+  .start-zone .svc-btn.go{background:#1b7a3d;box-shadow:0 5px 14px rgba(27,122,61,.22)}
+  .start-zone .svc-btn.go:active{background:#145c2e}
 </style>
 </head>
 <body>
@@ -185,6 +191,8 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <div class="content" id="content">
   <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
 </div>
+
+<div class="start-zone" id="start-zone"></div>
 
 <script>
 /* ═══ RDZSync v4 — copie de référence, collée telle quelle (voir application/rdz-sync-v4.js) ═══ */
@@ -434,6 +442,7 @@ let journaux = {}; // constat_id -> [entrées]
 // Overlay optimiste : validations faites dans cette session, avant même confirmation réseau —
 // l'agent ne doit jamais attendre le retour serveur pour voir sa validation prise en compte.
 let localValidations = {}; // site_id -> {validated_at, agent_nom}
+let PENDING_SITES = [];    // v4.3 : sites du jour affichés dont les consignes ne sont pas encore validées
 
 function typeIcon(t) {
   const map = { 'note': '📝', 'reparation': '🔧', 'client': '📨', 'surveillance': '👁', 'cloture': '✅' };
@@ -607,6 +616,7 @@ async function render() {
 
   let html = '';
   let anySite = false;
+  if (isToday) PENDING_SITES = [];
 
   filteredSites.forEach(site => {
     const consList = consignes.filter(c => c.site_id === site.id && isActive(c, ref));
@@ -617,6 +627,7 @@ async function render() {
     anySite = true;
 
     const validation = validations[site.id];
+    if (isToday && !validation) PENDING_SITES.push(site.nom);
 
     html += `<div class="site-block">
       <div class="site-hdr"><div class="site-name">${escHtml(site.nom)}</div></div>
@@ -830,6 +841,78 @@ if (RADIO_ACTIVE) {
 } else {
   document.getElementById('service-zone').style.display = 'none';
 }
+
+// ── v4.3 : « JE PRENDS MON SERVICE » ──────────────────────────────────────────
+// Un geste explicite en fin de prise de service : ouvre une ligne dans
+// services_agents (debut renseigné, fin vide). mobile.html affiche alors le
+// voyant vert à côté du nom ; fin-de-service.html referme la ligne.
+// Écriture via RDZSync (pas de collision possible : chaque agent n'écrit que sa
+// propre ligne) → fonctionne hors réseau. L'id est un vrai UUID généré ici pour
+// que la fin de service retrouve la ligne (upsert sur id), même hors ligne.
+// Copie locale : rdz_service_agent (lue par mobile.html et fin-de-service.html).
+const LS_SVC = 'rdz_service_agent';
+const SVC_MAX_H = 16;   // au-delà, un service non terminé est considéré comme oublié
+function svcUuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = new Uint8Array(16); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(b) : b.forEach((_, i) => b[i] = Math.random() * 256 | 0);
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+function svcLocal() {
+  try {
+    const r = JSON.parse(localStorage.getItem(LS_SVC) || 'null');
+    if (!r || String(r.agent_id) !== String(AGENT_ID) || r.fin) return null;
+    if (Date.now() - new Date(r.debut).getTime() > SVC_MAX_H * 3600e3) return null;
+    return r;
+  } catch (e) { return null; }
+}
+function svcHeure(iso) { return new Date(iso).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' }); }
+
+function renderStartZone() {
+  const z = document.getElementById('start-zone');
+  const cur = svcLocal();
+  if (cur) {
+    z.innerHTML = `<div class="svc-card">
+      <div class="svc-ok" style="margin-bottom:10px">🟢 <b>Vous êtes en service</b><br>Depuis ${svcHeure(cur.debut)}${cur.site_nom ? ' · ' + escHtml(cur.site_nom) : ''}. Pensez à faire votre fin de service en partant.</div>
+      <a class="svc-btn" href="mobile.html">‹ Retour au menu</a></div>`;
+    return;
+  }
+  z.innerHTML = `<div class="svc-card">
+    <div class="svc-title">🔴 Vous n'êtes pas encore en service</div>
+    <div class="svc-sub">Une fois les consignes lues (et le véhicule pris si besoin), confirmez votre prise de service.</div>
+    <button class="svc-btn go" id="svc-start-btn" onclick="startService()">✅ Je prends mon service</button></div>`;
+}
+
+function startService() {
+  if (svcLocal()) { renderStartZone(); return; }
+  const isToday = (document.getElementById('date-select').value || today()) === today();
+  const pending = isToday ? PENDING_SITES.slice() : [];
+  const msg = pending.length
+    ? `Les consignes ne sont pas encore validées pour :\n\n${pending.map(n => '• ' + n).join('\n')}\n\nPrendre votre service quand même ?`
+    : 'Confirmer votre prise de service maintenant ?';
+  if (!window.confirm(msg)) return;
+  // Un ancien service resté ouvert sur cet appareil (fin oubliée) est refermé au passage.
+  try {
+    const old = JSON.parse(localStorage.getItem(LS_SVC) || 'null');
+    if (old && old.id && !old.fin && String(old.agent_id) === String(AGENT_ID)) {
+      RDZSync.save({ module: 'prise-de-poste', table: 'services_agents', op: 'upsert', onConflict: 'id',
+        row: Object.assign({}, old, { fin: new Date().toISOString(), fin_motif: 'non terminé (nouvelle prise de service)' }) });
+    }
+  } catch (e) {}
+  const siteVal = document.getElementById('site-select').value;
+  const site = sites.find(s => s.id === siteVal);
+  const row = {
+    id: svcUuid(), agent_id: String(AGENT_ID), agent_nom: AGENT_NOM,
+    site_id: site ? String(site.id) : null, site_nom: site ? site.nom : null,
+    debut: new Date().toISOString(), fin: null
+  };
+  RDZSync.save({ module: 'prise-de-poste', table: 'services_agents', op: 'upsert', onConflict: 'id', row: row });
+  localStorage.setItem(LS_SVC, JSON.stringify(row));
+  renderStartZone();
+}
+
+renderStartZone();
 loadAll();
 </script>
 </body>
