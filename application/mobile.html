@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v6.4 · 2026-10-19 · bouton vert « Je prends mon service » dans le sous-menu « Prise de service », sous « Prise de véhicule » (ouvre la ligne services_agents via RDZSync, hors réseau OK ; avertit si aucune validation de consignes aujourd'hui). v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -108,6 +108,13 @@ main{flex:1;padding:16px}
 .svc-status.off:after{content:"›";font-size:14px;line-height:1}
 .svc-status.wait{color:#64748b;background:#f1f5f9}
 @media (prefers-reduced-motion:reduce){.svc-dot.on{animation:none}}
+.svc-start{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:4px;padding:18px 16px;border:none;border-radius:17px;background:#16a34a;color:#fff;font-family:inherit;font-size:16.5px;font-weight:800;letter-spacing:-.01em;cursor:pointer;box-shadow:0 8px 22px rgba(22,163,74,.28);transition:transform .15s ease,background .15s ease}
+.svc-start:active{transform:scale(.985);background:#15803d}
+.svc-start:disabled{opacity:.7}
+.svc-start-note{font-size:12px;color:var(--rdz-muted,#64748b);text-align:center;margin:9px 8px 0;line-height:1.45}
+.svc-started{display:flex;align-items:center;gap:12px;margin-top:4px;padding:15px 16px;border-radius:17px;background:#dcfce7;border:1px solid #bbf7d0;color:#166534;font-size:13.5px;line-height:1.45}
+.svc-started b{display:block;font-size:15.5px}
+.svc-started .ic{font-size:26px}
 </style>
 <style id="rdz-mobile-premium">
 :root{--red:#e3062c;--red-dark:#bf0b28;--navy:#142130;--navy2:#223241;--ink:#102033;--muted:#63758f;--line:#dbe3ec;--bg:#eef3f7;--paper:#fff;--radius-card:17px;--radius-section:17px;--font:Inter,"Segoe UI",Arial,sans-serif}
@@ -514,6 +521,7 @@ body{background:#dfe6ed;color:var(--rdz-text);font-family:Inter,"Segoe UI",Arial
         <button class="back-btn" onclick="backToMain();return false;">‹ Retour</button>
         <div class="section-h">Prise de service</div>
         <div id="poste-items-list"></div>
+        <div id="svc-start-zone"></div>
       </div>
     </main>
   </div>
@@ -1613,10 +1621,81 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     if (state === 'on') { badge.textContent = 'En service depuis ' + heure(debut); badge.title = ''; }
     else if (state === 'off') { badge.textContent = 'Hors service · faire ma prise de service'; badge.title = 'Ouvrir la prise de service'; }
     else badge.textContent = 'Vérification du service…';
+    if (state !== 'wait') renderStart(state, debut);
   }
   badge.addEventListener('click', () => {
     if (badge.classList.contains('off') && typeof showPosteMenu === 'function') showPosteMenu();
   });
+
+  /* ── Bouton « Je prends mon service » (sous-menu Prise de service) ──
+     Ouvre une ligne services_agents (debut renseigné, fin vide) via RDZSync : marche
+     hors réseau. L'id est un vrai UUID généré ici pour que fin-de-service.html
+     retrouve la ligne (upsert sur id). Copie locale : rdz_service_agent. */
+  const zone = document.getElementById('svc-start-zone');
+  function renderStart(state, debut){
+    if (!zone) return;
+    if (state === 'on') {
+      zone.innerHTML = '<div class="svc-started"><span class="ic">🟢</span><span><b>Vous êtes en service</b>Depuis ' + heure(debut) + '. Pensez à votre fin de service en partant.</span></div>';
+    } else {
+      zone.innerHTML = '<button type="button" class="svc-start" id="svc-start-btn">✅ Je prends mon service</button>' +
+        '<div class="svc-start-note">Après avoir lu les consignes et pris le véhicule si besoin.</div>';
+      document.getElementById('svc-start-btn').onclick = startService;
+    }
+  }
+  function uuid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    const b = new Uint8Array(16);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b); else for (let i = 0; i < 16; i++) b[i] = Math.random() * 256 | 0;
+    b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+    return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+  }
+  // Consignes validées aujourd'hui ? (serveur, ou validation encore en file d'envoi)
+  async function consignesValidees(id){
+    try {
+      const q = JSON.parse(localStorage.getItem('rdz_sync_queue') || '[]');
+      if (q.some(it => it.table === 'consignes_lectures' && it.row && String(it.row.agent_id) === String(id))) return true;
+    } catch(e) {}
+    try {
+      const jour = (typeof serviceDate === 'function') ? serviceDate() : new Date().toISOString().slice(0,10);
+      const req = sb.from('consignes_lectures').select('id').eq('agent_id', id).eq('date_lecture', jour).limit(1);
+      const { data, error } = await Promise.race([req, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))]);
+      if (error) return null;
+      return !!(data && data.length);
+    } catch(e) { return null; }   // hors réseau : inconnu
+  }
+  let busy = false;
+  async function startService(){
+    const id = localStorage.getItem('rdz_agent_id'); if (!id || busy) return;
+    if (local(id)) { refresh(); return; }
+    busy = true;
+    const btn = document.getElementById('svc-start-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Vérification…'; }
+    const ok = await consignesValidees(id);
+    busy = false;
+    const msg = ok === false
+      ? "Vous n'avez pas encore validé les consignes aujourd'hui (« Consignes, événements & constats »).\n\nPrendre votre service quand même ?"
+      : ok === null
+        ? "Pas de réseau : impossible de vérifier vos consignes.\n\nConfirmer votre prise de service ?"
+        : 'Confirmer votre prise de service maintenant ?';
+    if (!window.confirm(msg)) { renderStart('off'); return; }
+    // Ancien service resté ouvert sur cet appareil (fin oubliée) : refermé au passage.
+    try {
+      const old = JSON.parse(localStorage.getItem(LS_SVC) || 'null');
+      if (old && old.id && !old.fin && String(old.agent_id) === String(id)) {
+        RDZSync.save({ module: 'mobile', table: 'services_agents', op: 'upsert', onConflict: 'id',
+          row: Object.assign({}, old, { fin: new Date().toISOString(), fin_motif: 'non terminé (nouvelle prise de service)' }) });
+      }
+    } catch(e) {}
+    let siteId = null, siteNom = null;
+    try { siteId = localStorage.getItem('rdz_agent_last_site') || null; if (siteId === 'all') siteId = null; } catch(e) {}
+    const row = { id: uuid(), agent_id: String(id), agent_nom: localStorage.getItem('rdz_agent_nom') || null,
+                  site_id: siteId, site_nom: siteNom, debut: new Date().toISOString(), fin: null };
+    RDZSync.save({ module: 'mobile', table: 'services_agents', op: 'upsert', onConflict: 'id', row: row });
+    localStorage.setItem(LS_SVC, JSON.stringify(row));
+    show('on', row.debut);
+    if (navigator.vibrate) try { navigator.vibrate(60); } catch(e) {}
+  }
 
   let seq = 0;
   async function refresh(){
