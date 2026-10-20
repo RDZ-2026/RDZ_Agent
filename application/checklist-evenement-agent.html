@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-20 (d) · Rapport : plusieurs photos par Événement particulier (1 et 2) ; heure de l'affluence maximum (affluence_max_heure) ; photo « départ des invités » retirée ; photo unique « fin de service » remplacée par « Photos fin de service (état des lieux) », plusieurs photos possibles. Photos stockées dans la nouvelle table evenements_rapports_photos (1 ligne par photo) — voir claude_migration-rapport-evenement-photos.sql. Photos redimensionnées (1600 px, JPEG) avant mise en file hors-ligne. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (c) · Ordre de service : retrait du bloc « Prise en charge — à signer par l'agent » (nom, date, signature) — le document n'est pas imprimé. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (b) · Cahier des charges Event en simple mémo : plus aucune case à cocher, liste en lecture seule (points à puce). -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 · fiche événement réordonnée : Ordre de service, puis Rapport à rédiger, puis « Cahier des charges Event » — fusion des checklists générique + responsable en une seule liste (doublons retirés par libellé normalisé), présentée comme pense-bête : cocher est facultatif, plus de compteur de progression. -->
@@ -128,6 +129,14 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 }
 .memo-row{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;background:#fff;border-bottom:1px solid var(--border);}
 .memo-dot{color:var(--red);font-weight:700;font-size:16px;line-height:1.2;flex-shrink:0;}
+.pgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:6px;margin-top:8px;}
+.pgal:empty{display:none;}
+.pthumb{position:relative;aspect-ratio:1/1;border-radius:8px;overflow:hidden;background:#e9eef5;border:1px solid var(--border);}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.pthumb .pdel{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:13px;line-height:22px;text-align:center;cursor:pointer;}
+.pthumb .pbadge{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:9.5px;text-align:center;padding:2px 0;}
+.pbtns{display:flex;gap:8px;margin-top:6px;}
+.pbtns>div{flex:1;text-align:center;font-size:12px;font-weight:700;padding:8px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;}
 </style>
 
 </head>
@@ -201,33 +210,37 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
         <div class="chip" id="chip-non" onclick="setControle(false)">Non</div>
       </div>
     </div>
-    <div class="fg"><label class="fl">Contrôle affluence maximum (comptage ou estimation)</label><input type="text" class="fi" id="rp-affluence" placeholder="Ex : 30 personnes"></div>
-    <div class="fg"><label class="fl">Événement particulier — préciser</label><textarea class="fi fi-ta" id="rp-evp1"></textarea></div>
-    <div class="fg"><label class="fl">Événement 2 — préciser (optionnel)</label><textarea class="fi fi-ta" id="rp-evp2"></textarea></div>
+    <div class="fg">
+      <label class="fl">Contrôle affluence maximum (comptage ou estimation)</label>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <input type="text" class="fi" id="rp-affluence" placeholder="Ex : 30 personnes" style="flex:1">
+        <div style="width:118px;flex-shrink:0">
+          <div style="font-size:10.5px;color:#64748b;margin-bottom:4px">À quelle heure ?</div>
+          <input type="time" class="fi" id="rp-affluence-heure">
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Événement particulier — préciser</label><textarea class="fi fi-ta" id="rp-evp1"></textarea>
+      <div class="pgal" id="gal-evp1"></div>
+      <div class="pbtns"><div onclick="pickPhotos('evp1',true)">📷 Caméra</div><div onclick="pickPhotos('evp1',false)">🖼 Galerie</div></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Événement 2 — préciser (optionnel)</label><textarea class="fi fi-ta" id="rp-evp2"></textarea>
+      <div class="pgal" id="gal-evp2"></div>
+      <div class="pbtns"><div onclick="pickPhotos('evp2',true)">📷 Caméra</div><div onclick="pickPhotos('evp2',false)">🖼 Galerie</div></div>
+    </div>
 
     <div class="sec-title">Fin d'événement</div>
     <div class="fg"><label class="fl">Heure de départ des invités</label><input type="time" class="fi" id="rp-depart-heure"></div>
-    <div class="fg">
-      <label class="fl">Photo — départ des invités</label>
-      <div class="photo-box" id="photo-depart" onclick="document.getElementById('file-depart').click()">📷</div>
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <div onclick="document.getElementById('file-depart-camera').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">📷 Caméra</div>
-        <div onclick="document.getElementById('file-depart').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">🖼 Galerie</div>
-      </div>
-      <input type="file" id="file-depart" accept="image/*" style="display:none" onchange="onPhoto(this,'depart')">
-      <input type="file" id="file-depart-camera" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this,'depart')">
-    </div>
     <div class="fg"><label class="fl">Heure de fin de service (accord client)</label><input type="time" class="fi" id="rp-fin-heure"></div>
     <div class="fg">
-      <label class="fl">Photo — fin de service</label>
-      <div class="photo-box" id="photo-fin" onclick="document.getElementById('file-fin').click()">📷</div>
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <div onclick="document.getElementById('file-fin-camera').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">📷 Caméra</div>
-        <div onclick="document.getElementById('file-fin').click()" style="flex:1;text-align:center;font-size:12px;font-weight:700;padding:7px 0;border:1.5px solid var(--border2);border-radius:8px;cursor:pointer;background:#fff;">🖼 Galerie</div>
-      </div>
-      <input type="file" id="file-fin" accept="image/*" style="display:none" onchange="onPhoto(this,'fin')">
-      <input type="file" id="file-fin-camera" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this,'fin')">
+      <label class="fl">Photos fin de service (état des lieux)</label>
+      <div class="pgal" id="gal-etat_lieux"></div>
+      <div class="pbtns"><div onclick="pickPhotos('etat_lieux',true)">📷 Caméra</div><div onclick="pickPhotos('etat_lieux',false)">🖼 Galerie</div></div>
     </div>
+    <input type="file" id="file-pics-cam" accept="image/*" capture="environment" style="display:none" onchange="onPhotos(this)">
+    <input type="file" id="file-pics-gal" accept="image/*" multiple style="display:none" onchange="onPhotos(this)">
 
     <button class="btn-submit" id="btn-save-rapport" onclick="saveRapport(false)">💾 Enregistrer</button>
     <button class="btn-submit" style="background:var(--green);margin-top:-14px" onclick="saveRapport(true)">✓ Enregistrer et clôturer</button>
@@ -402,8 +415,6 @@ let events = [], sites = [];
 let currentEvent = null;
 let sections = [], items = [], reponses = [];
 let currentFormulaire = null;
-let pendingPhoto = { depart: null, fin: null };
-let pendingPhotoDataUrl = { depart: null, fin: null };
 
 function escHtml(s){ return (s??'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 function todayStr(){ return ymdLocal(); }
@@ -600,17 +611,22 @@ async function openRapport(){
   document.getElementById('rp-lieu').value = currentRapport?.lieu_evenement || siteNom(currentEvent.site_id) || currentEvent.lieu || '';
   setControle(currentRapport ? currentRapport.controle_issues_secours : null, true);
   document.getElementById('rp-affluence').value = currentRapport?.affluence_max || '';
+  document.getElementById('rp-affluence-heure').value = (currentRapport?.affluence_max_heure||'').slice(0,5);
   document.getElementById('rp-evp1').value = currentRapport?.evenement_particulier_1 || '';
   document.getElementById('rp-evp2').value = currentRapport?.evenement_particulier_2 || '';
   document.getElementById('rp-depart-heure').value = (currentRapport?.depart_invites_heure||'').slice(0,5);
   document.getElementById('rp-fin-heure').value = (currentRapport?.heure_fin_service||'').slice(0,5);
-  pendingPhoto = { depart:null, fin:null };
-  pendingPhotoDataUrl = { depart:null, fin:null };
-  ['depart','fin'].forEach(k => {
-    const box = document.getElementById('photo-'+k);
-    const url = k==='depart' ? currentRapport?.photo_depart_invites_url : currentRapport?.photo_fin_service_url;
-    box.innerHTML = url ? `<img src="${url}">` : '📷';
-  });
+  pendingPics = { evp1:[], evp2:[], etat_lieux:[] };
+  savedPhotos = [];
+  try{
+    const { data } = await sb.from('evenements_rapports_photos').select('*').eq('evenement_id', currentEvent.id).order('created_at');
+    savedPhotos = data || [];
+  }catch(e){ savedPhotos = []; }
+  // Ancienne photo unique « fin de service » (avant 2026-10-20) : affichée dans
+  // l'état des lieux, en lecture seule.
+  if(currentRapport?.photo_fin_service_url)
+    savedPhotos.unshift({ id:'legacy-fin', categorie:'etat_lieux', url: currentRapport.photo_fin_service_url, _legacy:true });
+  PHOTO_CATS.forEach(renderGallery);
   showScreen('s-rapport');
 }
 let controleVal = null;
@@ -619,16 +635,73 @@ function setControle(val, silent){
   document.getElementById('chip-oui').classList.toggle('on', val===true);
   document.getElementById('chip-non').classList.toggle('on', val===false);
 }
-function onPhoto(input, key){
-  const file = input.files[0];
-  if(!file) return;
-  pendingPhoto[key] = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById('photo-'+key).innerHTML = `<img src="${e.target.result}">`;
-    pendingPhotoDataUrl[key] = e.target.result;
-  };
-  reader.readAsDataURL(file);
+// ─── PHOTOS DU RAPPORT (multi-photos, 2026-10-20) ─────────────────────────────
+// 3 galeries : evp1 / evp2 (Événements particuliers) et etat_lieux (fin de
+// service). Chaque photo = 1 ligne de evenements_rapports_photos, envoyée via
+// RDZSync (insert de la ligne, puis upload + remplissage de « url »).
+const PHOTO_CATS = ['evp1','evp2','etat_lieux'];
+let pendingPics = { evp1:[], evp2:[], etat_lieux:[] }; // pas encore enregistrées
+let savedPhotos = [];                                   // déjà enregistrées
+let pickCat = null;
+function pickPhotos(cat, camera){
+  pickCat = cat;
+  document.getElementById(camera ? 'file-pics-cam' : 'file-pics-gal').click();
+}
+// Redimensionne avant mise en file : la file hors-ligne vit dans localStorage
+// (~5 Mo) — des photos brutes de téléphone (3–6 Mo chacune) la satureraient.
+function resizeImage(file, max, quality){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = ev => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > max || h > max){ const r = Math.min(max/w, max/h); w = Math.round(w*r); h = Math.round(h*r); }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function onPhotos(input){
+  const cat = pickCat; const files = Array.from(input.files || []);
+  input.value = '';
+  if(!cat || !files.length) return;
+  for (const f of files){
+    try{ pendingPics[cat].push({ tmp: uid(), dataUrl: await resizeImage(f, 1600, 0.8) }); }
+    catch(e){ toast('Photo illisible : '+f.name, true); }
+  }
+  renderGallery(cat);
+}
+function removePending(cat, tmp){
+  pendingPics[cat] = pendingPics[cat].filter(p=>p.tmp!==tmp);
+  renderGallery(cat);
+}
+async function deleteSaved(id){
+  if(!confirm('Supprimer cette photo du rapport ?')) return;
+  try{
+    const { error } = await sb.from('evenements_rapports_photos').delete().eq('id', id);
+    if(error) throw error;
+    const p = savedPhotos.find(x=>x.id===id);
+    savedPhotos = savedPhotos.filter(x=>x.id!==id);
+    if(p) renderGallery(p.categorie);
+  }catch(e){ toast('Suppression impossible (réseau ?) : '+e.message, true); }
+}
+function renderGallery(cat){
+  const el = document.getElementById('gal-'+cat);
+  const saved = savedPhotos.filter(p=>p.categorie===cat).map(p => {
+    const src = p.url || p._preview;
+    const badge = p.url ? '' : `<div class="pbadge">⏳ en attente d'envoi</div>`;
+    const del = (p.url && !p._legacy) ? `<div class="pdel" onclick="deleteSaved('${p.id}')">×</div>` : '';
+    return `<div class="pthumb">${src ? `<img src="${src}">` : ''}${badge}${del}</div>`;
+  });
+  const pend = pendingPics[cat].map(p => `<div class="pthumb"><img src="${p.dataUrl}"><div class="pbadge">non enregistrée</div><div class="pdel" onclick="removePending('${cat}','${p.tmp}')">×</div></div>`);
+  el.innerHTML = saved.concat(pend).join('');
 }
 // (upload photo géré par RDZSync.save — voir saveRapport)
 
@@ -652,32 +725,40 @@ async function saveRapport(cloture){
     lieu_evenement: document.getElementById('rp-lieu').value.trim() || null,
     controle_issues_secours: controleVal,
     affluence_max: document.getElementById('rp-affluence').value.trim() || null,
+    affluence_max_heure: document.getElementById('rp-affluence-heure').value ? document.getElementById('rp-affluence-heure').value+':00' : null,
     evenement_particulier_1: document.getElementById('rp-evp1').value.trim() || null,
     evenement_particulier_2: document.getElementById('rp-evp2').value.trim() || null,
     depart_invites_heure: document.getElementById('rp-depart-heure').value ? document.getElementById('rp-depart-heure').value+':00' : null,
-    photo_depart_invites_url: currentRapport.photo_depart_invites_url || null,
     heure_fin_service: document.getElementById('rp-fin-heure').value ? document.getElementById('rp-fin-heure').value+':00' : null,
-    photo_fin_service_url: currentRapport.photo_fin_service_url || null,
     statut: currentRapport.statut || (cloture ? 'cloture' : 'ouvert'),
     updated_at: new Date().toISOString()
   };
   if(cloture){ payload.statut = 'cloture'; payload.cloture_par = AGENT_NOM; payload.cloture_at = new Date().toISOString(); }
 
-  const photos = [];
-  if (pendingPhotoDataUrl.depart) photos.push({ name: currentEvent.id + '_depart.jpg', field: 'photo_depart_invites_url', dataUrl: pendingPhotoDataUrl.depart });
-  if (pendingPhotoDataUrl.fin) photos.push({ name: currentEvent.id + '_fin.jpg', field: 'photo_fin_service_url', dataUrl: pendingPhotoDataUrl.fin });
-
+  // Les anciennes colonnes photo (photo_depart_invites_url, photo_fin_service_url)
+  // ne sont plus envoyées : l'upsert ne les touche donc pas, l'existant est conservé.
   RDZSync.save({
     module: 'checklist-evenement', table: 'evenements_rapports', row: payload,
-    op: 'upsert', onConflict: 'id',
-    bucket: 'evenements-photos', photos
+    op: 'upsert', onConflict: 'id'
+  });
+
+  // Une ligne par photo, mise en file APRÈS le rapport (la file est traitée dans l'ordre).
+  PHOTO_CATS.forEach(cat => {
+    pendingPics[cat].forEach(p => {
+      const row = { id: uid(), rapport_id: payload.id, evenement_id: currentEvent.id, categorie: cat, agent_nom: AGENT_NOM };
+      RDZSync.save({
+        module: 'checklist-evenement', table: 'evenements_rapports_photos', row,
+        op: 'insert', bucket: 'evenements-photos',
+        photos: [{ name: currentEvent.id + '_' + cat + '_' + row.id + '.jpg', field: 'url', dataUrl: p.dataUrl }]
+      });
+      savedPhotos.push(Object.assign({}, row, { url: null, _preview: p.dataUrl }));
+    });
+    pendingPics[cat] = [];
+    renderGallery(cat);
   });
 
   // Mise à jour optimiste locale : la prochaine sauvegarde connaît déjà l'id et le statut
   currentRapport = Object.assign({}, currentRapport, payload);
-  pendingPhoto = { depart:null, fin:null };
-  pendingPhotoDataUrl = { depart:null, fin:null };
-
   toast((cloture ? '✓ Rapport clôturé' : '💾 Rapport pris en compte') + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
   if(cloture) showScreen('s-fiche');
   btn.disabled = false;
