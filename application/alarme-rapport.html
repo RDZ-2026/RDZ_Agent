@@ -1,4 +1,4 @@
-<!-- RDZ · alarme-rapport · 2026-10-20 · brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
+<!-- RDZ · alarme-rapport · 2026-10-20 · boutons à la fin du formulaire (plus flottants) ; brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · alarme-rapport · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · alarme-rapport · v3 · 2026-09-27 · correctif : un bouton de
      réponse « Choix » dont le libellé contient une apostrophe (ex. « la
@@ -138,6 +138,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 .photo-wait{width:74px;height:74px;flex-shrink:0;border:1px dashed #cbd5e1;border-radius:9px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#64748b;background:#f8fafc;line-height:1.3}
 .draft-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
 .draft-toast.on{opacity:1}
+
+/* 2026-10-20 : boutons à la fin du formulaire (plus de barre flottante en bas de l'écran) */
+.save-bar{position:static!important;background:none!important;padding:16px 0 8px!important;margin-top:12px}
 </style>
 </head>
 <body>
