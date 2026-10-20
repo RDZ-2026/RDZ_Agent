@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-standard · 2026-10-20 · brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · rapport-standard · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-standard · v2 · 2026-08-09 -->
 <!DOCTYPE html>
@@ -151,6 +152,22 @@ textarea{min-height:110px!important}
   header .top>div:first-child{padding-left:88px}
   .row2{display:block!important}
 }
+/* brouillons (2026-10-20) */
+.btn-cloture{width:100%;margin-top:10px;background:#1b7a3d;color:#fff;border:none;border-radius:10px;padding:16px;font-size:16px;font-weight:bold;font-family:var(--font);cursor:pointer;box-shadow:0 6px 18px rgba(27,122,61,.18)}
+.btn-cloture:active{background:#145c2e}
+.draft-banner{background:#fff8e6;border:1px solid #ecd9a0;color:#5b4a1a;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.4;margin-bottom:12px}
+.draft-new{margin-top:8px;background:#fff;border:1px solid #ecd9a0;color:#5b4a1a;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.drafts-box{background:#fff;border:1px solid #e8edf3;border-radius:12px;margin-bottom:14px;overflow:hidden;box-shadow:0 3px 12px rgba(15,23,42,.045)}
+.drafts-hdr{background:#f0f0f0;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.3px;padding:9px 12px;color:#1a1a1a}
+.draft-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #eef1f5}
+.draft-txt{flex:1;min-width:0;cursor:pointer}
+.draft-main{font-size:13.5px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.draft-meta{font-size:11.5px;color:#64748b;margin-top:2px}
+.draft-go{background:#8B1A1A;color:#fff;border:none;border-radius:8px;padding:8px 11px;font-size:12.5px;font-weight:bold;cursor:pointer;font-family:var(--font)}
+.draft-del{background:none;border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px;font-size:13px;cursor:pointer}
+.photo-wait{width:74px;height:74px;flex-shrink:0;border:1px dashed #cbd5e1;border-radius:9px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#64748b;background:#f8fafc;line-height:1.3}
+.draft-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+.draft-toast.on{opacity:1}
 </style>
 
 </head>
@@ -187,6 +204,7 @@ textarea{min-height:110px!important}
         <div class="mrow"><span class="k">Activité</span><span class="v" id="m-activite">—</span></div>
       </div>
 
+      <div id="drafts-box"></div>
       <div id="rapport-err"></div>
 
       <div class="row2">
@@ -235,7 +253,8 @@ textarea{min-height:110px!important}
       </div>
 
       <div class="save-bar">
-        <button class="btn-primary" id="btn-save" onclick="saveEntry()">✓ Enregistrer dans le journal</button>
+        <button class="btn-primary" type="button" onclick="saveDraft()">💾 Enregistrer</button>
+        <button class="btn-cloture" id="btn-save" type="button" onclick="saveEntry()">✓ Enregistrer et clôturer</button>
       </div>
     </section>
 
@@ -243,9 +262,9 @@ textarea{min-height:110px!important}
     <section id="screen-done" class="hidden">
       <div class="confirm">
         <div class="big">✅</div>
-        <h2>Entrée enregistrée</h2>
-        <p id="done-sub">Elle est dans le journal de bord.</p>
-        <button class="ci" onclick="resetForm()">➕ Nouvelle entrée (même activité)</button>
+        <h2>Rapport clôturé</h2>
+        <p id="done-sub">Il a été transmis au centraliste.</p>
+        <button class="ci" onclick="newReport()">➕ Nouveau rapport (même activité)</button>
         <a class="ci" href="journal-de-bord.html" style="display:block;text-decoration:none">↩ Retour au journal</a>
       </div>
     </section>
@@ -629,7 +648,19 @@ document.getElementById('photo-gallery').addEventListener('change', e=>onPhotoPi
 
 function renderPhotos(){
   const box = document.getElementById('photo-list');
-  box.innerHTML = photos.map((p,i)=>`
+  // Photos déjà enregistrées (brouillon repris) puis nouvelles photos — 2026-10-20
+  const saved = savedPhotos.map((p,i)=>`
+    <div class="photo-item">
+      ${(p.url||p._preview) ? `<img src="${p.url||p._preview}" alt="">` : `<div class="photo-wait">⏳<br>en attente<br>d'envoi</div>`}
+      <div class="pmeta">
+        <div class="dictable">
+          <input type="text" placeholder="Légende de la photo…" value="${esc(p.legende||'')}" oninput="savedPhotos[${i}].legende=this.value" id="leg-s${i}">
+          <button type="button" class="mic" data-target="leg-s${i}" style="bottom:4px">🎤</button>
+        </div>
+        <button type="button" class="rm" onclick="removeSavedPhoto(${i})">✕ Retirer</button>
+      </div>
+    </div>`).join('');
+  box.innerHTML = saved + photos.map((p,i)=>`
     <div class="photo-item">
       <img src="${p.dataUrl}" alt="">
       <div class="pmeta">
@@ -695,13 +726,13 @@ function saveEntry(){
   const errBox = document.getElementById('rapport-err'); errBox.innerHTML='';
   const situation = document.getElementById('f-situation').value.trim();
   const actions = document.getElementById('f-actions').value.trim();
-  if(!situation && !actions && photos.length===0){
+  if(!situation && !actions && photos.length===0 && savedPhotos.length===0){
     errBox.innerHTML = '<div class="err">Renseignez au moins une description ou une photo.</div>';
     window.scrollTo(0,0); return;
   }
   let loc = document.getElementById('f-loc').value;
   if(loc==='__autre') loc='';
-  const entreeId = uid();
+  const entreeId = currentDraftId || uid();   // même id que le brouillon s'il y en a un
   const row = {
     id: entreeId,
     site_id: SITE_ID || null,
@@ -718,22 +749,228 @@ function saveEntry(){
   };
   RDZSync.save({ module:'rapport-standard', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
 
-  photos.forEach(p=>{
-    RDZSync.save({
-      module:'rapport-standard', table:'journal_photos',
-      row:{ id:uid(), entree_id:entreeId, legende:p.legende||null, created_at:new Date().toISOString() },
-      op:'upsert', onConflict:'id',
-      bucket:'journal-photos', photoField:'url',
-      photos:[{ name:p.name, dataUrl:p.dataUrl }]
-    });
-  });
+  const nNew = photos.length;
+  queuePhotos(entreeId);
+  closeDraftRecord();   // le brouillon passe en « clôturé » : il sort de la liste des rapports en cours
 
   document.getElementById('done-sub').textContent =
-    photos.length ? `Entrée enregistrée. ${photos.length} photo(s) partiront en WiFi.` : 'Elle est dans le journal de bord.';
+    'Il a été transmis au centraliste.' + (nNew ? ` ${nNew} photo(s) partiront en WiFi.` : '');
   show('screen-done');
 }
 
-init();
+
+const DRAFT_MODULE = 'rapport-standard', DRAFT_TYPE = '';
+function draftActivite(){ return ACTIVITE || null; }
+function draftLink(id){ return 'rapport-standard.html?site_id=' + encodeURIComponent(SITE_ID||'') + '&site=' + encodeURIComponent(SITE_NOM||'') + '&activite=' + encodeURIComponent(ACTIVITE||'') + '&brouillon=' + encodeURIComponent(id); }
+function getFormState(){
+  const v = id => document.getElementById(id).value;
+  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions') };
+}
+function setSelDraft(id, val){
+  const el = document.getElementById(id);
+  if(val && ![...el.options].some(o => o.value === val)){ const o = document.createElement('option'); o.value = val; o.textContent = val; el.insertBefore(o, el.lastChild); }
+  el.value = val || '';
+}
+function applyFormState(s){
+  if(s.date) document.getElementById('f-date').value = s.date;
+  if(s.heure) document.getElementById('f-heure').value = s.heure;
+  setSelDraft('f-loc', s.loc);
+  document.getElementById('f-loc-autre').value = s.loc_autre || '';
+  document.getElementById('f-situation').value = s.situation || '';
+  document.getElementById('f-actions').value = s.actions || '';
+}
+function draftResume(s){
+  const t = (s.situation || s.actions || '').trim();
+  const when = (s.date ? s.date.split('-').reverse().slice(0,2).join('.') : '') + (s.heure ? ' ' + s.heure : '');
+  return (when.trim() ? when.trim() + ' — ' : '') + (t ? t.slice(0,70) : 'sans description');
+}
+function resetAdapter(){}
+
+/* ======================= BROUILLONS (2026-10-20) =======================
+   « 💾 Enregistrer » garde le rapport en brouillon : table rapports_brouillons
+   (+ copie locale « rdz_brouillons » pour pouvoir le reprendre hors ligne).
+   « ✓ Enregistrer et clôturer » écrit le vrai rapport, avec le MÊME id que le
+   brouillon → c'est seulement là qu'il devient visible du centraliste et de la
+   supervision (qui ne lisent jamais rapports_brouillons).
+   Les photos d'un brouillon partent tout de suite dans journal_photos
+   (entree_id = id du futur rapport) : la supervision ne les affiche qu'une
+   fois le rapport clôturé, puisqu'elle les rattache par entree_id.
+   Les brouillons non clôturés sont aussi listés dans fin-de-service.html
+   (lien « Reprendre » = colonne lien). */
+const DRAFT_LS = 'rdz_brouillons';
+let currentDraftId = null, draftCreatedAt = null, savedPhotos = [], draftsCache = [];
+function readDraftsLS(){ try{ return JSON.parse(localStorage.getItem(DRAFT_LS)||'[]'); }catch(e){ return []; } }
+function writeDraftsLS(a){ try{ localStorage.setItem(DRAFT_LS, JSON.stringify(a)); }catch(e){} }
+function tsOf(x){ const t = new Date(x||0).getTime(); return isNaN(t) ? 0 : t; }
+function upsertDraftLS(d){
+  const lim = Date.now() - 7*864e5;   // les traces de brouillons clôturés/supprimés sont oubliées après 7 jours
+  const a = readDraftsLS().filter(x => x.id !== d.id && (x.statut === 'brouillon' || tsOf(x.updated_at) > lim));
+  a.push(d); writeDraftsLS(a);
+}
+function sameAgentNom(n){ return (n||'').trim().toLowerCase() === (AGENT_NOM||'').trim().toLowerCase(); }
+function inDraftScope(d){
+  return d.module === DRAFT_MODULE && sameAgentNom(d.agent_nom)
+    && (d.site_nom||'') === (SITE_NOM||'') && (d.type_slug||'') === (DRAFT_TYPE||'');
+}
+function fmtDraftDT(iso){
+  const d = new Date(iso); if(isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit'}) + ' à ' + d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});
+}
+function draftToast(msg){
+  let t = document.getElementById('draft-toast');
+  if(!t){ t = document.createElement('div'); t.id = 'draft-toast'; t.className = 'draft-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(draftToast._t); draftToast._t = setTimeout(()=>t.classList.remove('on'), 3200);
+}
+async function fetchDrafts(){
+  const map = new Map();
+  try{
+    let q = sb.from('rapports_brouillons').select('*').eq('module', DRAFT_MODULE).eq('site_nom', SITE_NOM).eq('statut','brouillon');
+    if(DRAFT_TYPE) q = q.eq('type_slug', DRAFT_TYPE);
+    const { data, error } = await q;
+    if(!error) (data||[]).filter(d=>sameAgentNom(d.agent_nom)).forEach(d => map.set(d.id, d));
+  }catch(e){ /* hors ligne : copie locale seule */ }
+  // La copie locale l'emporte si elle est plus récente (saisie pas encore remontée,
+  // ou brouillon clôturé/supprimé sur cet appareil mais pas encore confirmé par le serveur).
+  readDraftsLS().filter(inDraftScope).forEach(d => {
+    const s = map.get(d.id);
+    if(!s || tsOf(d.updated_at) >= tsOf(s.updated_at)) map.set(d.id, d);
+  });
+  return [...map.values()].filter(d => d.statut === 'brouillon').sort((a,b) => tsOf(b.updated_at) - tsOf(a.updated_at));
+}
+async function refreshDrafts(){ draftsCache = await fetchDrafts(); renderDrafts(); }
+function renderDrafts(){
+  const box = document.getElementById('drafts-box'); if(!box) return;
+  let html = '';
+  if(currentDraftId){
+    html += `<div class="draft-banner">📝 <b>Rapport en cours</b> — commencé le ${fmtDraftDT(draftCreatedAt)}.
+      <div style="margin-top:4px">« Enregistrer » le garde de côté · « Enregistrer et clôturer » le transmet au centraliste.</div>
+      <button type="button" class="draft-new" onclick="newReport()">➕ Commencer un autre rapport</button></div>`;
+  }
+  const others = draftsCache.filter(d => d.id !== currentDraftId);
+  if(others.length){
+    html += `<div class="drafts-box"><div class="drafts-hdr">📝 Rapports en cours, à terminer (${others.length})</div>` +
+      others.map(d => `<div class="draft-item">
+        <div class="draft-txt" onclick="resumeDraft('${d.id}')">
+          <div class="draft-main">${esc(d.resume || 'Rapport sans description')}</div>
+          <div class="draft-meta">Enregistré le ${fmtDraftDT(d.updated_at)}</div>
+        </div>
+        <button type="button" class="draft-go" onclick="resumeDraft('${d.id}')">Reprendre</button>
+        <button type="button" class="draft-del" title="Supprimer ce brouillon" onclick="deleteDraft('${d.id}')">🗑</button>
+      </div>`).join('') + `</div>`;
+  }
+  box.innerHTML = html;
+}
+function makeDraftRow(statut){
+  const st = getFormState();
+  return {
+    id: currentDraftId, module: DRAFT_MODULE, type_slug: DRAFT_TYPE || null,
+    site_id: SITE_ID || null, site_nom: SITE_NOM || null, activite: draftActivite(),
+    agent_nom: AGENT_NOM, resume: draftResume(st), lien: draftLink(currentDraftId),
+    donnees: st, statut, created_at: draftCreatedAt, updated_at: new Date().toISOString()
+  };
+}
+function storeDraftRow(row, newMeta){
+  RDZSync.save({ module: DRAFT_MODULE, table: 'rapports_brouillons', row, op: 'upsert', onConflict: 'id' });
+  const prev = readDraftsLS().find(x => x.id === row.id);
+  upsertDraftLS(Object.assign({}, row, { photos_meta: ((prev && prev.photos_meta) || []).concat(newMeta || []) }));
+}
+/* Met en file les photos : nouvelles photos (insert + upload) et légendes
+   modifiées sur les photos déjà enregistrées. Renvoie la liste des nouvelles. */
+function queuePhotos(entreeId){
+  const meta = [];
+  savedPhotos.forEach(p => {
+    if((p.legende||'') !== (p._leg0||'')){
+      RDZSync.save({ module: DRAFT_MODULE, table: 'journal_photos',
+        row: { id: p.id, entree_id: entreeId, legende: p.legende || null, created_at: p.created_at || new Date().toISOString() },
+        op: 'upsert', onConflict: 'id' });
+      p._leg0 = p.legende || '';
+    }
+  });
+  photos.forEach(p => {
+    const pid = uid(), created = new Date().toISOString();
+    RDZSync.save({
+      module: DRAFT_MODULE, table: 'journal_photos',
+      row: { id: pid, entree_id: entreeId, legende: p.legende || null, created_at: created },
+      op: 'upsert', onConflict: 'id',
+      bucket: 'journal-photos', photoField: 'url',
+      photos: [{ name: p.name, dataUrl: p.dataUrl }]
+    });
+    meta.push({ id: pid, legende: p.legende || '', created_at: created });
+    savedPhotos.push({ id: pid, entree_id: entreeId, legende: p.legende || '', _leg0: p.legende || '', url: null, created_at: created, _preview: p.dataUrl });
+  });
+  photos = [];
+  return meta;
+}
+function saveDraft(){
+  const err = document.getElementById('rapport-err'); if(err) err.innerHTML = '';
+  if(!currentDraftId){ currentDraftId = uid(); draftCreatedAt = new Date().toISOString(); }
+  const meta = queuePhotos(currentDraftId);
+  storeDraftRow(makeDraftRow('brouillon'), meta);
+  renderPhotos();
+  draftToast('💾 Rapport enregistré — vous pourrez le reprendre plus tard' + (navigator.onLine ? '' : ' (hors ligne)'));
+  refreshDrafts();
+}
+/* Appelé à la clôture, APRÈS l'écriture du vrai rapport. */
+function closeDraftRecord(){
+  if(!currentDraftId) return;
+  storeDraftRow(makeDraftRow('cloture'), []);
+  currentDraftId = null; draftCreatedAt = null; savedPhotos = [];
+}
+async function resumeDraft(id){
+  const d = draftsCache.find(x => x.id === id); if(!d) return;
+  if((photos.length) && !confirm('Les photos ajoutées à ce rapport et pas encore enregistrées seront perdues. Continuer ?')) return;
+  currentDraftId = d.id; draftCreatedAt = d.created_at || d.updated_at; photos = [];
+  applyFormState(d.donnees || {});
+  savedPhotos = [];
+  try{
+    const { data, error } = await sb.from('journal_photos').select('*').eq('entree_id', d.id).order('created_at');
+    if(!error) savedPhotos = (data||[]).map(p => Object.assign({}, p, { _leg0: p.legende || '' }));
+  }catch(e){}
+  // Photos prises sur CET appareil et pas encore arrivées sur le serveur.
+  const local = readDraftsLS().find(x => x.id === d.id);
+  ((local && local.photos_meta) || []).forEach(m => {
+    if(!savedPhotos.find(p => p.id === m.id)) savedPhotos.push({ id: m.id, entree_id: d.id, legende: m.legende || '', _leg0: m.legende || '', url: null, created_at: m.created_at });
+  });
+  renderPhotos(); renderDrafts();
+  window.scrollTo(0,0);
+}
+function deleteDraft(id){
+  const d = draftsCache.find(x => x.id === id); if(!d) return;
+  if(!confirm('Supprimer ce rapport en cours ? Il ne sera pas transmis au centraliste.')) return;
+  const row = Object.assign({}, d, { statut: 'supprime', updated_at: new Date().toISOString() });
+  delete row.photos_meta;
+  storeDraftRow(row, []);
+  if(id === currentDraftId) newReport(); else refreshDrafts();
+}
+function newReport(){
+  if(photos.length && !confirm('Les photos pas encore enregistrées seront perdues. Continuer ?')) return;
+  currentDraftId = null; draftCreatedAt = null; savedPhotos = [];
+  resetForm(); resetAdapter();
+  show('screen-form'); refreshDrafts();
+}
+async function removeSavedPhoto(i){
+  const p = savedPhotos[i]; if(!p) return;
+  if(!p.url){ alert("Cette photo n'est pas encore envoyée : elle pourra être retirée une fois arrivée sur le serveur."); return; }
+  if(!navigator.onLine){ alert('Pas de réseau : impossible de retirer une photo déjà enregistrée pour le moment.'); return; }
+  if(!confirm('Retirer cette photo du rapport ?')) return;
+  try{
+    const { error } = await sb.from('journal_photos').delete().eq('id', p.id);
+    if(error) throw error;
+    savedPhotos.splice(i,1); renderPhotos();
+  }catch(e){ alert('Suppression impossible : ' + (e.message||e)); }
+}
+async function draftsBoot(){
+  if(document.getElementById('screen-form').classList.contains('hidden')) return;
+  await refreshDrafts();
+  const want = new URLSearchParams(location.search).get('brouillon');
+  if(want){
+    if(draftsCache.find(d => d.id === want)) resumeDraft(want);
+    else draftToast('Ce rapport a déjà été clôturé ou supprimé.');
+  }
+}
+
+init().then(draftsBoot);
 </script>
 </body>
 </html>
