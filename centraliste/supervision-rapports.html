@@ -1,3 +1,4 @@
+<!-- v31 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre — « Autre — texte libre ») : affichée dans le détail, la liste, le rapport imprimable (section 1) et transmise à l'IA ; modifiable via « Modifier ». Distincte de Nature / Type d'action, inchangés. -->
 <!-- v30 · 2026-10-19 · impression/PDF : un rapport tient sur UNE page A4 par défaut. Juste avant l'impression, chaque rapport (.rp-doc) est mesuré ; s'il dépasse un peu une page, il est d'abord resserré (espaces entre sections, marges, hauteur des photos — .rp-compact), puis réduit légèrement (zoom, jamais sous 80 %). S'il ne tient toujours pas, rien n'est forcé : mise en page normale sur plusieurs pages (règles v19 inchangées). -->
 <!-- v29 · 2026-10-11 · nouveau statut « ✉️ À envoyer au client » (après « À revoir », avant « Transmis au client » / « Validé ») — NON verrouillé : modifiable librement, reste dans la vue À valider. Nécessite migration-statut-a-envoyer.sql. -->
 <!-- v28 · 2026-10-11 · tableau : colonne « Aperçu » retirée pour libérer la place (boutons Détail / Supprimer de nouveau visibles). La recherche continue de porter sur le texte du rapport. -->
@@ -973,6 +974,13 @@ function rapportTs(raw){
 /* Date LOCALE (Genève) au format AAAA-MM-JJ — toISOString() donnait la date
    UTC : un rapport enregistré entre minuit et 2 h affichait la veille. */
 function localYMD(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* Catégorie choisie par l'agent (rapport standard, 2026-10-20) — « Autre — précision » */
+function catFull(o){
+  if(!o) return '';
+  const a = String(o.categorie||'').trim(), b = String(o.categorie_autre||'').trim();
+  if(a && b && a!==b) return a + ' — ' + b;
+  return a || b;
+}
 function locFull(o){
   if(!o) return '';
   const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
@@ -1248,7 +1256,7 @@ function reportSnippet(r){
     return parts.slice(0,3).join(' · ');
   }
   if(r.kind==='standard'){
-    const parts = [r.raw.activite, locFull(r.raw), r.raw.situation].filter(Boolean);
+    const parts = [r.raw.activite, catFull(r.raw), locFull(r.raw), r.raw.situation].filter(Boolean);
     return parts.join(' · ') || (r.raw.actions||'');
   }
   if(isNewFormatAlarme(r)){
@@ -1426,6 +1434,7 @@ function openDetail(id){
       <div class="msec"><div class="st">Questions / Réponses</div><div class="txt">${qaHtml}</div></div>`;
   }else if(r.kind==='standard'){
     extra = `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.raw.activite||'—')}</div></div>
+      <div class="msec"><div class="st">Catégorie (agent)</div><div class="txt">${esc(catFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.raw.situation||'—')}</div></div>
       <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.raw.actions||'—')}</div></div>`;
@@ -1511,6 +1520,8 @@ function editFieldsFor(r){
   if(r.kind==='standard') return [
     {k:'site_nom', l:'Site', t:'text'},
     {k:'activite', l:'Activité', t:'text'},
+    {k:'categorie', l:'Catégorie (agent)', t:'text'},
+    {k:'categorie_autre', l:'Précision catégorie (si « Autre »)', t:'text'},
     {k:'localisation', l:'Localisation', t:'text'},
     {k:'localisation_autre', l:'Précision localisation', t:'text'},
     {k:'situation', l:'Que se passe-t-il ?', t:'textarea'},
@@ -2105,6 +2116,7 @@ function buildPromptLines(items){
       }
     }else if(r.kind==='standard'){
       lines.push('  Activité: ' + (r.raw.activite||'—'));
+      lines.push('  Catégorie choisie par l\'agent: ' + (catFull(r.raw)||'—'));
       lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       lines.push('  Situation (saisie brute agent): ' + (r.raw.situation||'—'));
       lines.push('  Actions (saisie brute agent): ' + (r.raw.actions||'—'));
@@ -2670,7 +2682,8 @@ function buildMultiReport(titreGlobal, corrected){
     let inner;
     if(r.kind==='standard'){
       const localisation = locFull(r.raw)||'';
-      inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
+      inner = (catFull(r.raw) ? rpFieldO('Catégorie', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '')
+        + (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
         + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
@@ -2752,7 +2765,7 @@ function buildStandardReport(r){
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
   }
-  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
+  const body = rpSec('1 — Contexte', (catFull(r.raw) ? rpFieldO('Catégorie', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '') + rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
