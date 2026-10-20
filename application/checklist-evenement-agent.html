@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-20 (e) · Liste des événements : les événements passés ne sont plus affichés (même sans rapport clôturé) — uniquement aujourd'hui + 7 prochains jours. Rien n'est supprimé en base. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (d) · Rapport : plusieurs photos par Événement particulier (1 et 2) ; heure de l'affluence maximum (affluence_max_heure) ; photo « départ des invités » retirée ; photo unique « fin de service » remplacée par « Photos fin de service (état des lieux) », plusieurs photos possibles. Photos stockées dans la nouvelle table evenements_rapports_photos (1 ligne par photo) — voir claude_migration-rapport-evenement-photos.sql. Photos redimensionnées (1600 px, JPEG) avant mise en file hors-ligne. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (c) · Ordre de service : retrait du bloc « Prise en charge — à signer par l'agent » (nom, date, signature) — le document n'est pas imprimé. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (b) · Cahier des charges Event en simple mémo : plus aucune case à cocher, liste en lecture seule (points à puce). -->
@@ -146,7 +147,7 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <div class="screen" id="s-list">
   <div class="topbar">
     <button class="tb-back" onclick="goBackFromList()" title="Retour">←</button>
-    <div><div class="tb-title">📅 Gestion d'événements</div><div class="tb-sub" id="tb-sub">Hier → J+7</div></div>
+    <div><div class="tb-title">📅 Gestion d'événements</div><div class="tb-sub" id="tb-sub">Aujourd'hui → J+7</div></div>
   </div>
   <div class="body" id="events-list"><div class="state-msg">⏳ Chargement…</div></div>
 </div>
@@ -459,7 +460,7 @@ async function loadEvents(){
     sites = siteData || [];
 
     let q = sb.from('evenements').select('*')
-      .gte('date', pastWindowStr())
+      .gte('date', todayStr())   // 2026-10-20 : plus aucun événement passé affiché
       .lte('date', in7DaysStr());
     if(SITE_ID) q = q.or('site_id.eq.'+SITE_ID+',site_id.is.null');
     // Ordre chronologique (retour Laurent 2026-10-11) : le plus ancien (passé sans
@@ -472,17 +473,11 @@ async function loadEvents(){
     // ni checklist ni rapport à produire par un agent.
     const all = (data || []).filter(e => (e.nb_agents||0) > 0);
 
-    const pastIds = all.filter(e=>e.date < todayStr()).map(e=>e.id);
-    const closedIds = new Set();
-    if(pastIds.length){
-      const { data: rap } = await sb.from('evenements_rapports').select('evenement_id,statut').in('evenement_id', pastIds);
-      (rap||[]).forEach(r=>{ if(r.statut==='cloture') closedIds.add(r.evenement_id); });
-    }
-    events = all.filter(e => e.date >= todayStr() || !closedIds.has(e.id));
+    events = all;
 
     document.getElementById('tb-sub').textContent = SITE_NOM
-      ? (SITE_NOM + ' · Aujourd\'hui + passés sans rapport + 7 prochains jours')
-      : 'Tous les sites · Aujourd\'hui + passés sans rapport + 7 prochains jours';
+      ? (SITE_NOM + ' · Aujourd\'hui + 7 prochains jours')
+      : 'Tous les sites · Aujourd\'hui + 7 prochains jours';
 
     renderEventsList();
   }catch(e){
@@ -502,7 +497,7 @@ function dayLabel(dateStr){
 function renderEventsList(){
   const el = document.getElementById('events-list');
   if(!events.length){
-    el.innerHTML = `<div class="state-msg">Aucun événement aujourd'hui ni à venir${SITE_NOM ? ' sur '+escHtml(SITE_NOM) : ''}, et aucun événement passé sans rapport.</div>`;
+    el.innerHTML = `<div class="state-msg">Aucun événement aujourd'hui ni dans les 7 prochains jours${SITE_NOM ? ' sur '+escHtml(SITE_NOM) : ''}.</div>`;
     return;
   }
   el.innerHTML = events.map(e => {
