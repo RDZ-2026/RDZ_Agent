@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-standard · 2026-10-20 (b) · champ « Catégorie » après la localisation : liste par site (table journal_categories, réglable dans journal-config.html) + « Autre (préciser) » avec saisie libre → journal_entrees.categorie / categorie_autre ; catégorie obligatoire à la clôture (pas pour un simple enregistrement). Boutons Enregistrer / Enregistrer et clôturer placés à la fin du formulaire (plus flottants). -->
 <!-- RDZ · rapport-standard · 2026-10-20 · brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · rapport-standard · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-standard · v2 · 2026-08-09 -->
@@ -168,6 +169,9 @@ textarea{min-height:110px!important}
 .photo-wait{width:74px;height:74px;flex-shrink:0;border:1px dashed #cbd5e1;border-radius:9px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#64748b;background:#f8fafc;line-height:1.3}
 .draft-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
 .draft-toast.on{opacity:1}
+
+/* 2026-10-20 : boutons à la fin du formulaire (plus de barre flottante en bas de l'écran) */
+.save-bar{position:static!important;background:none!important;padding:16px 0 8px!important;margin-top:12px}
 </style>
 
 </head>
@@ -219,6 +223,15 @@ textarea{min-height:110px!important}
       <div class="field">
         <label>Précision (facultatif)</label>
         <input type="text" id="f-loc-autre" placeholder="Ex. porte B2, 3e étage, parking niveau -2…">
+      </div>
+
+      <div class="field">
+        <label>Catégorie</label>
+        <select id="f-cat" onchange="onCatChange()"><option value="">— Choisir —</option></select>
+      </div>
+      <div class="field hidden" id="f-cat-autre-wrap">
+        <label>Préciser la catégorie</label>
+        <input type="text" id="f-cat-autre" placeholder="Écrivez la catégorie…">
       </div>
 
       <div class="field">
@@ -587,6 +600,7 @@ async function init(){
   document.getElementById('m-site').textContent = SITE_NOM;
   document.getElementById('m-activite').textContent = ACTIVITE;
   await loadLocalisations();
+  await loadCategories();
   resetForm();
   bindMics();
   show('screen-form');
@@ -602,6 +616,9 @@ function resetForm(){
   document.getElementById('f-actions').value = '';
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';
+  document.getElementById('f-cat').value = '';
+  document.getElementById('f-cat-autre').value = '';
+  onCatChange();
   show('screen-form');
 }
 
@@ -615,6 +632,37 @@ async function loadLocalisations(){
     (data||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l.label; o.textContent=l.label; sel.appendChild(o); });
   }catch(e){ /* facultatif */ }
   const o=document.createElement('option'); o.value='__autre'; o.textContent='Autre / non listé'; sel.appendChild(o);
+}
+
+/* ---------- catégories (2026-10-20) ----------
+   Liste propre au site (journal_categories, réglée dans journal-config.html)
+   + catégories communes (site_id null), puis « Autre (préciser) » qui ouvre
+   une saisie libre. Copie locale par site : la liste reste disponible hors
+   réseau si elle a déjà été chargée une fois sur ce téléphone. */
+async function loadCategories(){
+  const sel = document.getElementById('f-cat');
+  const cacheKey = 'rdz_journal_categories_' + (SITE_ID || 'tous');
+  let labels = null;
+  try{
+    let q = sb.from('journal_categories').select('label,ordre,site_id').eq('actif',true);
+    q = SITE_ID ? q.or('site_id.is.null,site_id.eq.'+SITE_ID) : q.is('site_id',null);
+    const { data, error } = await q.order('ordre');
+    if(error) throw error;
+    // catégories du site d'abord, puis communes ; sans doublon
+    const rows = (data||[]).slice().sort((a,b)=> (a.site_id?0:1)-(b.site_id?0:1) || (a.ordre||0)-(b.ordre||0));
+    labels = [...new Set(rows.map(r=>r.label))];
+    try{ localStorage.setItem(cacheKey, JSON.stringify(labels)); }catch(e){}
+  }catch(e){
+    try{ labels = JSON.parse(localStorage.getItem(cacheKey)||'null'); }catch(e2){ labels = null; }
+  }
+  sel.innerHTML = '<option value="">— Choisir —</option>';
+  (labels||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l; o.textContent=l; sel.appendChild(o); });
+  const o=document.createElement('option'); o.value='__autre'; o.textContent='Autre (préciser)'; sel.appendChild(o);
+}
+function onCatChange(){
+  const autre = document.getElementById('f-cat').value === '__autre';
+  document.getElementById('f-cat-autre-wrap').classList.toggle('hidden', !autre);
+  if(!autre) document.getElementById('f-cat-autre').value = '';
 }
 
 /* ---------- photos ---------- */
@@ -730,6 +778,16 @@ function saveEntry(){
     errBox.innerHTML = '<div class="err">Renseignez au moins une description ou une photo.</div>';
     window.scrollTo(0,0); return;
   }
+  const catSel = document.getElementById('f-cat').value;
+  const catAutre = document.getElementById('f-cat-autre').value.trim();
+  if(!catSel){
+    errBox.innerHTML = '<div class="err">Choisissez une catégorie (ou « Autre (préciser) »).</div>';
+    window.scrollTo(0,0); return;
+  }
+  if(catSel==='__autre' && !catAutre){
+    errBox.innerHTML = '<div class="err">Vous avez choisi « Autre » : écrivez la catégorie.</div>';
+    window.scrollTo(0,0); return;
+  }
   let loc = document.getElementById('f-loc').value;
   if(loc==='__autre') loc='';
   const entreeId = currentDraftId || uid();   // même id que le brouillon s'il y en a un
@@ -745,6 +803,8 @@ function saveEntry(){
     localisation_autre: document.getElementById('f-loc-autre').value.trim() || null,
     situation: situation || null,
     actions: actions || null,
+    categorie: catSel==='__autre' ? 'Autre' : catSel,
+    categorie_autre: catSel==='__autre' ? catAutre : null,
     created_at: new Date().toISOString()
   };
   RDZSync.save({ module:'rapport-standard', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
@@ -764,7 +824,7 @@ function draftActivite(){ return ACTIVITE || null; }
 function draftLink(id){ return 'rapport-standard.html?site_id=' + encodeURIComponent(SITE_ID||'') + '&site=' + encodeURIComponent(SITE_NOM||'') + '&activite=' + encodeURIComponent(ACTIVITE||'') + '&brouillon=' + encodeURIComponent(id); }
 function getFormState(){
   const v = id => document.getElementById(id).value;
-  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions') };
+  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions'), cat: v('f-cat'), cat_autre: v('f-cat-autre') };
 }
 function setSelDraft(id, val){
   const el = document.getElementById(id);
@@ -778,6 +838,10 @@ function applyFormState(s){
   document.getElementById('f-loc-autre').value = s.loc_autre || '';
   document.getElementById('f-situation').value = s.situation || '';
   document.getElementById('f-actions').value = s.actions || '';
+  if(s.cat && s.cat !== '__autre') setSelDraft('f-cat', s.cat); else document.getElementById('f-cat').value = s.cat || '';
+  document.getElementById('f-cat-autre').value = s.cat_autre || '';
+  onCatChange();
+  document.getElementById('f-cat-autre').value = s.cat_autre || '';
 }
 function draftResume(s){
   const t = (s.situation || s.actions || '').trim();
