@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-20 · fiche événement réordonnée : Ordre de service, puis Rapport à rédiger, puis « Cahier des charges Event » — fusion des checklists générique + responsable en une seule liste (doublons retirés par libellé normalisé), présentée comme pense-bête : cocher est facultatif, plus de compteur de progression. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-11 · bouton ← Retour sur la liste des événements (revient au journal de bord). Liste des événements en ordre chronologique : passés (sans rapport) / hier en haut, puis aujourd'hui, puis à venir. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · checklist-evenement-agent · v3 · 2026-08-02 -->
@@ -153,19 +154,13 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
         <div class="action-ico">📄</div>
         <div><div class="action-lbl">Ordre de service</div><div class="action-desc">Consulter et imprimer</div></div>
       </div>
-      <div class="action-btn" onclick="openChecklist('generique')">
-        <div class="action-ico">📋</div>
-        <div><div class="action-lbl">Checklist générique</div><div class="action-desc">À faire par tout agent en poste</div></div>
-        <div class="action-progress" id="prog-generique"></div>
-      </div>
-      <div class="action-btn" onclick="openChecklist('responsable')">
-        <div class="action-ico">⭐</div>
-        <div><div class="action-lbl">Checklist responsable</div><div class="action-desc">Chef de mission / agent désigné</div></div>
-        <div class="action-progress" id="prog-responsable"></div>
-      </div>
       <div class="action-btn" onclick="openRapport()">
-        <div class="action-ico">📄</div>
+        <div class="action-ico">📝</div>
         <div><div class="action-lbl">Rapport à rédiger</div><div class="action-desc">Rapport de fin d'événement</div></div>
+      </div>
+      <div class="action-btn" onclick="openChecklist()">
+        <div class="action-ico">📋</div>
+        <div><div class="action-lbl">Cahier des charges Event</div><div class="action-desc">Pense-bête — les points à ne pas oublier</div></div>
       </div>
     </div>
   </div>
@@ -175,7 +170,7 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <div class="screen hidden" id="s-checklist">
   <div class="topbar">
     <button class="tb-back" onclick="showScreen('s-fiche')">←</button>
-    <div><div class="tb-title" id="cl-title">Checklist</div><div class="tb-sub" id="cl-event-name"></div></div>
+    <div><div class="tb-title" id="cl-title">📋 Cahier des charges Event</div><div class="tb-sub" id="cl-event-name"></div></div>
   </div>
   <div class="body" id="checklist-body"></div>
 </div>
@@ -528,36 +523,62 @@ async function loadChecklistData(){
   }catch(e){ toast('Erreur checklist : '+e.message, true); }
 }
 
-function updateProgress(){
-  ['generique','responsable'].forEach(f => {
-    const secIds = sections.filter(s=>s.formulaire===f).map(s=>s.id);
-    const total = items.filter(i=>secIds.includes(i.section_id)).length;
-    const done = reponses.filter(r => items.find(i=>i.id===r.item_id && secIds.includes(i.section_id)) && r.checked).length;
-    document.getElementById('prog-'+f).textContent = total ? `${done}/${total}` : '';
-  });
-}
+// Plus de compteur x/y sur la fiche (2026-10-20) : le cahier des charges est un
+// pense-bête, pas une obligation — un compteur incomplet donnait l'impression
+// d'un travail non fait. Fonction conservée vide pour les appels existants.
+function updateProgress(){}
 
 // ─── CHECKLIST ────────────────────────────────────────────────────────────────
-function openChecklist(formulaire){
-  currentFormulaire = formulaire;
-  document.getElementById('cl-title').textContent = formulaire==='generique' ? '📋 Checklist générique' : '⭐ Checklist responsable';
+// Cahier des charges Event (2026-10-20) : fusion des formulaires « generique »
+// et « responsable » en une seule liste. Les sections de même nom sont
+// regroupées, et un point déjà présent (même libellé, à la casse, aux accents
+// et à la ponctuation près) n'est affiché qu'une fois — la version générique
+// est gardée, la version responsable est écartée. Les points propres au
+// responsable portent un petit repère ⭐. Cocher reste facultatif.
+function normLabel(t){
+  return (t||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+let mergedSections = [];
+function buildMerged(){
+  const ORDER = { generique:0, responsable:1 };
+  const secs = sections.filter(s=>s.formulaire in ORDER)
+    .sort((a,b)=> (ORDER[a.formulaire]-ORDER[b.formulaire]) || (a.ordre-b.ordre));
+  const bySec = new Map(); const seen = new Map(); // seen : label normalisé -> point gardé
+  mergedSections = [];
+  secs.forEach(sec => {
+    const key = normLabel(sec.label);
+    let grp = bySec.get(key);
+    if(!grp){ grp = { label: sec.label, items: [] }; bySec.set(key, grp); mergedSections.push(grp); }
+    items.filter(i=>i.section_id===sec.id).sort((a,b)=>a.ordre-b.ordre).forEach(it => {
+      const k = normLabel(it.label);
+      if(!k) return;
+      if(seen.has(k)){ seen.get(k).ids.push(it.id); return; } // doublon : on retient juste son id
+      const m = { id: it.id, ids: [it.id], label: it.label, tag: it.tag, resp: sec.formulaire==='responsable' };
+      seen.set(k, m); grp.items.push(m);
+    });
+  });
+  mergedSections = mergedSections.filter(g=>g.items.length);
+}
+function openChecklist(){
   document.getElementById('cl-event-name').textContent = currentEvent.titre;
+  buildMerged();
   renderChecklist();
   showScreen('s-checklist');
 }
 function renderChecklist(){
-  const secs = sections.filter(s=>s.formulaire===currentFormulaire).sort((a,b)=>a.ordre-b.ordre);
   const el = document.getElementById('checklist-body');
-  if(!secs.length){ el.innerHTML = `<div class="state-msg">Aucune checklist configurée.</div>`; return; }
-  el.innerHTML = secs.map(sec => {
-    const secItems = items.filter(i=>i.section_id===sec.id).sort((a,b)=>a.ordre-b.ordre);
-    return `<div class="sec-title">${escHtml(sec.label)}</div>` + secItems.map(it => {
-      const rep = reponses.find(r=>r.item_id===it.id);
-      const checked = rep && rep.checked;
+  if(!mergedSections.length){ el.innerHTML = `<div class="state-msg">Aucun cahier des charges configuré.</div>`; return; }
+  const intro = `<div style="margin:12px 14px 4px;padding:10px 12px;background:#fff8e6;border:1px solid #f1dca6;border-radius:10px;font-size:12.5px;line-height:1.45;color:#5b4a1a">
+    💡 <b>Pense-bête</b> — les points à garder en tête pendant l'événement. Rien n'est obligatoire à cocher : tu peux t'en servir pour te repérer, si ça t'aide.</div>`;
+  el.innerHTML = intro + mergedSections.map(grp => {
+    return `<div class="sec-title">${escHtml(grp.label)}</div>` + grp.items.map(it => {
+      const rep = reponses.find(r=>it.ids.includes(r.item_id) && r.checked);
+      const checked = !!rep;
       return `<div class="chk-row" onclick="toggleItem('${it.id}')">
         <div class="chk-box ${checked?'on':''}">${checked?'✓':''}</div>
         <div class="chk-txt">
-          ${it.tag ? `<span class="chk-tag">${escHtml(it.tag)}</span><br>` : ''}
+          ${it.tag || it.resp ? `<span class="chk-tag">${it.resp?'⭐ Responsable':''}${it.resp&&it.tag?' · ':''}${escHtml(it.tag||'')}</span><br>` : ''}
           ${escHtml(it.label)}
           ${checked && rep.agent_nom ? `<div class="chk-meta">✓ ${escHtml(rep.agent_nom)} — ${new Date(rep.checked_at).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}</div>` : ''}
         </div>
@@ -566,8 +587,10 @@ function renderChecklist(){
   }).join('');
 }
 async function toggleItem(itemId){
-  const existing = reponses.find(r=>r.item_id===itemId);
-  const nowChecked = !(existing && existing.checked);
+  const grpItem = mergedSections.flatMap(g=>g.items).find(m=>m.id===itemId);
+  const ids = grpItem ? grpItem.ids : [itemId];
+  const existing = reponses.find(r=>ids.includes(r.item_id) && r.checked);
+  const nowChecked = !existing;
   try{
     if(nowChecked){
       const { data, error } = await sb.from('evenements_checklist_reponses')
@@ -577,8 +600,8 @@ async function toggleItem(itemId){
       const idx = reponses.findIndex(r=>r.item_id===itemId);
       if(idx>-1) reponses[idx]=data; else reponses.push(data);
     }else{
-      await sb.from('evenements_checklist_reponses').delete().eq('evenement_id',currentEvent.id).eq('item_id',itemId);
-      reponses = reponses.filter(r=>r.item_id!==itemId);
+      await sb.from('evenements_checklist_reponses').delete().eq('evenement_id',currentEvent.id).in('item_id',ids);
+      reponses = reponses.filter(r=>!ids.includes(r.item_id));
     }
     renderChecklist();
     updateProgress();
