@@ -1,4 +1,4 @@
-<!-- RDZ · rapport-standard · 2026-10-20 (b) · champ « Catégorie » après la localisation : liste par site (table journal_categories, réglable dans journal-config.html) + « Autre (préciser) » avec saisie libre → journal_entrees.categorie / categorie_autre ; catégorie obligatoire à la clôture (pas pour un simple enregistrement). Boutons Enregistrer / Enregistrer et clôturer placés à la fin du formulaire (plus flottants). -->
+<!-- RDZ · rapport-standard · 2026-10-20 (c) · champ « Catégorie » après la localisation = liste « Nature / Type d'action » de supervision-rapports.html reprise mot à mot (sans Alarmes), identique pour tous les sites : Catégorie puis Type d'action en cascade, « Autre » → précision libre. Écrit dans journal_entrees.nature_activite / type_action / categorie_autre ; obligatoire à la clôture (pas pour un simple enregistrement). Remplace la liste par site (journal_categories), abandonnée. Boutons Enregistrer / Enregistrer et clôturer placés à la fin du formulaire (plus flottants). -->
 <!-- RDZ · rapport-standard · 2026-10-20 · brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · rapport-standard · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-standard · v2 · 2026-08-09 -->
@@ -227,10 +227,14 @@ textarea{min-height:110px!important}
 
       <div class="field">
         <label>Catégorie</label>
-        <select id="f-cat" onchange="onCatChange()"><option value="">— Choisir —</option></select>
+        <select id="f-nature" onchange="onNatureChange()"><option value="">— Choisir —</option></select>
+      </div>
+      <div class="field hidden" id="f-type-wrap">
+        <label>Type d'action</label>
+        <select id="f-type" onchange="onTypeChange()"><option value="">— Choisir —</option></select>
       </div>
       <div class="field hidden" id="f-cat-autre-wrap">
-        <label>Préciser la catégorie</label>
+        <label>Préciser</label>
         <input type="text" id="f-cat-autre" placeholder="Écrivez la catégorie…">
       </div>
 
@@ -600,7 +604,7 @@ async function init(){
   document.getElementById('m-site').textContent = SITE_NOM;
   document.getElementById('m-activite').textContent = ACTIVITE;
   await loadLocalisations();
-  await loadCategories();
+  fillNatures();
   resetForm();
   bindMics();
   show('screen-form');
@@ -616,9 +620,8 @@ function resetForm(){
   document.getElementById('f-actions').value = '';
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';
-  document.getElementById('f-cat').value = '';
-  document.getElementById('f-cat-autre').value = '';
-  onCatChange();
+  document.getElementById('f-nature').value = '';
+  onNatureChange();
   show('screen-form');
 }
 
@@ -634,33 +637,80 @@ async function loadLocalisations(){
   const o=document.createElement('option'); o.value='__autre'; o.textContent='Autre / non listé'; sel.appendChild(o);
 }
 
-/* ---------- catégories (2026-10-20) ----------
-   Liste propre au site (journal_categories, réglée dans journal-config.html)
-   + catégories communes (site_id null), puis « Autre (préciser) » qui ouvre
-   une saisie libre. Copie locale par site : la liste reste disponible hors
-   réseau si elle a déjà été chargée une fois sur ce téléphone. */
-async function loadCategories(){
-  const sel = document.getElementById('f-cat');
-  const cacheKey = 'rdz_journal_categories_' + (SITE_ID || 'tous');
-  let labels = null;
-  try{
-    let q = sb.from('journal_categories').select('label,ordre,site_id').eq('actif',true);
-    q = SITE_ID ? q.or('site_id.is.null,site_id.eq.'+SITE_ID) : q.is('site_id',null);
-    const { data, error } = await q.order('ordre');
-    if(error) throw error;
-    // catégories du site d'abord, puis communes ; sans doublon
-    const rows = (data||[]).slice().sort((a,b)=> (a.site_id?0:1)-(b.site_id?0:1) || (a.ordre||0)-(b.ordre||0));
-    labels = [...new Set(rows.map(r=>r.label))];
-    try{ localStorage.setItem(cacheKey, JSON.stringify(labels)); }catch(e){}
-  }catch(e){
-    try{ labels = JSON.parse(localStorage.getItem(cacheKey)||'null'); }catch(e2){ labels = null; }
-  }
-  sel.innerHTML = '<option value="">— Choisir —</option>';
-  (labels||[]).forEach(l=>{ const o=document.createElement('option'); o.value=l; o.textContent=l; sel.appendChild(o); });
-  const o=document.createElement('option'); o.value='__autre'; o.textContent='Autre (préciser)'; sel.appendChild(o);
+/* ---------- catégorie (2026-10-20 b) ----------
+   Liste reprise MOT À MOT de ACTIVITY_TAXONOMY dans
+   centraliste/supervision-rapports.html (« Nature / Type d'action »), sans
+   « Alarmes » (chaque site a son rapport d'alarme). Les deux listes doivent
+   rester identiques : toute modification se fait aux deux endroits.
+   Le choix de l'agent est écrit directement dans nature_activite /
+   type_action — la classification arrive donc déjà remplie en supervision,
+   où le superviseur peut la corriger. Type d'action « Autre » → précision
+   libre obligatoire (categorie_autre). */
+const STD_NATURE_ORDER = ["Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
+const STD_TAXONOMY = {
+  "Accès": [
+    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
+    "Fermeture d'un accès principal ou secondaire essentiel",
+    "Accompagnement entreprise",
+    "Site non hermétique",
+    "Contrôle de légitimation (personnel, étudiant, locataire)",
+    "Stationnement non autorisé, stationnement gênant",
+    "Autre"
+  ],
+  "Admin / conciergerie": [
+    "Objets trouvés",
+    "Administratif (Imprimantes, colis, Poste, ...)",
+    "Housing (draps, divers, ...)",
+    "Check-In / Check-Out"
+  ],
+  "Incivilité": [
+    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
+    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
+    "Détérioration de matériel",
+    "Encombrant dans voie de fuite",
+    "Autre"
+  ],
+  "Secourisme": [
+    "Assistance à la personne - Intervention 144",
+    "Assistance à la personne - Premiers soins",
+    "Assistance divers (Ronde de contrôle)",
+    "Autre"
+  ],
+  "Sécurité": [
+    "Evacuation - Personne(s) non autorisée(s) sur espace public",
+    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
+    "Evacuation - Fête non autorisée",
+    "Evacuation - SDF",
+    "Traces de squat",
+    "Gestion de comportement / conflit",
+    "Vol",
+    "Tapage nocturne / diurne",
+    "Autre"
+  ],
+  "Technique": [
+    "Constat de dysfonctionnement d'installation",
+    "Intervention technique (Plomberie, Electricité, …)",
+    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
+    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
+    "Divers technique (Déneigement, Nettoyage sommaire...)",
+    "Autre"
+  ]
+};
+function fillNatures(){
+  const sel = document.getElementById('f-nature');
+  sel.innerHTML = '<option value="">— Choisir —</option>' + STD_NATURE_ORDER.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
 }
-function onCatChange(){
-  const autre = document.getElementById('f-cat').value === '__autre';
+function onNatureChange(keepType){
+  const n = document.getElementById('f-nature').value;
+  const tSel = document.getElementById('f-type');
+  const list = STD_TAXONOMY[n] || [];
+  tSel.innerHTML = '<option value="">— Choisir —</option>' + list.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  document.getElementById('f-type-wrap').classList.toggle('hidden', !n);
+  if(keepType && list.includes(keepType)) tSel.value = keepType;
+  onTypeChange();
+}
+function onTypeChange(){
+  const autre = document.getElementById('f-type').value === 'Autre';
   document.getElementById('f-cat-autre-wrap').classList.toggle('hidden', !autre);
   if(!autre) document.getElementById('f-cat-autre').value = '';
 }
@@ -778,14 +828,15 @@ function saveEntry(){
     errBox.innerHTML = '<div class="err">Renseignez au moins une description ou une photo.</div>';
     window.scrollTo(0,0); return;
   }
-  const catSel = document.getElementById('f-cat').value;
+  const natSel = document.getElementById('f-nature').value;
+  const typeSel = document.getElementById('f-type').value;
   const catAutre = document.getElementById('f-cat-autre').value.trim();
-  if(!catSel){
-    errBox.innerHTML = '<div class="err">Choisissez une catégorie (ou « Autre (préciser) »).</div>';
+  if(!natSel || !typeSel){
+    errBox.innerHTML = '<div class="err">Choisissez une catégorie et un type d\'action.</div>';
     window.scrollTo(0,0); return;
   }
-  if(catSel==='__autre' && !catAutre){
-    errBox.innerHTML = '<div class="err">Vous avez choisi « Autre » : écrivez la catégorie.</div>';
+  if(typeSel==='Autre' && !catAutre){
+    errBox.innerHTML = '<div class="err">Vous avez choisi « Autre » : précisez.</div>';
     window.scrollTo(0,0); return;
   }
   let loc = document.getElementById('f-loc').value;
@@ -803,8 +854,9 @@ function saveEntry(){
     localisation_autre: document.getElementById('f-loc-autre').value.trim() || null,
     situation: situation || null,
     actions: actions || null,
-    categorie: catSel==='__autre' ? 'Autre' : catSel,
-    categorie_autre: catSel==='__autre' ? catAutre : null,
+    nature_activite: natSel,
+    type_action: typeSel,
+    categorie_autre: typeSel==='Autre' ? catAutre : null,
     created_at: new Date().toISOString()
   };
   RDZSync.save({ module:'rapport-standard', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
@@ -824,7 +876,7 @@ function draftActivite(){ return ACTIVITE || null; }
 function draftLink(id){ return 'rapport-standard.html?site_id=' + encodeURIComponent(SITE_ID||'') + '&site=' + encodeURIComponent(SITE_NOM||'') + '&activite=' + encodeURIComponent(ACTIVITE||'') + '&brouillon=' + encodeURIComponent(id); }
 function getFormState(){
   const v = id => document.getElementById(id).value;
-  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions'), cat: v('f-cat'), cat_autre: v('f-cat-autre') };
+  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions'), nature: v('f-nature'), type: v('f-type'), cat_autre: v('f-cat-autre') };
 }
 function setSelDraft(id, val){
   const el = document.getElementById(id);
@@ -838,9 +890,8 @@ function applyFormState(s){
   document.getElementById('f-loc-autre').value = s.loc_autre || '';
   document.getElementById('f-situation').value = s.situation || '';
   document.getElementById('f-actions').value = s.actions || '';
-  if(s.cat && s.cat !== '__autre') setSelDraft('f-cat', s.cat); else document.getElementById('f-cat').value = s.cat || '';
-  document.getElementById('f-cat-autre').value = s.cat_autre || '';
-  onCatChange();
+  document.getElementById('f-nature').value = STD_TAXONOMY[s.nature] ? s.nature : '';
+  onNatureChange(s.type);
   document.getElementById('f-cat-autre').value = s.cat_autre || '';
 }
 function draftResume(s){
