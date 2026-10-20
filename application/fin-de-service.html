@@ -1,3 +1,4 @@
+<!-- RDZ · fin-de-service · v12 · 2026-10-20 · nouveau bloc « 📝 Rapports non clôturés » : brouillons de rapport standard / alarme / autres types enregistrés avec « 💾 Enregistrer » mais pas encore clôturés (table rapports_brouillons + copie locale rdz_brouillons), avec lien « Reprendre » ; compté dans les éléments en suspens. -->
 <!-- RDZ · fin-de-service · v11 · 2026-10-19 · la confirmation de fin de service referme aussi le service de l'agent (services_agents, ouvert par « Je prends mon service » dans prise-de-poste.html) → voyant rouge dans mobile.html. Via RDZSync (hors ligne OK). Nécessite migration-services-agents.sql.
      v10 · 2026-10-16 · la confirmation de fin de service ferme aussi le service radio (radio_services) : l'agent est déconnecté de radio-agent.html. Hors ligne : fermeture mise en file RDZSync. Nécessite migration-radio-postes.sql.
      v9 · 2026-09-24 (RDZSync v5 : progression photos, interruption/reprise, vérification serveur) -->
@@ -505,10 +506,10 @@ function fmtDT(iso) { if (!iso) return '—'; const d = new Date(iso); return d.
 function escHtml(s) { return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function sameAgent(nom) { return (nom || '').trim().toLowerCase() === AGENT_NOM.trim().toLowerCase(); }
 
-let RESULT = { vehicules: [], materiel: [], consignesOk: null, feuilleRoute: [] };
+let RESULT = { vehicules: [], materiel: [], consignesOk: null, feuilleRoute: [], brouillons: [] };
 
 async function loadAll() {
-  await Promise.all([loadVehicules(), loadMateriel(), loadConsignes(), loadFeuilleRoute()]);
+  await Promise.all([loadVehicules(), loadMateriel(), loadConsignes(), loadFeuilleRoute(), loadBrouillons()]);
   render();
 }
 
@@ -589,6 +590,29 @@ async function loadFeuilleRoute() {
   } catch (err) { console.warn('loadFeuilleRoute:', err.message); }
 }
 
+// 5) RAPPORTS NON CLÔTURÉS — brouillons enregistrés (« 💾 Enregistrer ») dans
+// rapport-standard / alarme-rapport / rapport-type-agent, pas encore clôturés.
+// Serveur (rapports_brouillons) + copie locale « rdz_brouillons » (hors ligne) :
+// la plus récente des deux l'emporte, comme dans les pages de rapport.
+async function loadBrouillons() {
+  RESULT.brouillons = [];
+  const tsOf = x => { const t = new Date(x || 0).getTime(); return isNaN(t) ? 0 : t; };
+  const map = new Map();
+  try {
+    const { data, error } = await sb.from('rapports_brouillons').select('*').eq('statut', 'brouillon');
+    if (error) throw error;
+    (data || []).filter(d => sameAgent(d.agent_nom)).forEach(d => map.set(d.id, d));
+  } catch (err) { console.warn('loadBrouillons:', err.message || err); }
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem('rdz_brouillons') || '[]'); } catch (e) {}
+  local.filter(d => sameAgent(d.agent_nom)).forEach(d => {
+    const s = map.get(d.id);
+    if (!s || tsOf(d.updated_at) >= tsOf(s.updated_at)) map.set(d.id, d);
+  });
+  RESULT.brouillons = [...map.values()].filter(d => d.statut === 'brouillon')
+    .sort((a, b) => tsOf(b.updated_at) - tsOf(a.updated_at));
+}
+
 // ── DÉTAIL DES ÉLÉMENTS EN FILE (texte + photos) ────────────────────────────────
 // RDZSync.getStatus() ne renvoie qu'un compteur global — insuffisant pour savoir CE QUI
 // reste bloqué (ex. un module dont une écriture échoue en boucle, bloquant tout ce qui
@@ -619,7 +643,7 @@ function buildPendingDetail() {
 function render() {
   const st = RDZSync.getStatus();
   const anyWarn = RESULT.vehicules.length > 0 || RESULT.materiel.length > 0
-    || RESULT.consignesOk === false || RESULT.feuilleRoute.length > 0
+    || RESULT.consignesOk === false || RESULT.feuilleRoute.length > 0 || RESULT.brouillons.length > 0
     || st.textPending > 0 || st.photoPending > 0;
 
   let html = anyWarn
@@ -681,6 +705,22 @@ function render() {
         <div class="item-txt"><div class="item-main">${escHtml(f.name)}</div>
         <div class="item-meta">Pas encore confirmée complète pour aujourd'hui</div></div>
         <div class="item-action"><a class="link-btn" href="feuille-route-agent.html">Confirmer</a></div></div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Rapports non clôturés (brouillons)
+  html += `<div class="block"><div class="block-hdr"><div class="block-title">📝 Rapports non clôturés</div>
+    <span class="block-status ${RESULT.brouillons.length ? 'st-warn' : 'st-ok'}">${RESULT.brouillons.length ? RESULT.brouillons.length + ' à clôturer' : 'OK'}</span></div>`;
+  if (RESULT.brouillons.length === 0) {
+    html += `<div class="empty-block">Aucun rapport en cours.</div>`;
+  } else {
+    RESULT.brouillons.forEach(d => {
+      const typ = d.module === 'alarme-rapport' ? 'Alarme' : (d.activite || 'Rapport');
+      html += `<div class="item-row"><div class="item-dot dot-warn"></div>
+        <div class="item-txt"><div class="item-main">${escHtml(typ)} — ${escHtml(d.site_nom || '')}</div>
+        <div class="item-meta">${escHtml(d.resume || '')}<br>Enregistré le ${fmtDT(d.updated_at)} — pas encore transmis au centraliste</div></div>
+        <div class="item-action">${d.lien ? `<a class="link-btn" href="${escHtml(d.lien)}">Reprendre</a>` : ''}</div></div>`;
     });
   }
   html += `</div>`;
@@ -789,6 +829,7 @@ function buildMissingList() {
   if (RESULT.materiel.length) items.push(`🎒 ${RESULT.materiel.length} matériel/accès à rendre`);
   if (RESULT.consignesOk === false) items.push(`📋 Consignes non validées aujourd'hui`);
   if (RESULT.feuilleRoute.length) items.push(`🕐 ${RESULT.feuilleRoute.length} feuille(s) de route non confirmée(s)`);
+  if (RESULT.brouillons.length) items.push(`📝 ${RESULT.brouillons.length} rapport(s) non clôturé(s) — pas encore transmis au centraliste`);
   if (st.textPending) items.push(`📡 ${st.textPending} donnée(s) texte en attente de réseau`);
   if (st.photoPending) items.push(`📷 ${st.photoPending} photo(s) en attente d'envoi`);
   return items;
