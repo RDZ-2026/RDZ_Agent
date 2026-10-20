@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-10-20 (c) · Ordre de service : retrait du bloc « Prise en charge — à signer par l'agent » (nom, date, signature) — le document n'est pas imprimé. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (b) · Cahier des charges Event en simple mémo : plus aucune case à cocher, liste en lecture seule (points à puce). -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 · fiche événement réordonnée : Ordre de service, puis Rapport à rédiger, puis « Cahier des charges Event » — fusion des checklists générique + responsable en une seule liste (doublons retirés par libellé normalisé), présentée comme pense-bête : cocher est facultatif, plus de compteur de progression. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-11 · bouton ← Retour sur la liste des événements (revient au journal de bord). Liste des événements en ordre chronologique : passés (sans rapport) / hier en haut, puis aujourd'hui, puis à venir. -->
@@ -834,7 +835,6 @@ function buildOrdreDeServiceHtml(e){
     </table>
   </div>`;
 
-  html += signatureBlock();
   html += `<div style="margin-top:16px;border-top:1px solid #d0ccc5;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#9a9a9a">
     <span>RDZ Security Management SA — Document confidentiel à usage interne</span>
     <span>${fmt(e.date)}</span>
