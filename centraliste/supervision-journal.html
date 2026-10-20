@@ -1,3 +1,4 @@
+<!-- v54 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre) affichée dans le détail, la liste et le rapport imprimable. -->
 <!-- v53 · 2026-10-11 · créneaux du planning Agendrix (frise par agent + tuile « Agents en service ») relus à l'heure du planning : plus de décalage de +2 h (l'heure est stockée « murale » en UTC par planning-agendrix.html). -->
 <!-- v52 · 2026-10-11 · Rapport direction : nouvelle section finale « Frise d'activité par agent » — une frise temporelle par agent sur la journée de service (ou la période) sélectionnée : créneau prévu au planning (Agendrix) en bandeau clair + un point par action (rapports, alarmes, validations de consignes, ouvertures, comptages, badges, véhicules…), couleur = type d'action. Clic sur un point → rapport RDZ / détail ; clic sur le nom → liste des actions de l'agent. -->
 <!-- v51 · 2026-10-11 · (1) Journée de service / Vue complète : filtres Catégorie, Agent et Site à SÉLECTION MULTIPLE (cases à cocher dans un menu ; rien de coché = tout). (2) Rapport direction : graphiques des modules de comptage (comptage_releves) dans la carte du site concerné, un graphique par module — un point par relevé sur une journée, total par jour sur une période ; clic sur un point → liste des relevés → rapport RDZ du relevé, avec bouton « Détail / Modifier ». (3) Relevé de comptage : rapport RDZ imprimable + modification (compteurs, listes, note) directement ici. (4) Aperçu d'un rapport : bouton « ✏️ Détail / Modifier » pour passer du rapport RDZ à la fiche modifiable. -->
@@ -916,6 +917,13 @@ function rapportTs(raw){
 /* Date LOCALE (Genève) au format AAAA-MM-JJ — toISOString() donnait la date
    UTC : un rapport enregistré entre minuit et 2 h affichait la veille. */
 function localYMD(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* Catégorie choisie par l'agent (rapport standard, 2026-10-20) */
+function catFull(o){
+  if(!o) return '';
+  const a = String(o.categorie||'').trim(), b = String(o.categorie_autre||'').trim();
+  if(a && b && a!==b) return a + ' — ' + b;
+  return a || b;
+}
 function locFull(o){
   if(!o) return '';
   const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
@@ -1262,7 +1270,8 @@ function buildStandardReport(r){
     return rpRdzShell(esc(customTypeLabel(r)), esc(r.nature_activite || (RAPPORT_TYPES[r.rapport_type_id]||{}).nom || '—'), bodyC, metaC);
   }
   const body = rpSec('1 — Contexte',
-      rpFieldO('Localisation', esc(locFull(r)||'—'))
+      (catFull(r) ? rpFieldO('Catégorie', esc(catFull(r))) + '<div style="margin-top:10px"></div>' : '')
+      + rpFieldO('Localisation', esc(locFull(r)||'—'))
       + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + rpClotureRow(r.statut_cloture||null))
@@ -1790,7 +1799,7 @@ const SOURCES = [
         const parts = [locFull(r), ...parseReponses(r.reponses).map(q=>reponseValueText(q)).filter(v=>v && v!=='—')].filter(Boolean);
         return parts.slice(0,3).join(' · ');
       }
-      const parts=[r.activite, locFull(r), r.situation].filter(Boolean); return parts.join(' · ')||(r.actions||''); },
+      const parts=[r.activite, catFull(r), locFull(r), r.situation].filter(Boolean); return parts.join(' · ')||(r.actions||''); },
     photos(r){ return journalPhotosByEntree[r.id]||[]; },
     detailHtml(r){
       if(isCustomTypeReport(r)){
@@ -1805,6 +1814,7 @@ const SOURCES = [
         <div class="msec"><div class="st">Statut de clôture</div><div class="txt">${rpClotureBadge(r.statut_cloture)}</div></div>`;
       }
       return `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.activite||'—')}</div></div>
+        <div class="msec"><div class="st">Catégorie (agent)</div><div class="txt">${esc(catFull(r)||'—')}</div></div>
         <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r)||'—')}</div></div>
         <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.situation||'—')}</div></div>
         <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.actions||'—')}</div></div>
