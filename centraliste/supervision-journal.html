@@ -1,4 +1,5 @@
-<!-- v55 · 2026-10-22 · statut de clôture « 🔒 Situation sécurisée » (clé 'securise') ajouté à la liste — considéré comme clos (n'apparaît pas dans les problèmes en cours). Rien d'autre ne change. -->
+<!-- v56 · 2026-10-22 · retrait du statut « Situation sécurisée » ajouté en v55 (statuts de clôture d'origine). -->
+<!-- v55 · 2026-10-22 · statut de clôture « 🔒 Situation sécurisée » (clé 'securise') ajouté à la liste — retiré en v56. -->
 <!-- v54 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre) affichée dans le détail, la liste et le rapport imprimable. -->
 <!-- v53 · 2026-10-11 · créneaux du planning Agendrix (frise par agent + tuile « Agents en service ») relus à l'heure du planning : plus de décalage de +2 h (l'heure est stockée « murale » en UTC par planning-agendrix.html). -->
 <!-- v52 · 2026-10-11 · Rapport direction : nouvelle section finale « Frise d'activité par agent » — une frise temporelle par agent sur la journée de service (ou la période) sélectionnée : créneau prévu au planning (Agendrix) en bandeau clair + un point par action (rapports, alarmes, validations de consignes, ouvertures, comptages, badges, véhicules…), couleur = type d'action. Clic sur un point → rapport RDZ / détail ; clic sur le nom → liste des actions de l'agent. -->
@@ -1136,7 +1137,6 @@ function rpClotureRow(selKey){
    ============================================================ */
 const CLOTURE_OPTIONS = [
   {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
-  {k:'securise', label:'🔒 Situation sécurisée', color:'#2d5f8a', bg:'#eef4fa'}, // v55 : même liste que supervision-rapports / rapport-standard
   {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
   {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
   {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
