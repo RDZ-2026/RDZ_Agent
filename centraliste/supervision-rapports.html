@@ -1,4 +1,5 @@
-<!-- RDZ · supervision-rapports · v30 · 2026-10-22 · RÉFÉRENTIEL COMMUN agent/supervision (migration-referentiel-constats.sql) : catégories / types de constat lus dans ref_categories_constat / ref_types_constat (mêmes libellés que rapport-standard.html), code stable type_constat_code enregistré à chaque classification, gravité, actions réalisées (cases), statut « 🔒 Situation sécurisée », onglet 📊 Statistiques + export CSV. Anciennes classifications conservées et affichées « (ancien) ». Colonnes nature_activite / type_action inchangées (libellés). -->
+<!-- v31 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre — « Autre — texte libre ») : affichée dans le détail, la liste, le rapport imprimable (section 1) et transmise à l'IA ; modifiable via « Modifier ». Distincte de Nature / Type d'action, inchangés. -->
+<!-- v30 · 2026-10-19 · impression/PDF : un rapport tient sur UNE page A4 par défaut. Juste avant l'impression, chaque rapport (.rp-doc) est mesuré ; s'il dépasse un peu une page, il est d'abord resserré (espaces entre sections, marges, hauteur des photos — .rp-compact), puis réduit légèrement (zoom, jamais sous 80 %). S'il ne tient toujours pas, rien n'est forcé : mise en page normale sur plusieurs pages (règles v19 inchangées). -->
 <!-- v29 · 2026-10-11 · nouveau statut « ✉️ À envoyer au client » (après « À revoir », avant « Transmis au client » / « Validé ») — NON verrouillé : modifiable librement, reste dans la vue À valider. Nécessite migration-statut-a-envoyer.sql. -->
 <!-- v28 · 2026-10-11 · tableau : colonne « Aperçu » retirée pour libérer la place (boutons Détail / Supprimer de nouveau visibles). La recherche continue de porter sur le texte du rapport. -->
 <!-- v27 · 2026-10-11 · tableau (vues À valider et Tous les rapports) : nouvelle colonne « Nature / Type d'action » à côté du statut. -->
@@ -162,6 +163,21 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
 .report-view.open{display:block}
 .report-view .report-inner{max-width:820px;margin:0 auto}
 .report-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+/* v30 : mode resserré, posé par fitDocsOnePage() juste avant l'impression
+   (retiré après). Les styles du rapport étant en ligne, !important est requis. */
+.rp-doc.rp-compact > div:first-child{padding:1.1rem 2rem!important}
+.rp-doc.rp-compact > div:first-child > div:first-child{margin:-1.1rem -2rem 1rem!important}
+.rp-doc.rp-compact > div:nth-child(3){padding:1rem 1.5rem!important}
+.rp-doc.rp-compact .rp-sec{margin-bottom:.9rem!important}
+.rp-doc.rp-compact .rp-sec-h{padding:.5rem 1rem!important}
+.rp-doc.rp-compact .rp-sec > div:last-child{padding:.8rem 1rem .7rem!important}
+.rp-doc.rp-compact .rp-block{margin-bottom:1rem!important}
+.rp-doc.rp-compact .rp-block:not(:last-child){padding-bottom:1rem!important}
+.rp-doc.rp-compact .rp-photo > div:last-child{min-height:120px!important}
+.rp-doc.rp-compact .rp-photo img{max-height:230px!important}
+.rp-doc.rp-compact .rp-photo-row{gap:12px!important}
+.rp-doc.rp-compact .rp-photo-row + .rp-photo-row{margin-top:12px!important}
+.rp-doc.rp-compact .rp-foot{padding:.7rem 2rem!important}
 @media print{
   body > *:not(.report-view){display:none!important}
   .report-view{display:block!important;position:static!important;background:none!important;overflow:visible!important;margin:0;max-width:100%;padding:0}
@@ -368,21 +384,6 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
     .btn-nav{padding:7px 10px!important;font-size:10.5px!important}
   }
 }
-/* v30 — onglet Statistiques */
-.st-hidden{display:none!important}
-.stats-sum{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 16px}
-.stats-sum .k{background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:10px 14px;min-width:150px}
-.stats-sum .k b{display:block;font-size:22px;color:var(--ink)}
-.stats-sum .k span{font-size:12px;color:#666}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:16px}
-.stats-box{background:#fff;border:1px solid var(--line-soft);border-radius:10px;padding:12px 14px;overflow-x:auto}
-.stats-box h4{font-size:14px;margin:0 0 8px;color:var(--ink)}
-.stats-box table{font-size:12.5px}
-.stats-box th{background:#f0f0f0;color:#333;text-transform:none;letter-spacing:0;font-size:11.5px}
-.stats-box td{padding:6px 8px}
-.stats-box td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.sbar{height:8px;background:var(--red);border-radius:4px;min-width:2px}
-.stats-note{font-size:12px;color:#777;margin:4px 0 12px}
 </style>
 
 </head>
@@ -406,7 +407,6 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
       <div class="view-tabs">
         <button class="view-tab on" id="tab-avalider" onclick="setView('avalider')">🗂️ À valider <span class="n" id="cnt-avalider">…</span></button>
         <button class="view-tab" id="tab-tous" onclick="setView('tous')">📋 Tous les rapports <span class="n" id="cnt-tous">…</span></button>
-        <button class="view-tab" id="tab-stats" onclick="setView('stats')">📊 Statistiques</button>
         <button class="linklike" style="margin-left:auto" onclick="openChangePin()" title="Définir ou changer le code de validation direction">🔑 Code de validation</button>
       </div>
       <div class="view-hint" id="view-hint"></div>
@@ -462,13 +462,12 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
           <thead>
             <tr>
               <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
-              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Catégorie / Type de constat</th><th>Site</th><th>Agent</th><th>Photos</th><th></th>
+              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Nature / Type d'action</th><th>Site</th><th>Agent</th><th>Photos</th><th></th>
             </tr>
           </thead>
           <tbody id="list-body"><tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr></tbody>
         </table>
       </div>
-      <div id="stats-panel" class="st-hidden"></div>
     </div>
   </main>
 </div>
@@ -668,99 +667,76 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
    ses types d'action INCENDIE / INTRUSION / TECHNIQUE / Autre. Pour les
    interventions alarme (alarme_interventions), rien ne change : nature
    toujours "Alarmes", seul le type se choisit. */
-/* ============================================================================
-   RDZ · référentiel constats · v1 · 2026-10-22
-   BLOC IDENTIQUE dans rapport-standard.html (agent) et supervision-rapports.html
-   (centraliste) : même source, mêmes libellés des deux côtés.
-   Source : tables Supabase ref_categories_constat / ref_types_constat /
-   ref_actions_rapport (migration-referentiel-constats.sql). Copie gardée en
-   cache sur l'appareil (hors-ligne) ; à défaut, liste intégrée ci-dessous
-   (= contenu initial de la migration).
-   ============================================================================ */
-const RDZ_LBL = { categorie: 'Catégorie', type: 'Type de constat', actions: 'Actions réalisées', gravite: 'Gravité', cloture: 'Statut de clôture' };
-const RDZ_GRAVITES = [
-  {k:'faible',   label:'Faible',   color:'#1e6b1e'},
-  {k:'moderee',  label:'Modérée',  color:'#b8860b'},
-  {k:'elevee',   label:'Élevée',   color:'#c0560b'},
-  {k:'critique', label:'Critique', color:'#C8102E'}
-];
-/* Statut de clôture — clés en base INCHANGÉES (regle/action/info/probleme,
-   lues par le rapport direction) + 'securise'. Libellés communs agent/supervision. */
-const RDZ_CLOTURES = [
-  {k:'regle',    label:'✔ Situation terminée',  color:'#1e6b1e', bg:'#f0f8f0'},
-  {k:'securise', label:'🔒 Situation sécurisée', color:'#2d5f8a', bg:'#eef4fa'},
-  {k:'action',   label:'📅 Action à venir',      color:'#b45c00', bg:'#fff8f0'},
-  {k:'info',     label:'ℹ️ Pour information',    color:'#1a5a8a', bg:'#f0f6ff'},
-  {k:'probleme', label:'⚠️ Problème en cours',   color:'#C8102E', bg:'#fdf5f5'}
-];
-const RDZ_CLOTURES_FERMEES = ['regle','securise','info']; // posent cloture_at
-const RDZRef = (function(){
-  const SEED = {"categories": [{"code": "RDZ-01", "libelle": "Sécurité / Incidents", "ordre": 10}, {"code": "RDZ-02", "libelle": "Accès / Stationnement", "ordre": 20}, {"code": "RDZ-03", "libelle": "Technique / Maintenance", "ordre": 30}, {"code": "RDZ-04", "libelle": "Incendie / Prévention", "ordre": 40}, {"code": "RDZ-05", "libelle": "Secourisme / Assistance", "ordre": 50}, {"code": "RDZ-06", "libelle": "Propreté / Dégradations", "ordre": 60}, {"code": "RDZ-07", "libelle": "Administration / Services", "ordre": 70}, {"code": "RDZ-08", "libelle": "Alarmes", "ordre": 80}], "types": [{"code": "RDZ-01-01", "categorie_code": "RDZ-01", "libelle": "Intrusion / présence non autorisée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-01-02", "categorie_code": "RDZ-01", "libelle": "Comportement suspect", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-01-03", "categorie_code": "RDZ-01", "libelle": "Conflit / altercation", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-01-04", "categorie_code": "RDZ-01", "libelle": "Vol / tentative de vol", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-01-05", "categorie_code": "RDZ-01", "libelle": "Dégradation volontaire / vandalisme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-01-06", "categorie_code": "RDZ-01", "libelle": "Squat / occupation illicite", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-01-07", "categorie_code": "RDZ-01", "libelle": "Nuisances sonores / rassemblement", "gravite_defaut": "faible", "est_autre": false, "ordre": 70}, {"code": "RDZ-01-08", "categorie_code": "RDZ-01", "libelle": "Autre incident de sécurité", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}, {"code": "RDZ-02-01", "categorie_code": "RDZ-02", "libelle": "Porte / accès trouvé ouvert", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-02-02", "categorie_code": "RDZ-02", "libelle": "Défaut de fermeture / verrouillage", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-02-03", "categorie_code": "RDZ-02", "libelle": "Accès non autorisé / tentative de passage", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-02-04", "categorie_code": "RDZ-02", "libelle": "Contrôle d’autorisation / légitimation", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-02-05", "categorie_code": "RDZ-02", "libelle": "Badge / clé perdu(e) ou défectueux(se)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-02-06", "categorie_code": "RDZ-02", "libelle": "Stationnement non autorisé / gênant", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-02-07", "categorie_code": "RDZ-02", "libelle": "Autre anomalie d’accès", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-03-01", "categorie_code": "RDZ-03", "libelle": "Éclairage / électricité défectueux", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-03-02", "categorie_code": "RDZ-03", "libelle": "Fuite d’eau / plomberie", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-03-03", "categorie_code": "RDZ-03", "libelle": "Chauffage / ventilation / température", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-03-04", "categorie_code": "RDZ-03", "libelle": "Ascenseur / porte automatique en panne", "gravite_defaut": "moderee", "est_autre": false, "ordre": 40}, {"code": "RDZ-03-05", "categorie_code": "RDZ-03", "libelle": "Équipement de sûreté défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 50}, {"code": "RDZ-03-06", "categorie_code": "RDZ-03", "libelle": "Dommage / anomalie technique du bâtiment", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-03-07", "categorie_code": "RDZ-03", "libelle": "Autre anomalie technique", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-04-01", "categorie_code": "RDZ-04", "libelle": "Issue de secours obstruée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-04-02", "categorie_code": "RDZ-04", "libelle": "Porte coupe-feu / évacuation non conforme", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-04-03", "categorie_code": "RDZ-04", "libelle": "Extincteur / équipement incendie manquant ou défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-04-04", "categorie_code": "RDZ-04", "libelle": "Risque de départ de feu constaté", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-04-05", "categorie_code": "RDZ-04", "libelle": "Signalisation / éclairage de secours défectueux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-04-06", "categorie_code": "RDZ-04", "libelle": "Autre anomalie de prévention incendie", "gravite_defaut": "moderee", "est_autre": true, "ordre": 60}, {"code": "RDZ-05-01", "categorie_code": "RDZ-05", "libelle": "Malaise / problème de santé", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-05-02", "categorie_code": "RDZ-05", "libelle": "Chute / blessure", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-05-03", "categorie_code": "RDZ-05", "libelle": "Personne en détresse / vulnérable", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-05-04", "categorie_code": "RDZ-05", "libelle": "Accident impliquant une personne", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-05-05", "categorie_code": "RDZ-05", "libelle": "Autre besoin d’assistance à personne", "gravite_defaut": "moderee", "est_autre": true, "ordre": 50}, {"code": "RDZ-06-01", "categorie_code": "RDZ-06", "libelle": "Déchets / salissures / hygiène", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-06-02", "categorie_code": "RDZ-06", "libelle": "Dégradation de mobilier / matériel", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-06-03", "categorie_code": "RDZ-06", "libelle": "Dégradation des locaux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-06-04", "categorie_code": "RDZ-06", "libelle": "Objet encombrant hors issue de secours", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-06-05", "categorie_code": "RDZ-06", "libelle": "Négligence / équipement laissé en fonctionnement", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-06-06", "categorie_code": "RDZ-06", "libelle": "Autre constat de propreté / dégradation", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-07-01", "categorie_code": "RDZ-07", "libelle": "Objet trouvé / perdu", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-07-02", "categorie_code": "RDZ-07", "libelle": "Colis / courrier / livraison", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-07-03", "categorie_code": "RDZ-07", "libelle": "Accueil / check-in / check-out", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-07-04", "categorie_code": "RDZ-07", "libelle": "Demande de conciergerie / service", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-07-05", "categorie_code": "RDZ-07", "libelle": "Accompagnement d’entreprise / prestataire", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-07-06", "categorie_code": "RDZ-07", "libelle": "Autre demande administrative / service", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-08-01", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-08-02", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme avec intervention pompiers", "gravite_defaut": "critique", "est_autre": false, "ordre": 20}, {"code": "RDZ-08-03", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Dérangement centrale feu", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-08-04", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme effraction", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-08-05", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-08-06", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Dérangement", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-08-07", "categorie_code": "RDZ-08", "libelle": "TECHNIQUE - Alarme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 70}, {"code": "RDZ-08-08", "categorie_code": "RDZ-08", "libelle": "Autre", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}], "actions": [{"code": "verification", "libelle": "Vérification / levée de doute", "ordre": 10}, {"code": "securisation", "libelle": "Sécurisation des lieux", "ordre": 20}, {"code": "fermeture", "libelle": "Fermeture / verrouillage", "ordre": 30}, {"code": "assistance", "libelle": "Assistance à la personne", "ordre": 40}, {"code": "appel_144", "libelle": "Appel 144 (ambulance)", "ordre": 50}, {"code": "appel_117", "libelle": "Appel 117 (police)", "ordre": 60}, {"code": "appel_118", "libelle": "Appel 118 (pompiers)", "ordre": 70}, {"code": "info_centrale", "libelle": "Information à la centrale", "ordre": 80}, {"code": "transmission_responsable", "libelle": "Transmission au responsable / client", "ordre": 90}, {"code": "demande_technique", "libelle": "Demande d’intervention technique", "ordre": 100}, {"code": "photos", "libelle": "Photos prises", "ordre": 110}, {"code": "aucune", "libelle": "Aucune action requise", "ordre": 120}]};
-  const CACHE_KEY = 'rdz_ref_constats_v1';
-  let D = null;
-  function build(src){
-    const d = { source: src.source||'integre', categories: [], types: [], actions: [],
-      catByCode:{}, catByLabel:{}, typeByCode:{}, typesByCat:{}, actionByCode:{} };
-    (src.categories||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(c=>{
-      d.categories.push(c); d.catByCode[c.code]=c; d.catByLabel[c.libelle]=c; d.typesByCat[c.code]=[]; });
-    (src.types||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(t=>{
-      d.types.push(t); d.typeByCode[t.code]=t; (d.typesByCat[t.categorie_code]=d.typesByCat[t.categorie_code]||[]).push(t); });
-    (src.actions||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(a=>{ d.actions.push(a); d.actionByCode[a.code]=a; });
-    return d;
-  }
-  function readCache(){ try{ const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return (c && c.categories && c.categories.length && c.types && c.types.length) ? c : null; }catch(e){ return null; } }
-  function withTimeout(p, ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('délai dépassé')), ms))]); }
-  async function load(client){
-    try{
-      const [c,t,a] = await withTimeout(Promise.all([
-        client.from('ref_categories_constat').select('*').order('ordre'),
-        client.from('ref_types_constat').select('*').order('ordre'),
-        client.from('ref_actions_rapport').select('*').order('ordre')
-      ]), 6000);
-      const err = c.error || t.error || a.error; if(err) throw err;
-      if(!(c.data||[]).length || !(t.data||[]).length) throw new Error('référentiel vide');
-      const src = { source:'base', ts:Date.now(), categories:c.data, types:t.data, actions:a.data||[] };
-      try{ localStorage.setItem(CACHE_KEY, JSON.stringify(src)); }catch(e){}
-      D = build(src);
-    }catch(e){
-      const cached = readCache();
-      D = build(cached ? Object.assign({}, cached, {source:'cache'}) : Object.assign({source:'integre'}, SEED));
-      console.warn('Référentiel constats — source : ' + D.source + ' (' + (e && e.message || e) + ')');
-    }
-    return D;
-  }
-  function get(){ if(!D) D = build(readCache() || Object.assign({source:'integre'}, SEED)); return D; }
-  /* Libellé catégorie + libellé type → code (pour retrouver le code depuis
-     les colonnes texte nature_activite / type_action). */
-  function codeFor(catLabel, typeLabel){
-    const d = get(); const c = d.catByLabel[catLabel]; if(!c || !typeLabel) return null;
-    const t = (d.typesByCat[c.code]||[]).find(x=>x.libelle===typeLabel); return t ? t.code : null;
-  }
-  function graviteLabel(k){ const g = RDZ_GRAVITES.find(x=>x.k===k); return g ? g.label : ''; }
-  function actionsLabels(codes){ const d = get(); return (Array.isArray(codes)?codes:[]).map(c=>d.actionByCode[c] ? d.actionByCode[c].libelle : c); }
-  return { load, get, codeFor, graviteLabel, actionsLabels };
-})();
-
-/* v30 — ACTIVITY_TAXONOMY_ORDER / ACTIVITY_TAXONOMY ne sont plus codées en
-   dur : elles sont reconstruites depuis le référentiel commun (RDZRef), avec
-   la même forme qu'avant (nature → [types]) pour que tout le code existant
-   (Modifier, Classer, Analyser avec Claude, prompts IA) reste inchangé.
-   "Alarmes" = catégorie RDZ-08 (libellés identiques à l'ancienne liste). */
-let ACTIVITY_TAXONOMY_ORDER = [];
-let ACTIVITY_TAXONOMY = {};
-function applyTaxonomy(){
-  const d = RDZRef.get();
-  ACTIVITY_TAXONOMY_ORDER = d.categories.filter(c=>c.actif!==false).map(c=>c.libelle);
-  ACTIVITY_TAXONOMY = {};
-  d.categories.forEach(c=>{ ACTIVITY_TAXONOMY[c.libelle] = (d.typesByCat[c.code]||[]).filter(t=>t.actif!==false).map(t=>t.libelle); });
-  if(!ACTIVITY_TAXONOMY['Alarmes']) ACTIVITY_TAXONOMY['Alarmes'] = [];
-}
-applyTaxonomy();
+const ACTIVITY_TAXONOMY_ORDER = ["Alarmes", "Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
+const ACTIVITY_TAXONOMY = {
+  "Alarmes": [
+    "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)",
+    "INCENDIE - Alarme avec intervention pompiers",
+    "INCENDIE - Dérangement centrale feu",
+    "INTRUSION - Alarme effraction",
+    "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)",
+    "INTRUSION - Dérangement",
+    "TECHNIQUE - Alarme",
+    "Autre"
+  ],
+  "Accès": [
+    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
+    "Fermeture d'un accès principal ou secondaire essentiel",
+    "Accompagnement entreprise",
+    "Site non hermétique",
+    "Contrôle de légitimation (personnel, étudiant, locataire)",
+    "Stationnement non autorisé, stationnement gênant",
+    "Autre"
+  ],
+  "Admin / conciergerie": [
+    "Objets trouvés",
+    "Administratif (Imprimantes, colis, Poste, ...)",
+    "Housing (draps, divers, ...)",
+    "Check-In / Check-Out"
+  ],
+  "Incivilité": [
+    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
+    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
+    "Détérioration de matériel",
+    "Encombrant dans voie de fuite",
+    "Autre"
+  ],
+  "Secourisme": [
+    "Assistance à la personne - Intervention 144",
+    "Assistance à la personne - Premiers soins",
+    "Assistance divers (Ronde de contrôle)",
+    "Autre"
+  ],
+  "Sécurité": [
+    "Evacuation - Personne(s) non autorisée(s) sur espace public",
+    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
+    "Evacuation - Fête non autorisée",
+    "Evacuation - SDF",
+    "Traces de squat",
+    "Gestion de comportement / conflit",
+    "Vol",
+    "Tapage nocturne / diurne",
+    "Autre"
+  ],
+  "Technique": [
+    "Constat de dysfonctionnement d'installation",
+    "Intervention technique (Plomberie, Electricité, …)",
+    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
+    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
+    "Divers technique (Déneigement, Nettoyage sommaire...)",
+    "Autre"
+  ]
+};
 
 /* Statut de clôture — 4 options fixes, reprises du modèle de référence
    fourni par Laurent (rapport_intervention_rdz). Clé stable en base
    (colonne statut_cloture), libellé + couleur pour l'affichage. */
-const CLOTURE_OPTIONS = RDZ_CLOTURES; // v30 : liste commune (+ 'securise')
+const CLOTURE_OPTIONS = [
+  {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
+  {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
+  {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
+  {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
+];
 
 /* ---------- v20 · Statut du RAPPORT (cycle de vie administratif) ----------
    À ne pas confondre avec statut_cloture (situation terrain : terminée /
@@ -790,8 +766,8 @@ function statutBadgeHtml(r){
    type seul pour une alarme (nature implicite "Alarmes"). */
 function missingClassif(r){
   const m = [];
-  if(r.kind==='standard' && !r.raw.nature_activite) m.push('Catégorie');
-  if(!r.raw.type_action) m.push('Type de constat');
+  if(r.kind==='standard' && !r.raw.nature_activite) m.push('Nature d\'activité');
+  if(!r.raw.type_action) m.push('Type d\'action');
   return m;
 }
 /* Vue "À valider" : pas encore validé / transmis, OU classification
@@ -941,7 +917,6 @@ function clotureSelectedValue(idPrefix){
 function natureSelectHtml(natId, typeId, currentNature){
   const opts = ['<option value="">— Non renseigné —</option>']
     .concat(ACTIVITY_TAXONOMY_ORDER.map(n=>`<option value="${esc(n)}" ${currentNature===n?'selected':''}>${esc(n)}</option>`))
-    .concat(currentNature && !ACTIVITY_TAXONOMY_ORDER.includes(currentNature) ? [`<option value="${esc(currentNature)}" selected>(ancien) ${esc(currentNature)}</option>`] : [])
     .join('');
   return `<select id="${natId}" onchange="refreshTypeActionSelect('${natId}','${typeId}')">${opts}</select>`;
 }
@@ -950,11 +925,8 @@ function natureSelectHtml(natId, typeId, currentNature){
    changement de nature (currentType alors toujours null). */
 function typeActionOptionsHtml(nature, currentType){
   const list = ACTIVITY_TAXONOMY[nature] || [];
-  // v30 : une valeur ancienne (hors référentiel) reste affichée et sélectionnée
-  // → enregistrer sans y toucher ne l'efface jamais.
-  const keep = (currentType && !list.includes(currentType)) ? `<option value="${esc(currentType)}" selected>(ancien) ${esc(currentType)}</option>` : '';
-  if(!list.length) return keep ? ('<option value="">— Non renseigné —</option>' + keep) : '<option value="">— Choisis d\'abord une catégorie —</option>';
-  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('') + keep;
+  if(!list.length) return '<option value="">— Choisis d\'abord une nature d\'activité —</option>';
+  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('');
 }
 function refreshTypeActionSelect(natId, typeId){
   const nature = document.getElementById(natId).value;
@@ -1002,6 +974,13 @@ function rapportTs(raw){
 /* Date LOCALE (Genève) au format AAAA-MM-JJ — toISOString() donnait la date
    UTC : un rapport enregistré entre minuit et 2 h affichait la veille. */
 function localYMD(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+/* Catégorie choisie par l'agent (rapport standard, 2026-10-20) — « Autre — précision » */
+function catFull(o){
+  if(!o) return '';
+  const a = String(o.categorie||'').trim(), b = String(o.categorie_autre||'').trim();
+  if(a && b && a!==b) return a + ' — ' + b;
+  return a || b;
+}
 function locFull(o){
   if(!o) return '';
   const a = String(o.localisation||'').trim(), b = String(o.localisation_autre||'').trim();
@@ -1176,50 +1155,8 @@ let currentView = 'avalider';   // v20 : 'avalider' | 'tous'
 let RAPPORT_TYPES = {};  // id -> {nom, icone} — types de rapports personnalisés (rapport-types-config.html)
 
 /* ---------- Chargement ---------- */
-/* v30 — SCHEMA_REF_OK : colonnes de migration-referentiel-constats.sql
-   présentes ? Sinon on n'écrit QUE les anciennes colonnes (aucune erreur). */
-let SCHEMA_REF_OK = false, REF_LOADED = false;
-async function ensureRef(){
-  if(REF_LOADED) return; REF_LOADED = true;
-  await RDZRef.load(sb); applyTaxonomy();
-  try{
-    const { error } = await sb.from('journal_entrees').select('type_constat_code,gravite,actions_codes,cloture_at').limit(1);
-    SCHEMA_REF_OK = !error;
-    if(error) console.warn('Colonnes référentiel absentes — lancer migration-referentiel-constats.sql :', error.message||error);
-  }catch(e){ SCHEMA_REF_OK = false; }
-}
-/* Complète un payload d'écriture : code stable du type, date de clôture,
-   repli 'securise' → 'regle' tant que la migration n'est pas faite. Point
-   de passage UNIQUE pour Modifier / Analyser avec Claude / Classer. */
-function enrichPayload(r, payload){
-  if(Object.prototype.hasOwnProperty.call(payload,'type_action') || Object.prototype.hasOwnProperty.call(payload,'nature_activite')){
-    const nat = payload.nature_activite !== undefined ? payload.nature_activite : r.raw.nature_activite;
-    const typ = payload.type_action !== undefined ? payload.type_action : r.raw.type_action;
-    if(SCHEMA_REF_OK) payload.type_constat_code = RDZRef.codeFor(nat || (r.kind==='alarme' ? 'Alarmes' : ''), typ) || null;
-  }
-  if(Object.prototype.hasOwnProperty.call(payload,'statut_cloture')){
-    if(!SCHEMA_REF_OK){
-      if(payload.statut_cloture==='securise') payload.statut_cloture = 'regle';
-    } else {
-      const fermee = RDZ_CLOTURES_FERMEES.includes(payload.statut_cloture);
-      if(fermee && !r.raw.cloture_at) payload.cloture_at = new Date().toISOString();
-      if(!fermee && payload.statut_cloture && r.raw.cloture_at) payload.cloture_at = null;
-    }
-  }
-  if(!SCHEMA_REF_OK){ delete payload.gravite; delete payload.actions_codes; delete payload.type_constat_code; delete payload.cloture_at; delete payload.constat_precision; }
-  return payload;
-}
-function actionsDisplay(raw){
-  const lbl = RDZRef.actionsLabels(raw.actions_codes);
-  const parts = [];
-  if(lbl.length) parts.push(lbl.map(x=>'☑ '+x).join('\n'));
-  if(raw.actions) parts.push(raw.actions);
-  return parts.join('\n\n');
-}
 async function loadData(){
   document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr>';
-  await ensureRef();
-  STATS_ROWS = null; // v30 : les statistiques seront rechargées à la prochaine ouverture de l'onglet
   try{
     const [{data:entrees, error:e1}, {data:alarmes, error:e2}, {data:photosAll, error:e3}, {data:rtypes, error:e4}] = await Promise.all([
       sb.from('journal_entrees').select('*').order('created_at',{ascending:false}).limit(500),
@@ -1287,11 +1224,6 @@ function setView(v){
   currentView = v;
   document.getElementById('tab-avalider').classList.toggle('on', v==='avalider');
   document.getElementById('tab-tous').classList.toggle('on', v==='tous');
-  document.getElementById('tab-stats').classList.toggle('on', v==='stats');
-  const isStats = v==='stats';
-  document.querySelector('.table-wrap').classList.toggle('st-hidden', isStats);
-  document.getElementById('sel-toolbar').classList.toggle('st-hidden', isStats);
-  document.getElementById('stats-panel').classList.toggle('st-hidden', !isStats);
   render();
 }
 function populateSiteFilter(){
@@ -1324,7 +1256,7 @@ function reportSnippet(r){
     return parts.slice(0,3).join(' · ');
   }
   if(r.kind==='standard'){
-    const parts = [r.raw.activite, locFull(r.raw), r.raw.situation].filter(Boolean);
+    const parts = [r.raw.activite, catFull(r.raw), locFull(r.raw), r.raw.situation].filter(Boolean);
     return parts.join(' · ') || (r.raw.actions||'');
   }
   if(isNewFormatAlarme(r)){
@@ -1394,13 +1326,12 @@ function rowHtml(r){
 }
 
 function render(){
-  if(currentView==='stats'){ renderStats(); return; }
   filteredData = getFilteredEntries();
   // Compteurs des onglets (indépendants des filtres)
   document.getElementById('cnt-avalider').textContent = allReports.filter(needsValidation).length;
   document.getElementById('cnt-tous').textContent = allReports.length;
   document.getElementById('view-hint').textContent = currentView==='avalider'
-    ? 'Rapports pas encore validés ni transmis au client, ou dont la catégorie / le type de constat manque — regroupés par site.'
+    ? 'Rapports pas encore validés ni transmis au client, ou dont la nature d\'activité / le type d\'action manque — regroupés par site.'
     : 'Tous les rapports, du plus récent au plus ancien.';
   document.getElementById('fcount').textContent = filteredData.length + ' rapport(s)';
   const tbody = document.getElementById('list-body');
@@ -1503,17 +1434,17 @@ function openDetail(id){
       <div class="msec"><div class="st">Questions / Réponses</div><div class="txt">${qaHtml}</div></div>`;
   }else if(r.kind==='standard'){
     extra = `<div class="msec"><div class="st">Activité</div><div class="txt">${esc(r.raw.activite||'—')}</div></div>
+      <div class="msec"><div class="st">Catégorie (agent)</div><div class="txt">${esc(catFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.raw.situation||'—')}</div></div>
-      ${r.raw.constat_precision ? `<div class="msec"><div class="st">Précision du type</div><div class="txt">${esc(r.raw.constat_precision)}</div></div>` : ''}
-      <div class="msec"><div class="st">${RDZ_LBL.actions}</div><div class="txt">${esc(actionsDisplay(r.raw)||'—')}</div></div>`;
+      <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.raw.actions||'—')}</div></div>`;
   }else if(isNewFormatAlarme(r)){
     const reponses = parseReponses(r.raw.reponses);
     const qaHtml = reponses.length
       ? qaGroupedHtml(reponses, q=>`<div style="margin-bottom:8px"><div style="font-size:11px;color:#888;font-weight:bold;text-transform:uppercase;letter-spacing:.3px">${esc(q.libelle)}</div><div>${esc(reponseValueText(q))}</div></div>`)
       : '<i>Aucune question renseignée.</i>';
     extra = `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
-      ${r.raw.type_action ? `<div class="msec"><div class="st">Type de constat</div><div class="txt">${esc(r.raw.type_action)}</div></div>` : ''}
+      ${r.raw.type_action ? `<div class="msec"><div class="st">Type d'action</div><div class="txt">${esc(r.raw.type_action)}</div></div>` : ''}
       <div class="msec"><div class="st">Questions / Vérifications</div><div class="txt">${qaHtml}</div></div>`;
   }else{
     let checklistHtml = '';
@@ -1546,8 +1477,7 @@ function openDetail(id){
         <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent||'—')}</div></div>
         <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(r.ts)} ${fmtTime(r.ts)}</div></div>
         <div class="mcell"><div class="k">Statut du rapport</div><div class="v">${statutBadgeHtml(r)}${r.raw.statut_rapport_at?`<div style="font-size:11px;color:#888;font-weight:normal;margin-top:4px">depuis le ${fmtDate(r.raw.statut_rapport_at)} ${fmtTime(r.raw.statut_rapport_at)}</div>`:''}</div></div>
-        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:''}${r.raw.type_constat_code?`<div style="font-size:11px;color:#888;font-weight:normal;margin-top:3px">${esc(r.raw.type_constat_code)}</div>`:''}</div></div>
-        <div class="mcell"><div class="k">${RDZ_LBL.gravite} / Clôture</div><div class="v" style="font-size:12.5px">${esc(RDZRef.graviteLabel(r.raw.gravite)||'—')}<br><span style="font-weight:normal">${esc((CLOTURE_OPTIONS.find(o=>o.k===r.raw.statut_cloture)||{}).label||'—')}</span></div></div>
+        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:''}</div></div>
       </div>
       ${isLocked(r) ? '<div class="lock-note">🔒 Rapport protégé (' + esc(statutInfo(statutOf(r)).label) + ') — pour le modifier, le classer ou le supprimer, il faudra d\'abord changer son statut (code de validation).</div>' : ''}
       ${extra}
@@ -1590,6 +1520,8 @@ function editFieldsFor(r){
   if(r.kind==='standard') return [
     {k:'site_nom', l:'Site', t:'text'},
     {k:'activite', l:'Activité', t:'text'},
+    {k:'categorie', l:'Catégorie (agent)', t:'text'},
+    {k:'categorie_autre', l:'Précision catégorie (si « Autre »)', t:'text'},
     {k:'localisation', l:'Localisation', t:'text'},
     {k:'localisation_autre', l:'Précision localisation', t:'text'},
     {k:'situation', l:'Que se passe-t-il ?', t:'textarea'},
@@ -1707,30 +1639,17 @@ function renderEditForm(r){
       </div>` : ''}
       ${r.kind==='standard' ? `
       <div class="efield">
-        <label>Catégorie</label>
+        <label>Nature d'activité</label>
         ${natureSelectHtml('ef-nature_activite', 'ef-type_action', r.raw.nature_activite)}
       </div>
       <div class="efield">
-        <label>Type de constat</label>
+        <label>Type d'action</label>
         <select id="ef-type_action">${typeActionOptionsHtml(r.raw.nature_activite, r.raw.type_action)}</select>
       </div>` : `
       <div class="efield">
-        <label>Type de constat (catégorie : Alarmes)</label>
+        <label>Type d'action (nature : Alarmes)</label>
         ${alarmeTypeActionSelectHtml('ef-type_action', r.raw.type_action)}
       </div>`}
-      ${r.kind==='standard' && !isCustomTypeReport(r) ? `
-      <div class="efield">
-        <label>Précision du type (si « Autre… »)</label>
-        <input type="text" id="ef-constat_precision" value="${esc(r.raw.constat_precision||'')}">
-      </div>
-      <div class="efield">
-        <label>${RDZ_LBL.actions}</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px 14px">${RDZRef.get().actions.filter(a=>a.actif!==false || (r.raw.actions_codes||[]).includes(a.code)).map(a=>`<label style="font-weight:normal;display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" class="ef-actcode" value="${esc(a.code)}" ${(r.raw.actions_codes||[]).includes(a.code)?'checked':''}> ${esc(a.libelle)}</label>`).join('')}</div>
-      </div>` : ''}
-      <div class="efield">
-        <label>${RDZ_LBL.gravite}</label>
-        <select id="ef-gravite"><option value="">— Non renseignée —</option>${RDZ_GRAVITES.map(g=>`<option value="${g.k}" ${r.raw.gravite===g.k?'selected':''}>${esc(g.label)}</option>`).join('')}</select>
-      </div>
       <div class="efield">
         <label>Statut de clôture (situation terrain)</label>
         ${clotureSelectHtml('ef', r.raw.statut_cloture)}
@@ -1814,13 +1733,7 @@ async function saveEdit(id){
   // v21 — légendes de photos modifiées mais pas encore enregistrées
   const lgEls = Array.from(document.querySelectorAll('.ef-photo-lg'));
   for(const el of lgEls){ await saveEditPhotoLegende(el.dataset.photoid, el.value); }
-  // v30 — gravité, actions réalisées (cases), précision "Autre"
-  const gEl = document.getElementById('ef-gravite'); if(gEl) payload.gravite = gEl.value || null;
-  const acEls = document.querySelectorAll('.ef-actcode');
-  if(acEls.length){ const codes = Array.from(acEls).filter(x=>x.checked).map(x=>x.value); payload.actions_codes = codes.length ? codes : null; }
-  const pEl = document.getElementById('ef-constat_precision'); if(pEl) payload.constat_precision = pEl.value.trim() || null;
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
-  enrichPayload(r, payload);
   try{
     const { error } = await sb.from(table).update(payload).eq('id', id);
     if(error) throw error;
@@ -1910,6 +1823,33 @@ function buildReportFileName(entries){ // entries : [{site, ts, nature}]
    d'impression (A4 − marges 12 mm = 186 mm) juste avant l'impression,
    et on pose .rp-keep ou .rp-split. Branché sur "beforeprint", donc
    valable pour le bouton Imprimer / PDF, l'export groupé ET Ctrl/Cmd+P. */
+/* ---------- Un rapport = une page par défaut (v30) ----------
+   Pour chaque rapport (.rp-doc), mesuré à la largeur d'impression :
+   1) tient déjà sur une page → rien ne change ;
+   2) sinon, mode resserré (.rp-compact : moins d'espace entre les sections,
+      photos un peu moins hautes) → re-mesure ;
+   3) sinon, légère réduction (zoom) si elle reste lisible (≥ 80 %) ;
+   4) sinon, on n'insiste pas : mise en page normale sur plusieurs pages.
+   Appelée au début de tagPrintBlocks (donc aussi pour Ctrl/Cmd+P et
+   l'export groupé, où chaque rapport a sa propre page). */
+const ONE_PAGE_MIN_ZOOM = 0.8;
+function resetOnePageFit(root){
+  (root || document).querySelectorAll('.rp-doc').forEach(doc=>{ doc.classList.remove('rp-compact'); doc.style.zoom = ''; });
+}
+function fitDocsOnePage(root, pageH){
+  root.querySelectorAll('.rp-doc').forEach(doc=>{
+    doc.classList.remove('rp-compact'); doc.style.zoom = '';
+    if(doc.getBoundingClientRect().height <= pageH) return;           // 1) tient déjà
+    doc.classList.add('rp-compact');
+    const h = doc.getBoundingClientRect().height;
+    if(h <= pageH) return;                                            // 2) tient resserré
+    const z = Math.floor((pageH / h) * 1000) / 1000;
+    if(z >= ONE_PAGE_MIN_ZOOM){ doc.style.zoom = String(z); return; } // 3) tient réduit
+    doc.classList.remove('rp-compact');                               // 4) plusieurs pages
+  });
+}
+window.addEventListener('afterprint', ()=>resetOnePageFit(document.getElementById('report-content')));
+
 function tagPrintBlocks(){
   const root = document.getElementById('report-content');
   if(!root || !root.innerHTML) return;
@@ -1920,6 +1860,7 @@ function tagPrintBlocks(){
   document.body.removeChild(probe);
   const prevW = root.style.width;
   root.style.width = '186mm';
+  fitDocsOnePage(root, pageH);
   root.querySelectorAll('.rp-sec,.rp-block').forEach(el=>{
     el.classList.remove('rp-keep','rp-split');
     el.classList.add(el.getBoundingClientRect().height <= pageH ? 'rp-keep' : 'rp-split');
@@ -1927,7 +1868,17 @@ function tagPrintBlocks(){
   root.style.width = prevW;
 }
 window.addEventListener('beforeprint', tagPrintBlocks);
-function printReport(){
+/* v30 : les photos doivent être chargées avant la mesure (sinon leur hauteur
+   compte pour 0 et le calcul « tient sur une page » serait faux). */
+function waitReportImages(maxMs){
+  const root = document.getElementById('report-content');
+  const imgs = root ? Array.from(root.querySelectorAll('img')).filter(i=>!i.complete) : [];
+  if(!imgs.length) return Promise.resolve();
+  const all = Promise.all(imgs.map(i=>new Promise(res=>{ i.addEventListener('load',res,{once:true}); i.addEventListener('error',res,{once:true}); })));
+  return Promise.race([all, new Promise(res=>setTimeout(res, maxMs||4000))]);
+}
+async function printReport(){
+  await waitReportImages(4000);
   const prev = document.title;
   if(REPORT_FILE_NAME) document.title = REPORT_FILE_NAME;
   const restore = ()=>{ document.title = prev; window.removeEventListener('afterprint', restore); };
@@ -2087,7 +2038,7 @@ function buildPromptLines(items){
     '      "situation_corrigee": "Reformulation de LA SEULE situation de CE rapport — voir style attendu plus bas.",',
     '      "actions_corrigees": "Reformulation des SEULES actions de CE rapport — voir style attendu plus bas.",',
     '      "resultat_corrige": "Uniquement pour une intervention alarme ; null pour un rapport standard.",',
-    '      "statut_cloture": "regle | securise | action | info | probleme",',
+    '      "statut_cloture": "regle | action | info | probleme",',
     '      "nature_activite": "Choisie EXCLUSIVEMENT dans la liste fermée fournie plus bas (pour une intervention alarme, toujours EXACTEMENT \\"Alarmes\\"), ou null",',
     '      "type_action": "Choisi EXCLUSIVEMENT dans la sous-liste de la nature choisie, ou null",',
     '      "rapport_complet": true,',
@@ -2105,7 +2056,7 @@ function buildPromptLines(items){
     '- Corrige l\'orthographe et la grammaire, améliore la formulation, mais NE change PAS les faits, heures, lieux ou noms.',
     '- Pour un rapport dont les informations sont fournies sous forme de "Questions / Vérifications répondues" (nouveau format alarme), synthétise ces réponses en un texte narratif cohérent pour "situation_corrigee"/"actions_corrigees" plutôt que de les recopier telles quelles en liste.',
     '- Le champ "resultat_corrige" doit rester factuel (ne pas enjoliver une intervention non terminée).',
-    '- "statut_cloture" : choisis EXACTEMENT une des 5 valeurs "regle" (situation terminée), "securise" (situation sécurisée), "action" (action à venir), "info" (pour information), "probleme" (problème en cours) — jamais une autre valeur. Si l\'agent a déjà choisi un statut (voir « Statut agent »), garde-le sauf contradiction manifeste avec le texte.',
+    '- "statut_cloture" : choisis EXACTEMENT une des 4 valeurs "regle" (situation terminée), "action" (action à venir), "info" (pour information), "probleme" (problème en cours) — jamais une autre valeur.',
     '- "nature_activite" / "type_action" : choisis EXCLUSIVEMENT dans la liste fermée ci-dessous (section CATÉGORIES), en recopiant le libellé À L\'IDENTIQUE — n\'invente JAMAIS une autre catégorie ni un autre type. Pour un rapport de type "Intervention alarme", "nature_activite" est TOUJOURS "Alarmes" (pas de choix) — choisis uniquement le "type_action" dans la sous-liste "Alarmes" (INCENDIE / INTRUSION / TECHNIQUE / Autre). Pour un "Rapport standard" ou un rapport de type personnalisé, choisis la nature parmi toutes les catégories — y compris "Alarmes" (avec son type INCENDIE / INTRUSION / TECHNIQUE / Autre) si le rapport porte sur une alarme. Si aucun type précis ne correspond mais que la nature est claire, utilise l\'entrée "Autre" de cette nature si elle existe. Si rien ne correspond du tout, laisse "type_action" à null plutôt que de forcer une catégorie approximative.',
     '- "rapport_complet" : mets `false` si des informations essentielles manquent pour comprendre CE rapport (ex. résultat non déclaré, heure de fin absente, situation non décrite) — dans ce cas détaille précisément dans "elements_manquants" ; sinon `true` et "elements_manquants" à null.',
     '- Utilise le registre professionnel utilisé dans les rapports de sécurité privée suisse.',
@@ -2165,15 +2116,13 @@ function buildPromptLines(items){
       }
     }else if(r.kind==='standard'){
       lines.push('  Activité: ' + (r.raw.activite||'—'));
+      lines.push('  Catégorie choisie par l\'agent: ' + (catFull(r.raw)||'—'));
       lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       lines.push('  Situation (saisie brute agent): ' + (r.raw.situation||'—'));
       lines.push('  Actions (saisie brute agent): ' + (r.raw.actions||'—'));
-      if(RDZRef.actionsLabels(r.raw.actions_codes).length) lines.push('  Actions cochées par l\'agent: ' + RDZRef.actionsLabels(r.raw.actions_codes).join(', '));
-      if(r.raw.statut_cloture) lines.push('  Statut agent: ' + r.raw.statut_cloture);
-      if(r.raw.constat_precision) lines.push('  Précision du type (agent): ' + r.raw.constat_precision);
     }else if(isNewFormatAlarme(r)){
       lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
-      if(r.raw.type_action) lines.push('  Type de constat: ' + r.raw.type_action);
+      if(r.raw.type_action) lines.push('  Type d\'action: ' + r.raw.type_action);
       const reponses = parseReponses(r.raw.reponses);
       if(reponses.length){
         lines.push('  Questions / Vérifications répondues par l\'agent:');
@@ -2185,9 +2134,6 @@ function buildPromptLines(items){
       lines.push('  Transmetteur: ' + (r.raw.transmetteur_code||'—') + ' | Zone: ' + (r.raw.zone||'—'));
       lines.push('  Situation (saisie brute agent): ' + (r.raw.situation||'—'));
       lines.push('  Actions (saisie brute agent): ' + (r.raw.actions||'—'));
-      if(RDZRef.actionsLabels(r.raw.actions_codes).length) lines.push('  Actions cochées par l\'agent: ' + RDZRef.actionsLabels(r.raw.actions_codes).join(', '));
-      if(r.raw.statut_cloture) lines.push('  Statut agent: ' + r.raw.statut_cloture);
-      if(r.raw.constat_precision) lines.push('  Précision du type (agent): ' + r.raw.constat_precision);
       lines.push('  Résultat déclaré par l\'agent: ' + (r.raw.resultat||'—'));
       try{
         const cl = JSON.parse(r.raw.checklist||'[]');
@@ -2278,9 +2224,9 @@ function renderReviewCardHtml(i, r, corr){
       ${r.raw.resultat ? `<details class="rev-original"><summary>Voir le texte original saisi par l'agent</summary><div class="txt">${esc(r.raw.resultat)}</div></details>` : ''}
     </div>` : ''}
     ${r.kind==='standard' ? `
-    <div class="efield"><label>Catégorie</label><div id="rev-r${i}-nature"></div></div>
-    <div class="efield"><label>Type de constat</label><div id="rev-r${i}-type"></div></div>` : `
-    <div class="efield"><label>Type de constat (catégorie : Alarmes)</label><div id="rev-r${i}-type"></div></div>`}
+    <div class="efield"><label>Nature d'activité</label><div id="rev-r${i}-nature"></div></div>
+    <div class="efield"><label>Type d'action</label><div id="rev-r${i}-type"></div></div>` : `
+    <div class="efield"><label>Type d'action (nature : Alarmes)</label><div id="rev-r${i}-type"></div></div>`}
     <div class="efield"><label>Statut de clôture</label><div id="rev-r${i}-cloture"></div></div>
     <div class="efield">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#1a1a1a">
@@ -2310,7 +2256,6 @@ function backToJsonStep(){
 
 async function applyCorrectionToSource(r, payload){
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
-  enrichPayload(r, payload);
   const { error } = await sb.from(table).update(payload).eq('id', r.id);
   if(error) throw error;
   Object.assign(r.raw, payload);
@@ -2552,9 +2497,9 @@ function renderClassifyCardHtml(i, r, corr){
     <div class="rev-original" style="font-size:12.5px;color:#555;background:var(--bg-soft);border-radius:var(--radius-ui);padding:6px 8px;margin-bottom:10px">${esc(reportSnippet(r))||'<i>Sans description</i>'}</div>
     <div style="font-size:12px;color:#888;margin-bottom:8px">Actuellement : ${esc(currentCls)}</div>
     ${r.kind==='standard' ? `
-    <div class="efield"><label>Catégorie</label><div id="cls-r${i}-nature"></div></div>
-    <div class="efield"><label>Type de constat</label><div id="cls-r${i}-type"></div></div>` : `
-    <div class="efield"><label>Type de constat (catégorie : Alarmes)</label><div id="cls-r${i}-type"></div></div>`}
+    <div class="efield"><label>Nature d'activité</label><div id="cls-r${i}-nature"></div></div>
+    <div class="efield"><label>Type d'action</label><div id="cls-r${i}-type"></div></div>` : `
+    <div class="efield"><label>Type d'action (nature : Alarmes)</label><div id="cls-r${i}-type"></div></div>`}
     <div class="rev-apply">
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#555">
         <input type="checkbox" id="cls-r${i}-apply" checked style="width:auto"> ✅ Appliquer cette classification à la fiche source (le texte du rapport n'est pas modifié)
@@ -2631,7 +2576,7 @@ function rpPhotoGrid(photos, marginTop){
    en version figée (lecture seule) : seule l'option correspondant à
    selKey est mise en évidence, les autres restent grisées. */
 function rpClotureRow(selKey){
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">${CLOTURE_OPTIONS.map(o=>{
+  return `<div style="display:flex;gap:8px;flex-wrap:nowrap;margin-top:14px">${CLOTURE_OPTIONS.map(o=>{
     const sel = o.k===selKey;
     const border = sel ? o.color : '#ddd';
     const bg = sel ? o.bg : '#fff';
@@ -2657,7 +2602,7 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
     {label:'Date', value:dateTxt},
     ...timeCols,
     {label:'Agent', value:esc(meta.agent_name||'—')},
-    {label:'Catégorie', value:esc(activiteTxt||'—')}
+    {label:'Nature d\'activité', value:esc(activiteTxt||'—')}
   ];
   /* Retour Laurent 2026-08-16 : les libellés de longueurs différentes
      ("Date" vs "Nature d'activité") ne doivent pas décaler les valeurs les
@@ -2737,21 +2682,22 @@ function buildMultiReport(titreGlobal, corrected){
     let inner;
     if(r.kind==='standard'){
       const localisation = locFull(r.raw)||'';
-      inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
-        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(c.type_action))+'</div>') : '')
+      inner = (catFull(r.raw) ? rpFieldO('Catégorie', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '')
+        + (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
     }else if(isNewFormatAlarme(r)){
       const localisation = locFull(r.raw)||'';
       inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
-        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(c.type_action))+'</div>') : '')
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
     }else{
       inner = rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>'
-        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(c.type_action))+'</div>') : '')
+        + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(c.resultat||'—'))+'</div>'
@@ -2819,9 +2765,9 @@ function buildStandardReport(r){
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
   }
-  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(r.raw.type_action))+'</div>') : ''))
+  const body = rpSec('1 — Contexte', (catFull(r.raw) ? rpFieldO('Catégorie', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '') + rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(actionsDisplay(r.raw)||'—')) + rpClotureRow(r.raw.statut_cloture||null))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
         ? rpPhotoGrid(r.photos)
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
@@ -2834,7 +2780,7 @@ function buildAlarmeReport(r){
     const reponses = parseReponses(r.raw.reponses);
     const { html: qaSectionsHtml, nextNum } = reponsesSectionsHtml(reponses, 2);
     const localisation = locFull(r.raw)||'—';
-    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(localisation)) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(r.raw.type_action))+'</div>') : ''))
+    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(localisation)) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.raw.statut_cloture||null))
       + rpSec((nextNum+1) + ' — Photos', r.photos.length
@@ -2857,7 +2803,7 @@ function buildAlarmeReport(r){
      checklist (marche à suivre) dans "Constats sur place" — elle reste
      saisie et transmise à l'IA (voir buildPromptLines), qui l'intègre de
      façon narrative dans "Actions" ; ici on ne garde que la Situation. */
-  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>' + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type de constat', esc(r.raw.type_action))+'</div>') : ''))
+  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.raw.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.raw.zone||'—'))+'</div>' + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.raw.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
     + rpSec('4 — Photos', r.photos.length
@@ -2877,140 +2823,6 @@ function buildAlarmeReport(r){
     ]
   };
   return rpParkShell('Intervention alarme', r.raw.nature_activite || 'Alarme', body, meta);
-}
-
-/* =====================================================================
-   v30 — STATISTIQUES (catégorie / type de constat / gravité / clôture /
-   actions / sites). Requête dédiée, légère et paginée (toutes les lignes,
-   pas seulement les 500 dernières de la liste). Filtres appliqués : Type,
-   Site, Du / Au (barre de filtres ci-dessus). Regroupement par CODE quand
-   il existe (libellé à jour du référentiel), sinon par anciens libellés.
-   ===================================================================== */
-let STATS_ROWS = null, STATS_LOADING = false;
-async function fetchAllRows(table, cols){
-  const out = []; const PAGE = 1000;
-  for(let from=0; from<50000; from+=PAGE){
-    const { data, error } = await sb.from(table).select(cols).order('created_at',{ascending:false}).range(from, from+PAGE-1);
-    if(error) throw error;
-    out.push(...(data||[])); if(!data || data.length < PAGE) break;
-  }
-  return out;
-}
-async function loadStats(force){
-  if(STATS_LOADING) return; if(STATS_ROWS && !force) return;
-  STATS_LOADING = true;
-  document.getElementById('stats-panel').innerHTML = '<div class="state-msg">Chargement des statistiques…</div>';
-  try{
-    await ensureRef();
-    const extra = SCHEMA_REF_OK ? ',type_constat_code,gravite,cloture_at' : '';
-    const [std, alm] = await Promise.all([
-      fetchAllRows('journal_entrees', 'id,site_nom,agent_nom,created_at,date_rapport,heure_rapport,nature_activite,type_action,statut_cloture,rapport_type_id' + extra + (SCHEMA_REF_OK ? ',actions_codes' : '')),
-      fetchAllRows('alarme_interventions', 'id,site_nom,agent_nom,created_at,nature_activite,type_action,statut_cloture' + extra)
-    ]);
-    STATS_ROWS = [
-      ...std.map(r=>({kind:'standard', ts:rapportTs(r), raw:r})),
-      ...alm.map(r=>({kind:'alarme', ts:r.created_at, raw:Object.assign({}, r, {nature_activite: r.nature_activite || 'Alarmes'})}))
-    ].filter(x=>x.ts);
-  }catch(e){
-    console.error(e);
-    document.getElementById('stats-panel').innerHTML = '<div class="err">Impossible de charger les statistiques : ' + esc(e.message||e) + '</div>';
-    STATS_LOADING = false; return;
-  }
-  STATS_LOADING = false;
-  renderStats();
-}
-function statsFiltered(){
-  const kind = document.getElementById('flt-kind').value;
-  const site = document.getElementById('flt-site').value;
-  const from = document.getElementById('flt-from').value;
-  const to = document.getElementById('flt-to').value;
-  return (STATS_ROWS||[]).filter(x=>{
-    if(kind && x.kind!==kind) return false;
-    if(site && (x.raw.site_nom||'')!==site) return false;
-    if(from || to){ const d = localYMD(x.ts); if(from && d < from) return false; if(to && d > to) return false; }
-    return true;
-  });
-}
-function statsClassif(x){
-  const d = RDZRef.get(); const raw = x.raw;
-  const t = raw.type_constat_code ? d.typeByCode[raw.type_constat_code] : null;
-  if(t){ const c = d.catByCode[t.categorie_code]; return { cat: c ? c.libelle : t.categorie_code, catCode: t.categorie_code, type: t.libelle, code: t.code }; }
-  const code = RDZRef.codeFor(raw.nature_activite, raw.type_action); // libellés actuels sans code (ex. saisie avant migration)
-  if(code){ const t2 = d.typeByCode[code]; return { cat: raw.nature_activite, catCode: t2.categorie_code, type: t2.libelle, code }; }
-  if(!raw.nature_activite && !raw.type_action) return { cat:'Non classé', catCode:'~', type:'Non classé', code:'' };
-  const cat = raw.nature_activite ? (d.catByLabel[raw.nature_activite] ? raw.nature_activite : '(ancien) ' + raw.nature_activite) : 'Non classé';
-  return { cat, catCode: d.catByLabel[raw.nature_activite] ? d.catByLabel[raw.nature_activite].code : '~' + cat, type: raw.type_action ? '(ancien) ' + raw.type_action : '—', code:'' };
-}
-function countBy(rows, keyFn){ const m = new Map(); rows.forEach(r=>{ const k = keyFn(r); if(k==null) return; m.set(k, (m.get(k)||0)+1); }); return m; }
-function statsTable(title, headers, lines, total){
-  const max = Math.max(1, ...lines.map(l=>l.n));
-  return `<div class="stats-box"><h4>${title}</h4><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}<th class="n">Nb</th><th class="n">%</th><th style="width:30%"></th></tr></thead><tbody>${
-    lines.length ? lines.map(l=>`<tr>${l.cells.map(c=>`<td>${c}</td>`).join('')}<td class="n">${l.n}</td><td class="n">${total?Math.round(l.n*1000/total)/10:0}</td><td><div class="sbar" style="width:${Math.round(l.n*100/max)}%"></div></td></tr>`).join('')
-    : `<tr><td colspan="${headers.length+3}" style="color:#999">Aucune donnée.</td></tr>`}</tbody></table></div>`;
-}
-function renderStats(){
-  const panel = document.getElementById('stats-panel');
-  if(!STATS_ROWS){ loadStats(false); return; }
-  const rows = statsFiltered(); const N = rows.length;
-  document.getElementById('fcount').textContent = N + ' rapport(s) dans les statistiques';
-  const cl = rows.map(x=>Object.assign({x}, statsClassif(x)));
-  const d = RDZRef.get();
-  const catOrder = c=>{ const k = d.catByLabel[c]; return k ? (k.ordre||0) : 9999; };
-  const byCat = [...countBy(cl, c=>c.cat)].sort((a,b)=>catOrder(a[0])-catOrder(b[0]) || b[1]-a[1]);
-  const byType = [...countBy(cl, c=>c.code ? c.code : (c.cat+'||'+c.type))].sort((a,b)=>b[1]-a[1]).slice(0,25);
-  const typeInfo = {}; cl.forEach(c=>{ const k = c.code ? c.code : (c.cat+'||'+c.type); typeInfo[k] = c; });
-  const byGrav = [...countBy(rows, x=>x.raw.gravite || '')].sort((a,b)=>RDZ_GRAVITES.findIndex(g=>g.k===b[0]) - RDZ_GRAVITES.findIndex(g=>g.k===a[0]));
-  const byClot = [...countBy(rows, x=>x.raw.statut_cloture || '')].sort((a,b)=>b[1]-a[1]);
-  const actCounts = new Map(); let withActions = 0;
-  rows.forEach(x=>{ const a = Array.isArray(x.raw.actions_codes) ? x.raw.actions_codes : []; if(a.length) withActions++; a.forEach(k=>actCounts.set(k,(actCounts.get(k)||0)+1)); });
-  const byAct = [...actCounts].sort((a,b)=>b[1]-a[1]);
-  const classes = cl.filter(c=>c.code).length;
-  const lourds = rows.filter(x=>x.raw.gravite==='elevee' || x.raw.gravite==='critique').length;
-  const delais = rows.filter(x=>x.raw.cloture_at && x.raw.created_at).map(x=>(new Date(x.raw.cloture_at)-new Date(x.raw.created_at))/3600000).filter(h=>h>=0);
-  const delaiMoy = delais.length ? delais.reduce((a,b)=>a+b,0)/delais.length : null;
-  const ouverts = rows.filter(x=>x.raw.statut_cloture==='action' || x.raw.statut_cloture==='probleme').length;
-  // Sites × catégories
-  const sites = [...countBy(rows, x=>x.raw.site_nom||'Site inconnu')].sort((a,b)=>b[1]-a[1]).slice(0,15).map(s=>s[0]);
-  const cats = byCat.map(c=>c[0]);
-  const matrix = {}; cl.forEach(c=>{ const s = c.x.raw.site_nom||'Site inconnu'; matrix[s] = matrix[s]||{}; matrix[s][c.cat] = (matrix[s][c.cat]||0)+1; });
-  const fmtH = h=> h==null ? '—' : (h<1 ? Math.round(h*60)+' min' : (h<48 ? (Math.round(h*10)/10)+' h' : Math.round(h/24)+' j'));
-  panel.innerHTML = `
-    <div class="stats-note">Filtres appliqués : Type, Site, Du / Au. ${SCHEMA_REF_OK ? '' : '<b style="color:#8B1A1A">Migration migration-referentiel-constats.sql non détectée : gravité, actions et délais indisponibles.</b>'}
-      <button class="linklike" onclick="loadStats(true)">🔄 Recharger</button> · <button class="linklike" onclick="exportStatsCsv()">⬇ Export CSV (Excel)</button></div>
-    <div class="stats-sum">
-      <div class="k"><b>${N}</b><span>rapports (${rows.filter(x=>x.kind==='standard').length} standard · ${rows.filter(x=>x.kind==='alarme').length} alarme)</span></div>
-      <div class="k"><b>${N?Math.round(classes*100/N):0} %</b><span>rattachés à un code (${classes})</span></div>
-      <div class="k"><b>${lourds}</b><span>gravité élevée ou critique</span></div>
-      <div class="k"><b>${ouverts}</b><span>encore ouverts (action à venir / problème)</span></div>
-      <div class="k"><b>${fmtH(delaiMoy)}</b><span>délai moyen de clôture (${delais.length} rapport(s))</span></div>
-    </div>
-    <div class="stats-grid">
-      ${statsTable(RDZ_LBL.categorie, [RDZ_LBL.categorie], byCat.map(([k,n])=>({cells:[esc(k)], n})), N)}
-      ${statsTable(RDZ_LBL.gravite, [RDZ_LBL.gravite], byGrav.map(([k,n])=>({cells:[esc(RDZRef.graviteLabel(k)||'Non renseignée')], n})), N)}
-    </div>
-    <div class="stats-grid">
-      ${statsTable(RDZ_LBL.type + ' (25 plus fréquents)', ['Code', RDZ_LBL.categorie, RDZ_LBL.type], byType.map(([k,n])=>{ const i = typeInfo[k]; return {cells:[esc(i.code||'—'), esc(i.cat), esc(i.type)], n}; }), N)}
-    </div>
-    <div class="stats-grid">
-      ${statsTable(RDZ_LBL.cloture, [RDZ_LBL.cloture], byClot.map(([k,n])=>({cells:[esc((CLOTURE_OPTIONS.find(o=>o.k===k)||{}).label || 'Non renseigné')], n})), N)}
-      ${statsTable(RDZ_LBL.actions + ' (' + withActions + ' rapport(s) avec cases cochées)', ['Action'], byAct.map(([k,n])=>({cells:[esc(RDZRef.actionsLabels([k])[0])], n})), withActions)}
-    </div>
-    <div class="stats-box"><h4>Sites × ${RDZ_LBL.categorie.toLowerCase()} (15 sites les plus actifs)</h4>
-      <table><thead><tr><th>Site</th>${cats.map(c=>`<th class="n" style="white-space:normal">${esc(c)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>${
-        sites.map(s=>`<tr><td>${esc(s)}</td>${cats.map(c=>`<td class="n">${(matrix[s]&&matrix[s][c])||''}</td>`).join('')}<td class="n"><b>${cats.reduce((a,c)=>a+((matrix[s]&&matrix[s][c])||0),0)}</b></td></tr>`).join('') || `<tr><td colspan="${cats.length+2}" style="color:#999">Aucune donnée.</td></tr>`
-      }</tbody></table></div>`;
-}
-function exportStatsCsv(){
-  const rows = statsFiltered();
-  const head = ['source','id','date','heure','site','agent','code','categorie','type','gravite','statut_cloture','actions','cloture_at'];
-  const q = v=>{ const t = v==null ? '' : String(v); return /[;"\n]/.test(t) ? '"'+t.replace(/"/g,'""')+'"' : t; };
-  const lines = [head.join(';')].concat(rows.map(x=>{ const c = statsClassif(x); const r = x.raw;
-    return [x.kind, r.id, localYMD(x.ts), fmtTime(x.ts), r.site_nom||'', r.agent_nom||'', c.code, c.cat, c.type,
-      RDZRef.graviteLabel(r.gravite), (CLOTURE_OPTIONS.find(o=>o.k===r.statut_cloture)||{}).label||'', RDZRef.actionsLabels(r.actions_codes).join(', '), r.cloture_at||''].map(q).join(';'); }));
-  const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'RDZ_statistiques_rapports_' + localYMD(new Date().toISOString()) + '.csv';
-  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
 /* ---------- init ---------- */
