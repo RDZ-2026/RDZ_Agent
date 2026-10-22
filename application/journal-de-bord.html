@@ -1,3 +1,4 @@
+<!-- RDZ · journal-de-bord · v3.3 · 2026-10-22 · barre de recherche au-dessus de la liste des sites (filtre sur le nom, sans tenir compte des accents ni des majuscules). Rien d'autre ne change. -->
 <!-- RDZ · journal-de-bord · v3.2 · 2026-10-22 · un bouton relié à une catégorie (journal_activites.categorie_code, réglée dans journal-config) la transmet au rapport, qui la préremplit. Rien d'autre ne change (graphisme et intitulé « Rapport » inchangés). -->
 <!-- RDZ · journal-de-bord · v3.1 · 2026-10-13 · intitulé affiché « Rapport » (fichier inchangé) ; v3 · 2026-08-11 -->
 <!DOCTYPE html>
@@ -43,6 +44,11 @@ main{flex:1;padding:16px}
 .group-btn .chev{margin-left:auto;color:#bbb;font-size:20px;flex-shrink:0}
 .back-btn{background:none;border:none;color:var(--red);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin-bottom:10px}
 .state-msg{text-align:center;color:#999;font-size:14px;padding:30px 10px}
+.site-search{display:block;position:relative;margin-bottom:14px}
+.site-search input{width:100%;font-family:var(--font);font-size:16px;padding:13px 14px 13px 40px;border:1px solid var(--line);
+  border-radius:var(--radius-section);background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
+.site-search input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 3px rgba(139,26,26,.12)}
+.site-search .lp{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;color:#888;pointer-events:none}
 .err{background:#fdecea;border:1px solid #f5b5ae;color:#8B1A1A;border-radius:var(--radius-ui);padding:10px 12px;font-size:13px;margin-bottom:12px}
 </style>
 </head>
@@ -64,6 +70,10 @@ main{flex:1;padding:16px}
     <!-- Écran 1 : site -->
     <section id="screen-site">
       <div class="screen-title">Où êtes-vous ?</div>
+      <label class="site-search">
+        <span class="lp" aria-hidden="true">🔍</span>
+        <input id="site-q" type="search" autocomplete="off" placeholder="Rechercher un site" aria-label="Rechercher un site">
+      </label>
       <div id="site-list"><div class="state-msg">Chargement des sites…</div></div>
     </section>
 
@@ -83,6 +93,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentSite = null;      // {id, nom}
+let SITES = [];              // sites actifs, chargés une fois ; la recherche filtre cette liste
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function show(id){ ['screen-site','screen-activite'].forEach(s=>{
@@ -100,14 +111,24 @@ async function loadSites(){
     const { data, error } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom');
     if(error) throw error;
     if(!data || !data.length){ box.innerHTML = '<div class="state-msg">Aucun site actif.</div>'; return; }
-    box.innerHTML = data.map(s=>`
+    SITES = data;
+    renderSites();
+  }catch(e){ box.innerHTML = `<div class="err">Impossible de charger les sites (réseau ?).</div>`; }
+}
+function normSite(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+function renderSites(){
+  const box = document.getElementById('site-list');
+  const q = normSite(document.getElementById('site-q').value.trim());
+  const list = q ? SITES.filter(s => normSite(s.nom).includes(q)) : SITES;
+  if(!list.length){ box.innerHTML = '<div class="state-msg">Aucun site ne correspond à « ' + esc(document.getElementById('site-q').value.trim()) + ' ».</div>'; return; }
+  box.innerHTML = list.map(s=>`
       <button class="group-btn" onclick='pickSite(${JSON.stringify(s).replace(/'/g,"&#39;")})'>
         <span class="ic">📍</span>
         <span class="txt"><span class="t">${esc(s.nom)}</span></span>
         <span class="chev">›</span>
       </button>`).join('');
-  }catch(e){ box.innerHTML = `<div class="err">Impossible de charger les sites (réseau ?).</div>`; }
 }
+document.getElementById('site-q').addEventListener('input', renderSites);
 function pickSite(s){ currentSite = s; renderCrumbs(); loadActivites(); show('screen-activite'); }
 function goSite(){ renderCrumbs(); show('screen-site'); }
 
