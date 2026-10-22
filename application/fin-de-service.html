@@ -899,6 +899,7 @@ async function endOfServiceLogout() {
   localStorage.removeItem('rdz_agent_id');
   localStorage.removeItem('rdz_agent_nom');
   localStorage.removeItem('rdz_agent_pin_hash');
+  localStorage.removeItem('rdz_memo_cache'); // copie hors ligne de Mémo sites (22.10.2026)
   window.location.href = 'mobile.html';
 }
 
