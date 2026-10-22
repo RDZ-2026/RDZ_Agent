@@ -1,0 +1,587 @@
+<!-- RDZ · memo-sites · v1.1 · 2026-10-22 · interdictions de site, pas à pas plein écran,
+     barre d'urgence (repris de prom_selector_v2.html), page ouvrable hors ligne (sw-memo.js).
+     v1 · 2026-10-22
+     Fiches d'intervention par site, lues dans Supabase (RDZ_Agent) via la
+     fonction memo_fiches(agent_id, pin_hash) — voir 03_acces_memo.sql.
+     Hors ligne : copie gardée sur le natel, liée à l'agent connecté,
+     effacée à la fin de service / au changement d'agent, et au plus tard
+     16 h après le dernier chargement. -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RDZ — Mémo sites</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --red:#e3062c; --red-dark:#bf0b28; --navy:#142130; --navy2:#263746;
+  --ink:#102033; --muted:#63758f; --line:#dbe3ec; --bg:#eef3f7; --paper:#fff;
+  --ok:#14804a; --warn:#c75e00;
+  --font:Inter,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#dfe7ee}
+body{font-family:var(--font);color:var(--ink);-webkit-text-size-adjust:100%;line-height:1.45}
+.wrap{max-width:640px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#f7fafc 0,#edf3f7 100%);box-shadow:0 0 55px rgba(20,33,48,.12)}
+button{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:3px solid rgba(227,6,44,.3);outline-offset:2px}
+
+/* ── Bandeau ── */
+header{position:sticky;top:0;z-index:40;background:linear-gradient(135deg,#172431,var(--navy2));color:#fff;
+  border-bottom:4px solid var(--red);padding:max(12px,env(safe-area-inset-top)) 16px 12px}
+.bar{display:flex;align-items:center;gap:12px}
+.back{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:10px;color:#fff;
+  padding:8px 11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;flex:0 0 auto}
+.bar h1{font-size:17px;font-weight:800;letter-spacing:-.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sync{font-size:11.5px;color:rgba(255,255,255,.78);margin-top:6px;display:flex;align-items:center;gap:7px}
+.sync i{width:8px;height:8px;border-radius:50%;background:#4ade80;flex:0 0 auto}
+.sync.off i{background:#fbbf24}
+.sync button{margin-left:auto;background:none;border:none;color:#fff;text-decoration:underline;font-size:11.5px;cursor:pointer}
+
+main{padding:16px 16px max(28px,env(safe-area-inset-bottom))}
+
+/* ── Liste ── */
+.search{display:block;position:relative;margin-bottom:14px}
+.search input{width:100%;font:inherit;font-size:16px;padding:14px 14px 14px 44px;border:1px solid var(--line);border-radius:14px;background:#fff;
+  box-shadow:0 4px 14px rgba(34,50,65,.06)}
+.search input:focus{outline:none;border-color:var(--red)}
+.search svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin:-6px 2px 14px}
+.site{display:flex;gap:14px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-radius:15px;padding:13px 14px;margin-bottom:9px;cursor:pointer;box-shadow:0 6px 18px rgba(34,50,65,.06)}
+.site:active{border-color:var(--red)}
+.site .nm{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.site .ad{font-size:12.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site .body{flex:1;min-width:0}
+.site .prom{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--navy);text-align:right;flex:0 0 auto;max-width:42%;line-height:1.35}
+.tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#eef2f6;color:#40536b}
+.tag.feu{background:#ffe8ec;color:#b3001e}
+.tag.eff{background:#e5efff;color:#1d4fa3}
+.tag.part{background:#fff3df;color:var(--warn)}
+.empty{text-align:center;color:var(--muted);padding:40px 10px;font-size:14px}
+.err{background:#fff;border:1px solid #f3c3cb;border-left:4px solid var(--red);border-radius:12px;padding:16px;font-size:14px}
+.err b{display:block;margin-bottom:6px}
+.err a{color:var(--red);font-weight:700}
+
+/* ── Fiche ── */
+.f-head{margin-bottom:14px}
+.f-head .nc{font-size:13px;color:var(--muted)}
+.f-head .addr{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:14px}
+.btn-go{flex:0 0 auto;background:var(--navy);color:#fff;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;text-decoration:none}
+.codes{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.plate{background:#fff;border:1.5px solid var(--navy);border-radius:9px;padding:6px 10px 5px;min-width:0}
+.plate b{display:block;font-family:var(--mono);font-size:19px;letter-spacing:.04em;line-height:1.1}
+.plate span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.note-part{background:#fff3df;border:1px solid #ffd18b;color:#7a4300;border-radius:12px;padding:12px 14px;font-size:13.5px;margin-top:12px}
+
+/* Rail des étapes : c'est une vraie séquence, d'où la numérotation */
+.rail{position:sticky;z-index:30;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
+  margin:0 -16px 14px;padding:10px 16px;background:rgba(238,243,247,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+.rail::-webkit-scrollbar{display:none}
+.rail button{flex:0 0 auto;display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:22px;
+  padding:7px 12px 7px 7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;color:#26384b}
+.rail button .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#e8eef4;font-size:12px}
+.rail button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.rail button.on .n{background:var(--red);color:#fff}
+.rail button.annexe{padding-left:12px}
+
+.e-title{font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.e-res{font-size:13.5px;color:var(--muted);margin:3px 0 12px}
+
+/* Blocs */
+.blk{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.blk h3{font-size:14.5px;font-weight:800;margin-bottom:9px;letter-spacing:-.01em}
+.blk p,.blk li,.kv dd{font-size:14.5px}
+strong{font-weight:800}
+code.c{font-family:var(--mono);font-weight:700;background:#eef2f6;border-radius:5px;padding:1px 5px;font-size:.95em;white-space:nowrap}
+
+.kv{display:grid;grid-template-columns:minmax(0,38%) 1fr;gap:9px 12px}
+.kv dt{font-size:12.5px;color:var(--muted);font-weight:700;padding-top:2px}
+.kv dd.code{font-family:var(--mono);font-size:19px;font-weight:800;letter-spacing:.04em}
+@media(max-width:380px){.kv{grid-template-columns:1fr;gap:2px}.kv dd{margin-bottom:8px}}
+
+.liste{list-style:none}
+.liste li{position:relative;padding-left:16px;margin-bottom:7px}
+.liste li:last-child{margin-bottom:0}
+.liste li:before{content:'';position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:50%;background:#9aabbf}
+
+.stop{background:#fff4f6;border:1px solid #f6c3cd;border-left:5px solid var(--red);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.stop .lab{font-weight:800;color:#a1001b;font-size:14.5px;margin-bottom:4px}
+.stop p{font-size:14.5px}
+
+.manque{border:1.5px dashed #b9c6d4;border-radius:12px;padding:11px 14px;margin-bottom:12px;font-size:13.5px;color:#4a5d75;background:rgba(255,255,255,.6)}
+.manque .lab{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:3px}
+
+.num{list-style:none;counter-reset:s}
+.num li{position:relative;padding:0 0 12px 40px}
+.num li:last-child{padding-bottom:0}
+.num li:before{counter-increment:s;content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;
+  background:var(--navy);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800}
+.num li.rouge:before{background:var(--red)}
+.num li:after{content:'';position:absolute;left:13.5px;top:31px;bottom:2px;width:1px;background:var(--line)}
+.num li:last-child:after{display:none}
+.num li .a{font-weight:800;font-size:14.5px;padding-top:3px}
+.num li .d{font-size:14px;color:#33475f;margin-top:2px}
+
+.tel{list-style:none}
+.tel li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #edf1f5}
+.tel li:first-child{border-top:none;padding-top:0}
+.tel .who{flex:1;min-width:0}
+.tel .who b{display:block;font-size:14.5px}
+.tel .who span{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.call{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;text-decoration:none;background:#e9f6ef;border:1px solid #bfe3cf;
+  border-radius:11px;padding:7px 11px;color:var(--ok);font-weight:800;font-size:13px;font-family:var(--mono);white-space:nowrap}
+
+.tbl{width:100%;border-collapse:collapse}
+.tbl td{padding:8px 0;border-top:1px solid #edf1f5;font-size:14px;vertical-align:top}
+.tbl tr:first-child td{border-top:none}
+.tbl td.z{font-weight:800;padding-right:12px;width:40%}
+
+.choix{display:grid;gap:8px}
+.choix .o{border-radius:11px;padding:11px 13px;border:1px solid var(--line);border-left-width:5px}
+.choix .o.rouge{border-left-color:var(--red);background:#fff7f8}
+.choix .o.orange{border-left-color:#f08c00;background:#fffaf2}
+.choix .o.vert{border-left-color:var(--ok);background:#f4fbf7}
+.choix .o b{display:block;font-size:14.5px;margin-bottom:3px}
+.choix .o p{font-size:14px}
+
+details.sous{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:12px}
+details.sous summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:800;font-size:14.5px;display:flex;justify-content:space-between;gap:10px}
+details.sous summary::-webkit-details-marker{display:none}
+details.sous summary:after{content:'+';font-size:20px;line-height:1;color:var(--muted)}
+details.sous[open] summary:after{content:'–'}
+details.sous .in{padding:0 14px 2px}
+details.sous .in .blk{border:none;padding:0 0 12px;margin:0;border-radius:0}
+
+.gps{display:grid;gap:8px}
+.gps a{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.gps a b{font-size:14px}.gps a span{display:block;font-size:12.5px;color:var(--muted)}
+.gps a em{font-style:normal;font-weight:800;font-size:13px;color:#fff;background:var(--navy);border-radius:8px;padding:6px 10px;flex:0 0 auto}
+
+/* Interdictions */
+.ban-link{display:flex;align-items:center;gap:8px;margin-top:12px;background:#fff4f6;border:1px solid #f6c3cd;border-radius:11px;padding:10px 12px;
+  font-size:13.5px;font-weight:800;color:#a1001b;cursor:pointer;width:100%;text-align:left}
+.ban{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px;background:#fff}
+.ban .who{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ban .who b{font-size:16px;letter-spacing:.01em}
+.ban .who span{font-size:12px;font-weight:800;color:#a1001b}
+.ban p{font-size:13.5px;margin-top:4px}
+.ban small{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+
+/* Lanceur pas à pas */
+.go-proc{margin-top:12px;width:100%;border:none;border-radius:11px;background:var(--navy);color:#fff;padding:11px;font-size:14px;font-weight:800;cursor:pointer}
+
+/* Barre du bas : procédures + urgences, toujours à portée de pouce */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:45;pointer-events:none}
+.dock .in{max-width:640px;margin:0 auto;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);border-top:1px solid var(--line);
+  padding:8px 10px max(8px,env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(20,33,48,.08);pointer-events:auto}
+.dock .row{display:flex;gap:6px}
+.dock .row + .row{margin-top:6px}
+.dock a,.dock button{flex:1;min-width:0;border:none;border-radius:10px;padding:8px 2px 7px;text-align:center;text-decoration:none;
+  font-weight:800;font-size:14px;line-height:1.1;cursor:pointer;color:#fff;background:var(--navy)}
+.dock small{display:block;font-size:10px;font-weight:700;opacity:.85;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock .u{background:var(--red)}
+.dock .rdz{background:#3b4d61}
+.dock .p0{background:#c26a00}.dock .p1{background:#16305c}.dock .p2{background:#8f1d15}
+body.has-dock main{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
+
+/* Plein écran pas à pas */
+.proc{position:fixed;inset:0;z-index:60;background:var(--bg);overflow-y:auto}
+.proc-h{position:sticky;top:0;background:var(--navy);color:#fff;padding:max(14px,env(safe-area-inset-top)) 16px 14px;display:flex;gap:12px;align-items:center;border-bottom:4px solid var(--red)}
+.proc-h h2{font-size:17px;line-height:1.25;flex:1}
+.proc-h .cpt{font-size:12.5px;color:#c6d3ee;font-weight:700;margin-top:2px}
+.proc-h button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer}
+.proc-b{padding:14px 16px calc(90px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+.pit{display:flex;gap:13px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:9px;cursor:pointer}
+.pit .ck{flex:0 0 32px;height:32px;border-radius:50%;border:2px solid #c3cfdb;display:grid;place-items:center;font-weight:800;color:#5c6f86}
+.pit b{display:block;font-size:16.5px;line-height:1.3}
+.pit span.d{display:block;font-size:14.5px;color:#4a5d75;margin-top:4px}
+.pit.fait{background:#f0f8f3;border-color:#bfe0cd}
+.pit.fait .ck{background:var(--ok);border-color:var(--ok);color:#fff}
+.pit.fait b,.pit.fait span.d{color:#7b8d82}
+.proc-reset{position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));max-width:608px;margin:0 auto;border:1px solid var(--line);
+  background:#fff;border-radius:12px;padding:13px;font-weight:800;color:#26384b;cursor:pointer}
+
+.maj{font-size:12px;color:var(--muted);text-align:center;margin-top:20px}
+.hidden{display:none!important}
+.loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px 0;color:var(--muted);font-size:13.5px}
+.spin{width:28px;height:28px;border:3px solid #d3dde7;border-top-color:var(--red);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="bar">
+      <a class="back" id="btn-back" href="mobile.html">‹ Menu</a>
+      <h1 id="h-title">Mémo sites</h1>
+    </div>
+    <div class="sync hidden" id="sync"><i></i><span id="sync-txt"></span><button id="btn-reload" type="button">Recharger</button></div>
+  </header>
+
+  <main>
+    <div id="v-loading" class="loading"><div class="spin"></div>Chargement des fiches…</div>
+    <div id="v-error" class="hidden"></div>
+
+    <section id="v-list" class="hidden">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="Nom du site ou code PROM" aria-label="Rechercher un site ou un code PROM">
+      </label>
+      <p class="hint">Un code PROM se tape sans espace : 324199 ou seulement le début.</p>
+      <div id="list"></div>
+    </section>
+
+    <section id="v-fiche" class="hidden"></section>
+  </main>
+</div>
+
+<div class="dock hidden" id="dock"><div class="in">
+  <div class="row" id="dock-procs"></div>
+  <div class="row">
+    <a class="u" href="tel:112">112<small>Tous réseaux</small></a>
+    <a class="u" href="tel:118">118<small>Pompiers</small></a>
+    <a class="u" href="tel:117">117<small>Police</small></a>
+    <a class="rdz" href="tel:+41793391341">Astreinte<small>RDZ</small></a>
+    <a class="rdz" href="tel:+41844800811">Certas<small>Centrale</small></a>
+  </div>
+</div></div>
+
+<div class="proc hidden" id="proc" role="dialog" aria-modal="true" aria-labelledby="proc-t">
+  <div class="proc-h"><div style="flex:1;min-width:0"><h2 id="proc-t"></h2><div class="cpt" id="proc-c"></div></div><button type="button" id="proc-close">Fermer</button></div>
+  <div class="proc-b" id="proc-b"></div>
+  <button type="button" class="proc-reset" id="proc-reset">Tout décocher</button>
+</div>
+
+<script>
+/* ===================== Configuration ===================== */
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const CACHE_KEY = 'rdz_memo_cache';          // effacé aussi par fin-de-service.html et logout() de mobile.html
+const CACHE_TTL_MS = 16 * 60 * 60 * 1000;     // 16 h maximum, quoi qu'il arrive
+
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const AGENT = {
+  id: localStorage.getItem('rdz_agent_id'),
+  hash: localStorage.getItem('rdz_agent_pin_hash')
+};
+
+let FICHES = [];
+let current = null;   // fiche ouverte
+let tab = 0;          // onglet ouvert
+let PROCS = [];       // procédures « pas à pas » de la fiche ouverte
+let FAIT = {};        // étapes cochées, par procédure (oubliées en quittant la fiche)
+let procOpen = -1;
+
+const $ = id => document.getElementById(id);
+
+/* ===================== Cache local ===================== */
+function readCache() {
+  let c = null;
+  try { c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) {}
+  if (!c) return null;
+  const ok = c.agent === AGENT.id && c.hash === AGENT.hash && (Date.now() - c.ts) < CACHE_TTL_MS && Array.isArray(c.fiches);
+  if (!ok) { localStorage.removeItem(CACHE_KEY); return null; }
+  return c;
+}
+function writeCache(fiches) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ agent: AGENT.id, hash: AGENT.hash, ts: Date.now(), fiches })); } catch (e) {}
+}
+
+/* ===================== Chargement ===================== */
+async function load(force) {
+  if (!AGENT.id || !AGENT.hash) {
+    localStorage.removeItem(CACHE_KEY);
+    return showError("Aucun agent identifié sur ce natel",
+      'Ouvrez <a href="mobile.html">l\'application Agent</a> et identifiez-vous avec votre PIN, puis revenez sur Mémo sites.');
+  }
+  const cache = readCache();
+  if (cache && !force) { FICHES = cache.fiches; setSync(cache.ts, !navigator.onLine); renderList(); }
+  else if (!cache) show('v-loading');
+
+  if (!sb) { if (!cache) showError('Pas de réseau', "Les fiches n'ont encore jamais été chargées sur ce natel. Réessayez avec du réseau."); return; }
+
+  try {
+    const { data, error } = await sb.rpc('memo_fiches', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
+    if (error) throw error;
+    FICHES = Array.isArray(data) ? data : [];
+    writeCache(FICHES);
+    setSync(Date.now(), false);
+    if (current) {
+      current = FICHES.find(f => f.id === current.id) || null;
+      if (current) { if (procOpen < 0) { buildProcs(current); renderFiche(); } } else renderList();
+    }
+    else renderList();
+  } catch (err) {
+    const refused = err && (err.code === '28000' || /acces_refuse/.test(err.message || ''));
+    if (refused) {
+      localStorage.removeItem(CACHE_KEY);
+      return showError("Accès refusé",
+        'Votre code PIN a changé ou votre compte est désactivé. Identifiez-vous à nouveau dans <a href="mobile.html">l\'application Agent</a>.');
+    }
+    if (cache) setSync(cache.ts, true);
+    else showError('Pas de réseau', "Les fiches n'ont encore jamais été chargées sur ce natel. Réessayez avec du réseau.");
+  }
+}
+
+function setSync(ts, offline) {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  $('sync').classList.remove('hidden');
+  $('sync').classList.toggle('off', !!offline);
+  $('sync-txt').textContent = offline ? 'Hors ligne — copie du natel, chargée à ' + hh : 'À jour, chargé à ' + hh;
+}
+
+function show(id) {
+  ['v-loading', 'v-error', 'v-list', 'v-fiche'].forEach(v => $(v).classList.toggle('hidden', v !== id));
+  const dock = id === 'v-fiche';
+  $('dock').classList.toggle('hidden', !dock);
+  document.body.classList.toggle('has-dock', dock);
+  if (!dock) closeProc();
+}
+function showError(title, html) {
+  $('v-error').innerHTML = '<div class="err"><b>' + esc(title) + '</b>' + html + '</div>';
+  show('v-error');
+}
+
+/* ===================== Texte ===================== */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+// ##gras##  ~~code~~  [[libellé|lien]]  et retours à la ligne
+function fmt(s) {
+  let h = esc(s);
+  h = h.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, (m, lab, url) =>
+    /^https?:\/\//.test(url) ? '<a href="' + url + '" target="_blank" rel="noopener">' + lab + '</a>' : '<strong>' + lab + '</strong>');
+  h = h.replace(/~~(.+?)~~/g, '<code class="c">$1</code>');
+  h = h.replace(/##(.+?)##/g, '<strong>$1</strong>');
+  return h.replace(/\n/g, '<br>');
+}
+function norm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function digits(s) { return String(s || '').replace(/\D/g, ''); }
+function telHref(n) { return 'tel:' + String(n).replace(/[^\d+]/g, ''); }
+function mapHref(dest) { return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest); }
+
+function tagsHtml(f) {
+  const t = (f.types || []).map(x => {
+    const n = norm(x);
+    const cls = n.includes('incend') ? 'feu' : n.includes('effrac') ? 'eff' : '';
+    return '<span class="tag ' + cls + '">' + esc(x) + '</span>';
+  });
+  if (f.statut === 'partiel') t.push('<span class="tag part">Fiche incomplète</span>');
+  return t.length ? '<div class="tags">' + t.join('') + '</div>' : '';
+}
+
+/* ===================== Liste ===================== */
+function renderList() {
+  current = null;
+  $('h-title').textContent = 'Mémo sites';
+  $('btn-back').textContent = '‹ Menu';
+  const q = $('q').value.trim();
+  const qd = digits(q), qn = norm(q);
+  const isCode = qd.length >= 2 && qd.length === q.replace(/\s/g, '').length;
+
+  const res = FICHES.filter(f => {
+    if (!q) return true;
+    if (isCode) return (f.codes || []).some(c => c.code.startsWith(qd)) || digits(f.prom).includes(qd);
+    return [f.client, f.nom_complet, f.adresse, (f.types || []).join(' ')].some(x => norm(x).includes(qn));
+  });
+
+  $('list').innerHTML = res.length ? res.map(f => {
+    const codes = (f.codes || []).length ? f.codes.map(c => c.code.replace(/(\d{3})(?=\d)/g, '$1 ')).join('<br>') : esc(f.prom && f.prom !== '—' ? f.prom : '');
+    return '<button class="site" type="button" data-id="' + esc(f.id) + '">' +
+      '<div class="body"><div class="nm">' + esc(f.client) + '</div>' +
+      '<div class="ad">' + esc(f.adresse && f.adresse !== 'Non communiquée' ? f.adresse : (f.nom_complet || '')) + '</div>' +
+      tagsHtml(f) + '</div><div class="prom">' + codes + '</div></button>';
+  }).join('') : '<div class="empty">Aucun site ne correspond à « ' + esc(q) + ' ».<br>Vérifiez le code PROM ou cherchez par nom.</div>';
+
+  show('v-list');
+}
+
+/* ===================== Fiche ===================== */
+function tabsOf(f) {
+  const t = (f.etapes || []).map((e, i) => ({ n: i + 1, titre: e.titre, resume: e.resume, blocs: e.blocs || [] }));
+  if ((f.blocs_rondes || []).length) t.push({ titre: 'Rondes', blocs: f.blocs_rondes });
+  if ((f.blocs_notes || []).length) t.push({ titre: 'Annexes', blocs: f.blocs_notes });
+  if (f.interdictions && (f.interdictions.liste || []).length) t.push({ titre: 'Interdictions', ban: true, blocs: [] });
+  return t;
+}
+
+function openFiche(id, push) {
+  current = FICHES.find(f => f.id === id);
+  if (!current) return renderList();
+  tab = 0;
+  buildProcs(current);
+  if (push) history.pushState({ fiche: id }, '');
+  renderFiche();
+  window.scrollTo(0, 0);
+}
+
+function renderFiche() {
+  const f = current;
+  $('h-title').textContent = f.client;
+  $('btn-back').textContent = '‹ Sites';
+  const tabs = tabsOf(f);
+
+  let h = '<div class="f-head">';
+  if (f.nom_complet && f.nom_complet !== f.client) h += '<div class="nc">' + esc(f.nom_complet) + '</div>';
+  if (f.adresse && f.adresse !== 'Non communiquée')
+    h += '<div class="addr"><span style="flex:1">' + esc(f.adresse) + '</span><a class="btn-go" href="' + mapHref(f.adresse) + '" target="_blank" rel="noopener">Itinéraire</a></div>';
+  const tr = (f.transmetteurs || []).length ? f.transmetteurs : (f.codes || []).map(c => ({ code: c.code, label: c.libelle }));
+  if (tr.length) h += '<div class="codes">' + tr.map(t =>
+    '<div class="plate"><b>' + esc(String(t.code).replace(/(\d{3})(?=\d)/g, '$1 ')) + '</b><span>' + esc(t.label || '') + '</span></div>').join('') + '</div>';
+  h += tagsHtml(f);
+  const nb = f.interdictions && (f.interdictions.liste || []).length;
+  if (nb) h += '<button type="button" class="ban-link" data-tab="' + (tabs.length - 1) + '">⛔ ' + nb + (nb > 1 ? ' interdictions de site en cours' : ' interdiction de site en cours') + ' — voir la liste</button>';
+  if (!tabs.length) h += '<div class="note-part">Cette fiche est en cours de rédaction. En cas d\'alarme sur ce site, suivez les consignes du centraliste et appelez l\'astreinte RDZ au <a href="tel:+41793391341"><strong>+41 79 339 13 41</strong></a>.</div>';
+  h += '</div>';
+
+  if (tabs.length) {
+    const top = document.querySelector('header').offsetHeight;
+    h += '<nav class="rail" style="top:' + top + 'px" aria-label="Étapes de la fiche">' + tabs.map((t, i) =>
+      '<button type="button" data-tab="' + i + '" class="' + (i === tab ? 'on' : '') + (t.n ? '' : ' annexe') + '">' +
+      (t.n ? '<span class="n">' + t.n + '</span>' : '') + esc(t.titre) + '</button>').join('') + '</nav>';
+
+    const t = tabs[tab];
+    h += '<h2 class="e-title">' + esc(t.titre) + '</h2>';
+    if (t.resume) h += '<p class="e-res">' + esc(t.resume) + '</p>';
+    if (t.ban) h += banHtml(f.interdictions);
+    else h += t.blocs.map(renderBlock).join('');
+  }
+
+  if (f.maj_le) {
+    const d = String(f.maj_le).split('-');
+    h += '<p class="maj">Fiche mise à jour le ' + d[2] + '.' + d[1] + '.' + d[0] + (f.maj_par ? ' par ' + esc(f.maj_par) : '') + '</p>';
+  }
+
+  $('v-fiche').innerHTML = h;
+  $('dock-procs').innerHTML = PROCS.slice(0, 3).map((p, i) =>
+    '<button type="button" class="p' + i + '" data-proc="' + i + '">' + esc(p.court) + '<small>pas à pas</small></button>').join('');
+  $('dock-procs').classList.toggle('hidden', !PROCS.length);
+  show('v-fiche');
+  const on = $('v-fiche').querySelector('.rail .on');
+  if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+function collectShorts(blocs) {
+  const out = [];
+  (blocs || []).forEach(b => {
+    if (b.t === 'num' && b.court) out.push(b.court);
+    if (b.t === 'sous') out.push(...collectShorts(b.blocs));
+  });
+  return out;
+}
+
+function renderBlock(b) {
+  const title = b.titre ? '<h3>' + fmt(b.titre) + '</h3>' : '';
+  const items = b.items || [];
+  switch (b.t) {
+    case 'kv':
+      return '<div class="blk">' + title + '<dl class="kv">' + items.map(i =>
+        '<dt>' + fmt(i.k) + '</dt><dd class="' + (i.code ? 'code' : '') + '">' + fmt(i.v) + '</dd>').join('') + '</dl></div>';
+    case 'liste':
+      return '<div class="blk">' + title + '<ul class="liste">' + items.map(i => '<li>' + fmt(i) + '</li>').join('') + '</ul></div>';
+    case 'stop':
+      return '<div class="stop" role="note">' + (b.lab ? '<div class="lab">' + fmt(b.lab) + '</div>' : '') + '<p>' + fmt(b.txt) + '</p></div>';
+    case 'manque':
+      return '<div class="manque"><div class="lab">Information manquante</div>' + fmt(b.txt) + '</div>';
+    case 'num':
+      return '<div class="blk">' + title + '<ol class="num">' + items.map(i =>
+        '<li class="' + (i.puce === 'rouge' ? 'rouge' : '') + '"><div class="a">' + fmt(i.a) + '</div>' + (i.d ? '<div class="d">' + fmt(i.d) + '</div>' : '') + '</li>').join('') +
+        '</ol>' + (b.court ? '<button type="button" class="go-proc" data-proc="' + PROCS.findIndex(p => p.src === b) + '">Suivre pas à pas : ' + esc(b.court) + '</button>' : '') + '</div>';
+    case 'tel':
+      return '<div class="blk">' + title + '<ul class="tel">' + items.map(i =>
+        '<li><div class="who"><b>' + fmt(i.nom) + '</b>' + (i.role ? '<span>' + fmt(i.role) + '</span>' : '') + '</div>' +
+        (i.num ? '<a class="call" href="' + telHref(i.num) + '">' + esc(i.num) + '</a>' : '') + '</li>').join('') + '</ul></div>';
+    case 'table':
+      return '<div class="blk">' + title + '<table class="tbl"><tbody>' + items.map(i =>
+        '<tr><td class="z">' + fmt(i.z) + '</td><td>' + fmt(i.d) + '</td></tr>').join('') + '</tbody></table></div>';
+    case 'choix':
+      return '<div class="blk">' + title + '<div class="choix">' + items.map(i =>
+        '<div class="o ' + esc(i.couleur || '') + '"><b>' + fmt(i.titre) + '</b><p>' + fmt(i.txt) + '</p></div>').join('') + '</div></div>';
+    case 'sous':
+      return '<details class="sous"' + (collectShorts(b.blocs).length ? ' open' : '') + '><summary>' + fmt(b.titre) + '</summary><div class="in">' +
+        (b.blocs || []).map(renderBlock).join('') + '</div></details>';
+    case 'gps':
+      return '<div class="blk">' + title + '<div class="gps">' + items.map(i =>
+        '<a href="' + mapHref(i.dest) + '" target="_blank" rel="noopener"><div><b>' + fmt(i.label) + '</b><span>' + esc(i.dest) + '</span></div><em>Itinéraire</em></a>').join('') + '</div></div>';
+    default:
+      return b.txt ? '<div class="blk">' + title + '<p>' + fmt(b.txt) + '</p></div>' : '';
+  }
+}
+
+function banHtml(g) {
+  return (g.procedure ? '<div class="stop"><div class="lab">Conduite à tenir</div><p>' + fmt(g.procedure) + '</p></div>' : '') +
+    g.liste.map(p => '<div class="ban"><div class="who"><b>' + esc(p.nom) + '</b><span>jusqu\'au ' + esc(p.expiration || '—') + '</span></div>' +
+      '<p>' + fmt(p.motif || '') + '</p><small>Notifiée le ' + esc(p.dateEffet || '—') + (p.note ? ' — ' + esc(p.note) : '') + '</small></div>').join('');
+}
+
+/* ===================== Pas à pas ===================== */
+function buildProcs(f) {
+  PROCS = []; FAIT = {};
+  const walk = blocs => (blocs || []).forEach(b => {
+    if (b.t === 'num' && b.court) { FAIT[PROCS.length] = []; PROCS.push({ court: b.court, titre: b.titre, items: b.items || [], src: b }); }
+    if (b.t === 'sous') walk(b.blocs);
+  });
+  (f.etapes || []).forEach(e => walk(e.blocs));
+}
+function openProc(i) {
+  if (!PROCS[i]) return;
+  if (procOpen < 0) history.pushState({ proc: i }, '');
+  procOpen = i;
+  $('proc').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  drawProc();
+  $('proc').scrollTop = 0;
+}
+function closeProc() {
+  procOpen = -1;
+  $('proc').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function drawProc() {
+  const p = PROCS[procOpen], faits = FAIT[procOpen];
+  $('proc-t').innerHTML = fmt(p.titre || p.court);
+  $('proc-c').textContent = faits.length + ' sur ' + p.items.length + ' fait' + (faits.length > 1 ? 's' : '');
+  $('proc-b').innerHTML = p.items.map((it, i) =>
+    '<button type="button" class="pit' + (faits.includes(i) ? ' fait' : '') + '" data-i="' + i + '"><span class="ck">' + (faits.includes(i) ? '✓' : i + 1) + '</span>' +
+    '<span><b>' + fmt(it.a) + '</b>' + (it.d ? '<span class="d">' + fmt(it.d) + '</span>' : '') + '</span></button>').join('');
+}
+
+/* ===================== Événements ===================== */
+$('q').addEventListener('input', renderList);
+$('list').addEventListener('click', e => { const s = e.target.closest('.site'); if (s) openFiche(s.dataset.id, true); });
+$('v-fiche').addEventListener('click', e => {
+  const tb = e.target.closest('.rail button, .ban-link');
+  if (tb) { tab = +tb.dataset.tab; renderFiche(); window.scrollTo(0, 0); return; }
+  const pr = e.target.closest('.go-proc');
+  if (pr) openProc(+pr.dataset.proc);
+});
+$('dock-procs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) openProc(+b.dataset.proc); });
+$('proc-b').addEventListener('click', e => {
+  const it = e.target.closest('.pit'); if (!it || e.target.closest('a')) return;
+  const i = +it.dataset.i, f = FAIT[procOpen], k = f.indexOf(i);
+  k >= 0 ? f.splice(k, 1) : f.push(i);
+  drawProc();
+});
+$('proc-close').addEventListener('click', () => history.back());
+$('proc-reset').addEventListener('click', () => { FAIT[procOpen] = []; drawProc(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && procOpen >= 0) history.back(); });
+$('btn-back').addEventListener('click', e => { if (current) { e.preventDefault(); history.back(); } });
+window.addEventListener('popstate', () => {
+  if (procOpen >= 0) return closeProc();
+  if (current) { renderList(); window.scrollTo(0, 0); }
+});
+$('btn-reload').addEventListener('click', () => load(true));
+window.addEventListener('online', () => load(true));
+
+load(false);
+
+// Garde la page elle-même ouvrable sans réseau (les fiches, elles, sont dans le cache local ci-dessus)
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw-memo.js').catch(() => {});
+</script>
+</body>
+</html>
