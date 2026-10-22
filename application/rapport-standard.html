@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-standard · 2026-10-22 · référentiel commun agent / supervision (migration-referentiel-constats.sql) : listes Catégorie → Type d'action lues dans ref_categories_constat / ref_types_constat (mêmes libellés que supervision-rapports.html, plus de liste recopiée à la main) ; code stable type_constat_code enregistré ; Gravité (proposée selon le type), Actions réalisées (cases) et Statut de clôture ajoutés (obligatoires à la clôture seulement, gardés dans les brouillons) ; « Autre… » → précision dans categorie_autre comme avant ; catégorie préremplie si le bouton du journal de bord en transmet une. Sans la migration en base : seules les colonnes existantes sont envoyées (la file hors-ligne n'est jamais bloquée). Graphisme inchangé. -->
 <!-- RDZ · rapport-standard · 2026-10-20 (c) · champ « Catégorie » après la localisation = liste « Nature / Type d'action » de supervision-rapports.html reprise mot à mot (sans Alarmes), identique pour tous les sites : Catégorie puis Type d'action en cascade, « Autre » → précision libre. Écrit dans journal_entrees.nature_activite / type_action / categorie_autre ; obligatoire à la clôture (pas pour un simple enregistrement). Remplace la liste par site (journal_categories), abandonnée. Boutons Enregistrer / Enregistrer et clôturer placés à la fin du formulaire (plus flottants). -->
 <!-- RDZ · rapport-standard · 2026-10-20 · brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · rapport-standard · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
@@ -172,6 +173,12 @@ textarea{min-height:110px!important}
 
 /* 2026-10-20 : boutons à la fin du formulaire (plus de barre flottante en bas de l'écran) */
 .save-bar{position:static!important;background:none!important;padding:16px 0 8px!important;margin-top:12px}
+/* 2026-10-22 : cases Actions réalisées / Statut de clôture — mêmes bordures,
+   rayons et couleurs que les champs existants (variables de la charte) */
+.opts{display:flex;flex-direction:column;gap:8px}
+.field label.opt{display:flex!important;align-items:center;gap:10px;margin:0;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-ui);padding:11px 12px;font-size:15px!important;text-transform:none;letter-spacing:0;font-weight:normal;color:var(--ink)!important;cursor:pointer}
+.field label.opt input{width:19px;height:19px;accent-color:var(--red);flex-shrink:0;margin:0}
+.field label.opt.on{border-color:var(--red)}
 </style>
 
 </head>
@@ -237,6 +244,12 @@ textarea{min-height:110px!important}
         <label>Préciser</label>
         <input type="text" id="f-cat-autre" placeholder="Écrivez la catégorie…">
       </div>
+      <div class="field">
+        <label>Gravité
+          <span class="hint" id="f-grav-hint">Proposée selon le type d'action — modifiable.</span>
+        </label>
+        <select id="f-grav" onchange="gravTouched=true"><option value="">— Choisir —</option></select>
+      </div>
 
       <div class="field">
         <label>Que se passe-t-il&nbsp;?
@@ -249,6 +262,13 @@ textarea{min-height:110px!important}
       </div>
 
       <div class="field">
+        <label>Actions réalisées
+          <span class="hint">Cochez tout ce que vous avez fait.</span>
+        </label>
+        <div class="opts" id="f-acts"></div>
+      </div>
+
+      <div class="field">
         <label>Qu'avez-vous fait&nbsp;?
           <span class="hint">Les actions menées, comment vous êtes intervenu.</span>
         </label>
@@ -256,6 +276,13 @@ textarea{min-height:110px!important}
           <textarea id="f-actions" placeholder="Décrivez ou dictez vos actions…"></textarea>
           <button type="button" class="mic" data-target="f-actions">🎤 Dicter</button>
         </div>
+      </div>
+
+      <div class="field">
+        <label>Statut de clôture
+          <span class="hint">Où en est la situation quand vous partez ?</span>
+        </label>
+        <div class="opts" id="f-clot"></div>
       </div>
 
       <div class="field">
@@ -578,6 +605,80 @@ textarea{min-height:110px!important}
 </script>
 
 <script>
+/* ============================================================================
+   RDZ · référentiel constats · v1 · 2026-10-22 (libellés écran : Catégorie / Type d'action)
+   BLOC IDENTIQUE dans rapport-standard.html (agent) et supervision-rapports.html
+   (centraliste) : même source, mêmes libellés des deux côtés.
+   Source : tables Supabase ref_categories_constat / ref_types_constat /
+   ref_actions_rapport (migration-referentiel-constats.sql). Copie gardée en
+   cache sur l'appareil (hors-ligne) ; à défaut, liste intégrée ci-dessous
+   (= contenu initial de la migration).
+   ============================================================================ */
+const RDZ_LBL = { categorie: 'Catégorie', type: 'Type d\'action', actions: 'Actions réalisées', gravite: 'Gravité', cloture: 'Statut de clôture' };
+const RDZ_GRAVITES = [
+  {k:'faible',   label:'Faible',   color:'#1e6b1e'},
+  {k:'moderee',  label:'Modérée',  color:'#b8860b'},
+  {k:'elevee',   label:'Élevée',   color:'#c0560b'},
+  {k:'critique', label:'Critique', color:'#C8102E'}
+];
+/* Statut de clôture — clés en base INCHANGÉES (regle/action/info/probleme,
+   lues par le rapport direction) + 'securise'. Libellés communs agent/supervision. */
+const RDZ_CLOTURES = [
+  {k:'regle',    label:'✔ Situation terminée',  color:'#1e6b1e', bg:'#f0f8f0'},
+  {k:'securise', label:'🔒 Situation sécurisée', color:'#2d5f8a', bg:'#eef4fa'},
+  {k:'action',   label:'📅 Action à venir',      color:'#b45c00', bg:'#fff8f0'},
+  {k:'info',     label:'ℹ️ Pour information',    color:'#1a5a8a', bg:'#f0f6ff'},
+  {k:'probleme', label:'⚠️ Problème en cours',   color:'#C8102E', bg:'#fdf5f5'}
+];
+const RDZ_CLOTURES_FERMEES = ['regle','securise','info']; // posent cloture_at
+const RDZRef = (function(){
+  const SEED = {"categories": [{"code": "RDZ-01", "libelle": "Sécurité / Incidents", "ordre": 10}, {"code": "RDZ-02", "libelle": "Accès / Stationnement", "ordre": 20}, {"code": "RDZ-03", "libelle": "Technique / Maintenance", "ordre": 30}, {"code": "RDZ-04", "libelle": "Incendie / Prévention", "ordre": 40}, {"code": "RDZ-05", "libelle": "Secourisme / Assistance", "ordre": 50}, {"code": "RDZ-06", "libelle": "Propreté / Dégradations", "ordre": 60}, {"code": "RDZ-07", "libelle": "Administration / Services", "ordre": 70}, {"code": "RDZ-08", "libelle": "Alarmes", "ordre": 80}], "types": [{"code": "RDZ-01-01", "categorie_code": "RDZ-01", "libelle": "Intrusion / présence non autorisée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-01-02", "categorie_code": "RDZ-01", "libelle": "Comportement suspect", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-01-03", "categorie_code": "RDZ-01", "libelle": "Conflit / altercation", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-01-04", "categorie_code": "RDZ-01", "libelle": "Vol / tentative de vol", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-01-05", "categorie_code": "RDZ-01", "libelle": "Dégradation volontaire / vandalisme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-01-06", "categorie_code": "RDZ-01", "libelle": "Squat / occupation illicite", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-01-07", "categorie_code": "RDZ-01", "libelle": "Nuisances sonores / rassemblement", "gravite_defaut": "faible", "est_autre": false, "ordre": 70}, {"code": "RDZ-01-08", "categorie_code": "RDZ-01", "libelle": "Autre incident de sécurité", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}, {"code": "RDZ-02-01", "categorie_code": "RDZ-02", "libelle": "Porte / accès trouvé ouvert", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-02-02", "categorie_code": "RDZ-02", "libelle": "Défaut de fermeture / verrouillage", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-02-03", "categorie_code": "RDZ-02", "libelle": "Accès non autorisé / tentative de passage", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-02-04", "categorie_code": "RDZ-02", "libelle": "Contrôle d’autorisation / légitimation", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-02-05", "categorie_code": "RDZ-02", "libelle": "Badge / clé perdu(e) ou défectueux(se)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-02-06", "categorie_code": "RDZ-02", "libelle": "Stationnement non autorisé / gênant", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-02-07", "categorie_code": "RDZ-02", "libelle": "Autre anomalie d’accès", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-03-01", "categorie_code": "RDZ-03", "libelle": "Éclairage / électricité défectueux", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-03-02", "categorie_code": "RDZ-03", "libelle": "Fuite d’eau / plomberie", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-03-03", "categorie_code": "RDZ-03", "libelle": "Chauffage / ventilation / température", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-03-04", "categorie_code": "RDZ-03", "libelle": "Ascenseur / porte automatique en panne", "gravite_defaut": "moderee", "est_autre": false, "ordre": 40}, {"code": "RDZ-03-05", "categorie_code": "RDZ-03", "libelle": "Équipement de sûreté défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 50}, {"code": "RDZ-03-06", "categorie_code": "RDZ-03", "libelle": "Dommage / anomalie technique du bâtiment", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-03-07", "categorie_code": "RDZ-03", "libelle": "Autre anomalie technique", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-04-01", "categorie_code": "RDZ-04", "libelle": "Issue de secours obstruée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-04-02", "categorie_code": "RDZ-04", "libelle": "Porte coupe-feu / évacuation non conforme", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-04-03", "categorie_code": "RDZ-04", "libelle": "Extincteur / équipement incendie manquant ou défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-04-04", "categorie_code": "RDZ-04", "libelle": "Risque de départ de feu constaté", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-04-05", "categorie_code": "RDZ-04", "libelle": "Signalisation / éclairage de secours défectueux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-04-06", "categorie_code": "RDZ-04", "libelle": "Autre anomalie de prévention incendie", "gravite_defaut": "moderee", "est_autre": true, "ordre": 60}, {"code": "RDZ-05-01", "categorie_code": "RDZ-05", "libelle": "Malaise / problème de santé", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-05-02", "categorie_code": "RDZ-05", "libelle": "Chute / blessure", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-05-03", "categorie_code": "RDZ-05", "libelle": "Personne en détresse / vulnérable", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-05-04", "categorie_code": "RDZ-05", "libelle": "Accident impliquant une personne", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-05-05", "categorie_code": "RDZ-05", "libelle": "Autre besoin d’assistance à personne", "gravite_defaut": "moderee", "est_autre": true, "ordre": 50}, {"code": "RDZ-06-01", "categorie_code": "RDZ-06", "libelle": "Déchets / salissures / hygiène", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-06-02", "categorie_code": "RDZ-06", "libelle": "Dégradation de mobilier / matériel", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-06-03", "categorie_code": "RDZ-06", "libelle": "Dégradation des locaux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-06-04", "categorie_code": "RDZ-06", "libelle": "Objet encombrant hors issue de secours", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-06-05", "categorie_code": "RDZ-06", "libelle": "Négligence / équipement laissé en fonctionnement", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-06-06", "categorie_code": "RDZ-06", "libelle": "Autre constat de propreté / dégradation", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-07-01", "categorie_code": "RDZ-07", "libelle": "Objet trouvé / perdu", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-07-02", "categorie_code": "RDZ-07", "libelle": "Colis / courrier / livraison", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-07-03", "categorie_code": "RDZ-07", "libelle": "Accueil / check-in / check-out", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-07-04", "categorie_code": "RDZ-07", "libelle": "Demande de conciergerie / service", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-07-05", "categorie_code": "RDZ-07", "libelle": "Accompagnement d’entreprise / prestataire", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-07-06", "categorie_code": "RDZ-07", "libelle": "Autre demande administrative / service", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-08-01", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-08-02", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme avec intervention pompiers", "gravite_defaut": "critique", "est_autre": false, "ordre": 20}, {"code": "RDZ-08-03", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Dérangement centrale feu", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-08-04", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme effraction", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-08-05", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-08-06", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Dérangement", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-08-07", "categorie_code": "RDZ-08", "libelle": "TECHNIQUE - Alarme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 70}, {"code": "RDZ-08-08", "categorie_code": "RDZ-08", "libelle": "Autre", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}], "actions": [{"code": "verification", "libelle": "Vérification / levée de doute", "ordre": 10}, {"code": "securisation", "libelle": "Sécurisation des lieux", "ordre": 20}, {"code": "fermeture", "libelle": "Fermeture / verrouillage", "ordre": 30}, {"code": "assistance", "libelle": "Assistance à la personne", "ordre": 40}, {"code": "appel_144", "libelle": "Appel 144 (ambulance)", "ordre": 50}, {"code": "appel_117", "libelle": "Appel 117 (police)", "ordre": 60}, {"code": "appel_118", "libelle": "Appel 118 (pompiers)", "ordre": 70}, {"code": "info_centrale", "libelle": "Information à la centrale", "ordre": 80}, {"code": "transmission_responsable", "libelle": "Transmission au responsable / client", "ordre": 90}, {"code": "demande_technique", "libelle": "Demande d’intervention technique", "ordre": 100}, {"code": "photos", "libelle": "Photos prises", "ordre": 110}, {"code": "aucune", "libelle": "Aucune action requise", "ordre": 120}]};
+  const CACHE_KEY = 'rdz_ref_constats_v1';
+  let D = null;
+  function build(src){
+    const d = { source: src.source||'integre', categories: [], types: [], actions: [],
+      catByCode:{}, catByLabel:{}, typeByCode:{}, typesByCat:{}, actionByCode:{} };
+    (src.categories||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(c=>{
+      d.categories.push(c); d.catByCode[c.code]=c; d.catByLabel[c.libelle]=c; d.typesByCat[c.code]=[]; });
+    (src.types||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(t=>{
+      d.types.push(t); d.typeByCode[t.code]=t; (d.typesByCat[t.categorie_code]=d.typesByCat[t.categorie_code]||[]).push(t); });
+    (src.actions||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(a=>{ d.actions.push(a); d.actionByCode[a.code]=a; });
+    return d;
+  }
+  function readCache(){ try{ const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return (c && c.categories && c.categories.length && c.types && c.types.length) ? c : null; }catch(e){ return null; } }
+  function withTimeout(p, ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('délai dépassé')), ms))]); }
+  async function load(client){
+    try{
+      const [c,t,a] = await withTimeout(Promise.all([
+        client.from('ref_categories_constat').select('*').order('ordre'),
+        client.from('ref_types_constat').select('*').order('ordre'),
+        client.from('ref_actions_rapport').select('*').order('ordre')
+      ]), 6000);
+      const err = c.error || t.error || a.error; if(err) throw err;
+      if(!(c.data||[]).length || !(t.data||[]).length) throw new Error('référentiel vide');
+      const src = { source:'base', ts:Date.now(), categories:c.data, types:t.data, actions:a.data||[] };
+      try{ localStorage.setItem(CACHE_KEY, JSON.stringify(src)); }catch(e){}
+      D = build(src);
+    }catch(e){
+      const cached = readCache();
+      D = build(cached ? Object.assign({}, cached, {source:'cache'}) : Object.assign({source:'integre'}, SEED));
+      console.warn('Référentiel constats — source : ' + D.source + ' (' + (e && e.message || e) + ')');
+    }
+    return D;
+  }
+  function get(){ if(!D) D = build(readCache() || Object.assign({source:'integre'}, SEED)); return D; }
+  /* Libellé catégorie + libellé type → code (pour retrouver le code depuis
+     les colonnes texte nature_activite / type_action). */
+  function codeFor(catLabel, typeLabel){
+    const d = get(); const c = d.catByLabel[catLabel]; if(!c || !typeLabel) return null;
+    const t = (d.typesByCat[c.code]||[]).find(x=>x.libelle===typeLabel); return t ? t.code : null;
+  }
+  function graviteLabel(k){ const g = RDZ_GRAVITES.find(x=>x.k===k); return g ? g.label : ''; }
+  function actionsLabels(codes){ const d = get(); return (Array.isArray(codes)?codes:[]).map(c=>d.actionByCode[c] ? d.actionByCode[c].libelle : c); }
+  return { load, get, codeFor, graviteLabel, actionsLabels };
+})();
+</script>
+<script>
 function ymdLocal(d){ d = d ? new Date(d) : new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); } // date LOCALE (Genève) — toISOString() donnait la date UTC : entre minuit et 2 h, la veille
 /* ===================== Rapport standard — logique ===================== */
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
@@ -592,6 +693,25 @@ const SITE_NOM = params.get('site') || '';
 const ACTIVITE = params.get('activite') || 'Passage / intervention';
 
 let photos = [];
+/* 2026-10-22 — référentiel commun */
+const CAT_PREFILL = params.get('categorie') || ''; // code catégorie transmis par le bouton du journal de bord
+let gravTouched = false;
+/* Colonnes de migration-referentiel-constats.sql présentes en base ?
+   Mémorisé sur l'appareil. Tant que ce n'est pas confirmé, on n'envoie QUE
+   les colonnes existantes : une colonne inconnue ferait échouer l'envoi et
+   bloquerait la file hors-ligne partagée par tous les modules. */
+const SCHEMA_KEY = 'rdz_schema_constats_ok';
+let SCHEMA_OK = false; try{ SCHEMA_OK = localStorage.getItem(SCHEMA_KEY) === '1'; }catch(e){}
+async function checkSchema(){
+  try{
+    const { error } = await Promise.race([
+      sb.from('journal_entrees').select('type_constat_code,gravite,actions_codes,cloture_at').limit(1),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('délai dépassé')), 5000))
+    ]);
+    if(!error){ SCHEMA_OK = true; try{ localStorage.setItem(SCHEMA_KEY,'1'); }catch(e){} }
+    else if(error.code === '42703' || error.code === 'PGRST204' || /column/i.test(error.message||'')){ SCHEMA_OK = false; try{ localStorage.setItem(SCHEMA_KEY,'0'); }catch(e){} }
+  }catch(e){ /* hors réseau : dernière valeur connue */ }
+}
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -603,8 +723,11 @@ async function init(){
   document.getElementById('m-agent').textContent = AGENT_NOM;
   document.getElementById('m-site').textContent = SITE_NOM;
   document.getElementById('m-activite').textContent = ACTIVITE;
+  await Promise.all([RDZRef.load(sb), checkSchema()]);
+  applyStdTaxonomy();
   await loadLocalisations();
   fillNatures();
+  fillExtras();
   resetForm();
   bindMics();
   show('screen-form');
@@ -620,7 +743,9 @@ function resetForm(){
   document.getElementById('f-actions').value = '';
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';
-  document.getElementById('f-nature').value = '';
+  const pre = CAT_PREFILL && RDZRef.get().catByCode[CAT_PREFILL];
+  document.getElementById('f-nature').value = (pre && STD_TAXONOMY[pre.libelle]) ? pre.libelle : '';
+  resetExtras();
   onNatureChange();
   show('screen-form');
 }
@@ -646,56 +771,42 @@ async function loadLocalisations(){
    type_action — la classification arrive donc déjà remplie en supervision,
    où le superviseur peut la corriger. Type d'action « Autre » → précision
    libre obligatoire (categorie_autre). */
-const STD_NATURE_ORDER = ["Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
-const STD_TAXONOMY = {
-  "Accès": [
-    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
-    "Fermeture d'un accès principal ou secondaire essentiel",
-    "Accompagnement entreprise",
-    "Site non hermétique",
-    "Contrôle de légitimation (personnel, étudiant, locataire)",
-    "Stationnement non autorisé, stationnement gênant",
-    "Autre"
-  ],
-  "Admin / conciergerie": [
-    "Objets trouvés",
-    "Administratif (Imprimantes, colis, Poste, ...)",
-    "Housing (draps, divers, ...)",
-    "Check-In / Check-Out"
-  ],
-  "Incivilité": [
-    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
-    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
-    "Détérioration de matériel",
-    "Encombrant dans voie de fuite",
-    "Autre"
-  ],
-  "Secourisme": [
-    "Assistance à la personne - Intervention 144",
-    "Assistance à la personne - Premiers soins",
-    "Assistance divers (Ronde de contrôle)",
-    "Autre"
-  ],
-  "Sécurité": [
-    "Evacuation - Personne(s) non autorisée(s) sur espace public",
-    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
-    "Evacuation - Fête non autorisée",
-    "Evacuation - SDF",
-    "Traces de squat",
-    "Gestion de comportement / conflit",
-    "Vol",
-    "Tapage nocturne / diurne",
-    "Autre"
-  ],
-  "Technique": [
-    "Constat de dysfonctionnement d'installation",
-    "Intervention technique (Plomberie, Electricité, …)",
-    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
-    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
-    "Divers technique (Déneigement, Nettoyage sommaire...)",
-    "Autre"
-  ]
-};
+/* 2026-10-22 : la liste n'est plus recopiée ici — elle vient du référentiel
+   commun (RDZRef, tables ref_*), le même que supervision-rapports.html.
+   « Alarmes » (RDZ-08) reste exclue : chaque site a son rapport d'alarme. */
+let STD_NATURE_ORDER = [];
+let STD_TAXONOMY = {};
+function applyStdTaxonomy(){
+  const d = RDZRef.get();
+  const cats = d.categories.filter(c=>c.actif!==false && c.code!=='RDZ-08');
+  STD_NATURE_ORDER = cats.map(c=>c.libelle);
+  STD_TAXONOMY = {};
+  cats.forEach(c=>{ STD_TAXONOMY[c.libelle] = (d.typesByCat[c.code]||[]).filter(t=>t.actif!==false).map(t=>t.libelle); });
+}
+applyStdTaxonomy();
+function stdType(nature, type){
+  const c = RDZRef.get().catByLabel[nature]; if(!c || !type) return null;
+  return (RDZRef.get().typesByCat[c.code]||[]).find(t=>t.libelle===type) || null;
+}
+function isAutreType(nature, type){ const t = stdType(nature, type); return t ? !!t.est_autre : type==='Autre'; }
+/* Gravité / Actions réalisées / Statut de clôture */
+function fillExtras(){
+  document.getElementById('f-grav').innerHTML = '<option value="">— Choisir —</option>' + RDZ_GRAVITES.map(g=>`<option value="${g.k}">${esc(g.label)}</option>`).join('');
+  document.getElementById('f-acts').innerHTML = RDZRef.get().actions.filter(a=>a.actif!==false).map(a=>
+    `<label class="opt"><input type="checkbox" value="${esc(a.code)}" onchange="onActChange(this)"> ${esc(a.libelle)}</label>`).join('');
+  document.getElementById('f-clot').innerHTML = RDZ_CLOTURES.map(o=>
+    `<label class="opt"><input type="radio" name="f-clot" value="${o.k}" onchange="markOpts('f-clot')"> ${esc(o.label)}</label>`).join('');
+}
+function markOpts(boxId){ document.querySelectorAll('#'+boxId+' label.opt').forEach(l=>l.classList.toggle('on', l.querySelector('input').checked)); }
+function onActChange(el){
+  if(el.checked) document.querySelectorAll('#f-acts input').forEach(i=>{ if(i!==el && (el.value==='aucune' || i.value==='aucune')) i.checked = false; });
+  markOpts('f-acts');
+}
+function getActs(){ return Array.from(document.querySelectorAll('#f-acts input:checked')).map(i=>i.value); }
+function setActs(codes){ document.querySelectorAll('#f-acts input').forEach(i=>{ i.checked = (codes||[]).includes(i.value); }); markOpts('f-acts'); }
+function getClot(){ const el = document.querySelector('input[name="f-clot"]:checked'); return el ? el.value : ''; }
+function setClot(k){ document.querySelectorAll('input[name="f-clot"]').forEach(i=>{ i.checked = (i.value===k); }); markOpts('f-clot'); }
+function resetExtras(){ gravTouched = false; document.getElementById('f-grav').value = ''; setActs([]); setClot(''); }
 function fillNatures(){
   const sel = document.getElementById('f-nature');
   sel.innerHTML = '<option value="">— Choisir —</option>' + STD_NATURE_ORDER.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -710,7 +821,10 @@ function onNatureChange(keepType){
   onTypeChange();
 }
 function onTypeChange(){
-  const autre = document.getElementById('f-type').value === 'Autre';
+  const nat = document.getElementById('f-nature').value, typ = document.getElementById('f-type').value;
+  const t = stdType(nat, typ);
+  if(!gravTouched) document.getElementById('f-grav').value = (t && t.gravite_defaut) ? t.gravite_defaut : '';
+  const autre = isAutreType(nat, typ);
   document.getElementById('f-cat-autre-wrap').classList.toggle('hidden', !autre);
   if(!autre) document.getElementById('f-cat-autre').value = '';
 }
@@ -835,8 +949,18 @@ function saveEntry(){
     errBox.innerHTML = '<div class="err">Choisissez une catégorie et un type d\'action.</div>';
     window.scrollTo(0,0); return;
   }
-  if(typeSel==='Autre' && !catAutre){
-    errBox.innerHTML = '<div class="err">Vous avez choisi « Autre » : précisez.</div>';
+  const autreSel = isAutreType(natSel, typeSel);
+  if(autreSel && !catAutre){
+    errBox.innerHTML = '<div class="err">Vous avez choisi « ' + esc(typeSel) + ' » : précisez.</div>';
+    window.scrollTo(0,0); return;
+  }
+  const acts = getActs(), clot = getClot(), grav = document.getElementById('f-grav').value || null;
+  if(!acts.length && !actions){
+    errBox.innerHTML = '<div class="err">Cochez au moins une action réalisée (ou décrivez ce que vous avez fait).</div>';
+    window.scrollTo(0,0); return;
+  }
+  if(!clot){
+    errBox.innerHTML = '<div class="err">Indiquez le statut de clôture.</div>';
     window.scrollTo(0,0); return;
   }
   let loc = document.getElementById('f-loc').value;
@@ -856,9 +980,23 @@ function saveEntry(){
     actions: actions || null,
     nature_activite: natSel,
     type_action: typeSel,
-    categorie_autre: typeSel==='Autre' ? catAutre : null,
+    categorie_autre: autreSel ? catAutre : null,
+    statut_cloture: (!SCHEMA_OK && clot==='securise') ? 'regle' : clot,
     created_at: new Date().toISOString()
   };
+  if(SCHEMA_OK){
+    const t = stdType(natSel, typeSel);
+    row.type_constat_code = t ? t.code : null;   // clé des statistiques
+    row.gravite = grav;
+    row.actions_codes = acts.length ? acts : null;
+    row.cloture_at = RDZ_CLOTURES_FERMEES.includes(clot) ? row.created_at : null;
+  } else {
+    // migration pas encore détectée : l'information reste lisible dans le texte
+    const extra = [];
+    if(acts.length) extra.push('Actions cochées : ' + RDZRef.actionsLabels(acts).join(', '));
+    if(grav) extra.push('Gravité : ' + RDZRef.graviteLabel(grav));
+    if(extra.length) row.actions = [actions, extra.join(' · ')].filter(Boolean).join('\n');
+  }
   RDZSync.save({ module:'rapport-standard', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
 
   const nNew = photos.length;
@@ -876,7 +1014,7 @@ function draftActivite(){ return ACTIVITE || null; }
 function draftLink(id){ return 'rapport-standard.html?site_id=' + encodeURIComponent(SITE_ID||'') + '&site=' + encodeURIComponent(SITE_NOM||'') + '&activite=' + encodeURIComponent(ACTIVITE||'') + '&brouillon=' + encodeURIComponent(id); }
 function getFormState(){
   const v = id => document.getElementById(id).value;
-  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions'), nature: v('f-nature'), type: v('f-type'), cat_autre: v('f-cat-autre') };
+  return { date: v('f-date'), heure: v('f-heure'), loc: v('f-loc'), loc_autre: v('f-loc-autre'), situation: v('f-situation'), actions: v('f-actions'), nature: v('f-nature'), type: v('f-type'), cat_autre: v('f-cat-autre'), gravite: v('f-grav'), grav_touched: gravTouched, actions_codes: getActs(), statut_cloture: getClot() };
 }
 function setSelDraft(id, val){
   const el = document.getElementById(id);
@@ -891,8 +1029,12 @@ function applyFormState(s){
   document.getElementById('f-situation').value = s.situation || '';
   document.getElementById('f-actions').value = s.actions || '';
   document.getElementById('f-nature').value = STD_TAXONOMY[s.nature] ? s.nature : '';
+  gravTouched = !!s.grav_touched;
   onNatureChange(s.type);
   document.getElementById('f-cat-autre').value = s.cat_autre || '';
+  if(s.gravite !== undefined) document.getElementById('f-grav').value = s.gravite || '';
+  setActs(s.actions_codes || []);
+  setClot(s.statut_cloture || '');
 }
 function draftResume(s){
   const t = (s.situation || s.actions || '').trim();
