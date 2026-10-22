@@ -1,3 +1,4 @@
+<!-- RDZ · journal-config · v2 · 2026-10-22 · activités menant au rapport : menu « Catégorie préremplie » (référentiel commun, migration-referentiel-constats.sql) — masqué si la migration n'est pas faite. Rien d'autre ne change. -->
 <!-- RDZ · journal-config · v1 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -265,8 +266,20 @@ async function catMove(i,dir){ const j=i+dir; if(j<0||j>=modules.length) return;
     const t=a.ordre; a.ordre=b.ordre; b.ordre=t; modules.sort((x,y)=>(x.ordre||0)-(y.ordre||0)); catLoad(); }catch(e){ toast('Échec', true);} }
 
 /* ==================== ACTIVITES PAR SITE ==================== */
+/* 2026-10-22 — catégorie préremplie (référentiel commun ref_categories_constat ;
+   liste vide si migration-referentiel-constats.sql n'est pas faite → menu masqué) */
+let refCats = [];
+async function loadRefCats(){
+  try{ const { data, error } = await sb.from('ref_categories_constat').select('code,libelle,ordre,actif').eq('actif',true).order('ordre');
+    refCats = error ? [] : (data||[]).filter(c=>c.code!=='RDZ-08'); }catch(e){ refCats = []; }
+}
+function isRapportStandard(a){ return !a.cible_url || /rapport-standard\.html/i.test(a.cible_url); }
+async function actCatUpd(id, v){
+  try{ const { error } = await sb.from('journal_activites').update({ categorie_code: v || null }).eq('id', id); if(error) throw error;
+    const a=activites.find(x=>x.id===id); if(a) a.categorie_code = v || null; toast('Modifié ✓'); }catch(e){ toast('Échec', true); }
+}
 async function actInit(){
-  await loadSites(); await loadModules();
+  await loadSites(); await loadModules(); await loadRefCats();
   document.getElementById('act-site').innerHTML = siteOptions();
   const sel = document.getElementById('act-module');
   sel.innerHTML = modules.map(m=>`<option value="${m.id}">${esc((m.icone||'')+' '+m.nom)}</option>`).join('');
@@ -295,6 +308,11 @@ async function actLoad(){
         <div class="grow">
           <input type="text" value="${esc(a.label)}" onchange="actUpd(${a.id},'label',this.value)">
           <div class="mini">→ ${esc(a.cible_url||'rapport-standard.html')}${a.description?' · '+esc(a.description):''}</div>
+          ${refCats.length && isRapportStandard(a) ? `<div class="mini">Catégorie préremplie :
+            <select style="width:auto" onchange="actCatUpd(${a.id}, this.value)">
+              <option value="">— aucune (l'agent choisit) —</option>
+              ${refCats.map(c=>`<option value="${esc(c.code)}" ${a.categorie_code===c.code?'selected':''}>${esc(c.libelle)}</option>`).join('')}
+            </select></div>` : ''}
         </div>
         <button class="del" onclick="actDel(${a.id})">🗑</button>
       </div>`).join('');
