@@ -1,10 +1,11 @@
-<!-- RDZ · journal-de-bord · v3.1 · 2026-10-13 · intitulé affiché « Rapport » (fichier inchangé) ; v3 · 2026-08-11 -->
+<!-- RDZ · journal-de-bord · v4 · 2026-10-22 · un bouton relié à une catégorie (journal_activites.categorie_code, réglé dans journal-config) la transmet au rapport standard, qui la préremplit. Aucun autre changement : les boutons « lien » vers les autres modules sont inchangés. -->
+<!-- RDZ · journal-de-bord · v3 · 2026-08-11 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>RDZ — Rapport</title>
+<title>RDZ — Journal de bord</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
@@ -51,7 +52,7 @@ main{flex:1;padding:16px}
     <div class="top">
       <div>
         <div class="brand">RDZ SECURITY MANAGEMENT SA</div>
-        <div class="sub">Rapport</div>
+        <div class="sub">Journal de bord</div>
       </div>
       <a class="home" href="mobile.html">← Menu</a>
     </div>
@@ -138,6 +139,7 @@ function pickActivite(a){
   const p = new URLSearchParams();
   if(currentSite){ p.set('site_id', currentSite.id); p.set('site', currentSite.nom); }
   p.set('activite', a.label);
+  if(a.categorie_code) p.set('categorie', a.categorie_code); // v4 : ignoré par les modules qui n'en ont pas besoin
   target += (target.indexOf('?') >= 0 ? '&' : '?') + p.toString();
   window.location.href = target;
 }
