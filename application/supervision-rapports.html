@@ -1,4 +1,8 @@
-<!-- v31 · 2026-10-20 · le rapport standard agent remplit désormais lui-même Nature / Type d'action (liste ACTIVITY_TAXONOMY reprise mot à mot dans application/rapport-standard.html — TOUTE MODIFICATION DE CETTE LISTE EST À REPORTER LÀ-BAS) ; précision libre quand le type est « Autre » (journal_entrees.categorie_autre) : affichée dans le détail, la liste, le rapport imprimable et transmise à l'IA, modifiable via « Modifier ». -->
+<!-- v35 · 2026-10-22 · Modifier (rapport standard) : retrait du champ « Ancienne catégorie (agent) » (ancien système de catégories par site, plus utilisé) pour éviter la confusion lors du reclassement. La valeur éventuelle reste en base, intacte. -->
+<!-- v34 · 2026-10-22 · repérage des rapports classés avec l'ANCIENNE liste : pastille « 🕓 Ancienne liste » dans la colonne Catégorie / Type d'action et dans le détail (même style que la pastille ⚠ existante) ; la Recherche accepte « ancienne » (rapports à reclasser), « nouvelle » et « non classé ». Graphisme inchangé. -->
+<!-- v33 · 2026-10-22 · retrait des « Actions réalisées » (cases) et du statut « Situation sécurisée » ; le formulaire agent ne demande plus le statut de clôture (il reste réglable ici, comme avant, par la supervision). Statistiques : catégorie, type d'action, gravité, sites. Les quelques rapports déjà saisis avec des cases cochées les affichent toujours dans « Actions » (lecture seule). -->
+<!-- v32 · 2026-10-22 · RÉFÉRENTIEL COMMUN agent / supervision (migration-referentiel-constats.sql) : Catégorie / Type d'action lus dans ref_categories_constat / ref_types_constat — mêmes libellés que rapport-standard.html ; code stable type_constat_code enregistré à chaque classification ; gravité et actions réalisées (cases) affichées et modifiables ; statut « 🔒 Situation sécurisée » ; onglet 📊 Statistiques + export CSV. Anciennes classifications conservées, affichées « (ancien) ». « Nature d'activité » s'affiche désormais « Catégorie » (même mot que l'agent) ; l'ancien champ « Catégorie (agent) » devient « Précision (agent) ». Graphisme inchangé (classes existantes réutilisées). -->
+<!-- v31 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre — « Autre — texte libre ») : affichée dans le détail, la liste, le rapport imprimable (section 1) et transmise à l'IA ; modifiable via « Modifier ». Distincte de Nature / Type d'action, inchangés. -->
 <!-- v30 · 2026-10-19 · impression/PDF : un rapport tient sur UNE page A4 par défaut. Juste avant l'impression, chaque rapport (.rp-doc) est mesuré ; s'il dépasse un peu une page, il est d'abord resserré (espaces entre sections, marges, hauteur des photos — .rp-compact), puis réduit légèrement (zoom, jamais sous 80 %). S'il ne tient toujours pas, rien n'est forcé : mise en page normale sur plusieurs pages (règles v19 inchangées). -->
 <!-- v29 · 2026-10-11 · nouveau statut « ✉️ À envoyer au client » (après « À revoir », avant « Transmis au client » / « Validé ») — NON verrouillé : modifiable librement, reste dans la vue À valider. Nécessite migration-statut-a-envoyer.sql. -->
 <!-- v28 · 2026-10-11 · tableau : colonne « Aperçu » retirée pour libérer la place (boutons Détail / Supprimer de nouveau visibles). La recherche continue de porter sur le texte du rapport. -->
@@ -407,6 +411,7 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
       <div class="view-tabs">
         <button class="view-tab on" id="tab-avalider" onclick="setView('avalider')">🗂️ À valider <span class="n" id="cnt-avalider">…</span></button>
         <button class="view-tab" id="tab-tous" onclick="setView('tous')">📋 Tous les rapports <span class="n" id="cnt-tous">…</span></button>
+        <button class="view-tab" id="tab-stats" onclick="setView('stats')">📊 Statistiques</button>
         <button class="linklike" style="margin-left:auto" onclick="openChangePin()" title="Définir ou changer le code de validation direction">🔑 Code de validation</button>
       </div>
       <div class="view-hint" id="view-hint"></div>
@@ -462,12 +467,13 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
           <thead>
             <tr>
               <th><input type="checkbox" id="check-all" onchange="toggleAll(this.checked)" title="Tout sélectionner"></th>
-              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Nature / Type d'action</th><th>Site</th><th>Agent</th><th>Photos</th><th></th>
+              <th>Date / Heure</th><th>Type</th><th>Statut</th><th>Catégorie / Type d'action</th><th>Site</th><th>Agent</th><th>Photos</th><th></th>
             </tr>
           </thead>
           <tbody id="list-body"><tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr></tbody>
         </table>
       </div>
+      <div id="stats-panel" style="display:none"></div>
     </div>
   </main>
 </div>
@@ -667,76 +673,97 @@ tr.site-group .gcount{font-weight:normal;color:#64748b;font-size:12px;margin-lef
    ses types d'action INCENDIE / INTRUSION / TECHNIQUE / Autre. Pour les
    interventions alarme (alarme_interventions), rien ne change : nature
    toujours "Alarmes", seul le type se choisit. */
-const ACTIVITY_TAXONOMY_ORDER = ["Alarmes", "Accès", "Admin / conciergerie", "Incivilité", "Secourisme", "Sécurité", "Technique"];
-const ACTIVITY_TAXONOMY = {
-  "Alarmes": [
-    "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)",
-    "INCENDIE - Alarme avec intervention pompiers",
-    "INCENDIE - Dérangement centrale feu",
-    "INTRUSION - Alarme effraction",
-    "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)",
-    "INTRUSION - Dérangement",
-    "TECHNIQUE - Alarme",
-    "Autre"
-  ],
-  "Accès": [
-    "Gestion des accès (ouvertures espaces communs, mise à disposition de badges, ...)",
-    "Fermeture d'un accès principal ou secondaire essentiel",
-    "Accompagnement entreprise",
-    "Site non hermétique",
-    "Contrôle de légitimation (personnel, étudiant, locataire)",
-    "Stationnement non autorisé, stationnement gênant",
-    "Autre"
-  ],
-  "Admin / conciergerie": [
-    "Objets trouvés",
-    "Administratif (Imprimantes, colis, Poste, ...)",
-    "Housing (draps, divers, ...)",
-    "Check-In / Check-Out"
-  ],
-  "Incivilité": [
-    "Propreté et Hygiène (Poubelles, Lieu sale, ...)",
-    "Négligence (Four allumé, Lumière, Matériel mis à disposition, ...)",
-    "Détérioration de matériel",
-    "Encombrant dans voie de fuite",
-    "Autre"
-  ],
-  "Secourisme": [
-    "Assistance à la personne - Intervention 144",
-    "Assistance à la personne - Premiers soins",
-    "Assistance divers (Ronde de contrôle)",
-    "Autre"
-  ],
-  "Sécurité": [
-    "Evacuation - Personne(s) non autorisée(s) sur espace public",
-    "Evacuation - Personne(s) non autorisée(s) sur espace privé",
-    "Evacuation - Fête non autorisée",
-    "Evacuation - SDF",
-    "Traces de squat",
-    "Gestion de comportement / conflit",
-    "Vol",
-    "Tapage nocturne / diurne",
-    "Autre"
-  ],
-  "Technique": [
-    "Constat de dysfonctionnement d'installation",
-    "Intervention technique (Plomberie, Electricité, …)",
-    "Contrôle Technique, Constats (Temperature , local ventilation, fuites...)",
-    "Contrôle des éléments de sécurité  (Matériel Incendie, ...)",
-    "Divers technique (Déneigement, Nettoyage sommaire...)",
-    "Autre"
-  ]
-};
+/* ============================================================================
+   RDZ · référentiel constats · v1 · 2026-10-22 (libellés écran : Catégorie / Type d'action)
+   BLOC IDENTIQUE dans rapport-standard.html (agent) et supervision-rapports.html
+   (centraliste) : même source, mêmes libellés des deux côtés.
+   Source : tables Supabase ref_categories_constat / ref_types_constat /
+   ref_actions_rapport (migration-referentiel-constats.sql). Copie gardée en
+   cache sur l'appareil (hors-ligne) ; à défaut, liste intégrée ci-dessous
+   (= contenu initial de la migration).
+   ============================================================================ */
+const RDZ_LBL = { categorie: 'Catégorie', type: 'Type d\'action', actions: 'Actions réalisées', gravite: 'Gravité', cloture: 'Statut de clôture' };
+const RDZ_GRAVITES = [
+  {k:'faible',   label:'Faible',   color:'#1e6b1e'},
+  {k:'moderee',  label:'Modérée',  color:'#b8860b'},
+  {k:'elevee',   label:'Élevée',   color:'#c0560b'},
+  {k:'critique', label:'Critique', color:'#C8102E'}
+];
+/* Statut de clôture (supervision uniquement depuis le 2026-10-22 b — retiré du
+   formulaire agent). Clés en base inchangées : regle / action / info / probleme. */
+const RDZ_CLOTURES = [
+  {k:'regle',    label:'✔ Situation terminée',  color:'#1e6b1e', bg:'#f0f8f0'},
+  {k:'action',   label:'📅 Action à venir',      color:'#b45c00', bg:'#fff8f0'},
+  {k:'info',     label:'ℹ️ Pour information',    color:'#1a5a8a', bg:'#f0f6ff'},
+  {k:'probleme', label:'⚠️ Problème en cours',   color:'#C8102E', bg:'#fdf5f5'}
+];
+const RDZ_CLOTURES_FERMEES = ['regle','info']; // posent cloture_at
+const RDZRef = (function(){
+  const SEED = {"categories": [{"code": "RDZ-01", "libelle": "Sécurité / Incidents", "ordre": 10}, {"code": "RDZ-02", "libelle": "Accès / Stationnement", "ordre": 20}, {"code": "RDZ-03", "libelle": "Technique / Maintenance", "ordre": 30}, {"code": "RDZ-04", "libelle": "Incendie / Prévention", "ordre": 40}, {"code": "RDZ-05", "libelle": "Secourisme / Assistance", "ordre": 50}, {"code": "RDZ-06", "libelle": "Propreté / Dégradations", "ordre": 60}, {"code": "RDZ-07", "libelle": "Administration / Services", "ordre": 70}, {"code": "RDZ-08", "libelle": "Alarmes", "ordre": 80}], "types": [{"code": "RDZ-01-01", "categorie_code": "RDZ-01", "libelle": "Intrusion / présence non autorisée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-01-02", "categorie_code": "RDZ-01", "libelle": "Comportement suspect", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-01-03", "categorie_code": "RDZ-01", "libelle": "Conflit / altercation", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-01-04", "categorie_code": "RDZ-01", "libelle": "Vol / tentative de vol", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-01-05", "categorie_code": "RDZ-01", "libelle": "Dégradation volontaire / vandalisme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-01-06", "categorie_code": "RDZ-01", "libelle": "Squat / occupation illicite", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-01-07", "categorie_code": "RDZ-01", "libelle": "Nuisances sonores / rassemblement", "gravite_defaut": "faible", "est_autre": false, "ordre": 70}, {"code": "RDZ-01-08", "categorie_code": "RDZ-01", "libelle": "Autre incident de sécurité", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}, {"code": "RDZ-02-01", "categorie_code": "RDZ-02", "libelle": "Porte / accès trouvé ouvert", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-02-02", "categorie_code": "RDZ-02", "libelle": "Défaut de fermeture / verrouillage", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-02-03", "categorie_code": "RDZ-02", "libelle": "Accès non autorisé / tentative de passage", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-02-04", "categorie_code": "RDZ-02", "libelle": "Contrôle d’autorisation / légitimation", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-02-05", "categorie_code": "RDZ-02", "libelle": "Badge / clé perdu(e) ou défectueux(se)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-02-06", "categorie_code": "RDZ-02", "libelle": "Stationnement non autorisé / gênant", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-02-07", "categorie_code": "RDZ-02", "libelle": "Autre anomalie d’accès", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-03-01", "categorie_code": "RDZ-03", "libelle": "Éclairage / électricité défectueux", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-03-02", "categorie_code": "RDZ-03", "libelle": "Fuite d’eau / plomberie", "gravite_defaut": "moderee", "est_autre": false, "ordre": 20}, {"code": "RDZ-03-03", "categorie_code": "RDZ-03", "libelle": "Chauffage / ventilation / température", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-03-04", "categorie_code": "RDZ-03", "libelle": "Ascenseur / porte automatique en panne", "gravite_defaut": "moderee", "est_autre": false, "ordre": 40}, {"code": "RDZ-03-05", "categorie_code": "RDZ-03", "libelle": "Équipement de sûreté défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 50}, {"code": "RDZ-03-06", "categorie_code": "RDZ-03", "libelle": "Dommage / anomalie technique du bâtiment", "gravite_defaut": "moderee", "est_autre": false, "ordre": 60}, {"code": "RDZ-03-07", "categorie_code": "RDZ-03", "libelle": "Autre anomalie technique", "gravite_defaut": "faible", "est_autre": true, "ordre": 70}, {"code": "RDZ-04-01", "categorie_code": "RDZ-04", "libelle": "Issue de secours obstruée", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-04-02", "categorie_code": "RDZ-04", "libelle": "Porte coupe-feu / évacuation non conforme", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-04-03", "categorie_code": "RDZ-04", "libelle": "Extincteur / équipement incendie manquant ou défectueux", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-04-04", "categorie_code": "RDZ-04", "libelle": "Risque de départ de feu constaté", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-04-05", "categorie_code": "RDZ-04", "libelle": "Signalisation / éclairage de secours défectueux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-04-06", "categorie_code": "RDZ-04", "libelle": "Autre anomalie de prévention incendie", "gravite_defaut": "moderee", "est_autre": true, "ordre": 60}, {"code": "RDZ-05-01", "categorie_code": "RDZ-05", "libelle": "Malaise / problème de santé", "gravite_defaut": "elevee", "est_autre": false, "ordre": 10}, {"code": "RDZ-05-02", "categorie_code": "RDZ-05", "libelle": "Chute / blessure", "gravite_defaut": "elevee", "est_autre": false, "ordre": 20}, {"code": "RDZ-05-03", "categorie_code": "RDZ-05", "libelle": "Personne en détresse / vulnérable", "gravite_defaut": "elevee", "est_autre": false, "ordre": 30}, {"code": "RDZ-05-04", "categorie_code": "RDZ-05", "libelle": "Accident impliquant une personne", "gravite_defaut": "critique", "est_autre": false, "ordre": 40}, {"code": "RDZ-05-05", "categorie_code": "RDZ-05", "libelle": "Autre besoin d’assistance à personne", "gravite_defaut": "moderee", "est_autre": true, "ordre": 50}, {"code": "RDZ-06-01", "categorie_code": "RDZ-06", "libelle": "Déchets / salissures / hygiène", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-06-02", "categorie_code": "RDZ-06", "libelle": "Dégradation de mobilier / matériel", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-06-03", "categorie_code": "RDZ-06", "libelle": "Dégradation des locaux", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-06-04", "categorie_code": "RDZ-06", "libelle": "Objet encombrant hors issue de secours", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-06-05", "categorie_code": "RDZ-06", "libelle": "Négligence / équipement laissé en fonctionnement", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-06-06", "categorie_code": "RDZ-06", "libelle": "Autre constat de propreté / dégradation", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-07-01", "categorie_code": "RDZ-07", "libelle": "Objet trouvé / perdu", "gravite_defaut": "faible", "est_autre": false, "ordre": 10}, {"code": "RDZ-07-02", "categorie_code": "RDZ-07", "libelle": "Colis / courrier / livraison", "gravite_defaut": "faible", "est_autre": false, "ordre": 20}, {"code": "RDZ-07-03", "categorie_code": "RDZ-07", "libelle": "Accueil / check-in / check-out", "gravite_defaut": "faible", "est_autre": false, "ordre": 30}, {"code": "RDZ-07-04", "categorie_code": "RDZ-07", "libelle": "Demande de conciergerie / service", "gravite_defaut": "faible", "est_autre": false, "ordre": 40}, {"code": "RDZ-07-05", "categorie_code": "RDZ-07", "libelle": "Accompagnement d’entreprise / prestataire", "gravite_defaut": "faible", "est_autre": false, "ordre": 50}, {"code": "RDZ-07-06", "categorie_code": "RDZ-07", "libelle": "Autre demande administrative / service", "gravite_defaut": "faible", "est_autre": true, "ordre": 60}, {"code": "RDZ-08-01", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme maîtrisée (fumées, quittance alarme, ...)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 10}, {"code": "RDZ-08-02", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Alarme avec intervention pompiers", "gravite_defaut": "critique", "est_autre": false, "ordre": 20}, {"code": "RDZ-08-03", "categorie_code": "RDZ-08", "libelle": "INCENDIE - Dérangement centrale feu", "gravite_defaut": "moderee", "est_autre": false, "ordre": 30}, {"code": "RDZ-08-04", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme effraction", "gravite_defaut": "elevee", "est_autre": false, "ordre": 40}, {"code": "RDZ-08-05", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Alarme sûreté (Issues de secours, boitiers de contrôle des issues)", "gravite_defaut": "moderee", "est_autre": false, "ordre": 50}, {"code": "RDZ-08-06", "categorie_code": "RDZ-08", "libelle": "INTRUSION - Dérangement", "gravite_defaut": "faible", "est_autre": false, "ordre": 60}, {"code": "RDZ-08-07", "categorie_code": "RDZ-08", "libelle": "TECHNIQUE - Alarme", "gravite_defaut": "moderee", "est_autre": false, "ordre": 70}, {"code": "RDZ-08-08", "categorie_code": "RDZ-08", "libelle": "Autre", "gravite_defaut": "moderee", "est_autre": true, "ordre": 80}], "actions": [{"code": "verification", "libelle": "Vérification / levée de doute", "ordre": 10}, {"code": "securisation", "libelle": "Sécurisation des lieux", "ordre": 20}, {"code": "fermeture", "libelle": "Fermeture / verrouillage", "ordre": 30}, {"code": "assistance", "libelle": "Assistance à la personne", "ordre": 40}, {"code": "appel_144", "libelle": "Appel 144 (ambulance)", "ordre": 50}, {"code": "appel_117", "libelle": "Appel 117 (police)", "ordre": 60}, {"code": "appel_118", "libelle": "Appel 118 (pompiers)", "ordre": 70}, {"code": "info_centrale", "libelle": "Information à la centrale", "ordre": 80}, {"code": "transmission_responsable", "libelle": "Transmission au responsable / client", "ordre": 90}, {"code": "demande_technique", "libelle": "Demande d’intervention technique", "ordre": 100}, {"code": "photos", "libelle": "Photos prises", "ordre": 110}, {"code": "aucune", "libelle": "Aucune action requise", "ordre": 120}]};
+  const CACHE_KEY = 'rdz_ref_constats_v1';
+  let D = null;
+  function build(src){
+    const d = { source: src.source||'integre', categories: [], types: [], actions: [],
+      catByCode:{}, catByLabel:{}, typeByCode:{}, typesByCat:{}, actionByCode:{} };
+    (src.categories||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(c=>{
+      d.categories.push(c); d.catByCode[c.code]=c; d.catByLabel[c.libelle]=c; d.typesByCat[c.code]=[]; });
+    (src.types||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(t=>{
+      d.types.push(t); d.typeByCode[t.code]=t; (d.typesByCat[t.categorie_code]=d.typesByCat[t.categorie_code]||[]).push(t); });
+    (src.actions||[]).slice().sort((a,b)=>(a.ordre||0)-(b.ordre||0)).forEach(a=>{ d.actions.push(a); d.actionByCode[a.code]=a; });
+    return d;
+  }
+  function readCache(){ try{ const c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); return (c && c.categories && c.categories.length && c.types && c.types.length) ? c : null; }catch(e){ return null; } }
+  function withTimeout(p, ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('délai dépassé')), ms))]); }
+  async function load(client){
+    try{
+      const [c,t,a] = await withTimeout(Promise.all([
+        client.from('ref_categories_constat').select('*').order('ordre'),
+        client.from('ref_types_constat').select('*').order('ordre'),
+        client.from('ref_actions_rapport').select('*').order('ordre')
+      ]), 6000);
+      const err = c.error || t.error || a.error; if(err) throw err;
+      if(!(c.data||[]).length || !(t.data||[]).length) throw new Error('référentiel vide');
+      const src = { source:'base', ts:Date.now(), categories:c.data, types:t.data, actions:a.data||[] };
+      try{ localStorage.setItem(CACHE_KEY, JSON.stringify(src)); }catch(e){}
+      D = build(src);
+    }catch(e){
+      const cached = readCache();
+      D = build(cached ? Object.assign({}, cached, {source:'cache'}) : Object.assign({source:'integre'}, SEED));
+      console.warn('Référentiel constats — source : ' + D.source + ' (' + (e && e.message || e) + ')');
+    }
+    return D;
+  }
+  function get(){ if(!D) D = build(readCache() || Object.assign({source:'integre'}, SEED)); return D; }
+  /* Libellé catégorie + libellé type → code (pour retrouver le code depuis
+     les colonnes texte nature_activite / type_action). */
+  function codeFor(catLabel, typeLabel){
+    const d = get(); const c = d.catByLabel[catLabel]; if(!c || !typeLabel) return null;
+    const t = (d.typesByCat[c.code]||[]).find(x=>x.libelle===typeLabel); return t ? t.code : null;
+  }
+  function graviteLabel(k){ const g = RDZ_GRAVITES.find(x=>x.k===k); return g ? g.label : ''; }
+  function actionsLabels(codes){ const d = get(); return (Array.isArray(codes)?codes:[]).map(c=>d.actionByCode[c] ? d.actionByCode[c].libelle : c); }
+  return { load, get, codeFor, graviteLabel, actionsLabels };
+})();
+
+/* v32 — ACTIVITY_TAXONOMY_ORDER / ACTIVITY_TAXONOMY reconstruites depuis le
+   référentiel commun (RDZRef), même forme qu'avant (catégorie → [types]) :
+   Modifier, Classer, Analyser avec Claude et les prompts IA restent inchangés.
+   "Alarmes" = catégorie RDZ-08 (libellés identiques à l'ancienne liste). */
+let ACTIVITY_TAXONOMY_ORDER = [];
+let ACTIVITY_TAXONOMY = {};
+function applyTaxonomy(){
+  const d = RDZRef.get();
+  ACTIVITY_TAXONOMY_ORDER = d.categories.filter(c=>c.actif!==false).map(c=>c.libelle);
+  ACTIVITY_TAXONOMY = {};
+  d.categories.forEach(c=>{ ACTIVITY_TAXONOMY[c.libelle] = (d.typesByCat[c.code]||[]).filter(t=>t.actif!==false).map(t=>t.libelle); });
+  if(!ACTIVITY_TAXONOMY['Alarmes']) ACTIVITY_TAXONOMY['Alarmes'] = [];
+}
+applyTaxonomy();
 
 /* Statut de clôture — 4 options fixes, reprises du modèle de référence
    fourni par Laurent (rapport_intervention_rdz). Clé stable en base
    (colonne statut_cloture), libellé + couleur pour l'affichage. */
-const CLOTURE_OPTIONS = [
-  {k:'regle', label:'✔ Situation terminée', color:'#1e6b1e', bg:'#f0f8f0'},
-  {k:'action', label:'📅 Action à venir', color:'#b45c00', bg:'#fff8f0'},
-  {k:'info', label:'ℹ️ Pour information', color:'#1a5a8a', bg:'#f0f6ff'},
-  {k:'probleme', label:'⚠️ Problème en cours', color:'#C8102E', bg:'#fdf5f5'}
-];
+const CLOTURE_OPTIONS = RDZ_CLOTURES; // v33 : les 4 statuts d'origine
 
 /* ---------- v20 · Statut du RAPPORT (cycle de vie administratif) ----------
    À ne pas confondre avec statut_cloture (situation terrain : terminée /
@@ -764,9 +791,22 @@ function statutBadgeHtml(r){
 }
 /* Classification manquante : nature + type pour un rapport standard ;
    type seul pour une alarme (nature implicite "Alarmes"). */
+/* v34 — de quelle liste vient la classification ?
+   'nouveau' : code du référentiel commun (ou libellés actuels) ;
+   'ancien'  : classée avec l'ancienne liste (à reclasser) ;
+   'aucune'  : rien de renseigné. */
+function classifEra(r){
+  const nat = r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '');
+  const typ = r.raw.type_action || '';
+  if(r.raw.type_constat_code || RDZRef.codeFor(nat, typ)) return 'nouveau';
+  if(nat || typ) return 'ancien';
+  return 'aucune';
+}
+const ERA_SEARCH = { nouveau:'nouvelle liste', ancien:'ancienne liste à reclasser', aucune:'non classé non classe' };
+const ANCIEN_PILL = '<span class="miss" title="Classé avec l\'ancienne liste — à reclasser (Modifier ou 🏷️ Classer)">🕓 Ancienne liste</span>';
 function missingClassif(r){
   const m = [];
-  if(r.kind==='standard' && !r.raw.nature_activite) m.push('Nature d\'activité');
+  if(r.kind==='standard' && !r.raw.nature_activite) m.push('Catégorie');
   if(!r.raw.type_action) m.push('Type d\'action');
   return m;
 }
@@ -917,6 +957,7 @@ function clotureSelectedValue(idPrefix){
 function natureSelectHtml(natId, typeId, currentNature){
   const opts = ['<option value="">— Non renseigné —</option>']
     .concat(ACTIVITY_TAXONOMY_ORDER.map(n=>`<option value="${esc(n)}" ${currentNature===n?'selected':''}>${esc(n)}</option>`))
+    .concat(currentNature && !ACTIVITY_TAXONOMY_ORDER.includes(currentNature) ? [`<option value="${esc(currentNature)}" selected>(ancien) ${esc(currentNature)}</option>`] : [])
     .join('');
   return `<select id="${natId}" onchange="refreshTypeActionSelect('${natId}','${typeId}')">${opts}</select>`;
 }
@@ -925,8 +966,10 @@ function natureSelectHtml(natId, typeId, currentNature){
    changement de nature (currentType alors toujours null). */
 function typeActionOptionsHtml(nature, currentType){
   const list = ACTIVITY_TAXONOMY[nature] || [];
-  if(!list.length) return '<option value="">— Choisis d\'abord une nature d\'activité —</option>';
-  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('');
+  // v32 : une ancienne valeur (hors référentiel) reste affichée et sélectionnée
+  const keep = (currentType && !list.includes(currentType)) ? `<option value="${esc(currentType)}" selected>(ancien) ${esc(currentType)}</option>` : '';
+  if(!list.length) return keep ? ('<option value="">— Non renseigné —</option>' + keep) : '<option value="">— Choisis d\'abord une catégorie —</option>';
+  return '<option value="">— Non renseigné —</option>' + list.map(t=>`<option value="${esc(t)}" ${currentType===t?'selected':''}>${esc(t)}</option>`).join('') + keep;
 }
 function refreshTypeActionSelect(natId, typeId){
   const nature = document.getElementById(natId).value;
@@ -1155,8 +1198,48 @@ let currentView = 'avalider';   // v20 : 'avalider' | 'tous'
 let RAPPORT_TYPES = {};  // id -> {nom, icone} — types de rapports personnalisés (rapport-types-config.html)
 
 /* ---------- Chargement ---------- */
+/* v32 — SCHEMA_REF_OK : colonnes de migration-referentiel-constats.sql
+   présentes ? Sinon on n'écrit QUE les anciennes colonnes (aucune erreur). */
+let SCHEMA_REF_OK = false, REF_LOADED = false;
+async function ensureRef(){
+  if(REF_LOADED) return; REF_LOADED = true;
+  await RDZRef.load(sb); applyTaxonomy();
+  try{
+    const { error } = await sb.from('journal_entrees').select('type_constat_code,gravite,actions_codes,cloture_at').limit(1);
+    SCHEMA_REF_OK = !error;
+    if(error) console.warn('Colonnes référentiel absentes — lancer migration-referentiel-constats.sql :', error.message||error);
+  }catch(e){ SCHEMA_REF_OK = false; }
+}
+/* Point de passage UNIQUE avant écriture (Modifier / Analyser / Classer) :
+   code stable du type d'action, date de clôture. */
+function enrichPayload(r, payload){
+  const has = k=>Object.prototype.hasOwnProperty.call(payload,k);
+  if(has('type_action') || has('nature_activite')){
+    const nat = payload.nature_activite !== undefined ? payload.nature_activite : r.raw.nature_activite;
+    const typ = payload.type_action !== undefined ? payload.type_action : r.raw.type_action;
+    if(SCHEMA_REF_OK) payload.type_constat_code = RDZRef.codeFor(nat || (r.kind==='alarme' ? 'Alarmes' : ''), typ) || null;
+  }
+  if(has('statut_cloture')){
+    if(SCHEMA_REF_OK){
+      const fermee = RDZ_CLOTURES_FERMEES.includes(payload.statut_cloture);
+      if(fermee && !r.raw.cloture_at) payload.cloture_at = new Date().toISOString();
+      if(!fermee && payload.statut_cloture && r.raw.cloture_at) payload.cloture_at = null;
+    }
+  }
+  if(!SCHEMA_REF_OK){ delete payload.gravite; delete payload.actions_codes; delete payload.type_constat_code; delete payload.cloture_at; }
+  return payload;
+}
+function actionsDisplay(raw){
+  const lbl = RDZRef.actionsLabels(raw.actions_codes);
+  const parts = [];
+  if(lbl.length) parts.push(lbl.map(x=>'☑ '+x).join('\n'));
+  if(raw.actions) parts.push(raw.actions);
+  return parts.join('\n\n');
+}
 async function loadData(){
   document.getElementById('list-body').innerHTML = '<tr><td colspan="9"><div class="state-msg">Chargement…</div></td></tr>';
+  await ensureRef();
+  STATS_ROWS = null; // v32 : statistiques rechargées à la prochaine ouverture de l'onglet
   try{
     const [{data:entrees, error:e1}, {data:alarmes, error:e2}, {data:photosAll, error:e3}, {data:rtypes, error:e4}] = await Promise.all([
       sb.from('journal_entrees').select('*').order('created_at',{ascending:false}).limit(500),
@@ -1224,6 +1307,11 @@ function setView(v){
   currentView = v;
   document.getElementById('tab-avalider').classList.toggle('on', v==='avalider');
   document.getElementById('tab-tous').classList.toggle('on', v==='tous');
+  document.getElementById('tab-stats').classList.toggle('on', v==='stats');
+  const isStats = v==='stats';
+  document.querySelector('.table-wrap').style.display = isStats ? 'none' : '';
+  document.getElementById('sel-toolbar').style.display = isStats ? 'none' : '';
+  document.getElementById('stats-panel').style.display = isStats ? '' : 'none';
   render();
 }
 function populateSiteFilter(){
@@ -1291,7 +1379,7 @@ function getFilteredEntries(){
       if(to && dayStr > to) return false;
     }
     if(search){
-      const hay = (r.site+' '+r.agent+' '+reportSnippet(r)).toLowerCase();
+      const hay = (r.site+' '+r.agent+' '+reportSnippet(r)+' '+ERA_SEARCH[classifEra(r)]).toLowerCase();
       if(!hay.includes(search)) return false;
     }
     return true;
@@ -1313,6 +1401,7 @@ function rowHtml(r){
         let h = nat ? `<div class="nat">${esc(nat)}</div>` : '';
         if(typ) h += `<div class="typ" title="${esc(typ)}">${esc(typ)}</div>`;
         if(miss.length) h += `<span class="miss" title="Classification à compléter (Modifier ou 🏷️ Classer)">⚠ ${esc(miss.join(' + '))}</span>`;
+        else if(classifEra(r)==='ancien') h += ANCIEN_PILL;
         return h || '—';
       })()}</td>
       <td>${esc(r.site||'—')}</td>
@@ -1326,12 +1415,13 @@ function rowHtml(r){
 }
 
 function render(){
+  if(currentView==='stats'){ renderStats(); return; }
   filteredData = getFilteredEntries();
   // Compteurs des onglets (indépendants des filtres)
   document.getElementById('cnt-avalider').textContent = allReports.filter(needsValidation).length;
   document.getElementById('cnt-tous').textContent = allReports.length;
   document.getElementById('view-hint').textContent = currentView==='avalider'
-    ? 'Rapports pas encore validés ni transmis au client, ou dont la nature d\'activité / le type d\'action manque — regroupés par site.'
+    ? 'Rapports pas encore validés ni transmis au client, ou dont la catégorie / le type d\'action manque — regroupés par site.'
     : 'Tous les rapports, du plus récent au plus ancien.';
   document.getElementById('fcount').textContent = filteredData.length + ' rapport(s)';
   const tbody = document.getElementById('list-body');
@@ -1437,7 +1527,7 @@ function openDetail(id){
       ${catFull(r.raw) ? `<div class="msec"><div class="st">Précision (agent)</div><div class="txt">${esc(catFull(r.raw))}</div></div>` : ''}
       <div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r.raw)||'—')}</div></div>
       <div class="msec"><div class="st">Que se passe-t-il ?</div><div class="txt">${esc(r.raw.situation||'—')}</div></div>
-      <div class="msec"><div class="st">Actions</div><div class="txt">${esc(r.raw.actions||'—')}</div></div>`;
+      <div class="msec"><div class="st">Actions</div><div class="txt">${esc(actionsDisplay(r.raw)||'—')}</div></div>`;
   }else if(isNewFormatAlarme(r)){
     const reponses = parseReponses(r.raw.reponses);
     const qaHtml = reponses.length
@@ -1477,7 +1567,8 @@ function openDetail(id){
         <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent||'—')}</div></div>
         <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(r.ts)} ${fmtTime(r.ts)}</div></div>
         <div class="mcell"><div class="k">Statut du rapport</div><div class="v">${statutBadgeHtml(r)}${r.raw.statut_rapport_at?`<div style="font-size:11px;color:#888;font-weight:normal;margin-top:4px">depuis le ${fmtDate(r.raw.statut_rapport_at)} ${fmtTime(r.raw.statut_rapport_at)}</div>`:''}</div></div>
-        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:''}</div></div>
+        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:(classifEra(r)==='ancien'?'<br>'+ANCIEN_PILL:'')}</div></div>
+        <div class="mcell"><div class="k">${RDZ_LBL.gravite}</div><div class="v" style="font-size:12.5px">${esc(RDZRef.graviteLabel(r.raw.gravite)||'—')}</div></div>
       </div>
       ${isLocked(r) ? '<div class="lock-note">🔒 Rapport protégé (' + esc(statutInfo(statutOf(r)).label) + ') — pour le modifier, le classer ou le supprimer, il faudra d\'abord changer son statut (code de validation).</div>' : ''}
       ${extra}
@@ -1520,7 +1611,8 @@ function editFieldsFor(r){
   if(r.kind==='standard') return [
     {k:'site_nom', l:'Site', t:'text'},
     {k:'activite', l:'Activité', t:'text'},
-    {k:'categorie_autre', l:'Précision (si type d\'action « Autre »)', t:'text'},
+    // v35 : ancien champ « categorie » (listes par site, abandonnées) retiré du formulaire Modifier — valeur existante conservée en base, non modifiée
+    {k:'categorie_autre', l:'Précision (si « Autre… »)', t:'text'},
     {k:'localisation', l:'Localisation', t:'text'},
     {k:'localisation_autre', l:'Précision localisation', t:'text'},
     {k:'situation', l:'Que se passe-t-il ?', t:'textarea'},
@@ -1638,7 +1730,7 @@ function renderEditForm(r){
       </div>` : ''}
       ${r.kind==='standard' ? `
       <div class="efield">
-        <label>Nature d'activité</label>
+        <label>Catégorie</label>
         ${natureSelectHtml('ef-nature_activite', 'ef-type_action', r.raw.nature_activite)}
       </div>
       <div class="efield">
@@ -1649,6 +1741,10 @@ function renderEditForm(r){
         <label>Type d'action (nature : Alarmes)</label>
         ${alarmeTypeActionSelectHtml('ef-type_action', r.raw.type_action)}
       </div>`}
+      <div class="efield">
+        <label>${RDZ_LBL.gravite}</label>
+        <select id="ef-gravite"><option value="">— Non renseignée —</option>${RDZ_GRAVITES.map(g=>`<option value="${g.k}" ${r.raw.gravite===g.k?'selected':''}>${esc(g.label)}</option>`).join('')}</select>
+      </div>
       <div class="efield">
         <label>Statut de clôture (situation terrain)</label>
         ${clotureSelectHtml('ef', r.raw.statut_cloture)}
@@ -1732,7 +1828,10 @@ async function saveEdit(id){
   // v21 — légendes de photos modifiées mais pas encore enregistrées
   const lgEls = Array.from(document.querySelectorAll('.ef-photo-lg'));
   for(const el of lgEls){ await saveEditPhotoLegende(el.dataset.photoid, el.value); }
+  // v32 — gravité
+  const gEl = document.getElementById('ef-gravite'); if(gEl) payload.gravite = gEl.value || null;
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
+  enrichPayload(r, payload);
   try{
     const { error } = await sb.from(table).update(payload).eq('id', id);
     if(error) throw error;
@@ -2115,7 +2214,7 @@ function buildPromptLines(items){
       }
     }else if(r.kind==='standard'){
       lines.push('  Activité: ' + (r.raw.activite||'—'));
-      lines.push('  Précision donnée par l\'agent (type « Autre »): ' + (catFull(r.raw)||'—'));
+      lines.push('  Catégorie choisie par l\'agent: ' + (catFull(r.raw)||'—'));
       lines.push('  Localisation: ' + (locFull(r.raw)||'—'));
       lines.push('  Situation (saisie brute agent): ' + (r.raw.situation||'—'));
       lines.push('  Actions (saisie brute agent): ' + (r.raw.actions||'—'));
@@ -2223,7 +2322,7 @@ function renderReviewCardHtml(i, r, corr){
       ${r.raw.resultat ? `<details class="rev-original"><summary>Voir le texte original saisi par l'agent</summary><div class="txt">${esc(r.raw.resultat)}</div></details>` : ''}
     </div>` : ''}
     ${r.kind==='standard' ? `
-    <div class="efield"><label>Nature d'activité</label><div id="rev-r${i}-nature"></div></div>
+    <div class="efield"><label>Catégorie</label><div id="rev-r${i}-nature"></div></div>
     <div class="efield"><label>Type d'action</label><div id="rev-r${i}-type"></div></div>` : `
     <div class="efield"><label>Type d'action (nature : Alarmes)</label><div id="rev-r${i}-type"></div></div>`}
     <div class="efield"><label>Statut de clôture</label><div id="rev-r${i}-cloture"></div></div>
@@ -2255,6 +2354,7 @@ function backToJsonStep(){
 
 async function applyCorrectionToSource(r, payload){
   const table = r.kind==='standard' ? 'journal_entrees' : 'alarme_interventions';
+  enrichPayload(r, payload);
   const { error } = await sb.from(table).update(payload).eq('id', r.id);
   if(error) throw error;
   Object.assign(r.raw, payload);
@@ -2496,7 +2596,7 @@ function renderClassifyCardHtml(i, r, corr){
     <div class="rev-original" style="font-size:12.5px;color:#555;background:var(--bg-soft);border-radius:var(--radius-ui);padding:6px 8px;margin-bottom:10px">${esc(reportSnippet(r))||'<i>Sans description</i>'}</div>
     <div style="font-size:12px;color:#888;margin-bottom:8px">Actuellement : ${esc(currentCls)}</div>
     ${r.kind==='standard' ? `
-    <div class="efield"><label>Nature d'activité</label><div id="cls-r${i}-nature"></div></div>
+    <div class="efield"><label>Catégorie</label><div id="cls-r${i}-nature"></div></div>
     <div class="efield"><label>Type d'action</label><div id="cls-r${i}-type"></div></div>` : `
     <div class="efield"><label>Type d'action (nature : Alarmes)</label><div id="cls-r${i}-type"></div></div>`}
     <div class="rev-apply">
@@ -2601,7 +2701,7 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
     {label:'Date', value:dateTxt},
     ...timeCols,
     {label:'Agent', value:esc(meta.agent_name||'—')},
-    {label:'Nature d\'activité', value:esc(activiteTxt||'—')}
+    {label:'Catégorie', value:esc(activiteTxt||'—')}
   ];
   /* Retour Laurent 2026-08-16 : les libellés de longueurs différentes
      ("Date" vs "Nature d'activité") ne doivent pas décaler les valeurs les
@@ -2681,9 +2781,9 @@ function buildMultiReport(titreGlobal, corrected){
     let inner;
     if(r.kind==='standard'){
       const localisation = locFull(r.raw)||'';
-      inner = (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
+      inner = (catFull(r.raw) ? rpFieldO('Précision', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '')
+        + (localisation ? rpFieldO('Localisation', esc(localisation)) : '')
         + (c.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(c.type_action))+'</div>') : '')
-        + (catFull(r.raw) ? ('<div style="margin-top:10px">'+rpFieldO('Précision', esc(catFull(r.raw)))+'</div>') : '')
         + '<div style="margin-top:10px">'+rpFieldO('Situation', esc(c.situation||'—'))+'</div>'
         + '<div style="margin-top:10px">'+rpFieldO('Actions', esc(c.actions||'—'))+'</div>'
         + rpClotureRow(c.statut_cloture||null);
@@ -2764,9 +2864,9 @@ function buildStandardReport(r){
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
   }
-  const body = rpSec('1 — Contexte', rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : '') + (catFull(r.raw) ? ('<div style="margin-top:10px">'+rpFieldO('Précision', esc(catFull(r.raw)))+'</div>') : ''))
+  const body = rpSec('1 — Contexte', (catFull(r.raw) ? rpFieldO('Précision', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '') + rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.raw.actions||'—')) + rpClotureRow(r.raw.statut_cloture||null))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(actionsDisplay(r.raw)||'—')) + rpClotureRow(r.raw.statut_cloture||null))
     + rpSec('4 — Photos', r.photos.length
         ? rpPhotoGrid(r.photos)
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
@@ -2822,6 +2922,133 @@ function buildAlarmeReport(r){
     ]
   };
   return rpParkShell('Intervention alarme', r.raw.nature_activite || 'Alarme', body, meta);
+}
+
+/* =====================================================================
+   v33 — STATISTIQUES : catégorie / type d'action / gravité / sites. Requête dédiée, légère et paginée (toutes les
+   lignes, pas seulement les 500 de la liste). Filtres appliqués : Type,
+   Site, Du / Au. Regroupement par CODE quand il existe (libellé à jour du
+   référentiel), sinon par anciens libellés « (ancien) ».
+   Mise en forme : uniquement des classes existantes (card-title,
+   table-wrap, mgrid / mcell, state-msg, linklike) — aucun nouveau style.
+   ===================================================================== */
+let STATS_ROWS = null, STATS_LOADING = false;
+async function fetchAllRows(table, cols){
+  const out = []; const PAGE = 1000;
+  for(let from=0; from<50000; from+=PAGE){
+    const { data, error } = await sb.from(table).select(cols).order('created_at',{ascending:false}).range(from, from+PAGE-1);
+    if(error) throw error;
+    out.push(...(data||[])); if(!data || data.length < PAGE) break;
+  }
+  return out;
+}
+async function loadStats(force){
+  if(STATS_LOADING) return; if(STATS_ROWS && !force) return;
+  STATS_LOADING = true;
+  document.getElementById('stats-panel').innerHTML = '<div class="state-msg">Chargement des statistiques…</div>';
+  try{
+    await ensureRef();
+    const extra = SCHEMA_REF_OK ? ',type_constat_code,gravite' : '';
+    const [std, alm] = await Promise.all([
+      fetchAllRows('journal_entrees', 'id,site_nom,agent_nom,created_at,date_rapport,heure_rapport,nature_activite,type_action' + extra),
+      fetchAllRows('alarme_interventions', 'id,site_nom,agent_nom,created_at,nature_activite,type_action' + extra)
+    ]);
+    STATS_ROWS = [
+      ...std.map(r=>({kind:'standard', ts:rapportTs(r), raw:r})),
+      ...alm.map(r=>({kind:'alarme', ts:r.created_at, raw:Object.assign({}, r, {nature_activite: r.nature_activite || 'Alarmes'})}))
+    ].filter(x=>x.ts);
+  }catch(e){
+    console.error(e);
+    document.getElementById('stats-panel').innerHTML = '<div class="state-msg">Impossible de charger les statistiques : ' + esc(e.message||e) + '</div>';
+    STATS_LOADING = false; return;
+  }
+  STATS_LOADING = false;
+  renderStats();
+}
+function statsFiltered(){
+  const kind = document.getElementById('flt-kind').value;
+  const site = document.getElementById('flt-site').value;
+  const from = document.getElementById('flt-from').value;
+  const to = document.getElementById('flt-to').value;
+  return (STATS_ROWS||[]).filter(x=>{
+    if(kind && x.kind!==kind) return false;
+    if(site && (x.raw.site_nom||'')!==site) return false;
+    if(from || to){ const d = localYMD(x.ts); if(from && d < from) return false; if(to && d > to) return false; }
+    return true;
+  });
+}
+function statsClassif(x){
+  const d = RDZRef.get(); const raw = x.raw;
+  const t = raw.type_constat_code ? d.typeByCode[raw.type_constat_code] : null;
+  if(t){ const c = d.catByCode[t.categorie_code]; return { cat: c ? c.libelle : t.categorie_code, type: t.libelle, code: t.code }; }
+  const code = RDZRef.codeFor(raw.nature_activite, raw.type_action);
+  if(code){ const t2 = d.typeByCode[code]; return { cat: raw.nature_activite, type: t2.libelle, code }; }
+  if(!raw.nature_activite && !raw.type_action) return { cat:'Non classé', type:'Non classé', code:'' };
+  const cat = raw.nature_activite ? (d.catByLabel[raw.nature_activite] ? raw.nature_activite : '(ancien) ' + raw.nature_activite) : 'Non classé';
+  return { cat, type: raw.type_action ? '(ancien) ' + raw.type_action : '—', code:'' };
+}
+function countBy(rows, keyFn){ const m = new Map(); rows.forEach(r=>{ const k = keyFn(r); if(k==null) return; m.set(k, (m.get(k)||0)+1); }); return m; }
+function statsTable(title, headers, lines, total){
+  const max = Math.max(1, ...lines.map(l=>l.n));
+  return `<div><div class="card-title" style="margin:6px 0 8px">${title}</div><div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}<th style="text-align:right">Nb</th><th style="text-align:right">%</th><th style="width:28%"></th></tr></thead><tbody>${
+    lines.length ? lines.map(l=>`<tr>${l.cells.map(c=>`<td>${c}</td>`).join('')}<td style="text-align:right">${l.n}</td><td style="text-align:right">${total?Math.round(l.n*1000/total)/10:0}</td><td><div style="height:7px;border-radius:4px;background:var(--red);width:${Math.max(2,Math.round(l.n*100/max))}%"></div></td></tr>`).join('')
+    : `<tr><td colspan="${headers.length+3}"><div class="state-msg" style="padding:12px">Aucune donnée.</div></td></tr>`}</tbody></table></div></div>`;
+}
+function renderStats(){
+  const panel = document.getElementById('stats-panel');
+  if(!STATS_ROWS){ loadStats(false); return; }
+  const rows = statsFiltered(); const N = rows.length;
+  document.getElementById('fcount').textContent = N + ' rapport(s) dans les statistiques';
+  const d = RDZRef.get();
+  const cl = rows.map(x=>Object.assign({x}, statsClassif(x)));
+  const catOrder = c=>{ const k = d.catByLabel[c]; return k ? (k.ordre||0) : 9999; };
+  const byCat = [...countBy(cl, c=>c.cat)].sort((a,b)=>catOrder(a[0])-catOrder(b[0]) || b[1]-a[1]);
+  const keyT = c=> c.code ? c.code : (c.cat+'||'+c.type);
+  const typeInfo = {}; cl.forEach(c=>{ typeInfo[keyT(c)] = c; });
+  const byType = [...countBy(cl, keyT)].sort((a,b)=>b[1]-a[1]).slice(0,25);
+  const gIdx = k=>{ const i = RDZ_GRAVITES.findIndex(g=>g.k===k); return i<0 ? -1 : i; };
+  const byGrav = [...countBy(rows, x=>x.raw.gravite || '')].sort((a,b)=>gIdx(b[0])-gIdx(a[0]));
+  const classes = cl.filter(c=>c.code).length;
+  const lourds = rows.filter(x=>x.raw.gravite==='elevee' || x.raw.gravite==='critique').length;
+  const sites = [...countBy(rows, x=>x.raw.site_nom||'Site inconnu')].sort((a,b)=>b[1]-a[1]).slice(0,15).map(s=>s[0]);
+  const cats = byCat.map(c=>c[0]);
+  const matrix = {}; cl.forEach(c=>{ const s = c.x.raw.site_nom||'Site inconnu'; matrix[s] = matrix[s]||{}; matrix[s][c.cat] = (matrix[s][c.cat]||0)+1; });
+  const cell = (k,v)=>`<div class="mcell"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const grid2 = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-bottom:14px';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;gap:14px;margin:4px 0 10px">
+      <button class="linklike" onclick="loadStats(true)">🔄 Recharger</button>
+      <button class="linklike" onclick="exportStatsCsv()">⬇ Export CSV (Excel)</button>
+    </div>
+    ${SCHEMA_REF_OK ? '' : '<div class="state-msg" style="padding:8px">Migration migration-referentiel-constats.sql non détectée : gravité indisponible.</div>'}
+    <div class="mgrid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      ${cell('Rapports', N + ` <span style="font-weight:normal;font-size:12px">(${rows.filter(x=>x.kind==='standard').length} standard · ${rows.filter(x=>x.kind==='alarme').length} alarme)</span>`)}
+      ${cell('Rattachés à un code', (N?Math.round(classes*100/N):0) + ' %')}
+      ${cell('Gravité élevée / critique', lourds)}
+    </div>
+    <div style="${grid2}">
+      ${statsTable(RDZ_LBL.categorie, [RDZ_LBL.categorie], byCat.map(([k,n])=>({cells:[esc(k)], n})), N)}
+      ${statsTable(RDZ_LBL.gravite, [RDZ_LBL.gravite], byGrav.map(([k,n])=>({cells:[esc(RDZRef.graviteLabel(k)||'Non renseignée')], n})), N)}
+    </div>
+    <div style="margin-bottom:14px">
+      ${statsTable(RDZ_LBL.type + ' — 25 plus fréquents', ['Code', RDZ_LBL.categorie, RDZ_LBL.type], byType.map(([k,n])=>{ const i = typeInfo[k]; return {cells:[esc(i.code||'—'), esc(i.cat), esc(i.type)], n}; }), N)}
+    </div>
+    <div class="card-title" style="margin:6px 0 8px">Sites × ${RDZ_LBL.categorie.toLowerCase()} (15 sites les plus actifs)</div>
+    <div class="table-wrap"><table><thead><tr><th>Site</th>${cats.map(c=>`<th style="white-space:normal;text-align:right">${esc(c)}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>${
+      sites.map(s=>`<tr><td>${esc(s)}</td>${cats.map(c=>`<td style="text-align:right">${(matrix[s]&&matrix[s][c])||''}</td>`).join('')}<td style="text-align:right"><b>${cats.reduce((a,c)=>a+((matrix[s]&&matrix[s][c])||0),0)}</b></td></tr>`).join('') || `<tr><td colspan="${cats.length+2}"><div class="state-msg" style="padding:12px">Aucune donnée.</div></td></tr>`
+    }</tbody></table></div>`;
+}
+function exportStatsCsv(){
+  const rows = statsFiltered();
+  const head = ['source','id','date','heure','site','agent','code','categorie','type_action','gravite'];
+  const q = v=>{ const t = v==null ? '' : String(v); return /[;"\n]/.test(t) ? '"'+t.replace(/"/g,'""')+'"' : t; };
+  const lines = [head.join(';')].concat(rows.map(x=>{ const c = statsClassif(x); const r = x.raw;
+    return [x.kind, r.id, localYMD(x.ts), fmtTime(x.ts), r.site_nom||'', r.agent_nom||'', c.code, c.cat, c.type,
+      RDZRef.graviteLabel(r.gravite)].map(q).join(';'); }));
+  const blob = new Blob(['\ufeff'+lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'RDZ_statistiques_rapports_' + localYMD(new Date().toISOString()) + '.csv';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
 /* ---------- init ---------- */
