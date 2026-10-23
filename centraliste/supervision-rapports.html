@@ -1,3 +1,4 @@
+<!-- v38 · 2026-10-23 · Modifier : Site, Activité et Localisation deviennent des menus déroulants, mêmes listes que côté agent (sites actifs ; journal_activites et journal_localisations du site, + communes à tous les sites) ; changer le site recharge les deux autres listes et met aussi à jour site_id. Une valeur actuelle absente des listes reste affichée et conservée. Rien d'autre ne change (aucun CSS ajouté). -->
 <!-- v37 · 2026-10-23 · « Type d'action » renommé « Constat » partout à l'écran (tableau, détail, Modifier, Classer, statistiques) — colonnes inchangées ; liste de secours du référentiel mise à jour (v2). Rien d'autre ne change. -->
 <!-- v36 · 2026-10-23 · rapport imprimable (rapport STANDARD) remanié pour le client : bandeau Date · Heure · Gravité · Agent · Catégorie (Gravité seulement si renseignée) ; 1 — Constat (Type de constat = type d'action choisi par l'agent [+ précision « Autre »], Précisez = « Que se passe-t-il ? ») ; 2 — Localisation (localisation + précision) ; 3 — Mesures prises (= « Qu'avez-vous fait ? ») sans les cases Situation terminée / Action à venir / Pour information / Problème en cours ; 4 — Photos. Rapports d'alarme, personnalisés et de synthèse inchangés. -->
 <!-- v35 · 2026-10-22 · Modifier (rapport standard) : retrait du champ « Ancienne catégorie (agent) » (ancien système de catégories par site, plus utilisé) pour éviter la confusion lors du reclassement. La valeur éventuelle reste en base, intacte. -->
@@ -1675,10 +1676,77 @@ function renderReponsesEditHtml(r){
   return `<div class="efield"><label style="margin-bottom:10px">Questions / Vérifications</label>${rows}</div>`;
 }
 
+/* v38 — listes du formulaire Modifier, identiques à celles de l'agent :
+   journal-de-bord.html (sites actifs, activités du site) et
+   rapport-standard.html / alarme-rapport.html (localisations du site).
+   Chargées une fois (puis gardées) ; en cas d'échec réseau, le formulaire
+   retombe sur les champs texte d'avant. */
+let EDIT_LISTS = null;
+async function ensureEditLists(){
+  if(EDIT_LISTS) return EDIT_LISTS;
+  try{
+    const [s1, s2, s3] = await Promise.all([
+      sb.from('sites').select('id,nom').eq('actif',true).order('nom'),
+      sb.from('journal_activites').select('label,site_id,ordre').eq('actif',true).order('ordre'),
+      sb.from('journal_localisations').select('label,site_id,ordre').eq('actif',true).order('ordre')
+    ]);
+    if(s1.error) throw s1.error;
+    EDIT_LISTS = { sites: s1.data||[], acts: s2.error ? null : (s2.data||[]), locs: s3.error ? null : (s3.data||[]) };
+  }catch(e){ console.warn('Listes Modifier :', e && e.message || e); EDIT_LISTS = null; }
+  return EDIT_LISTS;
+}
+function editSiteId(r){
+  if(r.raw.site_id) return String(r.raw.site_id);
+  const s = EDIT_LISTS && EDIT_LISTS.sites.find(x=>x.nom===r.raw.site_nom);
+  return s ? String(s.id) : '';
+}
+function labelsForSite(list, siteId){
+  const out = [];
+  (list||[]).filter(x=>!x.site_id || (siteId && String(x.site_id)===String(siteId)))
+    .forEach(x=>{ if(x.label && !out.includes(x.label)) out.push(x.label); });
+  return out;
+}
+/* Options d'un menu : — Choisir — + liste ; la valeur actuelle, si elle n'est
+   plus dans la liste, reste proposée (et sélectionnée) pour ne rien perdre. */
+function editOptionsHtml(labels, current, withAutre){
+  let h = '<option value="">— Choisir —</option>';
+  if(current && !labels.includes(current)) h += `<option value="${esc(current)}" selected>${esc(current)} (valeur actuelle)</option>`;
+  h += labels.map(l=>`<option value="${esc(l)}" ${l===current?'selected':''}>${esc(l)}</option>`).join('');
+  if(withAutre) h += '<option value="__autre">Autre / non listé</option>';
+  return h;
+}
+function editSelectHtml(k, r){
+  const L = EDIT_LISTS; if(!L) return null;
+  const val = r.raw[k]==null ? '' : String(r.raw[k]);
+  const sid = editSiteId(r);
+  if(k==='site_nom'){
+    let h = '<option value="" data-id="">— Choisir —</option>';
+    if(val && !L.sites.some(x=>x.nom===val)) h += `<option value="${esc(val)}" data-id="${esc(r.raw.site_id||'')}" selected>${esc(val)} (valeur actuelle)</option>`;
+    h += L.sites.map(x=>`<option value="${esc(x.nom)}" data-id="${esc(x.id)}" ${x.nom===val?'selected':''}>${esc(x.nom)}</option>`).join('');
+    return `<select id="ef-site_nom" onchange="onEditSiteChange()">${h}</select>`;
+  }
+  if(k==='activite' && L.acts) return `<select id="ef-activite">${editOptionsHtml(labelsForSite(L.acts, sid), val, false)}</select>`;
+  if(k==='localisation' && L.locs) return `<select id="ef-localisation">${editOptionsHtml(labelsForSite(L.locs, sid), val, true)}</select>`;
+  return null;
+}
+/* Changement de site : les menus Activité et Localisation suivent le
+   nouveau site (choix gardé s'il existe encore). */
+function onEditSiteChange(){
+  const sel = document.getElementById('ef-site_nom'); if(!sel || !EDIT_LISTS) return;
+  const opt = sel.options[sel.selectedIndex]; const sid = opt ? (opt.dataset.id||'') : '';
+  [['ef-activite', EDIT_LISTS.acts, false], ['ef-localisation', EDIT_LISTS.locs, true]].forEach(([id, list, autre])=>{
+    const el = document.getElementById(id); if(!el || el.tagName!=='SELECT') return;
+    const cur = el.value==='__autre' ? '' : el.value;
+    const labels = labelsForSite(list, sid);
+    el.innerHTML = editOptionsHtml(labels, labels.includes(cur) ? cur : '', autre);
+  });
+}
+
 async function openEdit(id){
   const r = allReports.find(x=>x.id===id); if(!r) return;
   if(!(await guardLocked([r], 'la modification'))) return;
   window._editingId = id;
+  await ensureEditLists();
   renderEditForm(r);
   document.getElementById('overlay').classList.add('show');
 }
@@ -1721,6 +1789,8 @@ function renderEditForm(r){
       ${fields.map(f=>{
         const val = r.raw[f.k]==null?'':r.raw[f.k];
         if(f.t==='textarea') return `<div class="efield"><label>${esc(f.l)}</label><textarea id="ef-${f.k}">${esc(val)}</textarea></div>`;
+        const selHtml = editSelectHtml(f.k, r); // v38 : menu déroulant comme côté agent
+        if(selHtml) return `<div class="efield"><label>${esc(f.l)}</label>${selHtml}</div>`;
         return `<div class="efield"><label>${esc(f.l)}</label><input type="text" id="ef-${f.k}" value="${esc(val)}"></div>`;
       }).join('')}
       ${(isNewFormatAlarme(r) || isCustomTypeReport(r)) ? renderReponsesEditHtml(r) : ''}
@@ -1776,6 +1846,12 @@ async function saveEdit(id){
   const fields = editFieldsFor(r);
   const payload = {};
   fields.forEach(f=>{ const el = document.getElementById('ef-'+f.k); if(el) payload[f.k] = el.value.trim() || null; });
+  if(payload.localisation === '__autre') payload.localisation = null; // v38 : comme côté agent
+  const siteSel = document.getElementById('ef-site_nom');
+  if(siteSel && siteSel.tagName==='SELECT' && payload.site_nom !== (r.raw.site_nom||null)){
+    const o = siteSel.options[siteSel.selectedIndex];
+    payload.site_id = (o && o.dataset.id) ? o.dataset.id : null; // v38 : site_id suit le site choisi
+  }
   if(isNewFormatAlarme(r) || isCustomTypeReport(r)){
     const reponses = parseReponses(r.raw.reponses).map((q,i)=>{
       let valeur = q.valeur;
