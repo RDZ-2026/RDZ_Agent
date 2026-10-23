@@ -1,3 +1,4 @@
+<!-- v57 · 2026-10-23 · rapport imprimable STANDARD aligné sur supervision-rapports v36 : bandeau Date · Heure · Gravité · Agent · Catégorie ; 1 — Constat (Type de constat + Précisez) ; 2 — Localisation ; 3 — Mesures prises, sans les cases de clôture ; 4 — Photos. Libellé du bandeau « Nature d'activité » → « Catégorie ». Le reste (alarmes, personnalisés, rapport direction) est inchangé. -->
 <!-- v56 · 2026-10-22 · retrait du statut « Situation sécurisée » ajouté en v55 (statuts de clôture d'origine). -->
 <!-- v55 · 2026-10-22 · statut de clôture « 🔒 Situation sécurisée » (clé 'securise') ajouté à la liste — retiré en v56. -->
 <!-- v54 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre) affichée dans le détail, la liste et le rapport imprimable. -->
@@ -1078,8 +1079,9 @@ function rpRdzShell(labelTxt, activiteTxt, bodyHtml, meta){
   const cols = [
     {label:'Date', value:dateTxt},
     ...timeCols,
+    ...(Array.isArray(meta.extraCols) ? meta.extraCols : []), // v57 : ex. Gravité (rapport standard)
     {label:'Agent', value:esc(meta.agent_name||'—')},
-    {label:'Nature d\'activité', value:esc(activiteTxt||'—')}
+    {label:'Catégorie', value:esc(activiteTxt||'—')}
   ];
   // Grille à deux rangées explicites (tous les libellés en rangée 1, toutes les valeurs
   // en rangée 2) pour que des libellés de longueurs différentes ("Date" vs "Arrivée sur
@@ -1271,16 +1273,17 @@ function buildStandardReport(r){
     const metaC = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:rapportTs(r) };
     return rpRdzShell(esc(customTypeLabel(r)), esc(r.nature_activite || (RAPPORT_TYPES[r.rapport_type_id]||{}).nom || '—'), bodyC, metaC);
   }
-  const body = rpSec('1 — Contexte',
-      (catFull(r) ? rpFieldO('Catégorie', esc(catFull(r))) + '<div style="margin-top:10px"></div>' : '')
-      + rpFieldO('Localisation', esc(locFull(r)||'—'))
-      + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
-    + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + rpClotureRow(r.statut_cloture||null))
+  /* v57 — mise en page client : Constat / Localisation / Mesures prises / Photos */
+  const typeTxt = r.type_action ? r.type_action + (r.categorie_autre ? ' — ' + r.categorie_autre : '') : (catFull(r) || '—');
+  const body = rpSec('1 — Constat', rpFieldO('Type de constat', esc(typeTxt)) + '<div style="margin-top:10px"></div>' + rpFieldO('Précisez', esc(r.situation||'—')))
+    + rpSec('2 — Localisation', rpFieldO('Localisation', esc(locFull(r)||'—')))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')))
     + rpSec('4 — Photos', photos.length
         ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${photos.map(p=>rpPhotoBoxO(p.legende||'Photo', p.url)).join('')}</div>`
         : `<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>`);
-  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:rapportTs(r) };
+  const GRAV_LBL = { faible:'Faible', moderee:'Modérée', elevee:'Élevée', critique:'Critique' }; // = RDZ_GRAVITES (supervision-rapports)
+  const gravTxt = GRAV_LBL[r.gravite] || '';
+  const meta = { site:r.site_nom, agent_name:r.agent_nom, id:r.id, created_at:rapportTs(r), extraCols: gravTxt ? [{label:'Gravité', value:esc(gravTxt)}] : [] };
   return rpRdzShell("Rapport d'intervention", esc(r.nature_activite || r.activite || '—'), body, meta);
 }
 function buildAlarmeReport(r){

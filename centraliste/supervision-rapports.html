@@ -1,3 +1,4 @@
+<!-- v36 · 2026-10-23 · rapport imprimable (rapport STANDARD) remanié pour le client : bandeau Date · Heure · Gravité · Agent · Catégorie (Gravité seulement si renseignée) ; 1 — Constat (Type de constat = type d'action choisi par l'agent [+ précision « Autre »], Précisez = « Que se passe-t-il ? ») ; 2 — Localisation (localisation + précision) ; 3 — Mesures prises (= « Qu'avez-vous fait ? ») sans les cases Situation terminée / Action à venir / Pour information / Problème en cours ; 4 — Photos. Rapports d'alarme, personnalisés et de synthèse inchangés. -->
 <!-- v35 · 2026-10-22 · Modifier (rapport standard) : retrait du champ « Ancienne catégorie (agent) » (ancien système de catégories par site, plus utilisé) pour éviter la confusion lors du reclassement. La valeur éventuelle reste en base, intacte. -->
 <!-- v34 · 2026-10-22 · repérage des rapports classés avec l'ANCIENNE liste : pastille « 🕓 Ancienne liste » dans la colonne Catégorie / Type d'action et dans le détail (même style que la pastille ⚠ existante) ; la Recherche accepte « ancienne » (rapports à reclasser), « nouvelle » et « non classé ». Graphisme inchangé. -->
 <!-- v33 · 2026-10-22 · retrait des « Actions réalisées » (cases) et du statut « Situation sécurisée » ; le formulaire agent ne demande plus le statut de clôture (il reste réglable ici, comme avant, par la supervision). Statistiques : catégorie, type d'action, gravité, sites. Les quelques rapports déjà saisis avec des cases cochées les affichent toujours dans « Actions » (lecture seule). -->
@@ -2700,6 +2701,7 @@ function rpParkShell(labelTxt, activiteTxt, bodyHtml, meta){
   const cols = [
     {label:'Date', value:dateTxt},
     ...timeCols,
+    ...(Array.isArray(meta.extraCols) ? meta.extraCols : []), // v36 : ex. Gravité (rapport standard)
     {label:'Agent', value:esc(meta.agent_name||'—')},
     {label:'Catégorie', value:esc(activiteTxt||'—')}
   ];
@@ -2864,13 +2866,18 @@ function buildStandardReport(r){
     const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
     return rpParkShell(esc(customTypeLabel(r)), r.raw.nature_activite || (customTypeInfo(r)?customTypeInfo(r).nom:'') || '—', body, meta);
   }
-  const body = rpSec('1 — Contexte', (catFull(r.raw) ? rpFieldO('Précision', esc(catFull(r.raw))) + '<div style="margin-top:10px"></div>' : '') + rpFieldO('Localisation', esc(locFull(r.raw)||'—')) + (r.raw.type_action ? ('<div style="margin-top:10px">'+rpFieldO('Type d\'action', esc(r.raw.type_action))+'</div>') : ''))
-    + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.raw.situation||'—')))
-    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(actionsDisplay(r.raw)||'—')) + rpClotureRow(r.raw.statut_cloture||null))
+  /* v36 — mise en page client : Constat / Localisation / Mesures prises / Photos */
+  const typeTxt = r.raw.type_action
+    ? r.raw.type_action + (r.raw.categorie_autre ? ' — ' + r.raw.categorie_autre : '')
+    : (catFull(r.raw) || '—');
+  const body = rpSec('1 — Constat', rpFieldO('Type de constat', esc(typeTxt)) + '<div style="margin-top:10px"></div>' + rpFieldO('Précisez', esc(r.raw.situation||'—')))
+    + rpSec('2 — Localisation', rpFieldO('Localisation', esc(locFull(r.raw)||'—')))
+    + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(actionsDisplay(r.raw)||'—')))
     + rpSec('4 — Photos', r.photos.length
         ? rpPhotoGrid(r.photos)
         : '<div style="color:#999;font-size:13px"><i>Aucune photo jointe.</i></div>');
-  const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts };
+  const gravTxt = RDZRef.graviteLabel(r.raw.gravite);
+  const meta = { site:r.site, agent_name:r.agent, id:r.id, created_at:r.ts, extraCols: gravTxt ? [{label:'Gravité', value:esc(gravTxt)}] : [] };
   return rpParkShell('Rapport d\'intervention', esc(r.raw.nature_activite || r.raw.activite || '—'), body, meta);
 }
 
