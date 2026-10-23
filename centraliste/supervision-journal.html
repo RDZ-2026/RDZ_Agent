@@ -1,3 +1,4 @@
+<!-- v58 · 2026-10-23 · « Type d'action » renommé « Constat » à l'écran (détail, rapports imprimables d'alarme, graphique par site) — colonnes inchangées. Rien d'autre ne change. -->
 <!-- v57 · 2026-10-23 · rapport imprimable STANDARD aligné sur supervision-rapports v36 : bandeau Date · Heure · Gravité · Agent · Catégorie ; 1 — Constat (Type de constat + Précisez) ; 2 — Localisation ; 3 — Mesures prises, sans les cases de clôture ; 4 — Photos. Libellé du bandeau « Nature d'activité » → « Catégorie ». Le reste (alarmes, personnalisés, rapport direction) est inchangé. -->
 <!-- v56 · 2026-10-22 · retrait du statut « Situation sécurisée » ajouté en v55 (statuts de clôture d'origine). -->
 <!-- v55 · 2026-10-22 · statut de clôture « 🔒 Situation sécurisée » (clé 'securise') ajouté à la liste — retiré en v56. -->
@@ -1302,7 +1303,7 @@ function buildAlarmeReport(r){
     // supervision-rapports.html::buildAlarmeReport, repris à l'identique ici.
     const reponses = parseReponses(r.reponses);
     const { html: qaSectionsHtml, nextNum } = reponsesSectionsHtml(reponses, 2);
-    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(locFull(r)||'—')) + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
+    const body = rpSec('1 — Localisation', rpFieldO('Localisation', esc(locFull(r)||'—')) + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Constat", esc(r.type_action))+'</div>') : ''))
       + qaSectionsHtml
       + rpSec(nextNum + ' — Clôture', rpClotureRow(r.statut_cloture||null))
       + rpSec((nextNum+1) + ' — Photos', photosHtml);
@@ -1313,7 +1314,7 @@ function buildAlarmeReport(r){
   // repli heuristique sur le résultat déclaré — même logique que supervision-rapports.html.
   const done = String(r.resultat||'').toLowerCase();
   const clotureKey = r.statut_cloture || ((done.includes('termin') || done.includes('quittance')) ? 'regle' : 'probleme');
-  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.zone||'—'))+'</div>' + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Type d'action", esc(r.type_action))+'</div>') : ''))
+  const body = rpSec('1 — Transmetteur / Zone', rpFieldO('Transmetteur', esc(r.transmetteur_code||'—')) + '<div style="margin-top:10px">'+rpFieldO('Zone', esc(r.zone||'—'))+'</div>' + (r.type_action ? ('<div style="margin-top:10px">'+rpFieldO("Constat", esc(r.type_action))+'</div>') : ''))
     + rpSec('2 — Constats sur place', rpFieldO('Situation', esc(r.situation||'—')))
     + rpSec('3 — Mesures prises', rpFieldO('Actions', esc(r.actions||'—')) + '<div style="margin-top:10px">'+rpFieldO('Résultat', esc(r.resultat||'—'))+'</div>' + rpClotureRow(clotureKey))
     + rpSec('4 — Photos', photosHtml);
@@ -1856,7 +1857,7 @@ const SOURCES = [
           : '<i>Aucune question renseignée.</i>';
         return `<div class="msec"><div class="st">Localisation</div><div class="txt">${esc(locFull(r)||'—')}</div></div>
         <div class="msec"><div class="st">Horaires</div><div class="txt">Alarme ${esc(fmtTime(r.created_at)||'—')} · Arrivée sur site ${esc(r.heure_arrivee||'—')} · Fin d'intervention ${esc(r.heure_fin||'—')}</div></div>
-        ${r.type_action?`<div class="msec"><div class="st">Type d'action</div><div class="txt">${esc(r.type_action)}</div></div>`:''}
+        ${r.type_action?`<div class="msec"><div class="st">Constat</div><div class="txt">${esc(r.type_action)}</div></div>`:''}
         <div class="msec"><div class="st">Questions / Vérifications</div><div class="txt">${qaHtml}</div></div>
         <div class="msec"><div class="st">Classification</div><div class="txt">Alarmes${r.type_action?' — '+esc(r.type_action):''}</div></div>
         <div class="msec"><div class="st">Statut de clôture</div><div class="txt">${rpClotureBadge(r.statut_cloture)}</div></div>`;
@@ -3355,7 +3356,7 @@ function changementPileHtml(siteData, skey){
 function siteCardHtml(siteData){
   const skey = siteKeySlug(siteData.site);
   const typeActionHtml = siteData.activity.length
-    ? chartBlock("Répartition des rapports par type d'action", siteTypeActionBarHtml(siteData.byType, skey))
+    ? chartBlock("Répartition des rapports par constat", siteTypeActionBarHtml(siteData.byType, skey))
     : '';
   return `<div class="site-card">
     <h4>📍 ${esc(siteData.site)}</h4>
