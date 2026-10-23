@@ -1,3 +1,5 @@
+<!-- v35 · 2026-10-22 · Modifier (rapport standard) : retrait du champ « Ancienne catégorie (agent) » (ancien système de catégories par site, plus utilisé) pour éviter la confusion lors du reclassement. La valeur éventuelle reste en base, intacte. -->
+<!-- v34 · 2026-10-22 · repérage des rapports classés avec l'ANCIENNE liste : pastille « 🕓 Ancienne liste » dans la colonne Catégorie / Type d'action et dans le détail (même style que la pastille ⚠ existante) ; la Recherche accepte « ancienne » (rapports à reclasser), « nouvelle » et « non classé ». Graphisme inchangé. -->
 <!-- v33 · 2026-10-22 · retrait des « Actions réalisées » (cases) et du statut « Situation sécurisée » ; le formulaire agent ne demande plus le statut de clôture (il reste réglable ici, comme avant, par la supervision). Statistiques : catégorie, type d'action, gravité, sites. Les quelques rapports déjà saisis avec des cases cochées les affichent toujours dans « Actions » (lecture seule). -->
 <!-- v32 · 2026-10-22 · RÉFÉRENTIEL COMMUN agent / supervision (migration-referentiel-constats.sql) : Catégorie / Type d'action lus dans ref_categories_constat / ref_types_constat — mêmes libellés que rapport-standard.html ; code stable type_constat_code enregistré à chaque classification ; gravité et actions réalisées (cases) affichées et modifiables ; statut « 🔒 Situation sécurisée » ; onglet 📊 Statistiques + export CSV. Anciennes classifications conservées, affichées « (ancien) ». « Nature d'activité » s'affiche désormais « Catégorie » (même mot que l'agent) ; l'ancien champ « Catégorie (agent) » devient « Précision (agent) ». Graphisme inchangé (classes existantes réutilisées). -->
 <!-- v31 · 2026-10-20 · catégorie choisie par l'agent dans le rapport standard (journal_entrees.categorie / categorie_autre — « Autre — texte libre ») : affichée dans le détail, la liste, le rapport imprimable (section 1) et transmise à l'IA ; modifiable via « Modifier ». Distincte de Nature / Type d'action, inchangés. -->
@@ -789,6 +791,19 @@ function statutBadgeHtml(r){
 }
 /* Classification manquante : nature + type pour un rapport standard ;
    type seul pour une alarme (nature implicite "Alarmes"). */
+/* v34 — de quelle liste vient la classification ?
+   'nouveau' : code du référentiel commun (ou libellés actuels) ;
+   'ancien'  : classée avec l'ancienne liste (à reclasser) ;
+   'aucune'  : rien de renseigné. */
+function classifEra(r){
+  const nat = r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '');
+  const typ = r.raw.type_action || '';
+  if(r.raw.type_constat_code || RDZRef.codeFor(nat, typ)) return 'nouveau';
+  if(nat || typ) return 'ancien';
+  return 'aucune';
+}
+const ERA_SEARCH = { nouveau:'nouvelle liste', ancien:'ancienne liste à reclasser', aucune:'non classé non classe' };
+const ANCIEN_PILL = '<span class="miss" title="Classé avec l\'ancienne liste — à reclasser (Modifier ou 🏷️ Classer)">🕓 Ancienne liste</span>';
 function missingClassif(r){
   const m = [];
   if(r.kind==='standard' && !r.raw.nature_activite) m.push('Catégorie');
@@ -1364,7 +1379,7 @@ function getFilteredEntries(){
       if(to && dayStr > to) return false;
     }
     if(search){
-      const hay = (r.site+' '+r.agent+' '+reportSnippet(r)).toLowerCase();
+      const hay = (r.site+' '+r.agent+' '+reportSnippet(r)+' '+ERA_SEARCH[classifEra(r)]).toLowerCase();
       if(!hay.includes(search)) return false;
     }
     return true;
@@ -1386,6 +1401,7 @@ function rowHtml(r){
         let h = nat ? `<div class="nat">${esc(nat)}</div>` : '';
         if(typ) h += `<div class="typ" title="${esc(typ)}">${esc(typ)}</div>`;
         if(miss.length) h += `<span class="miss" title="Classification à compléter (Modifier ou 🏷️ Classer)">⚠ ${esc(miss.join(' + '))}</span>`;
+        else if(classifEra(r)==='ancien') h += ANCIEN_PILL;
         return h || '—';
       })()}</td>
       <td>${esc(r.site||'—')}</td>
@@ -1551,7 +1567,7 @@ function openDetail(id){
         <div class="mcell"><div class="k">Agent</div><div class="v">${esc(r.agent||'—')}</div></div>
         <div class="mcell"><div class="k">Date / heure</div><div class="v">${fmtDate(r.ts)} ${fmtTime(r.ts)}</div></div>
         <div class="mcell"><div class="k">Statut du rapport</div><div class="v">${statutBadgeHtml(r)}${r.raw.statut_rapport_at?`<div style="font-size:11px;color:#888;font-weight:normal;margin-top:4px">depuis le ${fmtDate(r.raw.statut_rapport_at)} ${fmtTime(r.raw.statut_rapport_at)}</div>`:''}</div></div>
-        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:''}</div></div>
+        <div class="mcell"><div class="k">Classification</div><div class="v" style="font-size:12.5px">${esc(r.raw.nature_activite || (r.kind==='alarme' && r.raw.type_action ? 'Alarmes' : '—'))}${r.raw.type_action?'<br><span style="font-weight:normal">'+esc(r.raw.type_action)+'</span>':''}${missingClassif(r).length?`<br><span class="miss">⚠ ${esc(missingClassif(r).join(' + '))}</span>`:(classifEra(r)==='ancien'?'<br>'+ANCIEN_PILL:'')}</div></div>
         <div class="mcell"><div class="k">${RDZ_LBL.gravite}</div><div class="v" style="font-size:12.5px">${esc(RDZRef.graviteLabel(r.raw.gravite)||'—')}</div></div>
       </div>
       ${isLocked(r) ? '<div class="lock-note">🔒 Rapport protégé (' + esc(statutInfo(statutOf(r)).label) + ') — pour le modifier, le classer ou le supprimer, il faudra d\'abord changer son statut (code de validation).</div>' : ''}
@@ -1595,7 +1611,7 @@ function editFieldsFor(r){
   if(r.kind==='standard') return [
     {k:'site_nom', l:'Site', t:'text'},
     {k:'activite', l:'Activité', t:'text'},
-    {k:'categorie', l:'Ancienne catégorie (agent)', t:'text'},
+    // v35 : ancien champ « categorie » (listes par site, abandonnées) retiré du formulaire Modifier — valeur existante conservée en base, non modifiée
     {k:'categorie_autre', l:'Précision (si « Autre… »)', t:'text'},
     {k:'localisation', l:'Localisation', t:'text'},
     {k:'localisation_autre', l:'Précision localisation', t:'text'},
