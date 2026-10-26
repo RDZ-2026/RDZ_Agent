@@ -224,6 +224,7 @@ table.t{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
   <button class="tab on" data-t="poss" onclick="tab('poss')">🔑 En notre possession</button>
   <button class="tab" data-t="inv" onclick="tab('inv')">✅ Inventaires <span class="n hidden" id="n-miss"></span></button>
   <button class="tab" data-t="rendues" onclick="tab('rendues')">🏁 Rendues au client</button>
+  <button class="tab" data-t="reprise" onclick="tab('reprise')">📥 Clés déjà saisies <span class="n hidden" id="n-old"></span></button>
   <div class="save-status"><div class="save-dot" id="save-dot"></div><span id="save-text">Chargement…</span></div>
 </div></div>
 <div class="content"><div id="main"><div class="empty"><div class="big">⏳</div>Chargement…</div></div></div>
@@ -381,13 +382,19 @@ async function ckHistory(itemId){
 async function ckInvList(siteNom){try{return (await ckList('_inventaires/'+ckSlug(siteNom))).filter(n=>n.endsWith('.json'));}catch(e){return [];}}
 async function ckInvGet(siteNom,name){return ckJson('_inventaires/'+ckSlug(siteNom)+'/'+name);}
 function ckInvSave(siteNom,inv){return ckArchive([{path:'_inventaires/'+ckSlug(siteNom)+'/'+ckStamp()+'.json',json:inv}]);}
-const CK_EV={reception:['🤝','Reçue du client'],restitution:['🏁','Rendue au client'],site:['🚚','Changement de site'],modification:['✏️','Fiche modifiée']};
+const CK_EV={reception:['🤝','Reçue du client'],restitution:['🏁','Rendue au client'],site:['🚚','Changement de site'],modification:['✏️','Fiche modifiée'],reprise:['📥','Reprise de l\'ancien registre']};
 
+let OLD=[], OLDOUT=new Set(), OSEL={}, OSHOW='actifs';
 let T='poss', KEYS=[], INVS={}, MISS=new Set(), F={site:'',q:''}, RQ='';
 
 async function loadAll(){
   setSave('saving','Chargement…');await loadSites();
-  try{KEYS=await q(sb.from('stock_acces_items').select('*').eq('public',CK_PUBLIC).order('nom'));}
+  try{const all=await q(sb.from('stock_acces_items').select('*').order('nom'));
+    KEYS=all.filter(k=>k.public===CK_PUBLIC);
+    // clés saisies avant ce module (ancien registre) : tout sauf badges externes et clés clients déjà reprises
+    OLD=all.filter(k=>k.public!==CK_PUBLIC&&k.public!=='externe');
+    try{OLDOUT=new Set(((await q(sb.from('stock_acces').select('item_id').eq('statut','actif')))||[]).map(a=>String(a.item_id)));}catch(e){OLDOUT=new Set();}
+    const no=OLD.filter(k=>k.actif!==false).length;$('n-old').textContent=no;$('n-old').classList.toggle('hidden',!no);}
   catch(e){setSave('error','Erreur de connexion');$('main').innerHTML=`<div class="banner err">Impossible de charger : ${esc(e.message)}</div>`;return;}
   // dernier inventaire de chaque site (stockage)
   const sites=[...new Set([...SITES.map(s=>s.nom),...KEYS.map(k=>k.site_nom).filter(Boolean)])];
@@ -400,7 +407,46 @@ async function loadAll(){
   render();
 }
 function tab(t){T=t;document.querySelectorAll('#tabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));render();window.scrollTo(0,0);}
-function render(){$('main').innerHTML={poss:rPoss,inv:rInv,rendues:rRendues}[T]();}
+function render(){$('main').innerHTML={poss:rPoss,inv:rInv,rendues:rRendues,reprise:rReprise}[T]();}
+
+// ═══ REPRISE DES CLÉS DÉJÀ SAISIES ═══
+// Les clés de l'ancien registre restent dans la même table : la reprise change seulement leur marque
+// (public → 'rdz'), leur site si besoin et complète leur fiche. Rien n'est supprimé.
+function rReprise(){
+  const l=OLD.filter(k=>OSHOW==='tous'||k.actif!==false);const n=Object.keys(OSEL).filter(id=>OSEL[id]).length;
+  return `<div class="page-title">Clés déjà saisies — à reprendre</div>
+  <div class="page-sub">Ces clés, trousseaux et badges ont été saisis dans l'ancien registre (paramétrage « Accès »). Cochez ceux qui sont des <b>clés confiées par un client</b>, complétez si besoin, puis cliquez « Reprendre ». Ils passent alors dans ce registre (inventaires, restitution…).</div>
+  <div class="banner warn">Une clé reprise <b>n'est plus proposée</b> dans les anciens écrans de sortie (« Matériel & clés » des agents, prise de matériel du centraliste). Ne reprenez pas les clés que les agents empruntent au quotidien, si vous voulez qu'elles y restent.</div>
+  <div class="bar"><div class="seg"><button class="${OSHOW==='actifs'?'on':''}" onclick="OSHOW='actifs';render()">Actives</button><button class="${OSHOW==='tous'?'on':''}" onclick="OSHOW='tous';render()">Toutes (y c. archivées)</button></div>
+    <span class="grow"></span><button class="btn btn-g btn-sm" onclick="l0().forEach(k=>OSEL[k.id]=true);render()">Tout cocher</button><button class="btn btn-g btn-sm" onclick="OSEL={};render()">Tout décocher</button></div>
+  <div class="card tscroll"><table class="t"><thead><tr><th></th><th>Clé / badge</th><th>Type</th><th>Site actuel</th><th>Description</th><th>État</th></tr></thead><tbody>
+  ${l.length?l.map(k=>`<tr style="${k.actif===false?'opacity:.55':''}"><td><input type="checkbox" ${OSEL[k.id]?'checked':''} onchange="OSEL['${esc(k.id)}']=this.checked;render()" style="width:18px;height:18px"></td>
+    <td><b>${esc(k.nom)}</b></td><td>${CK_TYPES[k.type]||''} ${esc(k.type||'')}</td><td class="small">${esc(k.site_nom||'—')}${k.site_nom&&!SITES.some(s=>s.nom===k.site_nom)?' <span class="pill p-warn">à choisir</span>':''}</td>
+    <td class="small">${esc(k.description||'')}</td><td>${OLDOUT.has(String(k.id))?'<span class="pill p-warn">Sortie en ce moment</span>':k.actif===false?'<span class="pill p-mut">Archivée</span>':'<span class="pill p-ok">Active</span>'}</td></tr>`).join('')
+  :'<tr><td colspan="6"><div class="empty">Aucune clé à reprendre. 👍</div></td></tr>'}</tbody></table></div>
+  <div class="bar" style="margin-top:14px"><button class="btn btn-p" ${n?'':'disabled'} onclick="repriseForm()">📥 Reprendre la sélection (${n})</button></div>`;
+}
+function l0(){return OLD.filter(k=>OSHOW==='tous'||k.actif!==false);}
+function repriseForm(){
+  const ids=Object.keys(OSEL).filter(id=>OSEL[id]);
+  openModal('Reprendre '+ids.length+' clé(s)',`
+    <div class="mini" style="margin-bottom:12px">${ids.map(id=>esc(OLD.find(k=>String(k.id)===id)?.nom||'')).join(' · ')}</div>
+    <div class="field"><label>Client (facultatif, pour toute la sélection)</label><input id="rp-client" placeholder="Laisser vide si les clients sont différents — à compléter ensuite"></div>
+    <div class="field"><label>Site (facultatif)</label><select id="rp-site">${siteSelect('','— Garder le site actuel de chaque clé —')}</select>
+      <div class="field-hint">Les sites qui ne correspondent pas à la liste de l'application peuvent être corrigés ensuite, clé par clé (« Changer de site »).</div></div>
+    <div class="field"><label>Remise par (facultatif)</label><input id="rp-rp"></div>`,
+    [['Annuler','btn-g','closeModal()'],['📥 Reprendre','btn-p','doReprise()']]);
+}
+async function doReprise(){
+  const ids=Object.keys(OSEL).filter(id=>OSEL[id]);const client=$('rp-client').value.trim(),site=$('rp-site').value,rp=$('rp-rp').value.trim();const who=myName()||'Bureau';
+  let ok=0,ko=0;
+  for(const id of ids){const k=OLD.find(x=>String(x.id)===id);if(!k)continue;
+    const d={client:client||null,remis_par:rp||null,recue_le:'avant le '+ckFmtD(nowIso()).split(' ·')[0]+' (ancien registre)',notes:k.description||null};
+    const row={public:CK_PUBLIC,description:ckFormat(d),actif:true};if(site)row.site_nom=site;
+    try{await q(sb.from('stock_acces_items').update(row).eq('id',id));await ckEvent(id,'reprise',{cle_nom:k.nom,site:site||k.site_nom,client:client||null,agent:who,notes:'Ancienne description : '+(k.description||'—')});ok++;}
+    catch(e){ko++;console.warn(e);}}
+  OSEL={};closeModal();toast(ok+' clé(s) reprise(s)'+(ko?' — '+ko+' échec(s)':''),!!ko);await loadAll();if(ok)tab('poss');
+}
 const poss=()=>KEYS.filter(k=>k.actif!==false);
 const keyById=id=>KEYS.find(k=>String(k.id)===String(id));
 function sub(k){const d=ckParse(k.description);return [d.ref?'Réf. <b>'+esc(d.ref)+'</b>':'',d.client?esc(d.client):''].filter(Boolean).join(' · ');}
