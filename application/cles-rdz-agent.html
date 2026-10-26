@@ -139,8 +139,38 @@ function toast(msg,type='ok'){const t=document.createElement('div');t.className=
 const CK_BUCKET='journal-photos', CK_DIR='cles-rdz', CK_PUBLIC='rdz';
 const CK_TYPES={'clé':'🔑','badge':'🪪','autre':'🗝️'};
 const CK_FIELDS=[['ref','Réf.'],['client','Client'],['remis_par','Remise par'],['recue_le','Reçue le'],['recue_par','Reçue par'],['rendue_le','Rendue le'],['rendue_a','Rendue à'],['rendue_par','Rendue par'],['notes','Notes']];
-function ckParse(desc){const o={};String(desc||'').split('\n').forEach(l=>{const m=l.match(/^([^:]+?)\s*:\s*(.*)$/);if(!m)return;const f=CK_FIELDS.find(x=>x[1]===m[1].trim());if(f)o[f[0]]=m[2].trim();else o.notes=(o.notes?o.notes+' ':'')+l.trim();});return o;}
-function ckFormat(o){return CK_FIELDS.filter(([k])=>o[k]).map(([k,l])=>l+' : '+String(o[k]).replace(/\n/g,' ')).join('\n')||null;}
+const CK_MARK='Clé client RDZ';
+function ckParse(desc){const o={};String(desc||'').split('\n').forEach(l=>{if(l.trim()===CK_MARK)return;const m=l.match(/^([^:]+?)\s*:\s*(.*)$/);if(!m)return;const f=CK_FIELDS.find(x=>x[1]===m[1].trim());if(f)o[f[0]]=m[2].trim();else o.notes=(o.notes?o.notes+' ':'')+l.trim();});return o;}
+function ckFormat(o){return [CK_MARK].concat(CK_FIELDS.filter(([k])=>o[k]).map(([k,l])=>l+' : '+String(o[k]).replace(/\n/g,' '))).join('\n');}
+// Une clé client = marque public 'rdz' OU description commençant par « Clé client RDZ »
+function isCK(k){return k&&(k.public===CK_PUBLIC||String(k.description||'').split('\n')[0].trim()===CK_MARK);}
+function ckErr(e){return [e&&e.message,e&&e.details,e&&e.hint,e&&e.code?'code '+e.code:''].filter(Boolean).join(' — ')||String(e);}
+// Site : la table des clés attend un site de son propre référentiel (stock_acces_sites, comme l'ancien
+// paramétrage « Accès »). On y retrouve — ou on y ajoute — le site choisi dans la liste de l'application,
+// puis on écrit site_id + site_nom ensemble (même format que l'ancien paramétrage).
+let _ckSites=null;
+async function ckSiteRef(nom){
+  if(!nom)return {site_id:null,site_nom:null};
+  if(!_ckSites){const r=await sb.from('stock_acces_sites').select('*');if(r.error)throw r.error;_ckSites=r.data||[];}
+  const n=String(nom).trim().toLowerCase();
+  let s=_ckSites.find(x=>String(x.nom||'').trim().toLowerCase()===n&&x.actif!==false)||_ckSites.find(x=>String(x.nom||'').trim().toLowerCase()===n);
+  if(!s){const r=await sb.from('stock_acces_sites').insert({nom:String(nom).trim(),actif:true}).select().single();if(r.error)throw r.error;s=r.data;_ckSites.push(s);}
+  else if(s.actif===false){await sb.from('stock_acces_sites').update({actif:true}).eq('id',s.id);s.actif=true;}
+  return {site_id:s.id,site_nom:s.nom};
+}
+// Écriture d'une clé : on tente la marque 'rdz' ; si la base la refuse, on garde la marque dans la description
+const CK_NORDZ='rdz_ck_no_public_rdz';
+async function ckWriteKey(id,row){
+  const useRdz=(()=>{try{return localStorage.getItem(CK_NORDZ)!=='1';}catch(e){return true;}})();
+  const go=r=>id?sb.from('stock_acces_items').update(r).eq('id',id).select().single():sb.from('stock_acces_items').insert(r).select().single();
+  let res=await go(useRdz?Object.assign({},row,{public:CK_PUBLIC}):Object.assign({},row,id?{}:{public:'agent'}));
+  if(res.error&&useRdz&&/public/i.test(ckErr(res.error))){
+    try{localStorage.setItem(CK_NORDZ,'1');}catch(e){}
+    res=await go(Object.assign({},row,id?{}:{public:'agent'}));
+  }
+  if(res.error)throw res.error;
+  return res.data;
+}
 function ckSlug(s){return String(s||'sans-site').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'sans-site';}
 function ckStamp(){return new Date().toISOString().replace(/[:.]/g,'-');}
 function ckFmtD(iso){if(!iso)return '';const d=new Date(iso);if(isNaN(d))return iso;return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' · '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'});}
@@ -190,9 +220,9 @@ function lastSite(){try{return localStorage.getItem(LS_SITE)||'';}catch(e){retur
 function setLastSite(s){try{localStorage.setItem(LS_SITE,s);}catch(e){}}
 async function load(){
   try{
-    const [s,k]=await Promise.all([sb.from('sites').select('id,nom,actif').order('nom'),sb.from('stock_acces_items').select('*').eq('public',CK_PUBLIC).order('nom')]);
+    const [s,k]=await Promise.all([sb.from('sites').select('id,nom,actif').order('nom'),sb.from('stock_acces_items').select('*').neq('public','externe').order('nom')]);
     if(k.error)throw k.error;
-    SITES=(s.data||[]).filter(x=>x.actif!==false);KEYS=k.data||[];LOADED=true;
+    SITES=(s.data||[]).filter(x=>x.actif!==false);KEYS=(k.data||[]).filter(isCK);LOADED=true;
     try{localStorage.setItem(LS_CACHE,JSON.stringify({SITES,KEYS,at:new Date().toISOString()}));}catch(e){}
   }catch(e){
     try{const c=JSON.parse(localStorage.getItem(LS_CACHE)||'null');if(c){SITES=c.SITES;KEYS=c.KEYS;LOADED=true;toast('Hors réseau — dernière liste connue','err');}}catch(_){}
@@ -288,11 +318,10 @@ async function doRec(withSig){
   const now=new Date().toISOString();
   const d={ref:REC.ref||null,client:REC.client,remis_par:REC.pers,recue_le:ckFmtD(now),recue_par:AGENT_NOM,notes:REC.notes||null};
   try{
-    const {data,error}=await sb.from('stock_acces_items').insert({nom:REC.nom,type:REC.type,public:CK_PUBLIC,site_nom:REC.site,description:ckFormat(d),actif:true}).select().single();
-    if(error)throw error;
+    const data=await ckWriteKey(null,Object.assign({nom:REC.nom,type:REC.type,description:ckFormat(d),actif:true},await ckSiteRef(REC.site)));
     ckEvent(data.id,'reception',{cle_nom:REC.nom,cle_type:REC.type,ref:REC.ref||null,site:REC.site,client:REC.client,personne:REC.pers,agent:AGENT_NOM,notes:REC.notes||null},sig);
     closeSheet();toast('✅ Clé enregistrée'+(sig?' (signée)':''));go('s-home');
-  }catch(e){toast('❌ '+(e.message||e),'err');document.querySelectorAll('.sheet .btn').forEach(b=>b.disabled=false);}
+  }catch(e){toast('❌ '+ckErr(e),'err');document.querySelectorAll('.sheet .btn').forEach(b=>b.disabled=false);}
 }
 
 // ═══ RESTITUTION ═══
@@ -320,10 +349,10 @@ async function doRest(id,withSig){
   const d=ckParse(k.description);Object.assign(d,{rendue_le:ckFmtD(now),rendue_a:pers,rendue_par:AGENT_NOM});if(notes)d.notes=[d.notes,notes].filter(Boolean).join(' — ');
   document.querySelectorAll('.sheet .btn').forEach(b=>b.disabled=true);
   try{
-    const {error}=await sb.from('stock_acces_items').update({actif:false,description:ckFormat(d)}).eq('id',id);if(error)throw error;
+    await ckWriteKey(id,{actif:false,description:ckFormat(d)});
     ckEvent(id,'restitution',{cle_nom:k.nom,site:k.site_nom,client:d.client||null,personne:pers,agent:AGENT_NOM,notes:notes||null},sig);
     closeSheet();toast('🏁 Clé rendue au client'+(sig?' (signée)':''));go('s-home');
-  }catch(e){toast('❌ '+(e.message||e),'err');document.querySelectorAll('.sheet .btn').forEach(b=>b.disabled=false);}
+  }catch(e){toast('❌ '+ckErr(e),'err');document.querySelectorAll('.sheet .btn').forEach(b=>b.disabled=false);}
 }
 
 // ═══ RECHERCHE ═══
