@@ -504,7 +504,7 @@ function editBadge(id){
     <div class="field"><label>Site</label><select id="b-site">${siteOptions(sid)}${i.site_nom&&!sid?`<option value="__old" selected>${esc(i.site_nom)} (actuel)</option>`:''}</select><div class="field-hint">Liste des sites de l'application.</div></div>
     <div class="field"><label>Description (emplacement, n°…)</label><input id="b-desc" value="${esc(i.description||'')}"></div>
     ${id?`<div class="field"><label>Statut</label><select id="b-actif"><option value="true" ${i.actif!==false?'selected':''}>Actif</option><option value="false" ${i.actif===false?'selected':''}>Archivé</option></select></div>`:''}`,
-    [['Annuler','btn-g','closeModal()'],['Enregistrer','btn-p',`saveBadge(${id?`'${esc(id)}'`:'null'})`]]);
+    [...(id?[['🗑 Supprimer','btn-g',`delBadge('${esc(id)}')`]]:[]),['Annuler','btn-g','closeModal()'],['Enregistrer','btn-p',`saveBadge(${id?`'${esc(id)}'`:'null'})`]]);
 }
 async function saveBadge(id){
   const nom=$('b-nom').value.trim();if(!nom)return toast('Nom requis',1);const sv=$('b-site').value;
@@ -518,12 +518,36 @@ function editRec(id){
     <div class="field"><label>Nom et prénom</label><input id="r-nom" value="${esc(r.nom||'')}"></div>
     <div class="field-row"><div class="field"><label>Société</label><input id="r-soc" value="${esc(r.societe||'')}"></div><div class="field"><label>Téléphone</label><input id="r-tel" value="${esc(r.telephone||'')}"></div></div>
     ${id?`<div class="field"><label>Statut</label><select id="r-actif"><option value="true" ${r.actif!==false?'selected':''}>Dans la liste</option><option value="false" ${r.actif===false?'selected':''}>Retirée de la liste</option></select></div>`:''}`,
-    [['Annuler','btn-g','closeModal()'],['Enregistrer','btn-p',`saveRec(${id?`'${esc(id)}'`:'null'})`]]);
+    [...(id?[['🗑 Supprimer','btn-g',`delRec('${esc(id)}')`]]:[]),['Annuler','btn-g','closeModal()'],['Enregistrer','btn-p',`saveRec(${id?`'${esc(id)}'`:'null'})`]]);
 }
 async function saveRec(id){
   const nom=$('r-nom').value.trim();if(!nom)return toast('Nom requis',1);
   const row={nom,societe:$('r-soc').value.trim()||null,telephone:$('r-tel').value.trim()||null,actif:id?$('r-actif').value==='true':true};
   try{if(id)await q(sb.from('stock_acces_recept').update(row).eq('id',id));else await q(sb.from('stock_acces_recept').insert(row));closeModal();toast('Enregistré');loadAll();}catch(e){toast('❌ '+e.message,1);}
+}
+// Suppression définitive. L'historique des passages reste lisible (nom du badge / de la personne
+// recopiés dans chaque passage). Si la base refuse (lien avec d'anciens passages), on propose d'archiver.
+async function delBadge(id){
+  const i=D.items.find(x=>String(x.id)===String(id));if(!i)return;
+  if(D.pass.some(p=>p.statut==='actif'&&String(p.item_id)===String(id)))return toast('Ce badge est actuellement chez un tiers : enregistrez d\'abord son retour.',1);
+  const n=D.pass.filter(p=>String(p.item_id)===String(id)).length;
+  if(!confirm(`Supprimer définitivement « ${i.nom} » ?${n?`\n\nSes ${n} passage(s) restent consultables dans l'historique.`:''}`))return;
+  const r=await sb.from('stock_acces_items').delete().eq('id',id).select();
+  if(r.error||!(r.data||[]).length){
+    if(confirm('La base n\'a pas permis la suppression'+(r.error?' ('+r.error.message+')':'')+'.\n\nArchiver ce badge à la place ? Il ne sera plus proposé aux agents.')){
+      try{await q(sb.from('stock_acces_items').update({actif:false}).eq('id',id));closeModal();toast('Badge archivé');loadAll();}catch(e){toast('❌ '+e.message,1);}}
+    return;}
+  closeModal();toast('🗑 Badge supprimé');loadAll();
+}
+async function delRec(id){
+  const r0=D.rec.find(x=>String(x.id)===String(id));if(!r0)return;
+  if(!confirm(`Supprimer définitivement « ${r0.nom} » de la liste ?\n\nSes passages restent consultables dans l'historique.`))return;
+  const r=await sb.from('stock_acces_recept').delete().eq('id',id).select();
+  if(r.error||!(r.data||[]).length){
+    if(confirm('La base n\'a pas permis la suppression'+(r.error?' ('+r.error.message+')':'')+'.\n\nLa retirer de la liste à la place ? Elle ne sera plus proposée aux agents.')){
+      try{await q(sb.from('stock_acces_recept').update({actif:false}).eq('id',id));closeModal();toast('Personne retirée de la liste');loadAll();}catch(e){toast('❌ '+e.message,1);}}
+    return;}
+  closeModal();toast('🗑 Personne supprimée');loadAll();
 }
 $('who').textContent=myName()?'👤 '+myName():'';
 loadAll();
