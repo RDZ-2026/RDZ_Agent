@@ -181,7 +181,7 @@ async function ckHistory(itemId){
 async function ckInvList(siteNom){try{return (await ckList('_inventaires/'+ckSlug(siteNom))).filter(n=>n.endsWith('.json'));}catch(e){return [];}}
 async function ckInvGet(siteNom,name){return ckJson('_inventaires/'+ckSlug(siteNom)+'/'+name);}
 function ckInvSave(siteNom,inv){return ckArchive([{path:'_inventaires/'+ckSlug(siteNom)+'/'+ckStamp()+'.json',json:inv}]);}
-const CK_EV={reception:['🤝','Reçue du client'],restitution:['🏁','Rendue au client'],site:['🚚','Changement de site'],modification:['✏️','Fiche modifiée']};
+const CK_EV={reception:['🤝','Reçue du client'],restitution:['🏁','Rendue au client'],site:['🚚','Changement de site'],modification:['✏️','Fiche modifiée'],reprise:['📥','Reprise de l\'ancien registre']};
 
 
 let SITES=[], KEYS=[], LOADED=false;
