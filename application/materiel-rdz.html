@@ -60,6 +60,7 @@ h2{font-size:19px;font-weight:800;margin-bottom:3px}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
 .act .n{position:absolute;top:10px;right:10px;background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:2px 8px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
 .filt{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eef3f8;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
 @media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
 .act{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 14px;text-align:left;cursor:pointer;box-shadow:var(--sh);position:relative;overflow:hidden}
@@ -167,13 +168,13 @@ async function sPut(p,obj){const r=await sb.storage.from(BUCKET).upload(DIR+'/'+
 function slug(s){return norm(s).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'x';}
 
 // ═══ PARAMÈTRES (modifiables dans l'onglet Paramètres) ═══
-const CFG_DEFAULT={v:1,locaux:{},articles:[],etats:[
+const CFG_DEFAULT={v:1,locaux:{},articles:[],fournisseurs:[],etats:[
   {code:'bon',label:'Bon',couleur:'#1b7a3d',stock:true,panne:false},
   {code:'use',label:'Usé',couleur:'#a76a00',stock:true,panne:false},
   {code:'defectueux',label:'Défectueux',couleur:'#b3122a',stock:false,panne:true},
   {code:'hs',label:'Hors service',couleur:'#6b0f1a',stock:false,panne:true}]};
 let CFG=JSON.parse(JSON.stringify(CFG_DEFAULT));
-async function loadCfg(){try{const l=await sList('config');if(l[0])CFG=Object.assign({},CFG_DEFAULT,await sGet('config/'+l[0]));}catch(e){}}
+async function loadCfg(){try{const l=await sList('config');if(l[0])CFG=JSON.parse(JSON.stringify(Object.assign({},CFG_DEFAULT,await sGet('config/'+l[0]))));}catch(e){}if(!Array.isArray(CFG.fournisseurs))CFG.fournisseurs=[];}
 async function saveCfg(){CFG.updated=new Date().toISOString();CFG.par=ME.nom;await sPut('config/'+stamp()+'.json',CFG);}
 const etat=c=>CFG.etats.find(e=>e.code===c)||CFG.etats.find(e=>e.label===c)||{code:c,label:c||'—',couleur:'#63758f',stock:true};
 const etatPill=c=>{const e=etat(c);return `<span class="pill" style="background:${e.couleur}1a;color:${e.couleur}"><span class="dot" style="background:${e.couleur}"></span>${esc(e.label)}</span>`;};
@@ -237,7 +238,7 @@ async function reload(){
     D.rows=(r[0].data||[]).filter(x=>x.actif!==false).map(x=>Object.assign(x,parse(x)));
     D.attr=r[1].data||[];D.agents=r[2].data||[];D.stockAgents=r[3].data||[];D.sites=(r[4].data||[]).filter(s=>s.actif!==false);
     D.hist=r[5].data||[];D.maint=r[6].data||[];
-    await loadCfg();
+    await loadCfg();await loadBons();
   }catch(e){toast('Chargement impossible : '+errTxt(e),'err');}
   render();
 }
@@ -271,14 +272,14 @@ async function bump(row,dTotal,dDispo){
 }
 
 // ═══ NAVIGATION ═══
-const TABS=[['home','🏠 Accueil'],['stock','📦 Stock'],['sortie','📤 Sortie'],['retour','📥 Retour'],['inv','✅ Inventaire'],['hist','📜 Historique'],['param','⚙️ Paramètres']];
+const TABS=[['home','🏠 Accueil'],['stock','📦 Stock'],['sortie','📤 Sortie'],['retour','📥 Retour'],['inv','✅ Inventaire'],['cmd','🛒 Commandes'],['hist','📜 Historique'],['param','⚙️ Paramètres']];
 function tab(t,f){T=t;F=f||{};render();window.scrollTo(0,0);}
 function render(){
   if(!ME)return;
   const nOut=new Set(actives().map(a=>a.agent_nom)).size,nOld=legacy().length;
   document.querySelector('nav.tabs').classList.toggle('hidden',T==='home');   // l'accueil = les boutons, pas de barre
-  $('tabs').innerHTML=TABS.concat(nOld?[['reprise','📥 Reprise']]:[]).map(([k,l])=>`<button class="tab ${T===k?'on':''}" onclick="tab('${k}')">${l}${k==='retour'&&nOut?`<span class="n">${nOut}</span>`:''}${k==='reprise'?`<span class="n">${nOld}</span>`:''}</button>`).join('');
-  $('main').innerHTML=({home:rHome,stock:rStock,sortie:rSortie,retour:rRetour,inv:rInv,hist:rHist,param:rParam,reprise:rReprise}[T]||rHome)();
+  $('tabs').innerHTML=TABS.concat(nOld?[['reprise','📥 Reprise']]:[]).map(([k,l])=>`<button class="tab ${T===k||(k==='cmd'&&T==='cmdprep')?'on':''}" onclick="tab('${k}')">${l}${k==='retour'&&nOut?`<span class="n">${nOut}</span>`:''}${k==='reprise'?`<span class="n">${nOld}</span>`:''}</button>`).join('');
+  $('main').innerHTML=({home:rHome,stock:rStock,sortie:rSortie,retour:rRetour,inv:rInv,cmd:rCmd,cmdprep:rCmdPrep,hist:rHist,param:rParam,reprise:rReprise}[T]||rHome)();
 }
 
 // ═══ ACCUEIL ═══
@@ -296,6 +297,7 @@ function rHome(){
   ${b("tab('retour')",'📥','Retour','Avec l\'état du matériel',nOut)}
   ${b("tab('inv')",'✅','Inventaire','État des lieux d\'un local')}
   ${b('entree()','➕','Entrée','Nouveau matériel')}
+  ${b("tab('cmd')",'🛒','Commandes','Bons, suivi, réception',BONS.filter(enCours).length)}
   ${b("tab('hist')",'📜','Historique','Sorties, retours, mouvements')}
   ${b("tab('param')",'⚙️','Paramètres','Locaux, états, articles')}
   ${nOld?b("tab('reprise')",'🗂','Reprise','Ancien stock à ranger',nOld):''}
@@ -314,7 +316,8 @@ function rStock(){
   const v=F.vue||'local';const FT=STOCK_FILTRES[F.filtre];
   const L=located().filter(r=>!F.site||r.site===F.site).filter(r=>!F.q||norm(r.nom).includes(norm(F.q))).filter(r=>!FT||FT.test(r));
   let h=`<h2>Stock</h2><div class="sub">Disponible = prêt à sortir · Sorti = chez un agent / en mission · Indispo = défectueux ou hors service.</div>
-  ${FT?`<div class="filt"><span>${FT.label} — ${L.length} ligne(s)</span><button class="btn sm g" onclick="F.filtre='';render()">✕ Tout afficher</button></div>`:''}
+  ${FT?`<div class="filt"><span>${FT.label} — ${L.length} ligne(s)</span><span style="display:flex;gap:6px;flex-wrap:wrap">${F.filtre==='seuil'&&L.length?'<button class="btn sm d" onclick="prepSeuil();tab(\'cmdprep\')">🛒 Commander</button>':''}<button class="btn sm g" onclick="F.filtre='';render()">✕ Tout afficher</button></span></div>`:''}
+  ${(()=>{const sansPrix=new Set(L.filter(r=>!artPrix(r.art)).map(r=>r.art)).size;return `<div class="note">💰 Valeur ${FT||F.site||F.q?'de cette sélection':'du stock'} : <b>${chf(sum(L,r=>(r.quantite_total||0)*artPrix(r.art)))}</b> <span style="color:var(--muted)">(quantité totale × prix unitaire${sansPrix?' · '+sansPrix+' article(s) sans prix':''})</span></div>`;})()}
   <div class="card pad"><div class="fr"><select class="fi" onchange="F.site=this.value;render()"><option value="">Tous les sites</option>${sitesList().map(s=>`<option ${F.site===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
     <input class="fi" placeholder="🔍 Article…" value="${esc(F.q||'')}" onchange="F.q=this.value;render()"></div>
     <div class="chips" style="margin-top:10px"><button class="chip ${v==='local'?'on':''}" onclick="F.vue='local';render()">Par local</button><button class="chip ${v==='art'?'on':''}" onclick="F.vue='art';render()">Par article (total)</button></div></div>`;
@@ -337,6 +340,8 @@ function rowSheet(id){
     <button class="btn full g" onclick="moveSheet('${esc(id)}')">🚚 Déplacer vers un autre local</button>
     ${ind?`<button class="btn full ok" onclick="repairSheet('${esc(id)}')">🔧 Remettre en service (réparé)</button><button class="btn full g" onclick="rebutSheet('${esc(id)}')">🗑 Retirer définitivement (rebut / perte)</button>`:''}
     <button class="btn full g" onclick="entree('${esc(r.art)}','${esc(r.site)}','${esc(r.local)}')">➕ Ajouter des pièces</button>
+    <button class="btn full g" onclick="addToPrep('${esc(r.art)}','${esc(r.site)}','${esc(r.local)}',Math.max(1,(r_=rowById('${esc(id)}')).seuil_alerte-r_.quantite_dispo));closeSheet();tab('cmdprep')">🛒 Commander</button>
+    <div class="hint">Prix unitaire : ${artPrix(r.art)?chf(artPrix(r.art))+' · valeur : '+chf(r.quantite_total*artPrix(r.art)):'non renseigné (Paramètres › Articles)'}</div>
     <label class="fl">Seuil d'alerte (disponibles)</label><div class="qty"><input id="se" type="number" min="0" value="${r.seuil_alerte||0}"><button class="btn sm g" onclick="saveSeuil('${esc(id)}')">Enregistrer</button></div>
     <button class="btn full g" onclick="closeSheet()">Fermer</button>`);
 }
@@ -507,7 +512,7 @@ function rHist(){
   const ev=[];
   D.attr.forEach(a=>{ev.push({d:a.date_sortie,t:'📤 Sortie',x:`${a.quantite} × ${parse({nom:a.materiel_nom}).art} → ${a.agent_nom}`,s:[noteGet(a.note,'Mission'),noteGet(a.note,'Départ')&&'départ : '+noteGet(a.note,'Départ')].filter(Boolean).join(' · ')});
     if(a.statut==='rendu')ev.push({d:a.date_retour,t:'📥 Retour',x:`${a.quantite} × ${parse({nom:a.materiel_nom}).art} ← ${a.agent_nom}`,s:noteGet(a.note,'Retour')||a.etat_retour||''});});
-  D.hist.forEach(h=>ev.push({d:h.created_at,t:{entree:'➕ Entrée',transfert:'🚚 Déplacement',inventaire:'✅ Inventaire',reparation:'🔧 Remis en service',rebut:'🗑 Retiré',reprise:'📥 Reprise'}[h.type_op]||h.type_op,x:`${h.quantite!=null?h.quantite+' × ':''}${h.article_nom||''}`,s:h.note||''}));
+  D.hist.forEach(h=>ev.push({d:h.created_at,t:{entree:'➕ Entrée',transfert:'🚚 Déplacement',inventaire:'✅ Inventaire',reparation:'🔧 Remis en service',commande:'🛒 Réception de commande',rebut:'🗑 Retiré',reprise:'📥 Reprise'}[h.type_op]||h.type_op,x:`${h.quantite!=null?h.quantite+' × ':''}${h.article_nom||''}`,s:h.note||''}));
   ev.sort((a,b)=>new Date(b.d)-new Date(a.d));
   const f=ev.filter(e=>!F.q||norm(e.t+' '+e.x+' '+e.s).includes(norm(F.q)));
   return `<h2>Historique</h2><div class="sub">Sorties, retours, entrées, déplacements, inventaires.</div>
@@ -523,8 +528,11 @@ function rParam(){
   <div class="sec">États du matériel</div>
   <div class="card">${CFG.etats.map((e,i)=>`<div class="row"><div class="g"><div class="t">${etatPill(e.code)}</div><div class="s">${e.stock?'reste disponible en stock':'mis de côté (indisponible)'}${e.panne?' · crée un signalement de panne':''}</div></div><button class="btn sm g" onclick="etatSheet(${i})">Modifier</button></div>`).join('')}
     <div class="row"><button class="btn sm d" onclick="etatSheet(-1)">➕ Ajouter un état</button></div></div>
+  <div class="sec">Fournisseurs</div>
+  <div class="card">${(CFG.fournisseurs||[]).map((f,i)=>`<div class="row"><div class="ic">🏢</div><div class="g"><div class="t">${esc(f.nom)}</div><div class="s">${[f.contact,f.tel,f.email].filter(Boolean).map(esc).join(' · ')||'—'} · ${BONS.filter(b=>b.fournisseur===f.nom).length} bon(s)</div></div><button class="btn sm g" onclick="fourSheet(${i})">Modifier</button></div>`).join('')||'<div class="empty">Aucun fournisseur (facultatif).</div>'}
+    <div class="row"><button class="btn sm d" onclick="fourSheet(-1)">➕ Ajouter un fournisseur</button></div></div>
   <div class="sec">Articles</div>
-  <div class="card">${articlesList().map(a=>`<div class="row"><div class="ic">${esc(a.icon||'📦')}</div><div class="g"><div class="t">${esc(a.nom)}</div><div class="s">${located().filter(r=>r.art===a.nom).length} local(aux)</div></div><button class="btn sm g" onclick="artSheet('${esc(a.nom)}')">Modifier</button></div>`).join('')||'<div class="empty">Aucun article. Faites une entrée de matériel.</div>'}
+  <div class="card">${articlesList().map(a=>`<div class="row"><div class="ic">${esc(a.icon||'📦')}</div><div class="g"><div class="t">${esc(a.nom)}</div><div class="s">${located().filter(r=>r.art===a.nom).length} local(aux) · ${artPrix(a.nom)?chf(artPrix(a.nom))+' / pièce':'prix non renseigné'}</div></div><button class="btn sm g" onclick="artSheet('${esc(a.nom)}')">Modifier</button></div>`).join('')||'<div class="empty">Aucun article. Faites une entrée de matériel.</div>'}
     <div class="row"><button class="btn sm d" onclick="entree()">➕ Entrée d'un nouvel article</button></div></div>
   <div class="note">Accès à cette application : cochez la fonction « Responsable matériel » dans le paramétrage des comptes agents.</div>`;
 }
@@ -560,10 +568,11 @@ async function delEtat(i){if(!confirm('Supprimer l\'état « '+CFG.etats[i].labe
 function artSheet(nom){const a=articlesList().find(x=>x.nom===nom)||{nom};
   sheet(`<h3>Article</h3><label class="fl first">Nom</label><input class="fi" id="ar-n" value="${esc(a.nom)}"><label class="fl">Icône</label><input class="fi" id="ar-i" maxlength="4" value="${esc(a.icon||'')}">
     <label class="fl">Seuil d'alerte par défaut (nouveaux locaux)</label><input class="fi" type="number" min="0" id="ar-s" value="${a.seuil||0}">
+    <label class="fl">Prix unitaire (CHF) — sert à la valorisation du stock et aux commandes</label><input class="fi" type="number" min="0" step="0.05" id="ar-p" value="${artPrix(nom)||''}">
     <button class="btn full" onclick="saveArt('${esc(nom)}')">Enregistrer</button><button class="btn full g" onclick="closeSheet()">Annuler</button>`);}
 async function saveArt(old){const n=$('ar-n').value.trim(),ic=$('ar-i').value.trim()||'📦',se=parseInt($('ar-s').value)||0;if(!n)return toast('Nom requis','err');if(n.includes(SEP))return toast('Le nom ne peut pas contenir « — »','err');
   try{for(const r of D.rows.filter(r=>r.art===old)){const nn=r.site?rowName(n,r.site,r.local):n;await q(sb.from('stock_materiel_items').update({nom:nn,icon:ic}).eq('id',r.id));}
-    CFG.articles=CFG.articles.filter(x=>x.nom!==old&&x.nom!==n);CFG.articles.push({nom:n,icon:ic,seuil:se});await saveCfg();closeSheet();toast('Article enregistré');reload();}catch(e){toast(errTxt(e),'err');}}
+    const pr=Math.max(0,parseFloat(String($('ar-p').value).replace(',','.'))||0);CFG.articles=CFG.articles.filter(x=>x.nom!==old&&x.nom!==n);CFG.articles.push({nom:n,icon:ic,seuil:se,prix:pr});await saveCfg();closeSheet();toast('Article enregistré');reload();}catch(e){toast(errTxt(e),'err');}}
 
 // ═══ REPRISE DE L'ANCIEN STOCK ═══
 function rReprise(){
@@ -586,6 +595,201 @@ async function doReprise(id){
     toast('📥 '+r.nom+' rangé dans '+s+' · '+l);reload();
   }catch(e){toast(errTxt(e),'err');}
 }
+
+// ═══ COMMANDES (bons de commande, suivi, réception → stock) ═══
+// Stockage EXISTANT journal-photos/materiel/commandes/<n° de bon>__<horodatage>.json :
+// une nouvelle version à chaque changement (historique complet, rien n'est écrasé).
+const ST={preparation:['En préparation','#566579'],valide:['Validé (direction)','#1e4f8a'],envoyee:['Commande envoyée','#6b3fa0'],
+  attente:['En attente de réception','#a76a00'],recue:['Réceptionné','#1b7a3d'],annulee:['Annulé','#b3122a'],reception:['📥 Réception partielle','#a76a00']};
+const stLabel=k=>(ST[k]||[k])[0];
+const stPill=b=>{const k=b.statut;let [l,c]=ST[k]||[k,'#566579'];if(k==='attente'&&b.lignes.some(x=>(x.recu||0)>0))l='Reçu en partie';
+  return `<span class="pill" style="background:${c}1a;color:${c}"><span class="dot" style="background:${c}"></span>${esc(l)}</span>`;};
+const chf=n=>{const [i,d]=(Number(n)||0).toFixed(2).split('.');return 'CHF '+i.replace(/\B(?=(\d{3})+(?!\d))/g,"'")+'.'+d;};   // format suisse : CHF 1'234.50
+const bonTotal=b=>sum(b.lignes,x=>(x.qte||0)*(x.prix||0));
+const enCours=b=>!['recue','annulee'].includes(b.statut);
+const artPrix=n=>Number(((CFG.articles||[]).find(a=>a.nom===n)||{}).prix)||0;
+let BONS=[];
+async function sListAll(p){let out=[],off=0;for(;;){const r=await sb.storage.from(BUCKET).list(DIR+'/'+p,{limit:1000,offset:off,sortBy:{column:'name',order:'desc'}});
+  if(r.error)throw r.error;const d=r.data||[];out=out.concat(d.map(f=>f.name).filter(n=>n&&n.endsWith('.json')));if(d.length<1000)break;off+=1000;}return out.sort().reverse();}
+async function loadBons(){try{const names=await sListAll('commandes');const last={};names.forEach(n=>{const id=n.split('__')[0];if(!last[id])last[id]=n;});
+  BONS=(await Promise.all(Object.values(last).map(n=>sGet('commandes/'+n).catch(()=>null)))).filter(Boolean).sort((a,b)=>String(b.numero).localeCompare(String(a.numero)));}
+  catch(e){console.warn('Bons de commande non lus',e);}}
+async function saveBon(b,statut,note){b.maj=new Date().toISOString();b.maj_par=ME.nom;
+  if(statut){b.statut=statut;(b.hist=b.hist||[]).push({statut,le:b.maj,par:ME.nom,note:note||null});}
+  await sPut('commandes/'+b.numero+'__'+stamp()+'.json',b);
+  const i=BONS.findIndex(x=>x.numero===b.numero);if(i>=0)BONS[i]=b;else BONS.unshift(b);}
+function nextNumero(){const y=new Date().getFullYear();const re=new RegExp('^BC-'+y+'-(\\d+)$');
+  const n=Math.max(0,...BONS.map(b=>{const m=String(b.numero).match(re);return m?+m[1]:0;}));return 'BC-'+y+'-'+String(n+1).padStart(3,'0');}
+
+// ── Liste des bons ──
+function rCmd(){
+  const fl=F.st||'cours',fo=F.fo||'';
+  const L=BONS.filter(b=>fl==='tous'||(fl==='cours'?enCours(b):b.statut===fl)).filter(b=>!fo||(b.fournisseur||'')===fo)
+    .filter(b=>!F.q||norm(b.numero+' '+(b.fournisseur||'')+' '+b.lignes.map(x=>x.art).join(' ')).includes(norm(F.q)));
+  const fours=[...new Set(BONS.map(b=>b.fournisseur).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+  const nd=prepLoad().lignes.length;
+  return `<h2>Commandes</h2><div class="sub">Préparez les commandes, répartissez-les sur un ou plusieurs bons et suivez leur état. À la réception, le stock est mis à jour automatiquement.</div>
+  <button class="btn full" onclick="tab('cmdprep')">🛒 ${nd?'Reprendre la préparation ('+nd+' ligne(s))':'Préparer une commande'}</button>
+  <div class="card pad" style="margin-top:12px"><div class="chips">${[['cours','En cours'],['recue','Réceptionnés'],['annulee','Annulés'],['tous','Tous']].map(([k,l])=>`<button class="chip ${fl===k?'on':''}" onclick="F.st='${k}';render()">${l}</button>`).join('')}</div>
+    <div class="fr" style="margin-top:10px"><select class="fi" onchange="F.fo=this.value;render()"><option value="">Tous les fournisseurs</option>${fours.map(f=>`<option ${f===fo?'selected':''}>${esc(f)}</option>`).join('')}</select>
+    <input class="fi" placeholder="🔍 N° de bon, article…" value="${esc(F.q||'')}" onchange="F.q=this.value;render()"></div></div>
+  ${fo&&L.length?`<div class="filt"><span>${esc(fo)} — ${L.length} bon(s)</span><span>${chf(sum(L,bonTotal))}</span></div>`:''}
+  <div class="card">${L.map(b=>`<div class="row click" onclick="bonSheet('${esc(b.numero)}')"><div class="ic">🧾</div><div class="g"><div class="t">${esc(b.numero)}${b.fournisseur?' · '+esc(b.fournisseur):''}</div>
+    <div class="s">${b.lignes.length} ligne(s) · ${b.lignes.slice(0,3).map(x=>x.qte+' × '+esc(x.art)).join(', ')}${b.lignes.length>3?'…':''}</div><div class="s">${fDT(b.cree_le)} · ${esc(b.cree_par||'?')}</div></div>
+    <div class="r" style="flex-direction:column;align-items:flex-end;gap:4px">${stPill(b)}<b style="font-size:13px">${chf(bonTotal(b))}</b></div></div>`).join('')||'<div class="empty">Aucun bon de commande.</div>'}</div>`;
+}
+
+// ── Préparation (brouillon gardé sur l'appareil jusqu'à l'enregistrement des bons) ──
+const DK='rdz_mat_cmd_draft';let PREP=null;
+function prepLoad(){if(PREP)return PREP;try{PREP=JSON.parse(localStorage.getItem(DK)||'null');}catch(e){}if(!PREP||!Array.isArray(PREP.bons)||!PREP.bons.length)PREP={bons:[{fournisseur:''}],lignes:[]};return PREP;}
+function prepSave(){try{localStorage.setItem(DK,JSON.stringify(PREP));}catch(e){}}
+const lid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function addToPrep(art,site,local,qte){prepLoad();const a=articlesList().find(x=>x.nom===art)||{};
+  if(PREP.lignes.some(l=>l.art===art&&l.site===(site||'')&&l.local===(local||'')))return false;
+  PREP.lignes.push({id:lid(),art,icon:a.icon||'📦',nouveau:false,qte:Math.max(1,qte||1),prix:artPrix(art),site:site||'',local:local||'',bon:0});prepSave();return true;}
+function rCmdPrep(){
+  const P=prepLoad();const fours=(CFG.fournisseurs||[]).map(f=>f.nom);const sel=P.lignes.filter(x=>x.sel).length;
+  const nb=P.bons.filter((b,i)=>P.lignes.some(x=>x.bon===i)).length;
+  const lineH=x=>`<div class="row"><input type="checkbox" ${x.sel?'checked':''} onchange="prepSel('${x.id}',this.checked)" style="width:22px;height:22px;flex-shrink:0"><div class="ic">${esc(x.icon||'📦')}</div>
+    <div class="g"><div class="t">${esc(x.art)}${x.nouveau?' <span class="pill p-warn">nouvel article</span>':''}</div><div class="s">${x.qte} × ${chf(x.prix)} = <b>${chf(x.qte*x.prix)}</b>${x.site?' · → '+esc(x.site+' / '+x.local):''}</div></div>
+    <button class="btn sm g" onclick="prepLine('${x.id}')">Modifier</button></div>`;
+  return `<h2>Préparer une commande</h2><div class="sub">Ajoutez les articles à commander (existants ou nouveaux). Pour les répartir sur plusieurs bons, cochez des lignes puis choisissez le bon. Rien n'est envoyé tant que vous n'avez pas enregistré.</div>
+  <div class="actions" style="grid-template-columns:1fr 1fr"><button class="act" onclick="prepLine()"><div class="i">➕</div><div class="l">Ajouter un article</div><div class="d">Existant ou nouveau</div></button>
+  <button class="act" onclick="prepSeuil()"><div class="i">⚠️</div><div class="l">Sous le seuil</div><div class="d">Ajouter ce qui manque</div></button></div>
+  ${sel?`<div class="filt" style="margin-top:12px;flex-wrap:wrap"><span>${sel} ligne(s) cochée(s) → mettre sur :</span><span style="display:flex;gap:6px;flex-wrap:wrap">${P.bons.map((b,i)=>`<button class="btn sm g" onclick="prepMove(${i})">Bon ${i+1}</button>`).join('')}<button class="btn sm d" onclick="prepMove(${P.bons.length})">➕ Nouveau bon</button></span></div>`:''}
+  ${P.bons.map((b,i)=>{const ls=P.lignes.filter(x=>x.bon===i);return `<div class="sec">🧾 Bon ${i+1}</div>
+    <div class="card pad"><div class="fr"><div><label class="fl first">Fournisseur</label><select class="fi" onchange="prepFour(${i},this.value)"><option value="">— À définir —</option>${fours.map(f=>`<option ${f===b.fournisseur?'selected':''}>${esc(f)}</option>`).join('')}<option value="__new">➕ Nouveau fournisseur…</option></select></div>
+    <div><label class="fl first">Note (facultatif)</label><input class="fi" value="${esc(b.note||'')}" onchange="PREP.bons[${i}].note=this.value;prepSave()" placeholder="Ex. livraison au siège"></div></div></div>
+    <div class="card">${ls.map(lineH).join('')||'<div class="empty">Aucune ligne sur ce bon.</div>'}${ls.length?`<div class="row" style="background:#f7f9fb"><div class="g"><b>Total bon ${i+1}</b></div><b>${chf(sum(ls,x=>x.qte*x.prix))}</b></div>`:''}</div>`;}).join('')}
+  <div class="sticky"><button class="btn full" onclick="prepCreate()" ${nb?'':'disabled'}>✅ Enregistrer ${nb} bon(s) de commande</button>${P.lignes.length?'<button class="btn full g" onclick="prepClear()">🗑 Vider la préparation</button>':''}</div>`;
+}
+function prepSel(id,v){const x=prepLoad().lignes.find(l=>l.id===id);if(x)x.sel=v;prepSave();render();}
+function prepCompact(){const P=PREP;const used=P.bons.map((b,i)=>P.lignes.some(x=>x.bon===i));
+  if(!used.some(Boolean)){P.bons=[P.bons[0]||{fournisseur:''}];return;}
+  const map={};const nb=[];P.bons.forEach((b,i)=>{if(used[i]){map[i]=nb.length;nb.push(b);}});P.lignes.forEach(x=>x.bon=map[x.bon]);P.bons=nb;}
+function prepMove(i){const P=prepLoad();if(i>=P.bons.length)P.bons.push({fournisseur:''});P.lignes.forEach(x=>{if(x.sel){x.bon=i;x.sel=false;}});prepCompact();prepSave();render();}
+function prepFour(i,v){const P=prepLoad();if(v==='__new')return fourSheet(-1,n=>{P.bons[i].fournisseur=n;prepSave();render();});P.bons[i].fournisseur=v;prepSave();}
+function prepClear(){if(!confirm('Vider la préparation en cours ?'))return;PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();render();}
+function prepSeuil(){const low=located().filter(r=>(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte);let n=0;
+  low.forEach(r=>{if(addToPrep(r.art,r.site,r.local,r.seuil_alerte-r.quantite_dispo))n++;});toast(n?'⚠️ '+n+' ligne(s) ajoutée(s)':'Rien de plus à ajouter',n?'ok':'err');render();}
+function prepLine(id){const P=prepLoad();const x=id?P.lignes.find(l=>l.id===id):null;const arts=articlesList();const isNew=(x&&x.nouveau)||!arts.length;
+  sheet(`<h3>${x?'Modifier la ligne':'Ajouter un article'}</h3>
+  <label class="fl first">Article</label><select class="fi" id="pl-a" onchange="$('pl-new').classList.toggle('hidden',this.value!=='__new');if(this.value!=='__new'){const p=artPrix(this.value);$('pl-p').value=p||'';}">${arts.map(a=>`<option ${x&&!x.nouveau&&a.nom===x.art?'selected':''}>${esc(a.nom)}</option>`).join('')}<option value="__new" ${isNew?'selected':''}>➕ Nouvel article…</option></select>
+  <div id="pl-new" class="${isNew?'':'hidden'}"><div class="fr"><input class="fi" id="pl-nom" placeholder="Nom du nouvel article" value="${x&&x.nouveau?esc(x.art):''}" style="margin-top:8px"><input class="fi" id="pl-ico" placeholder="Icône (ex. 📻)" maxlength="4" value="${x&&x.nouveau?esc(x.icon||''):''}" style="margin-top:8px"></div>
+    <div class="hint">La fiche de ce nouvel article est créée quand vous enregistrez le bon.</div></div>
+  <div class="fr"><div><label class="fl">Quantité</label>${qtyField('pl-q',null,x?x.qte:1)}</div><div><label class="fl">Prix unitaire (CHF)</label><input class="fi" id="pl-p" type="number" min="0" step="0.05" value="${x?(x.prix||''):(!isNew&&arts[0]?artPrix(arts[0].nom)||'':'')}"></div></div>
+  <div class="hint">Où le ranger à la réception (modifiable à ce moment-là) :</div>${locSelect('pl',x?x.site:'',x?x.local:'')}
+  ${P.bons.length>1?`<label class="fl">Bon</label><select class="fi" id="pl-b">${P.bons.map((b,i)=>`<option value="${i}" ${(x?x.bon:0)===i?'selected':''}>Bon ${i+1}${b.fournisseur?' — '+esc(b.fournisseur):''}</option>`).join('')}</select>`:''}
+  <button class="btn full" onclick="savePrepLine('${x?x.id:''}')">${x?'Enregistrer':'Ajouter'}</button>${x?`<button class="btn full g" onclick="delPrepLine('${x.id}')">🗑 Retirer la ligne</button>`:''}<button class="btn full g" onclick="closeSheet()">Annuler</button>`);}
+function savePrepLine(id){const P=prepLoad();let a=$('pl-a').value,nouveau=false,icon;
+  if(a==='__new'){a=$('pl-nom').value.trim();if(!a)return toast('Nom de l\'article requis','err');if(a.includes(SEP))return toast('Le nom ne peut pas contenir « — »','err');
+    const ex=articlesList().find(z=>norm(z.nom)===norm(a));if(ex){a=ex.nom;icon=ex.icon||'📦';}else{nouveau=true;icon=$('pl-ico').value.trim()||'📦';}}
+  else icon=(articlesList().find(z=>z.nom===a)||{}).icon||'📦';
+  const qte=parseInt($('pl-q').value)||0;if(qte<1)return toast('Quantité invalide','err');
+  const prix=Math.max(0,parseFloat(String($('pl-p').value).replace(',','.'))||0);
+  const cur=id?P.lignes.find(l=>l.id===id):null;const bon=$('pl-b')?parseInt($('pl-b').value):(cur?cur.bon:0);
+  const row={art:a,icon,nouveau,qte,prix,site:$('pl-site').value,local:$('pl-local').value,bon};
+  if(cur)Object.assign(cur,row);else P.lignes.push(Object.assign({id:lid()},row));prepCompact();prepSave();closeSheet();render();}
+function delPrepLine(id){const P=prepLoad();P.lignes=P.lignes.filter(l=>l.id!==id);prepCompact();prepSave();closeSheet();render();}
+async function prepCreate(){const P=prepLoad();const groups=P.bons.map((b,i)=>({b,ls:P.lignes.filter(x=>x.bon===i)})).filter(g=>g.ls.length);
+  if(!groups.length)return toast('Ajoutez au moins un article','err');
+  if(!confirm(groups.length+' bon(s) de commande vont être créés, au statut « En préparation ». Continuer ?'))return;
+  try{let chg=false;
+    P.lignes.forEach(x=>{const a=CFG.articles.find(z=>z.nom===x.art);
+      if(!a){const r=D.rows.find(r=>r.art===x.art);CFG.articles.push({nom:x.art,icon:x.icon||(r&&r.icon)||'📦',seuil:r?r.seuil_alerte||0:0,prix:x.prix||0});chg=true;}
+      else if(!a.prix&&x.prix){a.prix=x.prix;chg=true;}});
+    if(chg)await saveCfg();
+    const made=[];
+    for(const g of groups){const now=new Date().toISOString();
+      const b={v:1,numero:nextNumero(),fournisseur:g.b.fournisseur||'',note:g.b.note||'',statut:'preparation',cree_le:now,cree_par:ME.nom,
+        lignes:g.ls.map(x=>({art:x.art,icon:x.icon||'📦',nouveau:!!x.nouveau,qte:x.qte,prix:x.prix||0,site:x.site||'',local:x.local||'',recu:0})),
+        hist:[{statut:'preparation',le:now,par:ME.nom,note:null}]};
+      await saveBon(b);made.push(b.numero);}
+    PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();toast('🧾 '+made.join(', ')+' enregistré(s)');F={};tab('cmd');
+  }catch(e){toast(errTxt(e),'err');}}
+
+// ── Détail, suivi, réception, impression ──
+function bonSheet(nu){const b=BONS.find(x=>x.numero===nu);if(!b)return;const prep=b.statut==='preparation';const acts=[];
+  if(b.statut==='preparation')acts.push(`<button class="btn full ok" onclick="validSheet('${esc(nu)}')">✔ Validé par la direction</button>`);
+  if(b.statut==='valide')acts.push(`<button class="btn full" onclick="setSt('${esc(nu)}','envoyee')">📨 Commande envoyée</button>`);
+  if(b.statut==='envoyee')acts.push(`<button class="btn full" onclick="setSt('${esc(nu)}','attente')">⏳ En attente de réception</button>`);
+  if(['envoyee','attente'].includes(b.statut))acts.push(`<button class="btn full ok" onclick="recvSheet('${esc(nu)}')">📥 Réceptionner</button>`);
+  sheet(`<h3>🧾 ${esc(b.numero)}</h3><div class="sub">${b.fournisseur?'Fournisseur : <b>'+esc(b.fournisseur)+'</b> · ':''}créé le ${fDT(b.cree_le)} par ${esc(b.cree_par||'?')}${b.valide_par?' · validé par '+esc(b.valide_par):''}</div>
+   <div style="margin:4px 0 10px">${stPill(b)}</div>${b.note?`<div class="note">${esc(b.note)}</div>`:''}
+   <div class="card"><div class="tscroll"><table class="t"><tr><th>Article</th><th>Qté</th><th>Reçu</th><th>Prix u.</th><th>Total</th></tr>
+   ${b.lignes.map((x,i)=>`<tr><td>${esc(x.icon||'')} ${esc(x.art)}${x.nouveau?' <span class="pill p-warn">nouveau</span>':''}${x.site?`<div style="font-size:11.5px;color:var(--muted)">→ ${esc(x.site+' / '+x.local)}</div>`:''}</td>
+     <td>${prep?`<input class="fi" style="width:70px;padding:6px" type="number" min="0" value="${x.qte}" onchange="editLine('${esc(nu)}',${i},'qte',this.value)">`:x.qte}</td><td>${x.recu||0}</td>
+     <td>${prep?`<input class="fi" style="width:90px;padding:6px" type="number" min="0" step="0.05" value="${x.prix||0}" onchange="editLine('${esc(nu)}',${i},'prix',this.value)">`:chf(x.prix)}</td><td>${chf(x.qte*(x.prix||0))}</td></tr>`).join('')}
+   <tr><td colspan="4"><b>Total</b></td><td><b>${chf(bonTotal(b))}</b></td></tr></table></div></div>
+   ${prep?'<div class="hint" style="margin-bottom:10px">En préparation : quantités et prix modifiables (quantité 0 = ligne retirée).</div>':''}
+   ${acts.join('')}<button class="btn full g" onclick="printBon('${esc(nu)}')">🖨 Imprimer / PDF</button>
+   ${enCours(b)?`<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">Autres actions (corriger le statut, annuler)</summary>
+     <select class="fi" id="bs-st" style="margin-top:8px">${['preparation','valide','envoyee','attente','annulee'].map(k=>`<option value="${k}" ${k===b.statut?'selected':''}>${stLabel(k)}</option>`).join('')}</select>
+     <button class="btn full g" onclick="setSt('${esc(nu)}',$('bs-st').value)">Appliquer ce statut</button></details>`:''}
+   <div class="sec">Suivi du bon</div><div class="card">${(b.hist||[]).slice().reverse().map(h=>`<div class="row"><div class="g"><div class="t" style="font-weight:700">${esc(stLabel(h.statut))}</div><div class="s">${fDT(h.le)} · ${esc(h.par||'')}${h.note?' · '+esc(h.note):''}</div></div></div>`).join('')}</div>
+   <button class="btn full g" onclick="closeSheet()">Fermer</button>`);}
+async function editLine(nu,i,f,v){const b=BONS.find(x=>x.numero===nu);const x=b.lignes[i];
+  if(f==='qte'){const n=parseInt(v)||0;if(n<1){if(!confirm('Retirer « '+x.art+' » du bon ?'))return bonSheet(nu);b.lignes.splice(i,1);}else x.qte=n;}
+  else x.prix=Math.max(0,parseFloat(String(v).replace(',','.'))||0);
+  if(!b.lignes.length)return toast('Un bon doit garder au moins une ligne (annulez-le plutôt)','err');
+  try{await saveBon(b);bonSheet(nu);render();}catch(e){toast(errTxt(e),'err');}}
+function validSheet(nu){sheet(`<h3>✔ Validation du bon ${esc(nu)}</h3><div class="sub">La validation est faite par la direction.</div>
+  <label class="fl first">Validé par</label><input class="fi" id="va-n" placeholder="Nom de la personne de la direction"><label class="fl">Commentaire (facultatif)</label><input class="fi" id="va-c">
+  <button class="btn full ok" onclick="if(!$('va-n').value.trim())return toast('Indiquez qui a validé','err');setSt('${esc(nu)}','valide',$('va-c').value.trim(),{valide_par:$('va-n').value.trim()})">Enregistrer la validation</button><button class="btn full g" onclick="bonSheet('${esc(nu)}')">Retour</button>`);}
+async function setSt(nu,st,note,extra){const b=BONS.find(x=>x.numero===nu);if(!b||st===b.statut)return;
+  if(st==='annulee'&&!confirm('Annuler le bon '+nu+' ? Il reste dans l\'historique.'))return;
+  try{Object.assign(b,extra||{});await saveBon(b,st,note);toast('🧾 '+nu+' : '+stLabel(st));bonSheet(nu);render();}catch(e){toast(errTxt(e),'err');}}
+function recvSheet(nu){const b=BONS.find(x=>x.numero===nu);
+  sheet(`<h3>📥 Réception — ${esc(nu)}</h3><div class="sub">Indiquez les quantités reçues et où les ranger : le stock est mis à jour directement. Réception partielle possible : le bon reste « en attente » pour le reste.</div>
+  ${b.lignes.map((x,i)=>{const rest=Math.max(0,x.qte-(x.recu||0));if(!rest)return `<div class="card pad"><b>${esc(x.icon||'')} ${esc(x.art)}</b> <span class="pill p-ok">entièrement reçu (${x.recu})</span></div>`;
+    const loc=x.site?{site:x.site,local:x.local}:(located().find(r=>r.art===x.art)||{site:'',local:''});
+    return `<div class="card pad"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(x.icon||'')} ${esc(x.art)}</b><span class="pill p-mut">${x.recu||0} / ${x.qte} reçu(s)</span></div>
+     <div class="fr"><div><label class="fl">Reçu maintenant</label><input class="fi" type="number" min="0" max="${rest}" id="rv-q${i}" value="${rest}"></div><div><label class="fl">Prix unitaire (CHF)</label><input class="fi" type="number" min="0" step="0.05" id="rv-p${i}" value="${x.prix||0}"></div></div>
+     ${locSelect('rv'+i,loc.site,loc.local)}</div>`;}).join('')}
+  <button class="btn full ok" onclick="doRecv('${esc(nu)}')">✅ Confirmer la réception</button><button class="btn full g" onclick="bonSheet('${esc(nu)}')">Retour</button>`);}
+async function doRecv(nu){const b=BONS.find(x=>x.numero===nu);const todo=[];
+  for(let i=0;i<b.lignes.length;i++){const x=b.lignes[i];const rest=Math.max(0,x.qte-(x.recu||0));if(!rest||!$('rv-q'+i))continue;
+    const n=parseInt($('rv-q'+i).value)||0;if(n<0||n>rest)return toast('Quantité invalide pour '+x.art,'err');if(!n)continue;
+    const s=$('rv'+i+'-site').value,l=$('rv'+i+'-local').value;if(!s||!l)return toast('Choisissez le site et le local pour '+x.art,'err');
+    todo.push({i,n,s,l,p:Math.max(0,parseFloat(String($('rv-p'+i).value).replace(',','.'))||0)});}
+  if(!todo.length)return toast('Aucune quantité reçue','err');
+  try{let chg=false;const now=new Date().toISOString();
+    for(const t of todo){const x=b.lignes[t.i];
+      let a=CFG.articles.find(z=>z.nom===x.art);
+      if(!a){a={nom:x.art,icon:x.icon||artIcon(x.art)||'📦',seuil:0,prix:t.p};CFG.articles.push(a);chg=true;}
+      else if(t.p&&a.prix!==t.p){a.prix=t.p;chg=true;}        // dernier prix d'achat → valorisation du stock
+      const r=await ensureRow(x.art,t.s,t.l);await bump(r,t.n,t.n);
+      await log('commande',x.art,t.n,`Bon ${b.numero}${b.fournisseur?' — '+b.fournisseur:''} — ${t.s} / ${t.l}`);
+      x.recu=(x.recu||0)+t.n;x.prix=t.p;x.site=t.s;x.local=t.l;}
+    if(chg){try{await saveCfg();}catch(e){}}
+    const all=b.lignes.every(x=>(x.recu||0)>=x.qte),txt=todo.map(t=>t.n+' × '+b.lignes[t.i].art).join(', ');
+    b.statut=all?'recue':'attente';(b.hist=b.hist||[]).push({statut:all?'recue':'reception',le:now,par:ME.nom,note:txt});
+    await saveBon(b);closeSheet();toast(all?'✅ Bon réceptionné — stock mis à jour':'📥 Réception partielle enregistrée — stock mis à jour');reload();
+  }catch(e){toast(errTxt(e),'err');}}
+function printBon(nu){const b=BONS.find(x=>x.numero===nu);const logo=(document.querySelector('.logo img')||{}).src||'';const f=(CFG.fournisseurs||[]).find(z=>z.nom===b.fournisseur)||{};
+  const w=window.open('','_blank');if(!w)return toast('Autorisez l\'ouverture de fenêtres pour imprimer','err');
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(b.numero)}</title><style>body{font-family:Inter,"Segoe UI",Arial,sans-serif;color:#102033;margin:32px;font-size:13px}h1{font-size:20px;margin:0}
+  table{width:100%;border-collapse:collapse;margin-top:18px}th{background:#142130;color:#fff;text-align:left;padding:8px;font-size:11px;text-transform:uppercase}td{padding:8px;border-bottom:1px solid #dbe3ec}.r{text-align:right}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #e3062c;padding-bottom:14px}.box{border:1px solid #dbe3ec;border-radius:8px;padding:10px 12px;margin-top:14px}@media print{body{margin:14mm}}</style></head><body>
+  <div class="hd"><div>${logo?`<img src="${logo}" style="height:46px">`:''}<div style="margin-top:6px;font-weight:700">RDZ Security Management SA</div></div>
+  <div style="text-align:right"><h1>Bon de commande</h1><div style="font-size:15px;font-weight:700;margin-top:4px">${esc(b.numero)}</div><div>Date : ${new Date(b.cree_le).toLocaleDateString('fr-CH')}</div><div>Statut : ${esc(stLabel(b.statut))}</div></div></div>
+  <div class="box"><b>Fournisseur</b><br>${esc(b.fournisseur||'—')}${f.contact?'<br>'+esc(f.contact):''}${f.tel?'<br>'+esc(f.tel):''}${f.email?'<br>'+esc(f.email):''}</div>
+  <table><tr><th>Article</th><th class="r">Quantité</th><th class="r">Prix unitaire</th><th class="r">Total</th></tr>${b.lignes.map(x=>`<tr><td>${esc(x.art)}</td><td class="r">${x.qte}</td><td class="r">${chf(x.prix)}</td><td class="r">${chf(x.qte*(x.prix||0))}</td></tr>`).join('')}
+  <tr><td colspan="3" class="r"><b>Total</b></td><td class="r"><b>${chf(bonTotal(b))}</b></td></tr></table>
+  ${b.note?`<div class="box"><b>Note</b><br>${esc(b.note)}</div>`:''}
+  <div class="box" style="display:flex;justify-content:space-between;gap:20px"><div>Établi par : ${esc(b.cree_par||'')}</div><div>Validé par : ${esc(b.valide_par||'……………………………')}</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>`);w.document.close();}
+
+// ── Fournisseurs (Paramètres) ──
+function fourSheet(i,cb){const f=i>=0?CFG.fournisseurs[i]:{nom:'',contact:'',tel:'',email:''};window._fourCb=cb||null;
+  sheet(`<h3>${i>=0?'Fournisseur':'Nouveau fournisseur'}</h3><label class="fl first">Nom</label><input class="fi" id="fo-n" value="${esc(f.nom)}"><label class="fl">Contact</label><input class="fi" id="fo-c" value="${esc(f.contact||'')}">
+  <div class="fr"><div><label class="fl">Téléphone</label><input class="fi" id="fo-t" value="${esc(f.tel||'')}"></div><div><label class="fl">E-mail</label><input class="fi" id="fo-e" value="${esc(f.email||'')}"></div></div>
+  <button class="btn full" onclick="saveFour(${i})">Enregistrer</button>${i>=0?`<button class="btn full g" onclick="delFour(${i})">🗑 Retirer de la liste</button>`:''}<button class="btn full g" onclick="closeSheet();render()">Annuler</button>`);}
+async function saveFour(i){const n=$('fo-n').value.trim();if(!n)return toast('Nom requis','err');CFG.fournisseurs=CFG.fournisseurs||[];
+  if(CFG.fournisseurs.some((f,j)=>j!==i&&norm(f.nom)===norm(n)))return toast('Ce fournisseur existe déjà','err');
+  const f={nom:n,contact:$('fo-c').value.trim(),tel:$('fo-t').value.trim(),email:$('fo-e').value.trim()};if(i>=0)CFG.fournisseurs[i]=f;else CFG.fournisseurs.push(f);
+  try{await saveCfg();closeSheet();toast('Fournisseur enregistré');const cb=window._fourCb;window._fourCb=null;if(cb)cb(n);else render();}catch(e){toast(errTxt(e),'err');}}
+async function delFour(i){if(!confirm('Retirer « '+CFG.fournisseurs[i].nom+' » de la liste ? (les anciens bons gardent son nom)'))return;CFG.fournisseurs.splice(i,1);try{await saveCfg();closeSheet();render();}catch(e){toast(errTxt(e),'err');}}
 
 // ═══ FENÊTRE ═══
 function sheet(h){$('sheet-root').innerHTML=`<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">${h}</div></div>`;}
