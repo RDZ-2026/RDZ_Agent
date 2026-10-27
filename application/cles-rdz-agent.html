@@ -67,6 +67,11 @@ textarea.fi{min-height:60px;resize:vertical}
 .inv .box2{width:28px;height:28px;border-radius:8px;border:2px solid #b9c6d4;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;flex-shrink:0}
 .inv.on .box2{background:var(--ok);border-color:var(--ok)}
 .inv .g{flex:1;min-width:0}.inv .n{font-size:14.5px;font-weight:800}.inv .s{font-size:12px;color:var(--muted);margin-top:2px}
+.inv.out{border-color:var(--warn);background:#fffaf0}.inv.out .box2{background:var(--warn);border-color:var(--warn);font-size:15px}
+.inv .hs{flex-shrink:0;padding:7px 10px;border-radius:999px;border:1px solid #e3cfa3;background:#fff;font-size:12px;font-weight:800;color:var(--warn);white-space:nowrap}
+.inv.out .hs{background:var(--warn);border-color:var(--warn);color:#fff}
+.inv .note{width:100%;margin-top:8px;padding:9px 10px;border:1px solid #e3cfa3;border-radius:8px;font:inherit;font-size:13.5px;background:#fff}
+.warnbox{background:var(--warn-l);border-left:4px solid var(--warn);padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;line-height:1.45}
 .sum{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(20,33,48,.08)}
 .sum .btn{margin-top:6px}
 .pill{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
@@ -98,7 +103,7 @@ textarea.fi{min-height:60px;resize:vertical}
 </div>
 
 <div class="screen hidden" id="s-inv">
-  <div class="top"><span class="logo"><img src="" alt=""></span><div class="t"><div class="n">Inventaire</div><div class="s">Cochez chaque clé présente</div></div><button class="back" onclick="go('s-home')">‹ Retour</button></div>
+  <div class="top"><span class="logo"><img src="" alt=""></span><div class="t"><div class="n">Inventaire</div><div class="s">Présente, hors site ou manquante</div></div><button class="back" onclick="go('s-home')">‹ Retour</button></div>
   <div class="body" id="inv-body"></div>
 </div>
 <div class="screen hidden" id="s-rec">
@@ -503,34 +508,45 @@ async function go(id){
 }
 
 // ═══ INVENTAIRE ═══
-let INV={site:'',checked:{},prevSite:null,prev:''};
+// État par clé : 'p' = présente · 'm' = hors site (en mission…, note obligatoire conseillée) · rien = manquante
+let INV={site:'',st:{},note:{},prevSite:null,prev:''};
+function invTap(id){INV.st[id]=INV.st[id]==='p'?undefined:'p';rInv();}
+function invOut(id,ev){ev.stopPropagation();INV.st[id]=INV.st[id]==='m'?undefined:'m';rInv();if(INV.st[id]==='m')setTimeout(()=>{const i=document.getElementById('note-'+id);if(i)i.focus();},50);}
+const invHors=c=>c.etat==='hors_site';
+const invMiss=c=>!c.presente&&!invHors(c);
 async function rInv(){
   if(!INV.site)INV.site=lastSite();
   if(J_SITE&&!window._free_invsite)INV.site=J_SITE;
   const keys=inPossession().filter(k=>k.site_nom===INV.site);
   if(INV.prevSite!==INV.site){INV.prevSite=INV.site;INV.prev='';
-  if(INV.site&&navigator.onLine!==false){try{const l=await ckInvList(INV.site);if(l[0]){const p=await ckInvGet(INV.site,l[0]);const miss=(p.cles||[]).filter(c=>!c.presente);
-    INV.prev=`<div class="${miss.length?'alert':'okbox'}">Dernier inventaire : ${ckFmtD(p.date)} par ${esc(p.par||'?')} — ${miss.length?'<b>'+miss.length+' clé(s) manquante(s)</b> : '+miss.map(c=>esc(c.nom)).join(', '):'tout était présent'}</div>`;}}catch(e){}}}
+  if(INV.site&&navigator.onLine!==false){try{const l=await ckInvList(INV.site);if(l[0]){const p=await ckInvGet(INV.site,l[0]);const miss=(p.cles||[]).filter(invMiss),hors=(p.cles||[]).filter(invHors);
+    INV.prev=`<div class="${miss.length?'alert':hors.length?'warnbox':'okbox'}">Dernier inventaire : ${ckFmtD(p.date)} par ${esc(p.par||'?')} — ${miss.length?'<b>'+miss.length+' clé(s) manquante(s)</b> : '+miss.map(c=>esc(c.nom)).join(', '):hors.length?'aucune manquante':'tout était présent'}${hors.length?'<br>🚗 <b>Hors site</b> : '+hors.map(c=>esc(c.nom)+(c.note?' ('+esc(c.note)+')':'')).join(', '):''}</div>`;}}catch(e){}}}
   const prev=INV.prev||'';
-  const n=keys.filter(k=>INV.checked[k.id]).length;
-  $('inv-body').innerHTML=`<div class="box"><label class="fl first">Site</label>${J_SITE&&!window._free_invsite?siteField('invsite',INV.site):`<select class="fi" onchange="INV.site=this.value;INV.checked={};setLastSite(this.value);rInv()">${siteOpts(INV.site,'— Choisir le site —')}</select>`}</div>
+  const n=keys.filter(k=>INV.st[k.id]==='p').length,nm=keys.filter(k=>INV.st[k.id]==='m').length,nx=keys.length-n-nm;
+  $('inv-body').innerHTML=`<div class="box"><label class="fl first">Site</label>${J_SITE&&!window._free_invsite?siteField('invsite',INV.site):`<select class="fi" onchange="INV.site=this.value;INV.st={};INV.note={};setLastSite(this.value);rInv()">${siteOpts(INV.site,'— Choisir le site —')}</select>`}</div>
     ${prev}
-    ${INV.site?(keys.length?`<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px"><span class="hint" style="margin:0">${keys.length} clé(s) attendue(s) sur ce site</span><button class="chip" onclick="keysAt().forEach(k=>INV.checked[k.id]=true);rInv()">Tout cocher</button></div>
-      ${keys.map(k=>`<div class="inv ${INV.checked[k.id]?'on':''}" onclick="INV.checked['${k.id}']=!INV.checked['${k.id}'];rInv()"><div class="box2">${INV.checked[k.id]?'✓':''}</div><div class="g"><div class="n">${CK_TYPES[k.type]||'🔑'} ${esc(k.nom)}</div><div class="s">${esc(keyLine(k))}</div></div></div>`).join('')}
+    ${INV.site?(keys.length?`<div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 10px"><span class="hint" style="margin:0">${keys.length} clé(s) attendue(s) sur ce site</span><button class="chip" onclick="keysAt().forEach(k=>{if(INV.st[k.id]!=='m')INV.st[k.id]='p';});rInv()">Tout cocher</button></div>
+      <div class="hint" style="margin:0 2px 10px">Touchez une clé pour la cocher présente. Si elle n'est pas là mais que vous savez où elle est (en mission avec le patrouilleur…), touchez <b>🚗 Hors site</b> et notez où elle se trouve.</div>
+      ${keys.map(k=>{const s=INV.st[k.id];return `<div class="inv ${s==='p'?'on':s==='m'?'out':''}" onclick="invTap('${k.id}')"><div class="box2">${s==='p'?'✓':s==='m'?'🚗':''}</div><div class="g"><div class="n">${CK_TYPES[k.type]||'🔑'} ${esc(k.nom)}</div><div class="s">${esc(keyLine(k))}</div>${s==='m'?`<input class="note" id="note-${k.id}" placeholder="Où se trouve-t-elle ? (ex. en mission avec …)" value="${esc(INV.note[k.id]||'')}" onclick="event.stopPropagation()" oninput="INV.note['${k.id}']=this.value">`:''}</div><button class="hs" onclick="invOut('${k.id}',event)">🚗 Hors site</button></div>`;}).join('')}
       <div style="height:90px"></div>
-      <div class="sum"><div style="font-size:13px;font-weight:700">${n} / ${keys.length} présente(s)${keys.length-n?` · <span style="color:var(--bad)">${keys.length-n} manquante(s)</span>`:''}</div><button class="btn ok" onclick="saveInv()">✅ Enregistrer l'inventaire</button></div>`
+      <div class="sum"><div style="font-size:13px;font-weight:700">${n} / ${keys.length} présente(s)${nm?` · <span style="color:var(--warn)">${nm} hors site</span>`:''}${nx?` · <span style="color:var(--bad)">${nx} manquante(s)</span>`:''}</div><button class="btn ok" onclick="saveInv()">✅ Enregistrer l'inventaire</button></div>`
     :'<div class="state">Aucune clé enregistrée sur ce site.</div>'):''}`;
 }
 const keysAt=()=>inPossession().filter(k=>k.site_nom===INV.site);
 async function saveInv(){
-  const keys=keysAt();const miss=keys.filter(k=>!INV.checked[k.id]);
+  const keys=keysAt();const miss=keys.filter(k=>!INV.st[k.id]);const hors=keys.filter(k=>INV.st[k.id]==='m');
+  const sansNote=hors.filter(k=>!(INV.note[k.id]||'').trim());
+  if(sansNote.length&&!confirm(sansNote.length+' clé(s) « hors site » sans indication de l\'endroit :\n\n'+sansNote.map(k=>'• '+k.nom).join('\n')+'\n\nEnregistrer quand même ?'))return;
   if(miss.length&&!confirm(miss.length+' clé(s) non cochée(s) seront signalées MANQUANTES :\n\n'+miss.map(k=>'• '+k.nom).join('\n')+'\n\nEnregistrer ?'))return;
-  await ckInvSave(INV.site,{v:1,site:INV.site,date:new Date().toISOString(),par:AGENT_NOM,par_id:AGENT_ID,
-    cles:keys.map(k=>({id:k.id,nom:k.nom,ref:ckParse(k.description).ref||null,presente:!!INV.checked[k.id]}))});
-  journal(INV.site,miss.length?`✅ Inventaire des clés : ${keys.length-miss.length}/${keys.length} présentes — ⚠️ MANQUANTE(S) : ${miss.map(k=>k.nom).join(', ')}.`:`✅ Inventaire des clés : ${keys.length}/${keys.length} présentes.`);
-  toast(miss.length?'⚠️ Inventaire enregistré — '+miss.length+' manquante(s)':'✅ Inventaire enregistré — tout est présent',miss.length?'err':'ok');
+  const np=keys.length-miss.length-hors.length;
+  await ckInvSave(INV.site,{v:2,site:INV.site,date:new Date().toISOString(),par:AGENT_NOM,par_id:AGENT_ID,
+    cles:keys.map(k=>{const s=INV.st[k.id];return {id:k.id,nom:k.nom,ref:ckParse(k.description).ref||null,presente:s==='p',
+      etat:s==='p'?'presente':s==='m'?'hors_site':'manquante',note:s==='m'?((INV.note[k.id]||'').trim()||null):null};})});
+  const hTxt=hors.length?` — 🚗 HORS SITE : ${hors.map(k=>k.nom+((INV.note[k.id]||'').trim()?' ('+INV.note[k.id].trim()+')':'')).join(', ')}`:'';
+  journal(INV.site,`✅ Inventaire des clés : ${np}/${keys.length} présentes${hTxt}${miss.length?` — ⚠️ MANQUANTE(S) : ${miss.map(k=>k.nom).join(', ')}`:''}.`);
+  toast(miss.length?'⚠️ Inventaire enregistré — '+miss.length+' manquante(s)':hors.length?'✅ Inventaire enregistré — '+hors.length+' hors site':'✅ Inventaire enregistré — tout est présent',miss.length?'err':'ok');
   if(navigator.onLine===false)toast('Hors réseau : envoi dès le retour du réseau','err');
-  INV.checked={};INV.prevSite=null;go('s-home');
+  INV.st={};INV.note={};INV.prevSite=null;go('s-home');
 }
 
 // ═══ RÉCEPTION ═══
