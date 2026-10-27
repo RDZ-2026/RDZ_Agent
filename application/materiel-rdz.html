@@ -59,6 +59,9 @@ h2{font-size:19px;font-weight:800;margin-bottom:3px}
 .kpi.ok{border-top-color:var(--ok)}.kpi.warn{border-top-color:var(--warn)}.kpi.bad{border-top-color:var(--bad)}.kpi.click{cursor:pointer}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
+.act .n{position:absolute;top:10px;right:10px;background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:2px 8px}
+.filt{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eef3f8;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
+@media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
 .act{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 14px;text-align:left;cursor:pointer;box-shadow:var(--sh);position:relative;overflow:hidden}
 .act::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
 .act .i{font-size:24px}.act .l{font-size:14.5px;font-weight:800;margin-top:6px}.act .d{font-size:12px;color:var(--muted);margin-top:2px}
@@ -273,31 +276,45 @@ function tab(t,f){T=t;F=f||{};render();window.scrollTo(0,0);}
 function render(){
   if(!ME)return;
   const nOut=new Set(actives().map(a=>a.agent_nom)).size,nOld=legacy().length;
+  document.querySelector('nav.tabs').classList.toggle('hidden',T==='home');   // l'accueil = les boutons, pas de barre
   $('tabs').innerHTML=TABS.concat(nOld?[['reprise','📥 Reprise']]:[]).map(([k,l])=>`<button class="tab ${T===k?'on':''}" onclick="tab('${k}')">${l}${k==='retour'&&nOut?`<span class="n">${nOut}</span>`:''}${k==='reprise'?`<span class="n">${nOld}</span>`:''}</button>`).join('');
   $('main').innerHTML=({home:rHome,stock:rStock,sortie:rSortie,retour:rRetour,inv:rInv,hist:rHist,param:rParam,reprise:rReprise}[T]||rHome)();
 }
 
 // ═══ ACCUEIL ═══
 function rHome(){
-  const L=located();const low=L.filter(r=>(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte);
-  const ind=sum(L,indispo),out=sum(actives(),a=>a.quantite);
-  return `<h2>Bonjour ${esc(ME.nom.split(' ').slice(-1)[0])}</h2><div class="sub">Sorties et retours du matériel (radios, lampes…), par site et par local.</div>
-  ${legacy().length?`<div class="warnbox">📥 <b>${legacy().length} article(s) de l'ancien stock</b> n'ont pas encore de local. <button class="btn sm d" onclick="tab('reprise')">Les ranger</button></div>`:''}
-  <div class="kpis"><div class="kpi ok click" onclick="tab('stock')"><b>${sum(L,r=>r.quantite_dispo)}</b><span>disponibles</span></div><div class="kpi warn click" onclick="tab('retour')"><b>${out}</b><span>sortis</span></div>
-  <div class="kpi bad click" onclick="tab('stock')"><b>${ind}</b><span>défectueux / HS</span></div><div class="kpi ${low.length?'bad':''} click" onclick="tab('stock')"><b>${low.length}</b><span>sous le seuil</span></div></div>
-  <div class="sec">Actions</div>
-  <div class="actions"><button class="act" onclick="tab('sortie')"><div class="i">📤</div><div class="l">Sortie</div><div class="d">À un agent / une mission</div></button>
-  <button class="act" onclick="tab('retour')"><div class="i">📥</div><div class="l">Retour</div><div class="d">Avec l'état du matériel</div></button>
-  <button class="act" onclick="tab('inv')"><div class="i">✅</div><div class="l">Inventaire</div><div class="d">État des lieux d'un local</div></button>
-  <button class="act" onclick="entree()"><div class="i">➕</div><div class="l">Entrée</div><div class="d">Nouveau matériel</div></button></div>
-  ${actives().length?`<div class="sec">Sorties en cours</div><div class="card">${holders().slice(0,6).map(h=>`<div class="row click" onclick="tab('retour')"><div class="ic">${h.agent?'👤':'🎯'}</div><div class="g"><div class="t">${esc(h.label)}</div><div class="s">${h.items.map(a=>a.quantite+' × '+esc(parse({nom:a.materiel_nom}).art)).join(' · ')}</div></div><span class="pill p-warn">${ago(h.since)}</span></div>`).join('')}</div>`:''}
-  ${low.length?`<div class="sec">Sous le seuil d'alerte</div><div class="card">${low.map(r=>`<div class="row"><div class="ic">${esc(r.icon||'📦')}</div><div class="g"><div class="t">${esc(r.art)}</div><div class="s">${esc(r.site)} · ${esc(r.local)}</div></div><div class="q bad"><b>${r.quantite_dispo}</b><span>seuil ${r.seuil_alerte}</span></div></div>`).join('')}</div>`:''}`;
+  const L=located();const low=L.filter(STOCK_FILTRES.seuil.test);
+  const ind=sum(L,indispo),out=sum(actives(),a=>a.quantite),nOut=new Set(actives().map(a=>a.agent_nom)).size,nOld=legacy().length;
+  const kpi=(cls,n,lbl,f)=>`<div class="kpi ${cls} click" onclick="tab('stock',{filtre:'${f}'})"><b>${n}</b><span>${lbl}</span></div>`;
+  const b=(t,i,l,d,n)=>`<button class="act" onclick="${t}"><div class="i">${i}</div><div class="l">${l}</div><div class="d">${d}</div>${n?`<span class="n">${n}</span>`:''}</button>`;
+  return `<h2>Bonjour ${esc(ME.nom.split(' ').slice(-1)[0])}</h2>
+  <div class="kpis">${kpi('ok',sum(L,r=>r.quantite_dispo),'disponibles','dispo')}${kpi('warn',out,'sortis','sorti')}${kpi(ind?'bad':'',ind,'défectueux / HS','indispo')}${kpi(low.length?'bad':'',low.length,'sous le seuil','seuil')}</div>
+  <div class="sec">Menu</div>
+  <div class="actions">
+  ${b("tab('stock')",'📦','Stock','Par local ou par article')}
+  ${b("tab('sortie')",'📤','Sortie','À un agent / une mission')}
+  ${b("tab('retour')",'📥','Retour','Avec l\'état du matériel',nOut)}
+  ${b("tab('inv')",'✅','Inventaire','État des lieux d\'un local')}
+  ${b('entree()','➕','Entrée','Nouveau matériel')}
+  ${b("tab('hist')",'📜','Historique','Sorties, retours, mouvements')}
+  ${b("tab('param')",'⚙️','Paramètres','Locaux, états, articles')}
+  ${nOld?b("tab('reprise')",'🗂','Reprise','Ancien stock à ranger',nOld):''}
+  </div>`;
 }
+// Filtres des tuiles de l'accueil (appliqués à l'écran Stock)
+const STOCK_FILTRES={
+  dispo:{label:'Disponibles',test:r=>(r.quantite_dispo||0)>0},
+  sorti:{label:'Sortis',test:r=>outOf(r.id)>0},
+  indispo:{label:'Défectueux / HS',test:r=>indispo(r)>0},
+  seuil:{label:'Sous le seuil',test:r=>(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte}
+};
 
 // ═══ STOCK ═══
 function rStock(){
-  const v=F.vue||'local';const L=located().filter(r=>!F.site||r.site===F.site).filter(r=>!F.q||norm(r.nom).includes(norm(F.q)));
+  const v=F.vue||'local';const FT=STOCK_FILTRES[F.filtre];
+  const L=located().filter(r=>!F.site||r.site===F.site).filter(r=>!F.q||norm(r.nom).includes(norm(F.q))).filter(r=>!FT||FT.test(r));
   let h=`<h2>Stock</h2><div class="sub">Disponible = prêt à sortir · Sorti = chez un agent / en mission · Indispo = défectueux ou hors service.</div>
+  ${FT?`<div class="filt"><span>${FT.label} — ${L.length} ligne(s)</span><button class="btn sm g" onclick="F.filtre='';render()">✕ Tout afficher</button></div>`:''}
   <div class="card pad"><div class="fr"><select class="fi" onchange="F.site=this.value;render()"><option value="">Tous les sites</option>${sitesList().map(s=>`<option ${F.site===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
     <input class="fi" placeholder="🔍 Article…" value="${esc(F.q||'')}" onchange="F.q=this.value;render()"></div>
     <div class="chips" style="margin-top:10px"><button class="chip ${v==='local'?'on':''}" onclick="F.vue='local';render()">Par local</button><button class="chip ${v==='art'?'on':''}" onclick="F.vue='art';render()">Par article (total)</button></div></div>`;
@@ -308,8 +325,8 @@ function rStock(){
     return h;}
   const by={};L.forEach(r=>{const k=r.site+' · '+r.local;(by[k]=by[k]||[]).push(r);});
   const keys=Object.keys(by).sort((a,b)=>a.localeCompare(b,'fr'));
-  h+=keys.length?keys.map(k=>`<div class="sec">📍 ${esc(k)}</div><div class="card">${by[k].sort((a,b)=>a.art.localeCompare(b.art,'fr')).map(r=>`<div class="row click" onclick="rowSheet('${esc(r.id)}')"><div class="ic">${esc(r.icon||'📦')}</div><div class="g"><div class="t">${esc(r.art)}</div>${(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte?`<div class="s" style="color:var(--bad)">⚠ sous le seuil (${r.seuil_alerte})</div>`:''}</div><div class="r">${qh(r)}</div></div>`).join('')}</div>`).join('')
-    :`<div class="card"><div class="empty">Aucun matériel rangé dans un local.${legacy().length?'<br><br><button class="btn d" onclick="tab(\'reprise\')">Ranger l\'ancien stock</button>':''}<br><br><button class="btn" onclick="entree()">➕ Entrée de matériel</button></div></div>`;
+  h+=keys.length?keys.map(k=>`<div class="sec">📍 ${esc(k)}</div><div class="card">${by[k].sort((a,b)=>a.art.localeCompare(b.art,'fr')).map(r=>`<div class="row click" onclick="rowSheet('${esc(r.id)}')"><div class="ic">${esc(r.icon||'📦')}</div><div class="g"><div class="t">${esc(r.art)}</div>${(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte?`<div class="s" style="color:var(--bad)">⚠ sous le seuil (${r.seuil_alerte})</div>`:''}${F.filtre==='sorti'?`<div class="s">${actives().filter(a=>String(a.materiel_id)===String(r.id)).map(a=>a.quantite+' × '+esc(a.agent_nom||'?')+' · '+ago(a.date_sortie||a.created_at)).join(' — ')}</div>`:''}</div><div class="r">${qh(r)}</div></div>`).join('')}</div>`).join('')
+    :FT?`<div class="card"><div class="empty">Aucun élément « ${FT.label.toLowerCase()} ».</div></div>`:`<div class="card"><div class="empty">Aucun matériel rangé dans un local.${legacy().length?'<br><br><button class="btn d" onclick="tab(\'reprise\')">Ranger l\'ancien stock</button>':''}<br><br><button class="btn" onclick="entree()">➕ Entrée de matériel</button></div></div>`;
   return h;
 }
 function rowSheet(id){
