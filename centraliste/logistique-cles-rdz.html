@@ -415,6 +415,8 @@ function ckInvSave(siteNom,inv){return ckArchive([{path:'_inventaires/'+ckSlug(s
 const CK_EV={reception:['🤝','Reçue du client'],restitution:['🏁','Rendue au client'],site:['🚚','Changement de site'],modification:['✏️','Fiche modifiée'],reprise:['📥','Reprise de l\'ancien registre']};
 
 let OLD=[], OLDOUT=new Set(), OSEL={}, OSHOW='actifs';
+const invHors=c=>c.etat==='hors_site', invMiss=c=>!c.presente&&!invHors(c);
+let HORS=new Map();   // id → note (clé « hors site » au dernier inventaire : en mission…)
 let T='poss', KEYS=[], INVS={}, MISS=new Set(), F={site:'',q:''}, RQ='';
 
 async function loadAll(){
@@ -430,8 +432,8 @@ async function loadAll(){
   const sites=[...new Set([...SITES.map(s=>s.nom),...KEYS.map(k=>k.site_nom).filter(Boolean)])];
   INVS={};
   await Promise.all(sites.map(async s=>{const l=await ckInvList(s);if(l.length){try{INVS[s]={list:l,last:await ckInvGet(s,l[0])};}catch(e){INVS[s]={list:l,last:null};}}}));
-  MISS=new Set();
-  Object.entries(INVS).forEach(([s,v])=>{(v.last?.cles||[]).filter(c=>!c.presente).forEach(c=>{const k=KEYS.find(x=>String(x.id)===String(c.id));if(k&&k.actif!==false&&k.site_nom===s)MISS.add(String(k.id));});});
+  MISS=new Set();HORS=new Map();
+  Object.entries(INVS).forEach(([s,v])=>{(v.last?.cles||[]).filter(c=>!c.presente).forEach(c=>{const k=KEYS.find(x=>String(x.id)===String(c.id));if(k&&k.actif!==false&&k.site_nom===s){if(invHors(c))HORS.set(String(k.id),c.note||'');else MISS.add(String(k.id));}});});
   $('n-miss').textContent=MISS.size;$('n-miss').classList.toggle('hidden',!MISS.size);
   setSave('saved','Synchronisé '+new Date().toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}));
   render();
@@ -498,12 +500,12 @@ function rPoss(){
   ${Object.keys(by).length?Object.keys(by).sort((a,b)=>a.localeCompare(b,'fr')).map(s=>`<div class="sec">📍 ${esc(s)} <span class="mini" style="text-transform:none;letter-spacing:0;font-weight:600">${by[s].length} clé(s)${INVS[s]?.last?' · dernier inventaire '+ckFmtD(INVS[s].last.date):' · jamais inventorié'}</span></div>
     <div class="card">${by[s].map(k=>{const d=ckParse(k.description);return `<div class="row click" onclick="detail('${esc(k.id)}')"><div class="ic">${CK_TYPES[k.type]||'🔑'}</div>
       <div class="g"><div class="t">${esc(k.nom)}</div><div class="s">${sub(k)||'—'}</div><div class="s">Reçue le ${esc(d.recue_le||'?')} de ${esc(d.remis_par||'?')}${d.recue_par?' · par '+esc(d.recue_par):''}</div></div>
-      <div class="r">${MISS.has(String(k.id))?'<span class="pill p-bad">⚠ Manquante au dernier inventaire</span>':'<span class="pill p-ok">En possession</span>'}</div></div>`;}).join('')}</div>`).join('')
+      <div class="r">${statPill(k.id)}</div></div>`;}).join('')}</div>`).join('')
   :'<div class="card"><div class="empty"><div class="big">🔑</div>Aucune clé.</div></div>'}`;
 }
 function exportCsv(){
   const rows=[['Désignation','Type','Réf.','Client','Site','Statut','Reçue le','Remise par','Reçue par','Rendue le','Rendue à']];
-  KEYS.forEach(k=>{const d=ckParse(k.description);rows.push([k.nom,k.type,d.ref||'',d.client||'',k.site_nom||'',k.actif===false?'Rendue':MISS.has(String(k.id))?'Manquante':'En possession',d.recue_le||'',d.remis_par||'',d.recue_par||'',d.rendue_le||'',d.rendue_a||'']);});
+  KEYS.forEach(k=>{const d=ckParse(k.description);rows.push([k.nom,k.type,d.ref||'',d.client||'',k.site_nom||'',k.actif===false?'Rendue':MISS.has(String(k.id))?'Manquante':HORS.has(String(k.id))?'Hors site'+(HORS.get(String(k.id))?' ('+HORS.get(String(k.id))+')':''):'En possession',d.recue_le||'',d.remis_par||'',d.recue_par||'',d.rendue_le||'',d.rendue_a||'']);});
   const csv='﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='cles-clients-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
@@ -519,22 +521,26 @@ function rRendues(){
 }
 
 // ═══ INVENTAIRES ═══
+function statPill(id){id=String(id);
+  if(MISS.has(id))return '<span class="pill p-bad">⚠ Manquante au dernier inventaire</span>';
+  if(HORS.has(id))return `<span class="pill p-warn" title="Hors site au dernier inventaire">🚗 Hors site${HORS.get(id)?' : '+esc(HORS.get(id)):''}</span>`;
+  return '<span class="pill p-ok">En possession</span>';}
 function rInv(){
   const sites=[...new Set([...poss().map(k=>k.site_nom).filter(Boolean),...Object.keys(INVS)])].sort((a,b)=>a.localeCompare(b,'fr'));
   return `<div class="page-title">Inventaires par site</div><div class="page-sub">Les inventaires sont faits sur téléphone (cases à cocher), par n'importe quel agent, autant de fois que nécessaire. Une clé non cochée reste signalée jusqu'à ce qu'un inventaire suivant la retrouve.</div>
   ${MISS.size?`<div class="banner err">⚠ <b>${MISS.size} clé(s) manquante(s)</b> au dernier inventaire de leur site : ${[...MISS].map(id=>esc(keyById(id)?.nom||'')).join(', ')}</div>`:''}
-  <div class="card">${sites.length?sites.map(s=>{const v=INVS[s];const n=poss().filter(k=>k.site_nom===s).length;const miss=(v?.last?.cles||[]).filter(c=>!c.presente);
+  <div class="card">${sites.length?sites.map(s=>{const v=INVS[s];const n=poss().filter(k=>k.site_nom===s).length;const miss=(v?.last?.cles||[]).filter(invMiss),hors=(v?.last?.cles||[]).filter(invHors);
     return `<div class="row ${v?'click':''}" ${v?`onclick="invSite('${esc(s)}')"`:''}><div class="ic">📍</div><div class="g"><div class="t">${esc(s)}</div><div class="s">${n} clé(s) attendue(s) · ${v?`dernier inventaire ${ckFmtD(v.last?.date)} par ${esc(v.last?.par||'?')} · ${v.list.length} inventaire(s) enregistré(s)`:'jamais inventorié'}</div></div>
-      <div class="r">${!v?'<span class="pill p-warn">À faire</span>':miss.length?`<span class="pill p-bad">${miss.length} manquante(s)</span>`:'<span class="pill p-ok">Tout présent</span>'}</div></div>`;}).join('')
+      <div class="r">${!v?'<span class="pill p-warn">À faire</span>':(miss.length?`<span class="pill p-bad">${miss.length} manquante(s)</span>`:hors.length?'':'<span class="pill p-ok">Tout présent</span>')+(v&&hors.length?` <span class="pill p-warn">🚗 ${hors.length} hors site</span>`:'')}</div></div>`;}).join('')
   :'<div class="empty">Aucun site avec des clés.</div>'}</div>`;
 }
 async function invSite(s){
   const v=INVS[s];if(!v)return;
   openModal('Inventaires — '+s,'<div class="empty">Chargement…</div>',[['Fermer','btn-g','closeModal()']],true);
   const last=v.list.slice(0,30);const invs=await Promise.all(last.map(n=>ckInvGet(s,n).catch(()=>null)));
-  $('modal-body').innerHTML=invs.filter(Boolean).map((iv,i)=>{const miss=(iv.cles||[]).filter(c=>!c.presente);
-    return `<div class="card" style="margin-bottom:10px"><div class="row" style="background:#f7f9fb"><div class="g"><div class="t">${ckFmtD(iv.date)} — ${esc(iv.par||'?')}</div><div class="s">${(iv.cles||[]).length-miss.length} / ${(iv.cles||[]).length} présente(s)</div></div>${miss.length?`<span class="pill p-bad">${miss.length} manquante(s)</span>`:'<span class="pill p-ok">Tout présent</span>'}</div>
-      ${i===0||miss.length?(iv.cles||[]).filter(c=>i===0||!c.presente).map(c=>`<div class="row"><div class="g"><div class="t" style="font-weight:600">${c.presente?'✅':'❌'} ${esc(c.nom)}${c.ref?' <span class="mini">· Réf. '+esc(c.ref)+'</span>':''}</div></div></div>`).join(''):''}</div>`;}).join('');
+  $('modal-body').innerHTML=invs.filter(Boolean).map((iv,i)=>{const cl=iv.cles||[];const miss=cl.filter(invMiss),hors=cl.filter(invHors);
+    return `<div class="card" style="margin-bottom:10px"><div class="row" style="background:#f7f9fb"><div class="g"><div class="t">${ckFmtD(iv.date)} — ${esc(iv.par||'?')}</div><div class="s">${cl.filter(c=>c.presente).length} / ${cl.length} présente(s)${hors.length?' · '+hors.length+' hors site':''}</div></div>${miss.length?`<span class="pill p-bad">${miss.length} manquante(s)</span>`:hors.length?`<span class="pill p-warn">🚗 ${hors.length} hors site</span>`:'<span class="pill p-ok">Tout présent</span>'}</div>
+      ${i===0||miss.length||hors.length?cl.filter(c=>i===0||!c.presente).map(c=>`<div class="row"><div class="g"><div class="t" style="font-weight:600">${c.presente?'✅':invHors(c)?'🚗':'❌'} ${esc(c.nom)}${c.ref?' <span class="mini">· Réf. '+esc(c.ref)+'</span>':''}</div>${invHors(c)?`<div class="s">Hors site${c.note?' : '+esc(c.note):' (endroit non précisé)'}</div>`:''}</div></div>`).join(''):''}</div>`;}).join('');
 }
 
 // ═══ DÉTAIL D'UNE CLÉ ═══
@@ -544,7 +550,7 @@ async function detail(id){
   if(!gone)acts.push(['🏁 Restituer au client','btn-p',`restit('${esc(id)}')`],['🚚 Changer de site','btn-g',`moveSite('${esc(id)}')`]);
   acts.push(['✏️ Modifier','btn-g',`editKey('${esc(id)}')`],['🗑 Supprimer','btn-g',`delKey('${esc(id)}')`],['Fermer','btn-g','closeModal()']);
   openModal(k.nom,`
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${gone?'<span class="pill p-mut">Rendue au client</span>':MISS.has(String(id))?'<span class="pill p-bad">⚠ Manquante au dernier inventaire</span>':'<span class="pill p-ok">En notre possession</span>'}<span class="pill p-mut">${CK_TYPES[k.type]||''} ${esc(k.type||'clé')}</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${gone?'<span class="pill p-mut">Rendue au client</span>':MISS.has(String(id))||HORS.has(String(id))?statPill(id):'<span class="pill p-ok">En notre possession</span>'}<span class="pill p-mut">${CK_TYPES[k.type]||''} ${esc(k.type||'clé')}</span></div>
     <div class="field-row"><div class="field"><label>Client</label><div>${esc(d.client||'—')}</div></div><div class="field"><label>Réf. / n°</label><div>${esc(d.ref||'—')}</div></div><div class="field"><label>Site</label><div>${esc(k.site_nom||'—')}</div></div></div>
     <div class="field-row"><div class="field"><label>Reçue le</label><div>${esc(d.recue_le||'—')}</div></div><div class="field"><label>Remise par</label><div>${esc(d.remis_par||'—')}</div></div><div class="field"><label>Reçue par (RDZ)</label><div>${esc(d.recue_par||'—')}</div></div></div>
     ${gone?`<div class="field-row"><div class="field"><label>Rendue le</label><div>${esc(d.rendue_le||'—')}</div></div><div class="field"><label>Rendue à</label><div>${esc(d.rendue_a||'—')}</div></div><div class="field"><label>Par (RDZ)</label><div>${esc(d.rendue_par||'—')}</div></div></div>`:''}
