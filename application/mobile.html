@@ -1,4 +1,4 @@
-<!-- RDZ · mobile · v6.5 · 2026-10-22 · carte MEMO SITES activée (memo-sites.html), copie hors ligne effacée au changement d'agent. v6.4 · 2026-10-19 · bouton vert « Je prends mon service » dans le sous-menu « Prise de service », sous « Prise de véhicule » (ouvre la ligne services_agents via RDZSync, hors réseau OK ; avertit si aucune validation de consignes aujourd'hui). v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
+<!-- RDZ · mobile · v6.6 · 2026-10-27 · « Mes fonctions » lu dans le catalogue des fonctions (comptes-agents.html → ⚙ Catalogue des fonctions) : Matériel et toute fonction ajoutée apparaissent sans toucher au code. v6.5 · 2026-10-22 · carte MEMO SITES activée (memo-sites.html), copie hors ligne effacée au changement d'agent. v6.4 · 2026-10-19 · bouton vert « Je prends mon service » dans le sous-menu « Prise de service », sous « Prise de véhicule » (ouvre la ligne services_agents via RDZSync, hors réseau OK ; avertit si aucune validation de consignes aujourd'hui). v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
      cochés dans comptes-agents.html — ex. Préparation des quiz).
@@ -781,20 +781,43 @@ function backToMain(){
 }
 </script>
 <!-- ════════════════════════════════════════════════════════════════════
-     RDZ · application.html · bloc « Mes fonctions » · 2026-09-30
-     Effet : si l'agent connecté a des fonctions cochées dans
-     comptes-agents.html (colonne agents.fonctions), une section
-     « Mes fonctions » apparaît dans son menu, avant « Dépannage », avec un
-     bouton par fonction. Les autres agents ne voient rien.
-     Pour une nouvelle fonction : ajouter une entrée dans FONCTION_ITEMS
-     (même clé que dans FONCTIONS de comptes-agents.html).
+     RDZ · mobile.html · bloc « Mes fonctions » · v2 · 2026-10-27
+     REMPLACE le bloc précédent : supprimer l'ancien bloc (de la ligne
+     « <!-- ════ RDZ · mobile.html · bloc « Mes fonctions » » jusqu'à
+     son </script>) et coller celui-ci à la place, juste AVANT </body>.
+
+     Nouveauté v2 : plus besoin de modifier ce fichier pour ajouter une
+     fonction. La liste des boutons est lue dans le « Catalogue des
+     fonctions » géré depuis comptes-agents.html (fichier JSON dans le
+     stockage journal-photos/fonctions/). Si le catalogue est illisible
+     (hors ligne…), les fonctions de base ci-dessous sont utilisées.
      ════════════════════════════════════════════════════════════════════ -->
 <script>
-const FONCTION_ITEMS = {
-  questionnaires: { icon: '📝', name: 'Préparation des quiz', desc: "Créer, modifier et partager les quiz de formation. Corriger les résultats.", href: 'questionnaires-agent.html' }
-  // materiel:        { icon: '📦', name: 'Gestion du matériel', desc: '…', href: '…' },
-  // planning_equipe: { icon: '👥', name: "Planning de mon équipe", desc: '…', href: '…' }
-};
+const FONCTIONS_BASE = [
+  { key: 'questionnaires', icon: '📝', name: 'Préparation des quiz', href: 'questionnaires-agent.html',
+    desc: "Créer, modifier et partager les quiz de formation. Corriger les résultats." },
+  { key: 'materiel', icon: '📦', name: 'Matériel', href: 'materiel-rdz.html',
+    desc: "Sorties, retours et inventaire du matériel" }
+];
+let FONCTION_ITEMS = null;   // clé → { icon, name, desc, href }
+
+async function loadFonctionItems(){
+  const map = new Map(FONCTIONS_BASE.map(f => [f.key, Object.assign({ actif: true }, f)]));
+  try {
+    const { data, error } = await sb.storage.from('journal-photos')
+      .list('fonctions', { limit: 200, sortBy: { column: 'name', order: 'desc' } });
+    if (error) throw error;
+    const last = (data || []).map(f => f.name).filter(n => n.endsWith('.json'))[0];
+    if (last) {
+      const url = sb.storage.from('journal-photos').getPublicUrl('fonctions/' + last).data.publicUrl;
+      const saved = await (await fetch(url, { cache: 'no-store' })).json();
+      (saved.fonctions || []).forEach(f => map.set(f.key, Object.assign({}, map.get(f.key) || {}, f)));
+    }
+  } catch (e) { /* hors ligne : fonctions de base */ }
+  FONCTION_ITEMS = {};
+  map.forEach((f, k) => { if (f.actif !== false && f.href) FONCTION_ITEMS[k] = { icon: f.icon || '🔧', name: f.name || k, desc: f.desc || '', href: f.href }; });
+  return FONCTION_ITEMS;
+}
 
 async function renderFonctions(){
   const old = document.getElementById('fonctions-section');
@@ -802,11 +825,13 @@ async function renderFonctions(){
   const agentId = localStorage.getItem('rdz_agent_id');
   if (!agentId) return;
   try {
+    if (!FONCTION_ITEMS) await loadFonctionItems();
     const { data, error } = await sb.from('agents').select('fonctions').eq('id', agentId).single();
-    if (error || !data) return;                       // colonne absente ou agent introuvable : on n'affiche rien
+    if (error || !data) return;
     const items = (Array.isArray(data.fonctions) ? data.fonctions : [])
       .map(k => FONCTION_ITEMS[k]).filter(Boolean);
     if (!items.length) return;
+    if (document.getElementById('fonctions-section')) return;   // déjà affiché par un appel parallèle
     const section = document.createElement('div');
     section.id = 'fonctions-section';
     section.innerHTML = '<div class="section-h spaced">Mes fonctions</div>' +
@@ -816,10 +841,8 @@ async function renderFonctions(){
   } catch (e) { /* hors ligne : le menu habituel reste affiché */ }
 }
 
-// Affiche la section à chaque entrée dans le menu (PIN saisi, retour sur l'app…)
 const _enterMenuSansFonctions = enterMenu;
 enterMenu = function(nom){ _enterMenuSansFonctions(nom); renderFonctions(); };
-// Cas où le menu est déjà affiché au moment où ce bloc se charge
 if (document.getElementById('screen-menu').classList.contains('on')) renderFonctions();
 </script>
 <script>
