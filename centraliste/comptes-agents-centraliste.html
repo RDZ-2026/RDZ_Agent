@@ -1,0 +1,681 @@
+<!-- RDZ · comptes-agents-centraliste · v1 · 2026-10-27
+     Version CENTRALISTE de comptes-agents.html (dossier centraliste/).
+     Autorisé : voir les agents (nom, PIN défini ou non, statut), créer un
+     agent, définir / réinitialiser un PIN, mettre en pause / réactiver.
+     Pas d'accès : modifier (renommer) un agent, supprimer, fonctions,
+     catalogue des fonctions. Ces actions restent dans comptes-agents.html
+     (version administrateur). Mêmes tables, aucune modification de schéma. -->
+<!-- RDZ · comptes-agents · v3 · 2026-10-27 · catalogue des fonctions modifiable ici
+     (nom, icône, description, adresse du module) — plus besoin de toucher au code
+     pour ajouter une fonction. Le catalogue est un petit fichier rangé dans le
+     stockage EXISTANT journal-photos (dossier fonctions/, versions horodatées) :
+     aucune table créée ni modifiée. application.html lit le même catalogue
+     (bloc « Mes fonctions » v2).
+     v2 · 2026-09-30 · ajout des « fonctions » par agent
+     (boutons supplémentaires dans application.html, ex. Questionnaires).
+     Nécessite migration-fonctions-agents.sql (colonne agents.fonctions).
+     Accès aux pages de fonction : nom + PIN habituels uniquement (pas d'autre
+     identifiant). Pour ajouter une fonction plus tard (Matériel, Planning d'équipe…) :
+     ajouter une entrée dans FONCTIONS ci-dessous ET dans FONCTION_ITEMS de
+     application.html (même clé). -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RDZ — Comptes agents (centraliste)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --rdz-red: #8B1A1A;
+      --rdz-red-dark: #6B1212;
+      --rdz-red-light: #f5e8e8;
+      --rdz-black: #1a1a1a;
+      --rdz-gray: #4a4a4a;
+      --rdz-border: #d0ccc5;
+      --rdz-bg: #f5f4f2;
+    }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--rdz-bg); color: var(--rdz-black); min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: var(--rdz-red); border-bottom: 4px solid var(--rdz-red-dark); }
+    .header-inner { max-width: 960px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .header-brand { padding: 14px 0; }
+    .header-brand-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: .07em; text-transform: uppercase; }
+    .header-brand-sub { font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .03em; margin-top: 2px; }
+    .header-nav { display: flex; gap: 8px; align-items: center; }
+    .btn-nav { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; transition: all .15s; border: 1.5px solid rgba(255,255,255,.85); background: rgba(255,255,255,.12); color: #fff; text-decoration: none; }
+    .btn-nav:hover { background: rgba(255,255,255,.25); }
+    .btn-nav-accent { background: #fff; border-color: #fff; color: var(--rdz-red); }
+    .btn-nav-accent:hover { background: #f5f5f5; }
+
+    /* CONTENT */
+    .content { max-width: 960px; margin: 0 auto; padding: 32px 28px; }
+
+    /* PAGE TITLE */
+    .page-header { margin-bottom: 28px; }
+    .page-title { font-size: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--rdz-black); }
+    .page-sub { font-size: 12px; color: var(--rdz-gray); margin-top: 4px; }
+
+    /* TOOLBAR */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .search-input { padding: 8px 12px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 13px; background: #fff; color: var(--rdz-black); width: 260px; }
+    .search-input:focus { outline: none; border-color: var(--rdz-red); }
+
+    /* STATS */
+    .stats { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; padding: 14px 20px; flex: 1; }
+    .stat-num { font-size: 24px; font-weight: 700; color: var(--rdz-black); }
+    .stat-lbl { font-size: 11px; color: var(--rdz-gray); margin-top: 3px; letter-spacing: .03em; text-transform: uppercase; }
+    .stat-card.red .stat-num { color: var(--rdz-red); }
+    .stat-card.green .stat-num { color: #166534; }
+
+    /* TABLE */
+    .table-wrap { background: #fff; border: 1px solid var(--rdz-border); border-radius: 2px; overflow: hidden; }
+    .table-head { display: grid; grid-template-columns: 1fr 140px 100px 290px; padding: 9px 18px; background: var(--rdz-black); gap: 12px; }
+    .th { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+    .site-row { display: grid; grid-template-columns: 1fr 140px 100px 290px; padding: 0 18px; gap: 12px; border-bottom: 1px solid var(--rdz-border); align-items: center; min-height: 56px; transition: background .1s; }
+    .site-row:last-child { border-bottom: none; }
+    .site-row:hover { background: var(--rdz-bg); }
+    .site-row.inactive-row { opacity: .55; }
+
+    .site-name-cell { display: flex; flex-direction: column; gap: 3px; padding: 12px 0; }
+    .site-name-text { font-size: 14px; font-weight: 600; color: var(--rdz-black); }
+    .fn-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+    .fn-chip { display: inline-block; padding: 2px 8px; border-radius: 2px; font-size: 10.5px; font-weight: 700; background: var(--rdz-red-light); color: var(--rdz-red); letter-spacing: .02em; }
+
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .badge-actif { background: #dcfce7; color: #166534; }
+    .badge-inactif { background: #f3f4f6; color: #6b7280; }
+
+    .pin-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .pin-set { background: #dcfce7; color: #166534; }
+    .pin-unset { background: #fef9c3; color: #854d0e; }
+
+    .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .action-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 2px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--rdz-border); background: #fff; color: var(--rdz-gray); transition: all .15s; white-space: nowrap; }
+    .action-btn:hover { background: var(--rdz-bg); }
+    .action-btn.toggle-on { border-color: #bbf7d0; color: #166534; background: #f0fdf4; }
+    .action-btn.toggle-on:hover { background: #dcfce7; }
+    .action-btn.toggle-off { border-color: #d0ccc5; color: #6b7280; }
+    .action-btn.toggle-off:hover { background: #f3f4f6; }
+    .action-btn.rename { border-color: #bfdbfe; color: #1e3a5f; background: #eff6ff; }
+    .action-btn.rename:hover { background: #dbeafe; }
+    .action-btn.fn-btn { border-color: #e9c9c9; color: var(--rdz-red); background: var(--rdz-red-light); }
+    .action-btn.fn-btn:hover { background: #efd9d9; }
+    .action-btn.del-btn { border-color: #fca5a5; color: #7f1d1d; background: #fff5f5; }
+    .action-btn.del-btn:hover { background: #fee2e2; }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 50px 20px; font-size: 14px; color: var(--rdz-gray); }
+
+    /* SAVE STATUS */
+    .save-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--rdz-gray); padding: 10px 0; }
+    .save-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+    .save-dot.saving { background: #f59e0b; }
+    .save-dot.saved { background: #16a34a; }
+    .save-dot.error { background: #dc2626; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; padding: 80px 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 2px; border: 1px solid var(--rdz-border); border-top: 3px solid var(--rdz-red); padding: 28px; width: 100%; max-width: 460px; }
+    .modal-title { font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--rdz-red); padding-bottom: 16px; border-bottom: 1px solid var(--rdz-border); margin-bottom: 20px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rdz-gray); margin-bottom: 6px; }
+    .field input { width: 100%; padding: 9px 11px; border-radius: 2px; border: 1px solid var(--rdz-border); font-size: 14px; background: #fff; color: var(--rdz-black); font-family: Arial, sans-serif; }
+    .field input:focus { outline: none; border-color: var(--rdz-red); }
+    .field-hint { font-size: 11px; color: #9a9a9a; margin-top: 5px; font-style: italic; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--rdz-border); }
+    .mbtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 2px; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .mbtn-cancel { background: var(--rdz-bg); border-color: var(--rdz-border); color: var(--rdz-gray); }
+    .mbtn-cancel:hover { background: #ebe9e6; }
+    .mbtn-save { background: var(--rdz-red); border-color: var(--rdz-red-dark); color: #fff; }
+    .mbtn-save:hover { background: var(--rdz-red-dark); }
+
+    /* FONCTIONS (modal) */
+    .fn-option { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--rdz-border); border-radius: 2px; margin-bottom: 8px; cursor: pointer; }
+    .fn-option:hover { background: var(--rdz-bg); }
+    .fn-option input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--rdz-red); flex-shrink: 0; }
+    .fn-option .fn-t { font-size: 13.5px; font-weight: 700; }
+    .fn-option .fn-d { font-size: 12px; color: var(--rdz-gray); margin-top: 3px; line-height: 1.45; }
+    .fn-warn { font-size: 11.5px; color: #854d0e; background: #fef9c3; border: 1px solid #fde68a; padding: 9px 11px; border-radius: 2px; line-height: 1.5; margin-top: 10px; }
+
+    /* PIN INPUT (modal) */
+    .pin-input-group { display: flex; gap: 8px; }
+    .pin-input-group input { text-align: center; font-size: 20px; letter-spacing: .1em; font-family: monospace; }
+
+    /* FOOTER */
+    .footer { border-top: 1px solid var(--rdz-border); padding: 16px 28px; max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #9a9a9a; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <div class="header-brand-name">RDZ Security Management SA</div>
+      <div class="header-brand-sub">Centraliste — Comptes agents &amp; PIN</div>
+    </div>
+    <nav class="header-nav">
+      <a class="btn-nav" href="https://rdz-2026.github.io/routeops/index.html">← Accueil</a>
+      <button class="btn-nav btn-nav-accent" onclick="openAddAgent()">+ Nouvel agent</button>
+    </nav>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="page-header">
+    <div class="page-title">Comptes agents &amp; codes PIN</div>
+    <div class="page-sub">Créez un agent, définissez ou réinitialisez son code PIN d'accès à l'application mobile, mettez-le en pause ou réactivez-le. Pour corriger un nom, supprimer un agent ou lui attribuer des fonctions, adressez-vous à l'administrateur.</div>
+  </div>
+
+  <div class="stats" id="agent-stats">
+    <div class="stat-card"><div class="stat-num" id="astat-total">—</div><div class="stat-lbl">Agents au total</div></div>
+    <div class="stat-card green"><div class="stat-num" id="astat-actifs">—</div><div class="stat-lbl">Agents actifs</div></div>
+    <div class="stat-card"><div class="stat-num" id="astat-sanspin">—</div><div class="stat-lbl">Sans PIN défini</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="agent-search" placeholder="🔍  Rechercher un agent…" oninput="renderAgentsTable()">
+    <div class="save-status"><div class="save-dot" id="asave-dot"></div><span id="asave-text">Chargement…</span></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-head">
+      <div class="th">Nom de l'agent</div>
+      <div class="th">Code PIN</div>
+      <div class="th">Statut</div>
+      <div class="th" style="text-align:right">Actions</div>
+    </div>
+    <div id="agents-list">
+      <div class="empty">Chargement…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL AGENT (ajout / renommer) -->
+<div class="modal-overlay" id="modal-agent">
+  <div class="modal">
+    <div class="modal-title" id="modal-agent-title">Nouvel agent</div>
+    <div class="field">
+      <label>Prénom</label>
+      <input type="text" id="f-agent-prenom" placeholder="Ex : Jean">
+    </div>
+    <div class="field">
+      <label>Nom</label>
+      <input type="text" id="f-agent-nom" placeholder="Ex : Dupont">
+      <div class="field-hint">Nom affiché à l'écran d'identification de l'app mobile</div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeAgentModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="saveAgent()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PIN (définir / réinitialiser) -->
+<div class="modal-overlay" id="modal-pin">
+  <div class="modal">
+    <div class="modal-title" id="modal-pin-title">Définir le code PIN</div>
+    <div style="font-size:12.5px;color:var(--rdz-gray);line-height:1.6;margin-bottom:16px" id="modal-pin-agent-name"></div>
+    <div class="field">
+      <label>Nouveau code PIN (4 chiffres)</label>
+      <div class="pin-input-group">
+        <input type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" id="f-pin" placeholder="••••">
+      </div>
+      <div class="field-hint">L'agent devra ressaisir ce code à sa prochaine connexion sur son téléphone.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closePinModal()">Annuler</button>
+      <button class="mbtn mbtn-save" onclick="savePin()">✓ Enregistrer le PIN</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- MODAL CONFIRMER SUPPRESSION AGENT -->
+<div class="modal-overlay" id="modal-delete-agent">
+  <div class="modal" style="border-top-color:#7f1d1d">
+    <div class="modal-title" style="color:#7f1d1d">Confirmer la suppression</div>
+    <div style="font-size:13.5px;color:var(--rdz-black);line-height:1.6;margin-bottom:8px">
+      Vous allez supprimer l'agent <strong id="del-agent-name"></strong>.
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="closeDeleteAgentModal()">Annuler</button>
+      <button class="mbtn mbtn-save" style="background:#7f1d1d;border-color:#7f1d1d" onclick="confirmDeleteAgent()">Supprimer définitivement</button>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <span>RDZ Security Management SA — Paramétrage interne</span>
+  <span id="footer-date"></span>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Fonctions attribuables (clé = valeur stockée dans agents.fonctions).
+// La même clé doit exister dans FONCTION_ITEMS de application.html.
+// `acces` : rappel affiché quand la fonction demande aussi un compte ailleurs.
+// Fonctions de base (toujours proposées, modifiables dans le catalogue sauf leur clé).
+const FONCTIONS_BASE = [
+  { key: 'questionnaires', icon: '📝', name: 'Préparation des quiz', href: 'questionnaires-agent.html',
+    desc: "Créer, modifier et partager les quiz de formation. Corriger les résultats." },
+  { key: 'materiel', icon: '📦', name: 'Matériel', href: 'materiel-rdz.html',
+    desc: "Responsable matériel : sorties, retours, inventaire et paramètres du matériel (radios, lampes…)." }
+];
+// Catalogue complet = base + fonctions ajoutées ici (fichier dans le stockage existant)
+const CAT_BUCKET = 'journal-photos', CAT_DIR = 'fonctions';
+let CATALOGUE = FONCTIONS_BASE.map(f => Object.assign({ actif: true }, f));
+let FONCTIONS = [];
+function buildFonctions(){
+  FONCTIONS = CATALOGUE.filter(f => f.actif !== false).map(f => ({
+    key: f.key, label: (f.icon ? f.icon + ' ' : '') + f.name,
+    desc: (f.desc || '') + (f.href ? ' — module : ' + f.href : '') + ' Accès avec son nom et son PIN habituels.', acces: null }));
+}
+buildFonctions();
+async function loadCatalogue(){
+  try{
+    const { data, error } = await sb.storage.from(CAT_BUCKET).list(CAT_DIR, { limit: 200, sortBy: { column: 'name', order: 'desc' } });
+    if (error) throw error;
+    const last = (data || []).map(f => f.name).filter(n => n.endsWith('.json'))[0];
+    if (last) {
+      const url = sb.storage.from(CAT_BUCKET).getPublicUrl(CAT_DIR + '/' + last).data.publicUrl;
+      const saved = await (await fetch(url, { cache: 'no-store' })).json();
+      const map = new Map(CATALOGUE.map(f => [f.key, f]));
+      (saved.fonctions || []).forEach(f => map.set(f.key, Object.assign({}, map.get(f.key) || {}, f)));
+      CATALOGUE = [...map.values()];
+    }
+  }catch(e){ console.warn('Catalogue des fonctions non lu (fonctions de base utilisées) :', e); }
+  buildFonctions();
+}
+async function saveCatalogue(){
+  const blob = new Blob([JSON.stringify({ v: 1, maj: new Date().toISOString(), fonctions: CATALOGUE }, null, 1)], { type: 'application/json' });
+  const name = CAT_DIR + '/' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+  const { error } = await sb.storage.from(CAT_BUCKET).upload(name, blob, { upsert: false, contentType: 'application/json' });
+  if (error) throw error;
+}
+
+let agents = [];
+let pinAgentId = null;
+let deleteAgentId = null;
+let agentEditId = null;
+let fnAgentId = null;
+let fonctionsColumnOk = true;   // false si la migration n'a pas encore été lancée
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function setASave(state, msg) {
+  document.getElementById('asave-dot').className = 'save-dot' + (state ? ' ' + state : '');
+  document.getElementById('asave-text').textContent = msg;
+}
+
+// Nom complet affiché (le schéma sépare prénom et nom)
+function fullName(a) {
+  return [a.nom, a.prenom].filter(Boolean).join(' ') || a.nom || a.prenom || '—';
+}
+
+function agentFonctions(a) {
+  return Array.isArray(a.fonctions) ? a.fonctions : [];
+}
+
+// Doit être identique au hash utilisé dans mobile.html
+async function hashPin(pin) {
+  const enc = new TextEncoder().encode('RDZ-PIN-2026-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── JOURNAL ──────────────────────────────────────────────────────────────────
+async function logJournal(action, agentId, agentNom, details) {
+  try {
+    await sb.from('agents_journal').insert({
+      action,
+      agent_id: agentId || null,
+      agent_nom: agentNom || '—',
+      details: details || null
+    });
+  } catch (err) {
+    console.error('Journal non enregistré :', err);
+  }
+}
+
+// ── LOAD ─────────────────────────────────────────────────────────────────────
+async function loadAgents() {
+  try {
+    const { data, error } = await sb.from('agents').select('*').order('nom');
+    if (error) throw error;
+    agents = data || [];
+    fonctionsColumnOk = agents.length === 0 || agents.some(a => 'fonctions' in a);
+    setASave('saved', fonctionsColumnOk ? 'Données chargées' : 'Données chargées — colonne « fonctions » absente (lancer migration-fonctions-agents.sql)');
+    updateAgentStats();
+    renderAgentsTable();
+  } catch (err) {
+    setASave('error', 'Erreur de connexion');
+    document.getElementById('agents-list').innerHTML =
+      `<div class="empty">Impossible de charger les agents.<br><small>${esc(err.message)}</small></div>`;
+  }
+}
+
+function updateAgentStats() {
+  const actifs = agents.filter(a => a.actif !== false).length;
+  const sansPin = agents.filter(a => !a.pin_hash).length;
+  const avecFn = agents.filter(a => agentFonctions(a).length > 0).length;
+  document.getElementById('astat-total').textContent = agents.length;
+  document.getElementById('astat-actifs').textContent = actifs;
+  document.getElementById('astat-sanspin').textContent = sansPin;
+  
+}
+
+function fnLabel(key) {
+  const f = CATALOGUE.find(x => x.key === key);
+  return f ? (f.icon ? f.icon + ' ' : '') + f.name : key;
+}
+
+function renderAgentsTable() {
+  const search = document.getElementById('agent-search').value.toLowerCase().trim();
+  let filtered = agents.filter(a => !search || fullName(a).toLowerCase().includes(search));
+  filtered.sort((a, b) => fullName(a).localeCompare(fullName(b), 'fr'));
+
+  const el = document.getElementById('agents-list');
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="empty">Aucun agent trouvé.</div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map(a => {
+    const isActif = a.actif !== false;
+    const hasPin = !!a.pin_hash;
+    const fns = agentFonctions(a);
+    return `<div class="site-row${isActif ? '' : ' inactive-row'}">
+      <div class="site-name-cell">
+        <div class="site-name-text">${esc(fullName(a))}</div>
+      </div>
+      <div>
+        <span class="pin-badge ${hasPin ? 'pin-set' : 'pin-unset'}">
+          ${hasPin ? '● PIN défini' : '○ Non défini'}
+        </span>
+      </div>
+      <div>
+        <span class="status-badge ${isActif ? 'badge-actif' : 'badge-inactif'}">
+          ${isActif ? '● Actif' : '○ Inactif'}
+        </span>
+      </div>
+      <div class="row-actions">
+        <button class="action-btn rename" onclick="openPinModal('${a.id}')">${hasPin ? '⟳ PIN' : '🔑 Définir PIN'}</button>
+        <button class="action-btn ${isActif ? 'toggle-off' : 'toggle-on'}" onclick="toggleAgentActif('${a.id}')">
+          ${isActif ? '⏸ Pause' : '▶ Réactiver'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── AJOUTER / RENOMMER AGENT ──────────────────────────────────────────────────
+function openAddAgent() {
+  agentEditId = null;
+  document.getElementById('modal-agent-title').textContent = 'Nouvel agent';
+  document.getElementById('f-agent-prenom').value = '';
+  document.getElementById('f-agent-nom').value = '';
+  document.getElementById('modal-agent').classList.add('open');
+  setTimeout(() => document.getElementById('f-agent-prenom').focus(), 100);
+}
+
+function openRenameAgent(id) {
+  agentEditId = id;
+  const a = agents.find(x => x.id === id);
+  document.getElementById('modal-agent-title').textContent = "Renommer l'agent";
+  document.getElementById('f-agent-prenom').value = a.prenom || '';
+  document.getElementById('f-agent-nom').value = a.nom || '';
+  document.getElementById('modal-agent').classList.add('open');
+  setTimeout(() => document.getElementById('f-agent-prenom').focus(), 100);
+}
+
+function closeAgentModal() {
+  document.getElementById('modal-agent').classList.remove('open');
+}
+
+async function saveAgent() {
+  const prenom = document.getElementById('f-agent-prenom').value.trim();
+  const nom = document.getElementById('f-agent-nom').value.trim();
+  if (!prenom || !nom) { alert('Veuillez saisir le prénom et le nom.'); return; }
+  if (agentEditId) { alert("La modification d'un agent est réservée à l'administrateur."); return; }
+  const same = agents.find(x => fullName(x).toLowerCase() === (prenom + ' ' + nom).toLowerCase() || fullName(x).toLowerCase() === (nom + ' ' + prenom).toLowerCase());
+  if (same && !confirm('Un agent « ' + fullName(same) + ' » existe déjà' + (same.actif === false ? ' (en pause — vous pouvez simplement le réactiver)' : '') + '.\nCréer quand même un nouvel agent ?')) return;
+  setASave('saving', 'Enregistrement…');
+  if (agentEditId) {
+    const a = agents.find(a => a.id === agentEditId);
+    const avant = { prenom: a.prenom, nom: a.nom };
+    const { error } = await sb.from('agents').update({ nom, prenom, updated_at: new Date().toISOString() }).eq('id', agentEditId);
+    if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
+    a.nom = nom; a.prenom = prenom;
+    await logJournal('modification', agentEditId, fullName(a), { avant, apres: { prenom, nom } });
+  } else {
+    const { data, error } = await sb.from('agents').insert({ nom, prenom, actif: true }).select().single();
+    if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
+    agents.push(data);
+    agents.sort((a, b) => fullName(a).localeCompare(fullName(b)));
+    await logJournal('creation', data.id, fullName(data), { prenom, nom });
+  }
+  setASave('saved', 'Sauvegardé ✓');
+  setTimeout(() => setASave('', 'Prêt'), 3000);
+  closeAgentModal();
+  updateAgentStats();
+  renderAgentsTable();
+}
+
+// ── PIN ────────────────────────────────────────────────────────────────────────
+function openPinModal(id) {
+  pinAgentId = id;
+  const a = agents.find(x => x.id === id);
+  document.getElementById('modal-pin-title').textContent = a.pin_hash ? 'Réinitialiser le PIN' : 'Définir le PIN';
+  document.getElementById('modal-pin-agent-name').innerHTML =
+    `Agent : <strong>${esc(fullName(a))}</strong>` + (a.pin_hash ? '<br>⚠️ L\'agent devra ressaisir son code à sa prochaine ouverture de l\'app.' : '');
+  document.getElementById('f-pin').value = '';
+  document.getElementById('modal-pin').classList.add('open');
+  setTimeout(() => document.getElementById('f-pin').focus(), 100);
+}
+
+function closePinModal() {
+  document.getElementById('modal-pin').classList.remove('open');
+  pinAgentId = null;
+}
+
+async function savePin() {
+  const pin = document.getElementById('f-pin').value.trim();
+  if (!/^\d{4}$/.test(pin)) { alert('Le code PIN doit contenir exactement 4 chiffres.'); return; }
+  setASave('saving', 'Enregistrement…');
+  const a = agents.find(a => a.id === pinAgentId);
+  const action = a.pin_hash ? 'pin_reinitialise' : 'pin_defini';
+  const pin_hash = await hashPin(pin);
+  const { error } = await sb.from('agents').update({ pin_hash, updated_at: new Date().toISOString() }).eq('id', pinAgentId);
+  if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
+  a.pin_hash = pin_hash;
+  await logJournal(action, pinAgentId, fullName(a), null);
+  setASave('saved', 'PIN enregistré ✓');
+  setTimeout(() => setASave('', 'Prêt'), 3000);
+  closePinModal();
+  updateAgentStats();
+  renderAgentsTable();
+}
+
+// ── FONCTIONS ─────────────────────────────────────────────────────────────────
+function openFonctionsModal(id) {
+  if (!fonctionsColumnOk) {
+    alert("La colonne « fonctions » n'existe pas encore dans la base.\nLancez d'abord migration-fonctions-agents.sql dans Supabase (base principale).");
+    return;
+  }
+  fnAgentId = id;
+  const a = agents.find(x => x.id === id);
+  const current = agentFonctions(a);
+  document.getElementById('modal-fn-agent').innerHTML =
+    `Agent : <strong>${esc(fullName(a))}</strong><br>Cochez les boutons supplémentaires à afficher dans son application. Il garde tous ses boutons habituels.`;
+  document.getElementById('fn-options').innerHTML = FONCTIONS.map(f => `
+    <label class="fn-option">
+      <input type="checkbox" value="${esc(f.key)}" ${current.includes(f.key) ? 'checked' : ''} onchange="updateFnWarn()">
+      <span><span class="fn-t">${esc(f.label)}</span><span class="fn-d" style="display:block">${esc(f.desc)}</span></span>
+    </label>`).join('');
+  updateFnWarn();
+  document.getElementById('modal-fonctions').classList.add('open');
+}
+
+function selectedFonctions() {
+  return [...document.querySelectorAll('#fn-options input[type=checkbox]:checked')].map(c => c.value);
+}
+
+function updateFnWarn() {
+  const sel = selectedFonctions();
+  const notes = FONCTIONS.filter(f => sel.includes(f.key) && f.acces).map(f => '⚠️ ' + esc(f.acces));
+  const w = document.getElementById('fn-warn');
+  w.innerHTML = notes.join('<br><br>');
+  w.style.display = notes.length ? 'block' : 'none';
+}
+
+function closeFonctionsModal() {
+  document.getElementById('modal-fonctions').classList.remove('open');
+  fnAgentId = null;
+}
+
+async function saveFonctions() {
+  if (!fnAgentId) return;
+  const a = agents.find(x => x.id === fnAgentId);
+  const avant = agentFonctions(a);
+  // conserve les éventuelles fonctions inconnues de cette page (ajoutées ailleurs)
+  const inconnues = avant.filter(k => !FONCTIONS.some(f => f.key === k));
+  const apres = [...selectedFonctions(), ...inconnues];
+  setASave('saving', 'Enregistrement…');
+  const { error } = await sb.from('agents').update({ fonctions: apres, updated_at: new Date().toISOString() }).eq('id', fnAgentId);
+  if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
+  a.fonctions = apres;
+  await logJournal('fonctions', fnAgentId, fullName(a), { avant, apres });
+  setASave('saved', 'Fonctions enregistrées ✓');
+  setTimeout(() => setASave('', 'Prêt'), 3000);
+  closeFonctionsModal();
+  updateAgentStats();
+  renderAgentsTable();
+}
+
+// ── CATALOGUE DES FONCTIONS ─────────────────────────────────────────────────────
+function slugKey(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'') || 'fonction'; }
+function openCatalogue(){ renderCatList(); resetCatForm(); document.getElementById('modal-catalogue').classList.add('open'); }
+function closeCatalogue(){ document.getElementById('modal-catalogue').classList.remove('open'); }
+function renderCatList(){
+  const used = k => agents.filter(a => agentFonctions(a).includes(k)).length;
+  document.getElementById('cat-list').innerHTML = CATALOGUE.map(f => `
+    <div class="fn-option" style="cursor:default;align-items:center;${f.actif===false?'opacity:.5':''}">
+      <span style="font-size:22px;width:28px;text-align:center">${esc(f.icon||'🧩')}</span>
+      <span style="flex:1;min-width:0"><span class="fn-t">${esc(f.name)}</span><span class="fn-d" style="display:block">${esc(f.href||'—')} · ${used(f.key)} agent(s)${f.actif===false?' · retirée':''}</span></span>
+      <button class="action-btn rename" onclick="editCatItem('${esc(f.key)}')">✎</button>
+      <button class="action-btn ${f.actif===false?'toggle-on':'toggle-off'}" onclick="toggleCatItem('${esc(f.key)}')" title="${f.actif===false?'Remettre dans la liste':'Retirer de la liste'}">${f.actif===false?'Activer':'Masquer'}</button>
+    </div>`).join('');
+}
+function resetCatForm(){
+  ['cf-key','cf-icon','cf-label','cf-href','cf-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cat-form-title').textContent = 'Ajouter une fonction';
+  document.getElementById('cf-cancel').style.display = 'none';
+}
+function editCatItem(key){
+  const f = CATALOGUE.find(x => x.key === key); if (!f) return;
+  document.getElementById('cf-key').value = f.key; document.getElementById('cf-icon').value = f.icon || '';
+  document.getElementById('cf-label').value = f.name || ''; document.getElementById('cf-href').value = f.href || '';
+  document.getElementById('cf-desc').value = f.desc || '';
+  document.getElementById('cat-form-title').textContent = 'Modifier « ' + f.name + ' »';
+  document.getElementById('cf-cancel').style.display = 'inline-flex';
+}
+async function saveCatItem(){
+  const key = document.getElementById('cf-key').value;
+  const name = document.getElementById('cf-label').value.trim();
+  const href = document.getElementById('cf-href').value.trim();
+  if (!name || !href) { alert('Indiquez au moins le nom du bouton et l\'adresse du module.'); return; }
+  const item = { icon: document.getElementById('cf-icon').value.trim() || '🧩', name, href, desc: document.getElementById('cf-desc').value.trim() };
+  const avant = JSON.parse(JSON.stringify(CATALOGUE));
+  if (key) Object.assign(CATALOGUE.find(x => x.key === key), item);
+  else {
+    let k = slugKey(name), n = 2; while (CATALOGUE.some(x => x.key === k)) k = slugKey(name) + '_' + (n++);
+    CATALOGUE.push(Object.assign({ key: k, actif: true }, item));
+  }
+  try { setASave('saving', 'Enregistrement…'); await saveCatalogue(); buildFonctions(); setASave('saved', 'Catalogue enregistré ✓'); renderCatList(); resetCatForm(); renderAgentsTable(); }
+  catch (e) { CATALOGUE = avant; setASave('error', 'Erreur'); alert('Catalogue non enregistré : ' + e.message); }
+}
+async function toggleCatItem(key){
+  const f = CATALOGUE.find(x => x.key === key); if (!f) return;
+  const n = agents.filter(a => agentFonctions(a).includes(key)).length;
+  if (f.actif !== false && n && !confirm(`Retirer « ${f.name} » de la liste ? Les ${n} agent(s) qui l'ont ne verront plus le bouton (rien n'est effacé, vous pourrez la remettre).`)) return;
+  f.actif = f.actif === false;
+  try { await saveCatalogue(); buildFonctions(); renderCatList(); renderAgentsTable(); }
+  catch (e) { f.actif = !f.actif; alert('Catalogue non enregistré : ' + e.message); }
+}
+
+// ── ACTIF / INACTIF ────────────────────────────────────────────────────────────
+async function toggleAgentActif(id) {
+  const a = agents.find(x => x.id === id);
+  const newVal = a.actif === false ? true : false;
+  setASave('saving', 'Mise à jour…');
+  const { error } = await sb.from('agents').update({ actif: newVal }).eq('id', id);
+  if (error) { setASave('error', 'Erreur'); return; }
+  a.actif = newVal;
+  await logJournal(newVal ? 'activation' : 'desactivation', id, fullName(a), null);
+  setASave('saved', 'Sauvegardé ✓');
+  setTimeout(() => setASave('', 'Prêt'), 3000);
+  updateAgentStats();
+  renderAgentsTable();
+}
+
+// ── SUPPRIMER AGENT ─────────────────────────────────────────────────────────────
+function openDeleteAgent(id) {
+  deleteAgentId = id;
+  const a = agents.find(x => x.id === id);
+  document.getElementById('del-agent-name').textContent = '"' + fullName(a) + '"';
+  document.getElementById('modal-delete-agent').classList.add('open');
+}
+
+function closeDeleteAgentModal() {
+  document.getElementById('modal-delete-agent').classList.remove('open');
+  deleteAgentId = null;
+}
+
+async function confirmDeleteAgent() {
+  if (!deleteAgentId) return;
+  setASave('saving', 'Suppression…');
+  const a = agents.find(x => x.id === deleteAgentId);
+  const nomComplet = fullName(a);
+  const { error } = await sb.from('agents').delete().eq('id', deleteAgentId);
+  if (error) { setASave('error', 'Erreur'); alert(error.message); return; }
+  agents = agents.filter(a => a.id !== deleteAgentId);
+  await logJournal('suppression', deleteAgentId, nomComplet, { prenom: a.prenom, nom: a.nom });
+  setASave('saved', 'Supprimé ✓');
+  setTimeout(() => setASave('', 'Prêt'), 3000);
+  closeDeleteAgentModal();
+  updateAgentStats();
+  renderAgentsTable();
+}
+
+// ── EVENTS MODALES ────────────────────────────────────────────────────────────
+document.getElementById('f-agent-nom').addEventListener('keydown', e => { if (e.key === 'Enter') saveAgent(); });
+document.getElementById('f-agent-prenom').addEventListener('keydown', e => { if (e.key === 'Enter') saveAgent(); });
+document.getElementById('f-pin').addEventListener('keydown', e => { if (e.key === 'Enter') savePin(); });
+document.getElementById('f-pin').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); });
+
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// ── VERSION CENTRALISTE : actions réservées à l'administrateur ─────────────
+['openRenameAgent','openFonctionsModal','saveFonctions','openCatalogue','saveCatItem','toggleCatItem','editCatItem','openDeleteAgent','confirmDeleteAgent']
+  .forEach(n => { window[n] = () => alert("Action réservée à l'administrateur (comptes-agents.html)."); });
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.getElementById('footer-date').textContent = 'Version centraliste 1.0 — ' + new Date().getFullYear();
+loadCatalogue().then(loadAgents);
+</script>
+
+</body>
+</html>
