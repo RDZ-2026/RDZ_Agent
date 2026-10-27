@@ -1,4 +1,10 @@
-<!-- RDZ · comptes-agents · v2 · 2026-09-30 · ajout des « fonctions » par agent
+<!-- RDZ · comptes-agents · v3 · 2026-10-27 · catalogue des fonctions modifiable ici
+     (nom, icône, description, adresse du module) — plus besoin de toucher au code
+     pour ajouter une fonction. Le catalogue est un petit fichier rangé dans le
+     stockage EXISTANT journal-photos (dossier fonctions/, versions horodatées) :
+     aucune table créée ni modifiée. application.html lit le même catalogue
+     (bloc « Mes fonctions » v2).
+     v2 · 2026-09-30 · ajout des « fonctions » par agent
      (boutons supplémentaires dans application.html, ex. Questionnaires).
      Nécessite migration-fonctions-agents.sql (colonne agents.fonctions).
      Accès aux pages de fonction : nom + PIN habituels uniquement (pas d'autre
@@ -146,7 +152,8 @@
       <div class="header-brand-sub">Paramétrage — Comptes agents &amp; PIN</div>
     </div>
     <nav class="header-nav">
-      <a class="btn-nav" href="../index.html">← Accueil</a>
+      <a class="btn-nav" href="https://rdz-2026.github.io/routeops/RDZ_index.html">← Accueil admin</a>
+      <button class="btn-nav" onclick="openCatalogue()">⚙ Catalogue des fonctions</button>
       <button class="btn-nav btn-nav-accent" onclick="openAddAgent()">+ Nouvel agent</button>
     </nav>
   </div>
@@ -238,6 +245,28 @@
   </div>
 </div>
 
+<!-- MODAL CATALOGUE DES FONCTIONS -->
+<div class="modal-overlay" id="modal-catalogue">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">Catalogue des fonctions</div>
+    <div style="font-size:12.5px;color:var(--rdz-gray);line-height:1.6;margin-bottom:14px">Chaque fonction = un bouton supplémentaire dans l'application de l'agent, vers un module (adresse du fichier, comme dans le catalogue de modules du journal). Cochez ensuite la fonction pour les agents concernés via « ⚙ Fonctions ».</div>
+    <div id="cat-list"></div>
+    <div class="modal-section" style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--rdz-gray);background:var(--rdz-bg);padding:6px 10px;margin:16px 0 12px" id="cat-form-title">Ajouter une fonction</div>
+    <input type="hidden" id="cf-key">
+    <div style="display:grid;grid-template-columns:70px 1fr;gap:10px">
+      <div class="field"><label>Icône</label><input type="text" id="cf-icon" maxlength="4" placeholder="📦"></div>
+      <div class="field"><label>Nom du bouton</label><input type="text" id="cf-label" placeholder="Ex : Matériel"></div>
+    </div>
+    <div class="field"><label>Adresse du module (fichier)</label><input type="text" id="cf-href" placeholder="Ex : materiel-rdz.html"><div class="field-hint">Fichier situé dans le même dossier que l'application (dossier application).</div></div>
+    <div class="field"><label>Description courte</label><input type="text" id="cf-desc" placeholder="Ex : Sorties, retours et inventaire du matériel"></div>
+    <div class="modal-footer">
+      <button class="mbtn mbtn-cancel" onclick="resetCatForm()" id="cf-cancel" style="display:none">Annuler la modification</button>
+      <button class="mbtn mbtn-cancel" onclick="closeCatalogue()">Fermer</button>
+      <button class="mbtn mbtn-save" onclick="saveCatItem()">✓ Enregistrer la fonction</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONFIRMER SUPPRESSION AGENT -->
 <div class="modal-overlay" id="modal-delete-agent">
   <div class="modal" style="border-top-color:#7f1d1d">
@@ -265,15 +294,44 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Fonctions attribuables (clé = valeur stockée dans agents.fonctions).
 // La même clé doit exister dans FONCTION_ITEMS de application.html.
 // `acces` : rappel affiché quand la fonction demande aussi un compte ailleurs.
-const FONCTIONS = [
-  {
-    key: 'questionnaires',
-    label: '📝 Préparation des quiz',
-    desc: "Bouton « Préparation des quiz » : créer, modifier, supprimer et partager les quiz de formation, voir et corriger les résultats. Accès avec son nom et son PIN habituels, sans autre identifiant.",
-    acces: null
-  }
-  // À venir : { key: 'materiel', ... }, { key: 'planning_equipe', ... }
+// Fonctions de base (toujours proposées, modifiables dans le catalogue sauf leur clé).
+const FONCTIONS_BASE = [
+  { key: 'questionnaires', icon: '📝', name: 'Préparation des quiz', href: 'questionnaires-agent.html',
+    desc: "Créer, modifier et partager les quiz de formation. Corriger les résultats." },
+  { key: 'materiel', icon: '📦', name: 'Matériel', href: 'materiel-rdz.html',
+    desc: "Responsable matériel : sorties, retours, inventaire et paramètres du matériel (radios, lampes…)." }
 ];
+// Catalogue complet = base + fonctions ajoutées ici (fichier dans le stockage existant)
+const CAT_BUCKET = 'journal-photos', CAT_DIR = 'fonctions';
+let CATALOGUE = FONCTIONS_BASE.map(f => Object.assign({ actif: true }, f));
+let FONCTIONS = [];
+function buildFonctions(){
+  FONCTIONS = CATALOGUE.filter(f => f.actif !== false).map(f => ({
+    key: f.key, label: (f.icon ? f.icon + ' ' : '') + f.name,
+    desc: (f.desc || '') + (f.href ? ' — module : ' + f.href : '') + ' Accès avec son nom et son PIN habituels.', acces: null }));
+}
+buildFonctions();
+async function loadCatalogue(){
+  try{
+    const { data, error } = await sb.storage.from(CAT_BUCKET).list(CAT_DIR, { limit: 200, sortBy: { column: 'name', order: 'desc' } });
+    if (error) throw error;
+    const last = (data || []).map(f => f.name).filter(n => n.endsWith('.json'))[0];
+    if (last) {
+      const url = sb.storage.from(CAT_BUCKET).getPublicUrl(CAT_DIR + '/' + last).data.publicUrl;
+      const saved = await (await fetch(url, { cache: 'no-store' })).json();
+      const map = new Map(CATALOGUE.map(f => [f.key, f]));
+      (saved.fonctions || []).forEach(f => map.set(f.key, Object.assign({}, map.get(f.key) || {}, f)));
+      CATALOGUE = [...map.values()];
+    }
+  }catch(e){ console.warn('Catalogue des fonctions non lu (fonctions de base utilisées) :', e); }
+  buildFonctions();
+}
+async function saveCatalogue(){
+  const blob = new Blob([JSON.stringify({ v: 1, maj: new Date().toISOString(), fonctions: CATALOGUE }, null, 1)], { type: 'application/json' });
+  const name = CAT_DIR + '/' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+  const { error } = await sb.storage.from(CAT_BUCKET).upload(name, blob, { upsert: false, contentType: 'application/json' });
+  if (error) throw error;
+}
 
 let agents = [];
 let pinAgentId = null;
@@ -347,8 +405,8 @@ function updateAgentStats() {
 }
 
 function fnLabel(key) {
-  const f = FONCTIONS.find(x => x.key === key);
-  return f ? f.label : key;
+  const f = CATALOGUE.find(x => x.key === key);
+  return f ? (f.icon ? f.icon + ' ' : '') + f.name : key;
 }
 
 function renderAgentsTable() {
@@ -535,6 +593,57 @@ async function saveFonctions() {
   renderAgentsTable();
 }
 
+// ── CATALOGUE DES FONCTIONS ─────────────────────────────────────────────────────
+function slugKey(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'') || 'fonction'; }
+function openCatalogue(){ renderCatList(); resetCatForm(); document.getElementById('modal-catalogue').classList.add('open'); }
+function closeCatalogue(){ document.getElementById('modal-catalogue').classList.remove('open'); }
+function renderCatList(){
+  const used = k => agents.filter(a => agentFonctions(a).includes(k)).length;
+  document.getElementById('cat-list').innerHTML = CATALOGUE.map(f => `
+    <div class="fn-option" style="cursor:default;align-items:center;${f.actif===false?'opacity:.5':''}">
+      <span style="font-size:22px;width:28px;text-align:center">${esc(f.icon||'🧩')}</span>
+      <span style="flex:1;min-width:0"><span class="fn-t">${esc(f.name)}</span><span class="fn-d" style="display:block">${esc(f.href||'—')} · ${used(f.key)} agent(s)${f.actif===false?' · retirée':''}</span></span>
+      <button class="action-btn rename" onclick="editCatItem('${esc(f.key)}')">✎</button>
+      <button class="action-btn ${f.actif===false?'toggle-on':'toggle-off'}" onclick="toggleCatItem('${esc(f.key)}')" title="${f.actif===false?'Remettre dans la liste':'Retirer de la liste'}">${f.actif===false?'Activer':'Masquer'}</button>
+    </div>`).join('');
+}
+function resetCatForm(){
+  ['cf-key','cf-icon','cf-label','cf-href','cf-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cat-form-title').textContent = 'Ajouter une fonction';
+  document.getElementById('cf-cancel').style.display = 'none';
+}
+function editCatItem(key){
+  const f = CATALOGUE.find(x => x.key === key); if (!f) return;
+  document.getElementById('cf-key').value = f.key; document.getElementById('cf-icon').value = f.icon || '';
+  document.getElementById('cf-label').value = f.name || ''; document.getElementById('cf-href').value = f.href || '';
+  document.getElementById('cf-desc').value = f.desc || '';
+  document.getElementById('cat-form-title').textContent = 'Modifier « ' + f.name + ' »';
+  document.getElementById('cf-cancel').style.display = 'inline-flex';
+}
+async function saveCatItem(){
+  const key = document.getElementById('cf-key').value;
+  const name = document.getElementById('cf-label').value.trim();
+  const href = document.getElementById('cf-href').value.trim();
+  if (!name || !href) { alert('Indiquez au moins le nom du bouton et l\'adresse du module.'); return; }
+  const item = { icon: document.getElementById('cf-icon').value.trim() || '🧩', name, href, desc: document.getElementById('cf-desc').value.trim() };
+  const avant = JSON.parse(JSON.stringify(CATALOGUE));
+  if (key) Object.assign(CATALOGUE.find(x => x.key === key), item);
+  else {
+    let k = slugKey(name), n = 2; while (CATALOGUE.some(x => x.key === k)) k = slugKey(name) + '_' + (n++);
+    CATALOGUE.push(Object.assign({ key: k, actif: true }, item));
+  }
+  try { setASave('saving', 'Enregistrement…'); await saveCatalogue(); buildFonctions(); setASave('saved', 'Catalogue enregistré ✓'); renderCatList(); resetCatForm(); renderAgentsTable(); }
+  catch (e) { CATALOGUE = avant; setASave('error', 'Erreur'); alert('Catalogue non enregistré : ' + e.message); }
+}
+async function toggleCatItem(key){
+  const f = CATALOGUE.find(x => x.key === key); if (!f) return;
+  const n = agents.filter(a => agentFonctions(a).includes(key)).length;
+  if (f.actif !== false && n && !confirm(`Retirer « ${f.name} » de la liste ? Les ${n} agent(s) qui l'ont ne verront plus le bouton (rien n'est effacé, vous pourrez la remettre).`)) return;
+  f.actif = f.actif === false;
+  try { await saveCatalogue(); buildFonctions(); renderCatList(); renderAgentsTable(); }
+  catch (e) { f.actif = !f.actif; alert('Catalogue non enregistré : ' + e.message); }
+}
+
 // ── ACTIF / INACTIF ────────────────────────────────────────────────────────────
 async function toggleAgentActif(id) {
   const a = agents.find(x => x.id === id);
@@ -590,8 +699,8 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 });
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-document.getElementById('footer-date').textContent = 'Version 2.0 — ' + new Date().getFullYear();
-loadAgents();
+document.getElementById('footer-date').textContent = 'Version 3.0 — ' + new Date().getFullYear();
+loadCatalogue().then(loadAgents);
 </script>
 
 </body>
