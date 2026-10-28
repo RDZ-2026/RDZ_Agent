@@ -117,6 +117,10 @@ function bonsBlock(B){const C=B.filter(enCours);const y=new Date().getFullYear()
   ${B.filter(b=>!enCours(b)).length?`<details class="pad"><summary style="cursor:pointer;font-weight:700">Bons terminés (${B.filter(b=>!enCours(b)).length})</summary><table class="t" style="margin-top:8px"><tbody>${B.filter(b=>!enCours(b)).slice(0,40).map(b=>`<tr><td><b>${esc(b.numero)}</b></td><td>${esc(b.fournisseur||'—')}</td><td>${fD(b.cree_le)}</td><td>${stPill(b)}</td><td class="r">${chf(bonTotal(b))}</td></tr>`).join('')}</tbody></table></details>`:''}</div>`;}
 let DRAW=null;function draw(){try{$('main').innerHTML=DRAW();}catch(e){console.error(e);$('main').innerHTML=`<div class="banner">Affichage impossible : ${esc(e.message)}</div>`;}}
 // ═══ TABLEAU DE BORD VESTIAIRE ═══
+// Ordre des tailles : XXS / XS / S / M / L / XL / XXL / XXXL (2XL = XXL, 3XL = XXXL…), puis tailles chiffrées.
+const TORDER=['XXS','XS','S','M','L','XL','XXL','XXXL','XXXXL','XXXXXL'];
+const tRank=v=>{let k=String(v==null?'':v).trim().toUpperCase().replace(/\s+/g,'');const m=k.match(/^(\d)XL$/);if(m)k='X'.repeat(+m[1])+'L';return TORDER.indexOf(k);};
+const tCmp=(x,y)=>{const ia=tRank(x),ib=tRank(y);if(ia>=0&&ib>=0)return ia-ib;if(ia>=0)return -1;if(ib>=0)return 1;const na=parseFloat(x),nb=parseFloat(y);if(!isNaN(na)&&!isNaN(nb))return na-nb;return String(x).localeCompare(String(y),'fr',{numeric:true});};
 let D={};
 async function load(){
   try{const r=await Promise.all([sb.from('stock_vestiaire_items').select('*').order('nom'),sb.from('stock_tailles').select('*'),sb.from('stock_dotations').select('*').eq('statut','actif'),
@@ -142,7 +146,7 @@ function page(){
   const C=D.bons.filter(enCours);const agents=new Set(D.dots.map(d=>d.agent_id));
   const byProp={},byCat={},byLieu={};T.forEach(t=>{const v=(t.quantite||0)*pu(t.article_id);const p=prop(t.article_id);byProp[p]=(byProp[p]||0)+v;const c=item(t.article_id).categorie||'Autre';byCat[c]=(byCat[c]||0)+v;
     Object.entries(D.loc[t.id]||{}).forEach(([l,n])=>{byLieu[l]=(byLieu[l]||0)+n*pu(t.article_id);});const nl=Math.max(0,(t.quantite||0)-enL(t));if(nl)byLieu['Non localisé']=(byLieu['Non localisé']||0)+nl*pu(t.article_id);});
-  const byAg={};D.dots.forEach(d=>{const a=byAg[d.agent_id]=byAg[d.agent_id]||{nom:sag(d.agent_id),p:0,v:0,l:[]};a.p+=d.quantite;a.v+=d.quantite*pu(d.article_id);a.l.push(d.quantite+' × '+item(d.article_id).nom+' '+(d.taille||''));});
+  const byAg={};D.dots.slice().sort((x,y)=>String(item(x.article_id).nom).localeCompare(String(item(y.article_id).nom),'fr')||tCmp(x.taille,y.taille)).forEach(d=>{const a=byAg[d.agent_id]=byAg[d.agent_id]||{nom:sag(d.agent_id),p:0,v:0,l:[]};a.p+=d.quantite;a.v+=d.quantite*pu(d.article_id);a.l.push(d.quantite+' × '+item(d.article_id).nom+' '+(d.taille||''));});
   const ags=Object.values(byAg).sort((a,b)=>b.v-a.v);
   const arts=D.items.map(a=>{const ts=T.filter(t=>String(t.article_id)===String(a.id));const dd=D.dots.filter(d=>String(d.article_id)===String(a.id));
     return {a,ts,st:sum(ts,t=>t.quantite),dt:sum(dd,d=>d.quantite),pu:Number(a.valeur_chf)||0,low:ts.filter(t=>low.includes(t)).length};}).sort((x,y)=>(y.st+y.dt)*y.pu-(x.st+x.dt)*x.pu||x.a.nom.localeCompare(y.a.nom,'fr'));
@@ -165,7 +169,7 @@ function page(){
     <div class="card"><h3>Distribué — agents les plus dotés <small>valeur</small></h3>${bars(ags.slice(0,8).map(a=>({l:a.nom,v:a.v,tip:a.nom+' : '+a.p+' pièce(s), '+chf(a.v)})),chf0,'Aucune dotation.')}</div></div>
   <div class="card" style="margin-top:14px"><h3>Stock par article <small><button class="btn g" onclick="artCsv()">⬇ CSV</button></small></h3><div class="tscroll"><table class="t"><thead><tr><th>Article</th><th>Propriétaire</th><th>Tailles en stock</th><th class="r">En stock</th><th class="r">Chez les agents</th><th class="r">Valeur u.</th><th class="r">Valeur stock</th><th class="r">Valeur distribuée</th></tr></thead><tbody>
     ${arts.map(x=>`<tr><td>${esc(x.a.icon||'👕')} ${esc(x.a.nom)}<div class="mut">${esc(x.a.categorie||'')}</div>${x.low?` <span class="pill p-bad">${x.low} taille(s) sous le seuil</span>`:''}</td><td>${esc(prop(x.a.id))}</td>
-      <td class="mut">${x.ts.slice().sort((p,q)=>String(p.taille).localeCompare(String(q.taille),'fr',{numeric:true})).map(t=>esc(t.taille)+' : '+t.quantite).join(' · ')||'—'}</td><td class="r">${x.st}</td><td class="r">${x.dt}</td><td class="r">${chf(x.pu)}</td><td class="r"><b>${chf(x.st*x.pu)}</b></td><td class="r">${chf(x.dt*x.pu)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Aucun article.</td></tr>'}</tbody>
+      <td class="mut">${x.ts.slice().sort((p,q)=>tCmp(p.taille,q.taille)).map(t=>esc(t.taille)+' : '+t.quantite).join(' · ')||'—'}</td><td class="r">${x.st}</td><td class="r">${x.dt}</td><td class="r">${chf(x.pu)}</td><td class="r"><b>${chf(x.st*x.pu)}</b></td><td class="r">${chf(x.dt*x.pu)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Aucun article.</td></tr>'}</tbody>
     <tfoot><tr><td colspan="3">Total</td><td class="r">${nf(pStock)}</td><td class="r">${nf(pDot)}</td><td></td><td class="r">${chf(vStock)}</td><td class="r">${chf(vDot)}</td></tr></tfoot></table></div></div>
   <div class="sec">Vêtements distribués</div>
   <div class="card"><h3>Par agent <small>${agents.size} agent(s) · <button class="btn g" onclick="agCsv()">⬇ CSV</button></small></h3><div class="tscroll"><table class="t"><thead><tr><th>Agent</th><th>Vêtements détenus</th><th class="r">Pièces</th><th class="r">Valeur</th></tr></thead><tbody>
