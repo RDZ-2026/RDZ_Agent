@@ -585,13 +585,20 @@ async function archArt(id){const a=itemById(id);if(totArt(id)||D.dots.some(d=>St
 
 // ═══ IDENTIFICATION (PIN + fonction « vestiaire ») ═══
 const LS_ID='rdz_agent_id',LS_NOM='rdz_agent_nom',LS_HASH='rdz_agent_pin_hash',FONCTION='vestiaire';
-const hasF=a=>(a.fonctions||[]).some(k=>/vestiaire/i.test(String(k)));
+// Accès = code PIN habituel + une fonction « vestiaire » cochée dans comptes-agents (⚙ Fonctions).
+// Toute fonction du catalogue qui ouvre ce module (adresse vestiaire-rdz.html) ou dont le nom contient « vestiaire » compte.
+let VKEYS=new Set(['vestiaire']);
+async function loadVKeys(){try{const r=await sb.storage.from('journal-photos').list('fonctions',{limit:200,sortBy:{column:'name',order:'desc'}});
+  const last=(r.data||[]).map(f=>f.name).filter(n=>n&&n.endsWith('.json'))[0];if(!last)return;
+  const c=await (await fetch(sb.storage.from('journal-photos').getPublicUrl('fonctions/'+last).data.publicUrl,{cache:'no-store'})).json();
+  (c.fonctions||[]).forEach(f=>{if(/vestiaire/.test(norm((f.href||'')+' '+(f.key||'')+' '+(f.name||''))))VKEYS.add(f.key);});}catch(e){}}
+const hasF=a=>(a.fonctions||[]).some(k=>VKEYS.has(k)||/vestiaire/.test(norm(k)));
 let ME=null,PIN={buf:'',a:null};
 async function hashPin(pin){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('RDZ-PIN-2026-'+pin));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 function showAuth(h){$('app').classList.add('hidden');$('scr-auth').classList.remove('hidden');$('auth-in').innerHTML=h;}
 async function identList(msg){
-  showAuth(`<h2>Qui êtes-vous ?</h2><div class="sub">Réservé aux responsables du vestiaire. Choisissez votre nom puis saisissez votre code PIN habituel.</div>${msg?`<div class="warnbox">${esc(msg)}</div>`:''}<div id="ident"><div class="empty">Chargement…</div></div>`);
-  try{const d=(await q(sb.from('agents').select('id,nom,prenom,actif,fonctions').eq('actif',true).order('nom'))).filter(hasF);
+  showAuth(`<h2>Qui êtes-vous ?</h2><div class="sub">Choisissez votre nom puis saisissez votre code PIN habituel (le même que dans l'application RDZ). L'accès est ouvert aux agents qui ont la fonction « Vestiaire ».</div>${msg?`<div class="warnbox">${esc(msg)}</div>`:''}<div id="ident"><div class="empty">Chargement…</div></div>`);
+  try{const d=await q(sb.from('agents').select('id,nom,prenom,actif,fonctions').eq('actif',true).order('nom'));
     $('ident').innerHTML=d.length?d.map(a=>`<button class="pick" onclick="pickAgent('${esc(a.id)}')">${esc(fullName(a))}<span>›</span></button>`).join(''):'<div class="empty">Aucun agent n\'a encore la fonction « Vestiaire ».<br>Cochez-la dans le paramétrage des comptes agents.</div>';}
   catch(e){$('ident').innerHTML=`<div class="empty">Connexion impossible.<br>${esc(errTxt(e))}<br><br><button class="btn g" onclick="identList()">Réessayer</button></div>`;}
 }
@@ -611,11 +618,12 @@ async function pinKey(k){
   else{PIN.buf='';pinScreen('Code incorrect, réessayez',true);}
 }
 function enter(a){
-  if(!hasF(a))return identList('Votre compte n\'a pas la fonction « Vestiaire ».');
+  if(!hasF(a)){return identList(fullName(a)+' : code PIN correct, mais ce compte n\'a pas la fonction « Vestiaire ». Pour l\'ouvrir : comptes-agents → ⚙ Fonctions de l\'agent → cocher « Vestiaire ».');}
   ME={id:String(a.id),nom:fullName(a)};$('scr-auth').classList.add('hidden');$('app').classList.remove('hidden');$('top-sub').textContent='👤 '+ME.nom;
   reload();
 }
 async function init(){
+  await loadVKeys();
   const id=localStorage.getItem(LS_ID),h=localStorage.getItem(LS_HASH);if(!id)return identList();
   try{const a=await q(sb.from('agents').select('id,nom,prenom,pin_hash,actif,fonctions').eq('id',id).single());
     if(!a||a.actif===false)return identList('Accès désactivé.');
