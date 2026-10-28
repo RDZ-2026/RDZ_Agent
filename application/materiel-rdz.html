@@ -63,6 +63,15 @@ h2{font-size:19px;font-weight:800;margin-bottom:3px}
 .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
 .backbar{display:flex;align-items:center;margin:-4px 0 12px}
 .backbtn{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:13.5px;font-weight:800;color:var(--ink);cursor:pointer;box-shadow:var(--sh)}
+.cmp{display:flex;gap:8px;align-items:stretch;margin-top:10px;flex-wrap:wrap}
+.cmp .bx{flex:1 1 76px;min-width:76px;background:#f4f7fa;border:1px solid var(--line);border-radius:11px;padding:7px 8px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.cmp .bx span{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.cmp .bx b{display:block;font-size:26px;line-height:1.15;font-weight:800;color:var(--ink)}
+.cmp .bx.in{background:#fff;border:2px solid var(--accent)}
+.cmp .bx.in input{width:100%;border:none;background:transparent;font:inherit;font-size:26px;font-weight:800;text-align:center;color:var(--ink);padding:0;-moz-appearance:textfield}
+.cmp .bx.in input:focus{outline:none}
+.cmp .bx.ok b{color:var(--ok)}.cmp .bx.warn b{color:var(--warn)}.cmp .bx.bad b{color:var(--bad)}
+.cmp .bx.ok{background:var(--ok-l);border-color:#bfe3c9}.cmp .bx.warn{background:var(--warn-l);border-color:#f0d9a6}.cmp .bx.bad{background:var(--bad-l);border-color:#f3c0ca}
 .filt{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eef3f8;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
 @media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
 .act{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 14px;text-align:left;cursor:pointer;box-shadow:var(--sh);position:relative;overflow:hidden}
@@ -128,149 +137,6 @@ table.t{width:100%;border-collapse:collapse;font-size:13px}
 .toast{background:var(--navy);color:#fff;padding:11px 14px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.2);border-left:4px solid var(--accent)}
 .toast.ok{border-left-color:#4ade80}.toast.err{background:#7d0d1e}
 </style>
-
-<style id="rdz-materiel-mobile-harmonisation-2026">
-@media screen {
-:root{--navy:#111c2e;--navy2:#203249;--accent:#d71920;--accent-d:#ad1118;--ink:#172438;--muted:#64748b;--line:#e0e7ef;--bg:#f3f6fa;--sh:0 8px 26px rgba(15,30,49,.065)}
-html{background:#e7edf3;scroll-padding-top:125px}
-body{background:linear-gradient(180deg,#f9fbfd 0%,#f1f5f9 65%);letter-spacing:-.008em}
-.top{background:linear-gradient(115deg,#111c2e,#203249);border-bottom:3px solid var(--accent);box-shadow:0 6px 22px rgba(12,25,42,.20)}
-.top-in{min-height:70px;padding:11px 16px;gap:12px}
-.logo{padding:5px 8px;border-radius:10px;box-shadow:0 3px 12px rgba(0,0,0,.15)}
-.logo img{width:84px;height:34px}
-.top .n{font-size:15px;letter-spacing:-.02em}.top .s{font-size:11.5px;color:#d0dbe7;margin-top:3px}
-.tb{min-height:40px;display:inline-flex;align-items:center;justify-content:center;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22)}
-.tb:focus-visible,.tab:focus-visible,.act:focus-visible,.btn:focus-visible,.backbtn:focus-visible,.chip:focus-visible,.key:focus-visible,.pick:focus-visible{outline:3px solid rgba(215,25,32,.3);outline-offset:2px}
-.tabs{top:70px;background:rgba(255,255,255,.97);border-bottom:1px solid var(--line);box-shadow:0 4px 12px rgba(15,30,49,.04)}
-.tabs-in{gap:7px;padding:9px 14px}
-.tab{min-height:42px;padding:10px 15px;border-radius:11px;font-size:12.5px;transition:background .15s,color .15s}
-.tab.on{background:var(--navy);box-shadow:0 3px 9px rgba(17,28,46,.14)}
-.tab:not(.on):hover{background:#edf2f7;color:var(--ink)}
-main{padding:22px 16px 120px}
-h2{font-size:23px;line-height:1.2;letter-spacing:-.035em}
-.sub{font-size:13px;line-height:1.55;margin-top:5px;margin-bottom:18px}
-.sec{font-size:11px;letter-spacing:.085em;margin:24px 0 12px}
-.kpis{gap:11px;margin-bottom:12px}
-.kpi{padding:17px 15px;border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:16px;box-shadow:var(--sh);min-height:100px}
-.kpi b{font-size:27px;line-height:1.2;letter-spacing:-.035em}
-.kpi span{display:block;font-size:11.5px;line-height:1.4;margin-top:6px}
-.actions{gap:11px}
-.act{min-height:132px;padding:19px 15px 17px;border:1px solid var(--line);border-radius:17px;box-shadow:var(--sh);transition:transform .15s,box-shadow .15s}
-.act::before{width:3px}
-.act .i{display:grid;place-items:center;width:48px;height:48px;border-radius:13px;background:#fff0f2;font-size:25px}
-.act .l{font-size:14.5px;line-height:1.25;margin-top:12px}
-.act .d{font-size:12px;line-height:1.45;margin-top:5px}
-.act .n{top:12px;right:12px}
-.act:active,.row.click:active{transform:scale(.985)}
-.card{border-color:var(--line);border-radius:16px;box-shadow:var(--sh);margin-bottom:13px}
-.card.pad{padding:17px}
-.row{padding:15px 16px;gap:11px;border-bottom-color:#eaf0f5}
-.row.hd{background:#f5f8fb;padding:11px 16px}
-.row .t{font-size:14px;line-height:1.35}
-.row .s{font-size:12px;line-height:1.5;margin-top:4px}
-.row .ic{width:32px;font-size:23px}
-.row .r{gap:8px}
-.q{min-width:43px}.q b{font-size:19px}
-.pill{padding:5px 10px;font-size:10.5px}
-.filt{background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:12px;padding:13px 14px;box-shadow:0 3px 12px rgba(15,30,49,.035)}
-.fl{font-size:11px;margin:15px 0 7px}
-.fi{min-height:48px;border-radius:11px;border-color:#d1dbe6;padding:12px 13px;font-size:16px}
-.fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(215,25,32,.12)}
-.btn{min-height:46px;border-radius:11px;padding:12px 16px;background:var(--accent);font-size:13.5px;box-shadow:0 2px 5px rgba(15,30,49,.06)}
-.btn.sm{min-height:38px;padding:9px 12px}
-.btn:disabled{cursor:not-allowed}
-.btn.g{border-color:#d5dfe9;box-shadow:none}
-.btn.d{background:var(--navy)}
-.backbtn{min-height:43px;border-radius:11px;padding:10px 14px}
-.chips{gap:8px}.chip{min-height:42px;padding:10px 14px;border-radius:12px}
-.chip.on{background:var(--navy)}
-.qty button{min-width:44px;width:44px;height:44px}.qty input{min-height:44px}
-.tscroll{border-radius:12px;border:1px solid var(--line)}
-.t th{background:var(--navy);padding:12px;font-size:10px}
-.t td{padding:12px 10px}
-.sheet-bg{background:rgba(10,20,35,.62);backdrop-filter:blur(3px)}
-.sheet{border-top:3px solid var(--accent);border-radius:22px 22px 0 0;padding:23px 18px calc(22px + env(safe-area-inset-bottom));box-shadow:0 -14px 45px rgba(10,20,35,.16)}
-.sheet h3{font-size:20px;letter-spacing:-.025em}
-.auth{background:linear-gradient(135deg,#111c2e,#203249)}
-.auth-top{padding:calc(40px + env(safe-area-inset-top)) 20px 28px}
-.auth-top .n{font-size:21px;letter-spacing:-.025em}
-.auth-top .s{font-size:13px;margin-top:7px}
-.auth-body{background:#f5f8fb;border-radius:25px 25px 0 0;padding:26px 20px 40px}
-.pick{min-height:60px;border-radius:13px;padding:17px 16px;box-shadow:var(--sh)}
-.dots{gap:17px}.dotp{border-color:var(--navy)}.dotp.on{background:var(--navy)}
-.key{box-shadow:0 4px 15px rgba(15,30,49,.06);border-color:#dce5ee}
-.key:active{background:#f0f4f8}
-.sticky{border-top-color:var(--line);box-shadow:0 -6px 22px rgba(15,30,49,.09)}
-@media(hover:hover){.act:hover{transform:translateY(-2px);box-shadow:0 13px 30px rgba(15,30,49,.11)}.btn:hover:not(:disabled){filter:brightness(.96)}}
-@media(max-width:480px){
- .top-in{padding:10px 12px;min-height:66px;gap:9px}
- .logo{padding:4px 6px}.logo img{width:68px;height:30px}
- .top .n{font-size:13px}.top .s{font-size:10.5px}
- .tb{font-size:11px;padding:8px 9px;min-height:38px}
- .tabs{top:66px}.tabs-in{padding:8px 11px}
- main{padding:18px 12px 110px}
- .kpis,.actions{gap:9px}
- .kpi{padding:14px 12px;min-height:94px}.kpi b{font-size:24px}
- .act{min-height:129px;padding:15px 12px}.act .i{width:44px;height:44px}
- .act .l{font-size:13.5px}
- .card.pad{padding:14px}
- .row{padding:13px 12px;flex-wrap:wrap}
- .row .g{flex-basis:calc(100% - 50px)}
- .row .r{margin-left:auto;max-width:100%}
- .sheet{padding-left:15px;padding-right:15px}
- .sticky{margin-left:-12px;margin-right:-12px}
-}
-@media(max-width:350px){.top .s{display:none}.tab{padding:9px 11px}.act .l{font-size:12.5px}}
-@media(prefers-reduced-motion:reduce){.act,.tab,.btn{transition:none}}
-}
-</style>
-
-
-<style id="rdz-materiel-compact-controls-2026">
-@media screen {
-:root{--control-border:#d8e1eb;--control-shadow:0 3px 10px rgba(17,28,46,.045)}
-button,select,input,textarea{max-width:100%}
-.btn,.backbtn,.tb,.chip,.tab{font-weight:750;letter-spacing:-.012em;transition:background .16s,border-color .16s,box-shadow .16s,transform .12s}
-.btn{min-height:42px;padding:10px 14px;border-radius:12px;box-shadow:0 3px 9px rgba(215,25,32,.12);font-size:13px}
-.btn.sm{min-height:36px;padding:8px 11px;font-size:12px;border-radius:10px}
-.btn.full{width:100%;max-width:460px;margin-left:auto;margin-right:auto;display:flex}
-.btn.g,.backbtn{background:#f8fafc;border:1px solid var(--control-border);box-shadow:var(--control-shadow)}
-.btn.d{box-shadow:0 3px 9px rgba(17,28,46,.13)}
-.btn:active:not(:disabled),.backbtn:active,.chip:active{transform:scale(.975)}
-.fi{min-height:43px;padding:10px 12px;border:1px solid var(--control-border);border-radius:12px;background:#fbfcfe;font-size:14px;line-height:1.35;box-shadow:inset 0 1px 2px rgba(17,28,46,.025)}
-select.fi{padding-right:30px}
-textarea.fi{min-height:84px;line-height:1.5}
-.fl{font-size:10.5px;letter-spacing:.055em;margin:13px 0 5px}
-.fr{gap:9px;min-width:0}.fr>*{min-width:0}
-.card.pad{padding:15px}
-.card.pad>.btn.full{margin-top:13px}
-.sheet{width:min(100%,560px);padding:20px 16px calc(20px + env(safe-area-inset-bottom))}
-.sheet .btn.full{max-width:none}
-.chip{min-height:36px;padding:8px 12px;border-radius:10px;font-size:12px;border-color:var(--control-border)}
-.qty{gap:6px}.qty button{width:38px;min-width:38px;height:38px;border-radius:11px;background:#f8fafc}.qty input{min-height:38px;width:56px;border-radius:10px}
-.pick{min-height:52px;padding:13px 14px;font-size:14px}
-.key{width:68px;height:68px;font-size:24px}.keypad{grid-template-columns:repeat(3,68px);gap:12px 17px}
-@media(max-width:600px){
- main{padding-left:12px;padding-right:12px}
- .card.pad{padding:13px}
- .fr{grid-template-columns:minmax(0,1fr)}
- .fi{width:100%;min-width:0}
- .sheet{max-height:94dvh}
- .sheet .fr{grid-template-columns:minmax(0,1fr)}
- .row .r .btn{min-height:34px;padding:7px 10px}
- .btn.full{max-width:none}
- .sticky .btn{min-height:44px}
-}
-@media(max-width:380px){
- .sheet{padding-left:12px;padding-right:12px}
- .btn{padding:9px 11px;font-size:12.5px}
- .card.pad{padding:12px}
- .key{width:62px;height:62px}.keypad{grid-template-columns:repeat(3,62px);gap:10px 15px}
-}
-@media(hover:hover){.btn:hover:not(:disabled),.backbtn:hover,.chip:hover{box-shadow:0 5px 14px rgba(17,28,46,.10)}}
-}
-</style>
-
 </head>
 <body>
 <section id="scr-auth" class="auth hidden">
@@ -415,6 +281,10 @@ async function bump(row,dTotal,dDispo){
   await q(sb.from('stock_materiel_items').update(upd).eq('id',row.id));Object.assign(row,upd);
 }
 
+// Bloc de quantités bien lisible : [Attendu 8] [Compté __] [Écart −1]
+const bx=(lbl,val,cls)=>`<div class="bx ${cls||''}"><span>${lbl}</span><b>${val}</b></div>`;
+const bxIn=(lbl,input)=>`<div class="bx in"><span>${lbl}</span>${input}</div>`;
+const ecartBx=(c,a)=>c==null?bx('Écart','—'):c===a?bx('Écart','✓ 0','ok'):bx('Écart',(c>a?'+':'')+(c-a),c>a?'warn':'bad');
 // ═══ NAVIGATION ═══
 const TABS=[['home','🏠 Accueil'],['stock','📦 Stock'],['sortie','📤 Sortie'],['retour','📥 Retour'],['inv','✅ Inventaire'],['cmd','🛒 Commandes'],['hist','📜 Historique'],['param','⚙️ Paramètres']];
 function tab(t,f){T=t;F=f||{};render();window.scrollTo(0,0);}
@@ -552,8 +422,9 @@ function rSortie(){
     <label class="fl">Mission (texte libre)</label><input class="fi" id="so-mis" value="${esc(F.mis||'')}" oninput="F.mis=this.value" placeholder="Ex. Événement Palexpo 14.11">
     <div class="fr"><div><label class="fl">État au départ</label><select class="fi" id="so-et" onchange="F.et=this.value">${etatOpts(F.et||'bon')}</select></div><div><label class="fl">Commentaire</label><input class="fi" id="so-com" value="${esc(F.com||'')}" oninput="F.com=this.value"></div></div></div>
   <div class="card pad"><div class="fl first">Depuis</div>${locSelect('so',site,local,"F.site=$('so-site').value;F.local=$('so-local').value;render()")}
-    ${site&&local?(rows.length?`<label class="fl">Article</label><select class="fi" id="so-a">${rows.map(r=>`<option value="${esc(r.id)}">${esc((r.icon||'')+' '+r.art)} — ${r.quantite_dispo-sum(CART.filter(c=>c.id===r.id),c=>c.q)} dispo</option>`).join('')}</select>
-      <label class="fl">Quantité</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${qtyField('so-q',null)}<button class="btn sm d" onclick="addCart()">➕ Ajouter</button></div>`:'<div class="empty">Rien de disponible dans ce local.</div>'):''}</div>
+    ${site&&local?(rows.length?`<label class="fl">Article</label><select class="fi" id="so-a" onchange="$('so-disp').textContent=this.selectedOptions[0].dataset.d">${rows.map(r=>`<option value="${esc(r.id)}" data-d="${r.quantite_dispo-sum(CART.filter(c=>c.id===r.id),c=>c.q)}">${esc((r.icon||'')+' '+r.art)}</option>`).join('')}</select>
+      <div class="cmp"><div class="bx ok"><span>Disponible</span><b id="so-disp">${rows[0].quantite_dispo-sum(CART.filter(c=>c.id===rows[0].id),c=>c.q)}</b></div>${bxIn('À sortir','<input type="number" min="1" inputmode="numeric" id="so-q" value="1">')}</div>
+      <button class="btn full d" onclick="addCart()">➕ Ajouter à la sortie</button>`:'<div class="empty">Rien de disponible dans ce local.</div>'):''}</div>
   </div><div>
   <div class="card pad"><div class="fl first">À sortir</div>
     ${CART.length?CART.map((c,i)=>{const r=rowById(c.id);return `<div class="row" style="padding:9px 0"><div class="ic">${esc(r.icon||'📦')}</div><div class="g"><div class="t">${c.q} × ${esc(r.art)}</div><div class="s">${esc(r.site)} · ${esc(r.local)}</div></div><button class="btn sm g" style="flex:0 0 auto;width:38px" onclick="CART.splice(${i},1);render()">✕</button></div>`;}).join(''):'<div class="empty">Ajoutez du matériel.</div>'}
@@ -592,8 +463,9 @@ function retSheet(hi){
   const h=holders()[hi];if(!h)return;
   sheet(`<h3>📥 Retour — ${esc(h.label)}</h3><div class="sub">Indiquez ce qui revient, son état et où il est rangé.</div>
     ${h.items.map((a,i)=>{const r=rowById(a.materiel_id);const p=r||parse({nom:a.materiel_nom});return `<div class="card pad" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(p.art)}</b><span class="mini" style="font-size:12px;color:var(--muted)">${a.quantite} sorti(s)</span></div>
-      <div class="fr"><div><label class="fl">Quantité rendue</label>${qtyField('rt-q'+i,a.quantite,a.quantite)}</div><div><label class="fl">État au retour</label><select class="fi" id="rt-e${i}">${etatOpts('bon')}</select></div></div>
+      <b style="font-size:15px">${esc(p.art)}</b>
+      <div class="cmp">${bx('Sorti',a.quantite,'warn')}${bxIn('Rendu',`<input type="number" min="0" max="${a.quantite}" inputmode="numeric" id="rt-q${i}" value="${a.quantite}">`)}</div>
+      <label class="fl">État au retour</label><select class="fi" id="rt-e${i}">${etatOpts('bon')}</select>
       <label class="fl">Commentaire</label><input class="fi" id="rt-c${i}" placeholder="Obligatoire si défectueux">
       ${locSelect('rt'+i,p.site||'',p.local||'')}</div>`;}).join('')}
     <button class="btn full ok" onclick="doRetour(${hi})">✅ Enregistrer le retour</button><button class="btn full g" onclick="closeSheet()">Annuler</button>`);
@@ -642,11 +514,11 @@ function invStart(){const s=$('iv-site').value,l=$('iv-local').value;if(!s||!l)r
 function rInvCount(){
   const L=INV.lignes;const done=L.filter(x=>x.compte!=null).length;
   return `<h2>${esc(INV.site)} · ${esc(INV.local)}</h2><div class="sub">Attendu = pièces qui devraient être dans ce local (hors matériel sorti). ${done}/${L.length} compté(s).</div>
-  ${L.length?L.map((x,i)=>`<div class="card pad" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(x.icon||'📦')} ${esc(x.art)}</b><span class="pill p-mut">attendu ${x.attendu}${x.indispo0?' (dont '+x.indispo0+' indispo)':''}</span></div>
-    <div class="fr"><div><label class="fl">Présents</label><input class="fi" type="number" min="0" inputmode="numeric" value="${x.compte==null?'':x.compte}" placeholder="—" onchange="INV.lignes[${i}].compte=this.value===''?null:Math.max(0,parseInt(this.value)||0);render()"></div>
-    <div><label class="fl">Dont défectueux / HS</label><input class="fi" type="number" min="0" value="${x.defectueux||0}" onchange="INV.lignes[${i}].defectueux=Math.max(0,parseInt(this.value)||0);render()"></div></div>
+  ${L.length?L.map((x,i)=>`<div class="card pad" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:15px">${esc(x.icon||'📦')} ${esc(x.art)}</b>${x.indispo0?`<span class="pill p-warn">dont ${x.indispo0} indispo</span>`:''}</div>
+    <div class="cmp">${bx('Attendu',x.attendu)}${bxIn('Présents',`<input type="number" min="0" inputmode="numeric" value="${x.compte==null?'':x.compte}" placeholder="—" onchange="INV.lignes[${i}].compte=this.value===''?null:Math.max(0,parseInt(this.value)||0);render()">`)}${ecartBx(x.compte,x.attendu)}</div>
+    <div class="cmp">${bxIn('Dont défectueux / HS',`<input type="number" min="0" inputmode="numeric" value="${x.defectueux||0}" onchange="INV.lignes[${i}].defectueux=Math.max(0,parseInt(this.value)||0);render()">`)}</div>
     <input class="fi" style="margin-top:8px" placeholder="Commentaire (état, problème…)" value="${esc(x.com)}" onchange="INV.lignes[${i}].com=this.value">
-    ${x.compte!=null&&x.compte!==x.attendu?`<div style="margin-top:8px"><span class="pill p-bad">Écart ${x.compte>x.attendu?'+':''}${x.compte-x.attendu}</span></div>`:x.compte!=null?'<div style="margin-top:8px"><span class="pill p-ok">Conforme</span></div>':''}</div>`).join('')
+    </div>`).join('')
   :'<div class="card"><div class="empty">Aucun article attendu dans ce local.</div></div>'}
   <div class="card pad"><label class="fl first">Commentaire général</label><input class="fi" id="iv-com">
     <label style="display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:13px"><input type="checkbox" id="iv-fix" checked style="width:20px;height:20px;flex-shrink:0"><span><b>Corriger le stock</b> avec ces chiffres (inventaire). Décochez pour un simple <b>état des lieux</b>.</span></label>
@@ -905,8 +777,9 @@ function recvSheet(nu){const b=BONS.find(x=>x.numero===nu);
   sheet(`<h3>📥 Réception — ${esc(nu)}</h3><div class="sub">Indiquez les quantités reçues et où les ranger : le stock est mis à jour directement. Réception partielle possible : le bon reste « en attente » pour le reste.</div>
   ${b.lignes.map((x,i)=>{const rest=Math.max(0,x.qte-(x.recu||0));if(!rest)return `<div class="card pad"><b>${esc(x.icon||'')} ${esc(x.art)}</b> <span class="pill p-ok">entièrement reçu (${x.recu})</span></div>`;
     const loc=x.site?{site:x.site,local:x.local}:(located().find(r=>r.art===x.art)||{site:'',local:''});
-    return `<div class="card pad"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(x.icon||'')} ${esc(x.art)}</b><span class="pill p-mut">${x.recu||0} / ${x.qte} reçu(s)</span></div>
-     <div class="fr"><div><label class="fl">Reçu maintenant</label><input class="fi" type="number" min="0" max="${rest}" id="rv-q${i}" value="${rest}"></div><div><label class="fl">Prix unitaire (CHF)</label><input class="fi" type="number" min="0" step="0.05" id="rv-p${i}" value="${x.prix||0}"></div></div>
+    return `<div class="card pad"><b style="font-size:15px">${esc(x.icon||'')} ${esc(x.art)}</b>
+     <div class="cmp">${bx('Commandé',x.qte)}${bx('Déjà reçu',x.recu||0)}${bx('Reste',rest,'warn')}${bxIn('Reçu maintenant',`<input type="number" min="0" max="${rest}" inputmode="numeric" id="rv-q${i}" value="${rest}">`)}</div>
+     <label class="fl">Prix unitaire (CHF)</label><input class="fi" type="number" min="0" step="0.05" id="rv-p${i}" value="${x.prix||0}">
      ${locSelect('rv'+i,loc.site,loc.local)}</div>`;}).join('')}
   <button class="btn full ok" onclick="doRecv('${esc(nu)}')">✅ Confirmer la réception</button><button class="btn full g" onclick="bonSheet('${esc(nu)}')">Retour</button>`);}
 async function doRecv(nu){const b=BONS.find(x=>x.numero===nu);const todo=[];

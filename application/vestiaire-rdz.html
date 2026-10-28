@@ -64,6 +64,15 @@ h2{font-size:19px;font-weight:800;margin-bottom:3px}
 .backbar{display:flex;align-items:center;margin:-4px 0 12px}
 .backbtn{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:13.5px;font-weight:800;color:var(--ink);cursor:pointer;box-shadow:var(--sh)}
 .tg{min-width:44px;text-align:center;font-weight:800;font-size:13px;background:#eef3f8;border:1px solid var(--line);border-radius:8px;padding:6px 4px;flex-shrink:0}
+.cmp{display:flex;gap:8px;align-items:stretch;margin-top:10px;flex-wrap:wrap}
+.cmp .bx{flex:1 1 76px;min-width:76px;background:#f4f7fa;border:1px solid var(--line);border-radius:11px;padding:7px 8px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.cmp .bx span{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.cmp .bx b{display:block;font-size:26px;line-height:1.15;font-weight:800;color:var(--ink)}
+.cmp .bx.in{background:#fff;border:2px solid var(--accent)}
+.cmp .bx.in input{width:100%;border:none;background:transparent;font:inherit;font-size:26px;font-weight:800;text-align:center;color:var(--ink);padding:0;-moz-appearance:textfield}
+.cmp .bx.in input:focus{outline:none}
+.cmp .bx.ok b{color:var(--ok)}.cmp .bx.warn b{color:var(--warn)}.cmp .bx.bad b{color:var(--bad)}
+.cmp .bx.ok{background:var(--ok-l);border-color:#bfe3c9}.cmp .bx.warn{background:var(--warn-l);border-color:#f0d9a6}.cmp .bx.bad{background:var(--bad-l);border-color:#f3c0ca}
 .filt{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eef3f8;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:700}
 @media(min-width:760px){.actions{grid-template-columns:repeat(4,1fr)}}
 .act{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 14px;text-align:left;cursor:pointer;box-shadow:var(--sh);position:relative;overflow:hidden}
@@ -255,6 +264,10 @@ function agentChoices(){return D.agents.map(fullName).sort((a,b)=>a.localeCompar
 const artOpts=(sel,withNew)=>D.items.slice().sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(a=>`<option value="${a.id}" ${String(a.id)===String(sel)?'selected':''}>${esc((a.icon||'👕')+' '+a.nom)}${proprio(a.id)!=='RDZ'?' · '+esc(proprio(a.id)):''}</option>`).join('')+(withNew?'<option value="__new">➕ Nouvel article…</option>':'');
 const tOpts=(artId,sel,withStock)=>taillesOf(artId).map(t=>`<option value="${t.id}" ${String(t.id)===String(sel)?'selected':''}>${esc(t.taille)}${withStock?' — '+t.quantite+' en stock':''}</option>`).join('');
 
+// Bloc de quantités bien lisible : [Attendu 8] [Compté __] [Écart −1]
+const bx=(lbl,val,cls)=>`<div class="bx ${cls||''}"><span>${lbl}</span><b>${val}</b></div>`;
+const bxIn=(lbl,input)=>`<div class="bx in"><span>${lbl}</span>${input}</div>`;
+const ecartBx=(c,a)=>c==null?bx('Écart','—'):c===a?bx('Écart','✓ 0','ok'):bx('Écart',(c>a?'+':'')+(c-a),c>a?'warn':'bad');
 // ═══ NAVIGATION ═══
 function tab(t,f){T=t;F=f||{};render();window.scrollTo(0,0);}
 function render(){
@@ -360,8 +373,10 @@ function rAttr(){
     <label class="fl">Note (facultatif)</label><input class="fi" id="at-no" value="${esc(F.no||'')}" oninput="F.no=this.value" placeholder="Ex. dotation initiale, remplacement…"></div>
   <div class="sec">Ajouter</div><div class="card pad">
     <label class="fl first">Article</label><select class="fi" onchange="F.art=this.value;F.t='';render()">${artOpts(aid)}</select>
-    <div class="fr"><div><label class="fl">Taille</label><select class="fi" onchange="F.t=this.value;render()">${tOpts(aid,tid,true)}</select></div><div><label class="fl">Prendre dans</label><select class="fi" id="at-f">${t?fromOpts(t,F.from):''}</select></div></div>
-    <label class="fl">Quantité</label><div style="display:flex;gap:10px;align-items:center">${qtyField('at-q',t?t.quantite:0)}<button class="btn d" onclick="cartAdd()" ${t&&t.quantite?'':'disabled'}>➕ Ajouter</button></div></div>
+    <div class="fr"><div><label class="fl">Taille</label><select class="fi" onchange="F.t=this.value;render()">${tOpts(aid,tid,true)}</select></div><div><label class="fl">Prendre dans</label><select class="fi" id="at-f" onchange="F.from=this.value;render()">${t?fromOpts(t,F.from):''}</select></div></div>
+    ${t?(()=>{const fr=F.from!=null&&[...lieuxDe(t.id).map(([l])=>l),''].includes(F.from)?F.from:((lieuxDe(t.id)[0]||[''])[0]);const ici=(fr?enLieu(t.id,fr):nonLoc(t))-sum(CART.filter(c=>c.tid===t.id&&c.from===fr),c=>c.n);
+      return `<div class="cmp">${bx('En stock (taille '+esc(t.taille)+')',t.quantite,t.quantite?'':'bad')}${bx(fr?'Dans ce lieu':'Non localisé',Math.max(0,ici),ici>0?'ok':'bad')}${bxIn('À remettre','<input type="number" min="1" inputmode="numeric" id="at-q" value="1">')}</div>`;})():''}
+    <button class="btn full d" onclick="cartAdd()" ${t&&t.quantite?'':'disabled'}>➕ Ajouter à la dotation</button></div>
   ${CART.length?`<div class="sec">À remettre</div><div class="card">${CART.map((c,i)=>`<div class="row"><div class="ic">${esc(itemById(c.aid).icon||'👕')}</div><div class="g"><div class="t">${c.n} × ${esc(itemById(c.aid).nom)} — ${esc(tailleById(c.tid).taille)}</div><div class="s">depuis ${esc(c.from||'non localisé')}</div></div><button class="btn sm g" onclick="CART.splice(${i},1);render()">✕</button></div>`).join('')}</div>
     <div class="sticky"><button class="btn full" onclick="doAttr()">📤 Confirmer la dotation (${sum(CART,c=>c.n)} pièce(s))</button></div>`:''}`;
 }
@@ -386,8 +401,9 @@ function rRetour(){
     <div class="card">${ids.filter(id=>!F.q||norm(sagName(id)).includes(norm(F.q))).map(id=>`<div class="row click" onclick="tab('retour',{ag:'${id}'})"><div class="ic">👤</div><div class="g"><div class="t">${esc(sagName(id))}</div><div class="s">${by[id].map(d=>d.quantite+' × '+esc((itemById(d.article_id)||{}).nom||'?')+' '+esc(d.taille||'')).join(' · ')}</div></div><span class="pill p-warn">${sum(by[id],d=>d.quantite)} pièce(s)</span></div>`).join('')||'<div class="empty">Aucun vêtement chez les agents.</div>'}</div>`;
   const L=by[sel];
   return `<h2>Retour — ${esc(sagName(sel))}</h2><div class="sub">Indiquez combien de pièces sont rendues et leur état. « Bon » ou « Usé » : la pièce revient en stock dans le lieu choisi. Sinon elle est retirée.</div>
-  ${L.map((d,i)=>{const a=itemById(d.article_id)||{nom:'?'};return `<div class="card pad" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(a.icon||'👕')} ${esc(a.nom)} — ${esc(d.taille||'')}</b><span class="pill p-mut">détient ${d.quantite}</span></div>
-    <div class="fr"><div><label class="fl">Rendu(s)</label><input class="fi" type="number" min="0" max="${d.quantite}" id="rt-q${i}" value="0"></div><div><label class="fl">État</label><select class="fi" id="rt-e${i}">${CFG.etats.map(e=>`<option value="${esc(e.code)}">${esc(e.label)}${e.stock?' → stock':' → retiré'}</option>`).join('')}</select></div></div></div>`;}).join('')}
+  ${L.map((d,i)=>{const a=itemById(d.article_id)||{nom:'?'};return `<div class="card pad" style="margin-bottom:10px"><b style="font-size:15px">${esc(a.icon||'👕')} ${esc(a.nom)} — ${esc(d.taille||'')}</b>
+    <div class="cmp">${bx('Détient',d.quantite,'warn')}${bxIn('Rendu',`<input type="number" min="0" max="${d.quantite}" inputmode="numeric" id="rt-q${i}" value="0">`)}</div>
+    <div class="fr"><div><label class="fl">État</label><select class="fi" id="rt-e${i}">${CFG.etats.map(e=>`<option value="${esc(e.code)}">${esc(e.label)}${e.stock?' → stock':' → retiré'}</option>`).join('')}</select></div></div></div>`;}).join('')}
   <div class="card pad">${locSelect('rt',F.site||'','')}<div class="hint">Lieu où ranger les pièces qui reviennent en stock.</div><label class="fl">Commentaire</label><input class="fi" id="rt-c"></div>
   <div class="sticky"><button class="btn full" onclick="doRetour('${sel}')">📥 Enregistrer le retour</button><button class="btn full g" onclick="L_=D.dots.filter(d=>String(d.agent_id)==='${sel}');L_.forEach((d,i)=>{$('rt-q'+i).value=d.quantite})">Tout est rendu</button></div>`;
 }
@@ -446,7 +462,7 @@ function demSheet(id){const d=D.dem.find(x=>String(x.id)===String(id));const t=d
       <button class="btn full g" onclick="demSuivi('${id}')">Enregistrer le suivi</button>
       ${t&&t.quantite<d.quantite&&a?`<button class="btn full g" onclick="addToPrep('${a.id}','${esc(t.taille)}','',${d.quantite-t.quantite});demSuivi('${id}','commande',true)">🛒 Ajouter à une commande</button>`:''}</div>
     <div class="sec">Distribuer à l'agent</div>
-    ${t?`<label class="fl first">Prendre dans</label><select class="fi" id="dm-f">${fromOpts(t)}</select><div class="hint">${t.quantite} en stock pour cette taille.</div>`:'<div class="warnbox">Article ou taille absent du stock : créez-le (Paramètres › Articles) ou commandez-le.</div>'}
+    ${t?`<div class="cmp">${bx('Demandé',d.quantite)}${bx('En stock',t.quantite,t.quantite>=d.quantite?'ok':'bad')}</div><label class="fl">Prendre dans</label><select class="fi" id="dm-f">${fromOpts(t)}</select>`:'<div class="warnbox">Article ou taille absent du stock : créez-le (Paramètres › Articles) ou commandez-le.</div>'}
     <button class="btn full ok" onclick="demDecide('${id}',true)" ${t&&t.quantite>=d.quantite?'':'disabled'}>✅ Distribuer (accepter la demande)</button>
     <label class="fl">Motif du refus (communiqué à l'agent)</label><input class="fi" id="dm-n"><button class="btn full g" onclick="demDecide('${id}',false)">✖ Refuser</button>`
     :`${d.decided_at?`<div class="note">Traitée le ${fDT(d.decided_at)}${d.reponse?' — '+esc(d.reponse):''}</div>`:''}`}
@@ -472,8 +488,8 @@ function rInvCount(){const L=INV.lignes;const done=L.filter(x=>x.compte!=null).l
   const by={};L.forEach((x,i)=>{const t=tailleById(x.tid);(by[t.article_id]=by[t.article_id]||[]).push([x,i,t]);});
   return `<h2>📍 ${esc(INV.lieu)}</h2><div class="sub">Attendu = pièces enregistrées dans ce lieu. ${done}/${L.length} compté(s). Laissez vide ce que vous n'avez pas compté.</div>
   ${Object.keys(by).map(aid=>{const a=itemById(aid)||{nom:'?'};return `<div class="card" style="margin-bottom:10px"><div class="row" style="background:#f7f9fb"><div class="ic">${esc(a.icon||'👕')}</div><div class="g"><div class="t">${esc(a.nom)}</div></div></div>
-    ${by[aid].sort((p,q)=>tSort(p[2],q[2])).map(([x,i,t])=>`<div class="row"><div class="tg">${esc(t.taille)}</div><div class="g"><div class="s">attendu ${x.att}${x.compte!=null&&x.compte!==x.att?` · <b style="color:${x.compte>x.att?'var(--warn)':'var(--bad)'}">écart ${x.compte>x.att?'+':''}${x.compte-x.att}</b>`:''}</div></div>
-      <input class="fi" style="width:84px" type="number" min="0" inputmode="numeric" value="${x.compte==null?'':x.compte}" placeholder="—" onchange="INV.lignes[${i}].compte=this.value===''?null:Math.max(0,parseInt(this.value)||0);render()"></div>`).join('')}</div>`;}).join('')||'<div class="card"><div class="empty">Rien n\'est encore enregistré dans ce lieu. Ajoutez ce que vous trouvez ci-dessous.</div></div>'}
+    ${by[aid].sort((p,q)=>tSort(p[2],q[2])).map(([x,i,t])=>`<div class="row" style="align-items:stretch"><div class="tg" style="display:flex;align-items:center;justify-content:center;font-size:16px;min-width:52px">${esc(t.taille)}</div>
+      <div class="cmp" style="flex:1;margin-top:0">${bx('Attendu',x.att)}${bxIn('Compté',`<input type="number" min="0" inputmode="numeric" value="${x.compte==null?'':x.compte}" placeholder="—" onchange="INV.lignes[${i}].compte=this.value===''?null:Math.max(0,parseInt(this.value)||0);render()">`)}${ecartBx(x.compte,x.att)}</div></div>`).join('')}</div>`;}).join('')||'<div class="card"><div class="empty">Rien n\'est encore enregistré dans ce lieu. Ajoutez ce que vous trouvez ci-dessous.</div></div>'}
   <div class="card pad"><b>➕ Trouvé dans ce lieu</b><div class="fr"><div><label class="fl">Article</label><select class="fi" id="ia-a" onchange="$('ia-t').innerHTML=tOpts(this.value)">${artOpts()}</select></div><div><label class="fl">Taille</label><select class="fi" id="ia-t">${D.items[0]?tOpts(D.items[0].id):''}</select></div></div><button class="btn full g" onclick="invAdd()">Ajouter à la liste</button></div>
   <div class="card pad"><label style="display:flex;gap:9px;font-size:13.5px"><input type="checkbox" id="iv-fix" checked style="width:20px;height:20px"> Corriger le stock selon le comptage (sinon : simple constat)</label><label class="fl">Commentaire</label><input class="fi" id="iv-c"></div>
   <div class="sticky"><button class="btn full" onclick="invSave()">✅ Enregistrer l'inventaire</button></div>`;}
@@ -508,8 +524,8 @@ async function applyOld(id){const L=await q(sb.from('stock_inventaire_lignes').s
 function rReprise(){const L=D.tailles.filter(t=>nonLoc(t)>0).sort((a,b)=>((itemById(a.article_id)||{}).nom||'').localeCompare((itemById(b.article_id)||{}).nom||'','fr')||tSort(a,b));
   return `<h2>Stock à localiser</h2><div class="sub">Ces pièces sont dans le stock mais pas encore rattachées à un lieu (stock d'avant cette application, ou demandes acceptées ailleurs). Choisissez un lieu et rangez-les — ou faites l'inventaire du lieu, qui les localise aussi.</div>
   <div class="card pad">${locSelect('rp',F.site||'','')}</div>
-  <div class="card">${L.map(t=>{const a=itemById(t.article_id)||{nom:'?'};return `<div class="row"><div class="ic">${esc(a.icon||'👕')}</div><div class="g"><div class="t">${esc(a.nom)} — ${esc(t.taille)}</div><div class="s">${nonLoc(t)} non localisé(s) sur ${t.quantite}</div></div>
-    <input class="fi" style="width:74px" type="number" min="0" max="${nonLoc(t)}" id="rp-${t.id}" value="${nonLoc(t)}"><button class="btn sm d" onclick="doReprise('${t.id}')">Ranger</button></div>`;}).join('')||'<div class="empty">✅ Tout le stock est localisé.</div>'}</div>
+  <div class="card">${L.map(t=>{const a=itemById(t.article_id)||{nom:'?'};return `<div class="row"><div class="ic">${esc(a.icon||'👕')}</div><div class="g"><div class="t">${esc(a.nom)} — ${esc(t.taille)}</div><div class="cmp">${bx('À ranger',nonLoc(t),'warn')}${bx('Total',t.quantite)}${bxIn('Ranger',`<input type="number" min="0" max="${nonLoc(t)}" inputmode="numeric" id="rp-${t.id}" value="${nonLoc(t)}">`)}</div></div>
+    <button class="btn sm d" onclick="doReprise('${t.id}')">Ranger</button></div>`;}).join('')||'<div class="empty">✅ Tout le stock est localisé.</div>'}</div>
   ${L.length>1?'<button class="btn full g" onclick="repriseAll()">Tout ranger dans ce lieu</button>':''}`;}
 async function doReprise(tid){const t=tailleById(tid),a=itemById(t.article_id);const to=lieuVal('rp'),n=parseInt($('rp-'+tid).value)||0;F.site=$('rp-site').value;
   if(!to)return toast('Choisissez le site et le lieu en haut','err');if(n<1||n>nonLoc(t))return toast('Quantité invalide','err');
@@ -755,8 +771,9 @@ function recvSheet(nu){const b=BONS.find(x=>x.numero===nu);
   sheet(`<h3>📥 Réception — ${esc(nu)}</h3><div class="sub">Indiquez les quantités reçues et où les ranger : le stock est mis à jour directement. Réception partielle possible : le bon reste ouvert pour le reste.</div>
   ${b.lignes.map((x,i)=>{const rest=Math.max(0,x.qte-(x.recu||0));if(!rest)return `<div class="card pad"><b>${esc(x.icon||'')} ${esc(lnName(x))}</b> <span class="pill p-ok">entièrement reçu (${x.recu})</span></div>`;
     const [s,l]=(x.lieu||'').split(' / ');
-    return `<div class="card pad"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${esc(x.icon||'')} ${esc(lnName(x))}</b><span class="pill p-mut">${x.recu||0} / ${x.qte} reçu(s)</span></div>
-     <div class="fr"><div><label class="fl">Reçu maintenant</label><input class="fi" type="number" min="0" max="${rest}" id="rv-q${i}" value="${rest}"></div><div><label class="fl">Prix unitaire (CHF)</label><input class="fi" type="number" min="0" step="0.05" id="rv-p${i}" value="${x.prix||0}"></div></div>
+    return `<div class="card pad"><b style="font-size:15px">${esc(x.icon||'')} ${esc(lnName(x))}</b>
+     <div class="cmp">${bx('Commandé',x.qte)}${bx('Déjà reçu',x.recu||0)}${bx('Reste',rest,'warn')}${bxIn('Reçu maintenant',`<input type="number" min="0" max="${rest}" inputmode="numeric" id="rv-q${i}" value="${rest}">`)}</div>
+     <label class="fl">Prix unitaire (CHF)</label><input class="fi" type="number" min="0" step="0.05" id="rv-p${i}" value="${x.prix||0}">
      ${locSelect('rv'+i,s||'',l||'')}</div>`;}).join('')}
   <button class="btn full ok" onclick="doRecv('${esc(nu)}')">✅ Confirmer la réception</button><button class="btn full g" onclick="bonSheet('${esc(nu)}')">Retour</button>`);}
 async function doRecv(nu){const b=BONS.find(x=>x.numero===nu);const todo=[];
