@@ -1,3 +1,4 @@
+<!-- v39 · 2026-10-30 · Modifier : ordre des photos réglable par glisser-déposer (ordinateur) ou flèches ◀ ▶ (tablette / téléphone), numéro affiché sur chaque vignette. Enregistré aussitôt dans journal_photos.ordre ; le détail, l'impression/PDF et l'export suivent cet ordre. Les photos jamais réordonnées restent dans l'ordre d'avant. Nécessite migration-ordre-photos.sql. -->
 <!-- v38 · 2026-10-23 · Modifier : Site, Activité et Localisation deviennent des menus déroulants, mêmes listes que côté agent (sites actifs ; journal_activites et journal_localisations du site, + communes à tous les sites) ; changer le site recharge les deux autres listes et met aussi à jour site_id. Une valeur actuelle absente des listes reste affichée et conservée. Rien d'autre ne change (aucun CSS ajouté). -->
 <!-- v37 · 2026-10-23 · « Type d'action » renommé « Constat » partout à l'écran (tableau, détail, Modifier, Classer, statistiques) — colonnes inchangées ; liste de secours du référentiel mise à jour (v2). Rien d'autre ne change. -->
 <!-- v36 · 2026-10-23 · rapport imprimable (rapport STANDARD) remanié pour le client : bandeau Date · Heure · Gravité · Agent · Catégorie (Gravité seulement si renseignée) ; 1 — Constat (Type de constat = type d'action choisi par l'agent [+ précision « Autre »], Précisez = « Que se passe-t-il ? ») ; 2 — Localisation (localisation + précision) ; 3 — Mesures prises (= « Qu'avez-vous fait ? ») sans les cases Situation terminée / Action à venir / Pour information / Problème en cours ; 4 — Photos. Rapports d'alarme, personnalisés et de synthèse inchangés. -->
@@ -1279,7 +1280,10 @@ async function loadData(){
     (rtypes||[]).forEach(t=>{ RAPPORT_TYPES[t.id] = t; });
 
     const photosByEntree = {};
-    (photosAll||[]).forEach(p=>{ (photosByEntree[p.entree_id] = photosByEntree[p.entree_id]||[]).push({id:p.id, url:p.url, legende:p.legende||''}); });
+    (photosAll||[]).forEach(p=>{ (photosByEntree[p.entree_id] = photosByEntree[p.entree_id]||[]).push({id:p.id, url:p.url, legende:p.legende||'', ordre:(p.ordre==null?null:Number(p.ordre))}); });
+    // v39 — ordre choisi par la supervision (journal_photos.ordre) ; les photos
+    // sans ordre gardent l'ordre de chargement, après celles qui en ont un.
+    Object.values(photosByEntree).forEach(list=>list.sort(comparePhotoOrdre));
 
     const std = (entrees||[]).map(r=>({
       id:r.id, kind:'standard', site:r.site_nom||'', agent:r.agent_nom||'',
@@ -1756,9 +1760,17 @@ async function openEdit(id){
    et rejouée par saveEdit pour celles qui auraient changé entre-temps. */
 function editPhotosHtml(r){
   if(!r.photos.length) return '<div style="color:#999;font-size:12.5px;grid-column:1/-1"><i>Aucune photo.</i></div>';
-  return r.photos.map(p=>`
-          <div class="photo" style="position:relative">
-            <a href="${esc(p.url)}" target="_blank"><img src="${esc(p.url)}" alt=""></a>
+  const n = r.photos.length;
+  const arrowCss = 'background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:13px;cursor:pointer';
+  return r.photos.map((p,i)=>`
+          <div class="photo ef-photo-card" style="position:relative;cursor:grab" draggable="true" data-photoid="${esc(p.id)}"
+            ondragstart="onEditPhotoDragStart(event)" ondragover="onEditPhotoDragOver(event)" ondragleave="onEditPhotoDragLeave(event)" ondrop="onEditPhotoDrop(event)" ondragend="onEditPhotoDragEnd(event)">
+            <a href="${esc(p.url)}" target="_blank" draggable="false"><img src="${esc(p.url)}" alt="" draggable="false"></a>
+            <span style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:600" title="Glisser-déposer pour changer l'ordre">${i+1}</span>
+            <div style="position:absolute;top:84px;left:4px;right:4px;display:flex;justify-content:space-between;pointer-events:none">
+              <button type="button" style="${arrowCss};pointer-events:auto;${i===0?'visibility:hidden':''}" onclick="moveEditPhoto('${esc(p.id)}',-1)" title="Déplacer vers la gauche">◀</button>
+              <button type="button" style="${arrowCss};pointer-events:auto;${i===n-1?'visibility:hidden':''}" onclick="moveEditPhoto('${esc(p.id)}',1)" title="Déplacer vers la droite">▶</button>
+            </div>
             <button type="button" class="btn btn-sm" style="position:absolute;top:4px;right:4px;background:#8B1A1A;color:#fff;padding:3px 7px" onclick="removeEditPhoto('${p.id}')" title="Supprimer cette photo">✕</button>
             <input type="text" class="ef-photo-lg" data-photoid="${esc(p.id)}" value="${esc(p.legende||'')}" placeholder="Légende de la photo…"
               style="width:100%;border:none!important;border-top:1px solid var(--line-soft)!important;border-radius:0!important;padding:7px 8px;font-size:12px;font-family:var(--font)"
@@ -1767,6 +1779,76 @@ function editPhotosHtml(r){
 }
 function refreshEditPhotos(r){
   const el = document.getElementById('edit-photos'); if(el) el.innerHTML = editPhotosHtml(r);
+}
+
+/* v39 — ordre des photos : glisser-déposer (ordinateur) ou flèches ◀ ▶
+   (tablette / téléphone). Enregistré tout de suite dans journal_photos.ordre
+   (1, 2, 3…) ; le détail, l'impression/PDF et l'export suivent cet ordre. */
+function comparePhotoOrdre(a, b){
+  const ao = a.ordre==null, bo = b.ordre==null;
+  if(ao && bo) return 0;
+  if(ao) return 1;
+  if(bo) return -1;
+  return a.ordre - b.ordre;
+}
+async function persistPhotoOrder(r){
+  const prev = r.photos.map(p=>p.ordre);
+  r.photos.forEach((p,i)=>{ p.ordre = i+1; });
+  try{
+    const results = await Promise.all(r.photos.map(p=>sb.from('journal_photos').update({ ordre:p.ordre }).eq('id', p.id)));
+    const err = results.map(x=>x.error).find(Boolean);
+    if(err) throw err;
+    toast('✅ Ordre des photos enregistré');
+  }catch(e){
+    r.photos.forEach((p,i)=>{ p.ordre = prev[i]; });
+    const msg = String(e.message||e);
+    toast('❌ Ordre non enregistré : ' + (/ordre/i.test(msg) ? 'colonne « ordre » absente — exécuter migration-ordre-photos.sql' : msg), true);
+  }
+}
+async function reorderEditPhotos(r, fromIdx, toIdx){
+  if(fromIdx===toIdx || fromIdx<0 || toIdx<0 || toIdx>=r.photos.length) return;
+  const [p] = r.photos.splice(fromIdx, 1);
+  r.photos.splice(toIdx, 0, p);
+  refreshEditPhotos(r);
+  render();
+  await persistPhotoOrder(r);
+}
+function moveEditPhoto(photoId, dir){
+  const r = allReports.find(x=>x.id===window._editingId); if(!r) return;
+  const i = r.photos.findIndex(p=>p.id===photoId);
+  reorderEditPhotos(r, i, i+dir);
+}
+let _dragPhotoId = null;
+function onEditPhotoDragStart(e){
+  if(e.target && e.target.tagName==='INPUT'){ e.preventDefault(); return; } // sélection de texte dans la légende
+  const card = e.currentTarget;
+  _dragPhotoId = card.dataset.photoid;
+  e.dataTransfer.effectAllowed = 'move';
+  try{ e.dataTransfer.setData('text/plain', _dragPhotoId); }catch(_){}
+  card.style.opacity = '.4';
+}
+function onEditPhotoDragOver(e){
+  if(!_dragPhotoId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.outline = '3px dashed #8B1A1A';
+}
+function onEditPhotoDragLeave(e){ e.currentTarget.style.outline = ''; }
+function onEditPhotoDragEnd(e){
+  e.currentTarget.style.opacity = '';
+  document.querySelectorAll('.ef-photo-card').forEach(c=>{ c.style.outline=''; });
+  _dragPhotoId = null;
+}
+function onEditPhotoDrop(e){
+  e.preventDefault();
+  e.currentTarget.style.outline = '';
+  const fromId = _dragPhotoId, toId = e.currentTarget.dataset.photoid;
+  _dragPhotoId = null;
+  if(!fromId || fromId===toId) return;
+  const r = allReports.find(x=>x.id===window._editingId); if(!r) return;
+  const from = r.photos.findIndex(p=>p.id===fromId);
+  const to = r.photos.findIndex(p=>p.id===toId);
+  reorderEditPhotos(r, from, to);
 }
 async function saveEditPhotoLegende(photoId, value){
   const r = allReports.find(x=>x.id===window._editingId); if(!r) return;
@@ -1937,9 +2019,13 @@ async function onEditPhotoPicked(input, entreeId){
     const pub = sb.storage.from('journal-photos').getPublicUrl(path);
     const url = pub && pub.data ? pub.data.publicUrl : null;
     const photoId = uid();
-    const { error: insErr } = await sb.from('journal_photos').insert({ id:photoId, entree_id:entreeId, legende:null, url });
+    // v39 — si l'ordre a déjà été réglé pour ce rapport, la nouvelle photo se place en dernier.
+    const ordres = r.photos.map(p=>p.ordre).filter(o=>o!=null);
+    const row = { id:photoId, entree_id:entreeId, legende:null, url };
+    if(ordres.length) row.ordre = Math.max(...ordres) + 1;
+    const { error: insErr } = await sb.from('journal_photos').insert(row);
     if(insErr) throw insErr;
-    r.photos.push({ id:photoId, url, legende:'' });
+    r.photos.push({ id:photoId, url, legende:'', ordre:(row.ordre==null?null:row.ordre) });
     if(statusEl) statusEl.textContent = '';
     refreshEditPhotos(r);
     const lg = document.querySelector('.ef-photo-lg[data-photoid="'+photoId+'"]');
