@@ -1,4 +1,5 @@
-<!-- RDZ · mobile · v6.7 · 2026-11-04 · radio réactivée : bouton « Radio » actif, SOS flottant, pastille, lecture auto et bandeaux d'alerte de nouveau en service (RADIO_ACTIVE = true).
+<!-- RDZ · mobile · v6.8 · 2026-11-04 · choix du POSTE dans « Prise de service » : « Je prends mon service » ouvre le service (services_agents) ET connecte la radio sur le poste choisi (radio_prendre_service) ; poste exclusif occupé grisé ; sans réseau : service ouvert quand même, poste radio à valider ensuite.
+     v6.7 · 2026-11-04 · radio réactivée : bouton « Radio » actif, SOS flottant, pastille, lecture auto et bandeaux d'alerte de nouveau en service (RADIO_ACTIVE = true).
      v6.6 · 2026-10-27 · « Mes fonctions » lu dans le catalogue des fonctions (comptes-agents.html → ⚙ Catalogue des fonctions) : Matériel et toute fonction ajoutée apparaissent sans toucher au code. v6.5 · 2026-10-22 · carte MEMO SITES activée (memo-sites.html), copie hors ligne effacée au changement d'agent. v6.4 · 2026-10-19 · bouton vert « Je prends mon service » dans le sous-menu « Prise de service », sous « Prise de véhicule » (ouvre la ligne services_agents via RDZSync, hors réseau OK ; avertit si aucune validation de consignes aujourd'hui). v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
      v4 · 2026-09-30 · section « Mes fonctions » (boutons par agent,
@@ -116,6 +117,18 @@ main{flex:1;padding:16px}
 .svc-started{display:flex;align-items:center;gap:12px;margin-top:4px;padding:15px 16px;border-radius:17px;background:#dcfce7;border:1px solid #bbf7d0;color:#166534;font-size:13.5px;line-height:1.45}
 .svc-started b{display:block;font-size:15.5px}
 .svc-started .ic{font-size:26px}
+/* v6.8 : choix du poste avant « Je prends mon service » */
+.svc-postes-t{font-size:11px;font-weight:850;letter-spacing:.075em;text-transform:uppercase;color:#69788d;margin:6px 2px 9px}
+.svc-postes{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+.svc-p{background:#fff;border:1.5px solid #dbe3ec;border-radius:15px;padding:14px 8px;min-height:56px;font-family:inherit;font-size:14.5px;font-weight:800;color:#172033;cursor:pointer;box-shadow:0 4px 12px rgba(15,23,42,.05)}
+.svc-p.on{border-color:#d71920;background:#fdecee;color:#b3141a}
+.svc-p:disabled{opacity:.55;cursor:not-allowed;background:#eef2f7;box-shadow:none}
+.svc-p small{display:block;font-size:11px;font-weight:600;color:#64748b;margin-top:3px}
+.svc-radio{margin-top:10px;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #e1e8f0;font-size:13.5px;color:#172033;line-height:1.45}
+.svc-radio.warn{background:#fff8e7;border-color:#f0d594;color:#6b5414}
+.svc-radio .svc-postes{margin:10px 0 8px}
+.svc-radio button.lnk{background:none;border:0;color:#d71920;font:inherit;font-weight:800;padding:4px 0;cursor:pointer}
+.svc-err2{color:#b91c1c;font-size:12.5px;margin:8px 2px 0;line-height:1.45}
 </style>
 <style id="rdz-mobile-premium">
 :root{--red:#e3062c;--red-dark:#bf0b28;--navy:#142130;--navy2:#223241;--ink:#102033;--muted:#63758f;--line:#dbe3ec;--bg:#eef3f7;--paper:#fff;--radius-card:17px;--radius-section:17px;--font:Inter,"Segoe UI",Arial,sans-serif}
@@ -1606,6 +1619,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
   window.enterMenu = function(){ const r = origEnter.apply(this, arguments); start(); return r; };
   const origLogout = window.logout;
   if (origLogout) window.logout = function(){ stop(); return origLogout.apply(this, arguments); };
+  window.rdzRadioMenuReload = start;   // v6.8 : appelé juste après le choix du poste à la prise de service
   // Le rendu des cartes « Outil terrain » peut être refait : on repose la pastille.
   const list = el('outil-terrain-list');
   if (list && window.MutationObserver) new MutationObserver(() => { if (!list.querySelector('.rm-badge') && unread.size) renderBadge(); }).observe(list, {childList: true});
@@ -1655,15 +1669,96 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
      hors réseau. L'id est un vrai UUID généré ici pour que fin-de-service.html
      retrouve la ligne (upsert sur id). Copie locale : rdz_service_agent. */
   const zone = document.getElementById('svc-start-zone');
+  /* ── v6.8 : POSTE DU JOUR → RADIO ──────────────────────────────────────────
+     Avant « Je prends mon service », l'agent choisit son poste (radio_postes :
+     Centraliste, Maison de la Paix, Agent Event, Patrouilleur…). Le bouton ouvre
+     alors le service (services_agents, RDZSync, hors réseau OK) ET le service radio
+     sur ce poste (RPC radio_prendre_service → bons canaux dans radio-agent.html).
+     · Poste « un seul agent à la fois » déjà pris (ex. Centraliste) : grisé.
+     · Le serveur refuse le poste (pris entre-temps) : le service n'est PAS ouvert.
+     · Pas de réseau : le service s'ouvre quand même ; le poste radio reste à valider
+       (encadré jaune « Choisir mon poste radio » une fois en service).
+     · Liste des postes gardée en copie locale (rdz_radio_postes) pour l'afficher
+       hors réseau ; si aucun poste n'est connu, bouton comme avant, sans poste. */
+  const LS_POSTES = 'rdz_radio_postes', LS_RADIO = 'rdz_radio_service';
+  let postes = null, occupe = {}, radioSvc = null, pick = null, radioErr = '', radioBusy = false;
+  try { postes = JSON.parse(localStorage.getItem(LS_POSTES) || 'null'); } catch(e) {}
+  const escH = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  async function loadPostes(id){
+    try {
+      const since = new Date(Date.now() - MAX_H * 3600e3).toISOString();
+      const [p, s] = await Promise.all([
+        sb.from('radio_postes').select('*').eq('actif', true).order('ordre').order('nom'),
+        sb.from('radio_services').select('*').is('fin', null).gte('debut', since)
+      ]);
+      if (p.error || s.error) return;
+      postes = p.data || []; try { localStorage.setItem(LS_POSTES, JSON.stringify(postes)); } catch(e) {}
+      const open = s.data || [];
+      radioSvc = open.find(x => String(x.agent_id) === String(id)) || null;
+      if (radioSvc) localStorage.setItem(LS_RADIO, JSON.stringify(radioSvc)); else localStorage.removeItem(LS_RADIO);
+      occupe = {};
+      postes.filter(x => x.exclusif).forEach(x => { const o = open.find(v => v.poste_id === x.id && String(v.agent_id) !== String(id)); if (o) occupe[x.id] = o; });
+      if (pick && occupe[pick]) pick = null;
+    } catch(e) {}
+  }
+  function postesGrid(){
+    return '<div class="svc-postes">' + postes.map(p => {
+      const o = occupe[p.id];
+      if (o) return '<button type="button" class="svc-p" disabled>' + escH(p.nom) + '<small>Occupé · ' + escH(o.agent_nom || 'un agent') + ' depuis ' + heure(o.debut) + '</small></button>';
+      return '<button type="button" class="svc-p' + (p.id === pick ? ' on' : '') + '" data-poste="' + p.id + '">' + escH(p.nom) + '</button>';
+    }).join('') + '</div>';
+  }
+  function bindPostes(){
+    zone.querySelectorAll('.svc-p[data-poste]').forEach(b => b.onclick = () => { pick = b.dataset.poste; radioErr = ''; renderStart(lastState, lastDebut); });
+  }
+  let lastState = 'off', lastDebut = null;
   function renderStart(state, debut){
     if (!zone) return;
+    lastState = state; lastDebut = debut;
     if (state === 'on') {
-      zone.innerHTML = '<div class="svc-started"><span class="ic">🟢</span><span><b>Vous êtes en service</b>Depuis ' + heure(debut) + '. Pensez à votre fin de service en partant.</span></div>';
+      let radio = '';
+      if (postes && postes.length) {
+        if (radioSvc) radio = '<div class="svc-radio">📻 <b>Radio connectée · poste ' + escH(radioSvc.poste_nom || '') + '</b><br>Vos canaux radio sont ceux de ce poste jusqu\u2019à votre fin de service.</div>';
+        else radio = '<div class="svc-radio warn">📻 <b>Choisir mon poste radio</b><br>Pour être connecté à la radio, indiquez votre poste.' + postesGrid() +
+          '<button type="button" class="svc-start" id="svc-radio-btn"' + (pick && !radioBusy ? '' : ' disabled') + '>' + (radioBusy ? 'Connexion…' : pick ? '📻 Valider mon poste' : 'Choisissez votre poste') + '</button>' +
+          (radioErr ? '<div class="svc-err2">' + escH(radioErr) + '</div>' : '') + '</div>';
+      }
+      zone.innerHTML = '<div class="svc-started"><span class="ic">🟢</span><span><b>Vous êtes en service</b>Depuis ' + heure(debut) + '. Pensez à votre fin de service en partant.</span></div>' + radio;
+      const rb = document.getElementById('svc-radio-btn'); if (rb) rb.onclick = () => takeRadio(true);
+      bindPostes();
     } else {
-      zone.innerHTML = '<button type="button" class="svc-start" id="svc-start-btn">✅ Je prends mon service</button>' +
-        '<div class="svc-start-note">Après avoir lu les consignes et pris le véhicule si besoin.</div>';
+      const withPostes = postes && postes.length;
+      const chosen = withPostes && postes.find(p => p.id === pick);
+      zone.innerHTML = (withPostes ? '<div class="svc-postes-t">Mon poste aujourd\u2019hui</div>' + postesGrid() : '') +
+        '<button type="button" class="svc-start" id="svc-start-btn"' + (withPostes && !chosen ? ' disabled' : '') + '>' +
+          (withPostes ? (chosen ? '✅ Je prends mon service · ' + escH(chosen.nom) : 'Choisissez votre poste') : '✅ Je prends mon service') + '</button>' +
+        (radioErr ? '<div class="svc-err2">' + escH(radioErr) + '</div>' : '') +
+        '<div class="svc-start-note">Après avoir lu les consignes et pris le véhicule si besoin.' + (withPostes ? ' Le poste choisi vous connecte à la radio.' : '') + '</div>';
       document.getElementById('svc-start-btn').onclick = startService;
+      bindPostes();
     }
+  }
+  // Ouvre le service radio sur le poste choisi. Retour : 'ok' | 'occupe' | 'reseau'.
+  async function takeRadio(alone){
+    const id = localStorage.getItem('rdz_agent_id'); const poste = postes && postes.find(p => p.id === pick);
+    if (!id || !poste) return 'reseau';
+    if (alone) { radioBusy = true; radioErr = ''; renderStart(lastState, lastDebut); }
+    let res = 'reseau';
+    try {
+      let siteId = null; try { siteId = localStorage.getItem('rdz_agent_last_site') || null; if (siteId === 'all') siteId = null; } catch(e) {}
+      const req = sb.rpc('radio_prendre_service', { p_agent_id: String(id), p_agent_nom: localStorage.getItem('rdz_agent_nom') || null, p_poste_id: poste.id, p_site_id: siteId, p_site_nom: null });
+      const { data, error } = await Promise.race([req, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))]);
+      if (error) {
+        if (String(error.message || '').includes('POSTE_OCCUPE')) { radioErr = String(error.message).replace(/^.*POSTE_OCCUPE:\s*/, '') + '. Choisissez un autre poste.'; pick = null; res = 'occupe'; await loadPostes(id); }
+        else radioErr = 'Poste radio non enregistré (pas de réseau ?). Réessayez dans un instant.';
+      } else {
+        radioSvc = Array.isArray(data) ? data[0] : data;
+        localStorage.setItem(LS_RADIO, JSON.stringify(radioSvc)); radioErr = ''; res = 'ok';
+        if (typeof window.rdzRadioMenuReload === 'function') window.rdzRadioMenuReload();   // SOS, pastille, lecture auto
+      }
+    } catch(e) { radioErr = 'Poste radio non enregistré (pas de réseau ?). Réessayez dans un instant.'; }
+    if (alone) { radioBusy = false; renderStart(lastState, lastDebut); }
+    return res;
   }
   function uuid(){
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -1702,6 +1797,12 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
         ? "Pas de réseau : impossible de vérifier vos consignes.\n\nConfirmer votre prise de service ?"
         : 'Confirmer votre prise de service maintenant ?';
     if (!window.confirm(msg)) { renderStart('off'); return; }
+    // v6.8 : poste radio d'abord (s'il est refusé car déjà pris, le service n'est pas ouvert).
+    if (postes && postes.length && pick) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Connexion à la radio…'; }
+      const r = await takeRadio(false);
+      if (r === 'occupe') { renderStart('off'); return; }
+    }
     // Ancien service resté ouvert sur cet appareil (fin oubliée) : refermé au passage.
     try {
       const old = JSON.parse(localStorage.getItem(LS_SVC) || 'null');
@@ -1724,6 +1825,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
   async function refresh(){
     const id = localStorage.getItem('rdz_agent_id'); if (!id) return;
     const my = ++seq;
+    loadPostes(id).then(() => { if (my === seq) renderStart(lastState, lastDebut); });
     const loc = local(id);
     show(loc ? 'on' : 'off', loc && loc.debut);
     try {
