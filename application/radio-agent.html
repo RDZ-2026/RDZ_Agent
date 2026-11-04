@@ -1,4 +1,5 @@
-<!-- RDZ · radio-agent · v3.2 · 2026-10-16 · « Tous les agents » devient le canal d'ANNONCES de la centrale : tous les agents en service le reçoivent (lecture auto, accusés d'écoute) mais seuls les Centralistes y parlent ; les agents répondent sur leur ligne Centrale.
+<!-- RDZ · radio-agent · v3.3 · 2026-11-04 · lecture automatique retirée (bandeau « Touchez l'écran… » et bouton 🔊/🔇 supprimés) ; nouveau vocal hors de la conversation ouverte ou application en arrière-plan = notification système du téléphone (radio-sw.js), alerte SOS aussi.
+     v3.2 · 2026-10-16 · « Tous les agents » devient le canal d'ANNONCES de la centrale : tous les agents en service le reçoivent (lecture auto, accusés d'écoute) mais seuls les Centralistes y parlent ; les agents répondent sur leur ligne Centrale.
      v3.1 · 2026-10-16 · « Supprimer la conversation » sur les messages privés (masquée pour soi seulement ; réapparaît si un nouveau vocal arrive ; rien n'est effacé en base). Nécessite migration-radio-masquer.sql.
      v3 · 2026-10-16 · chaque agent a SA ligne privée avec la centrale (type de canal 'centrale') ; « Tous les agents » et les canaux de poste ne sont plus visibles que du Centraliste… et les canaux de poste plus du tout (remplacés par les lignes). Le Centraliste voit la ligne de chaque agent en service, classée par poste. Équipe (privé entre agents) et groupes inchangés. Nécessite migration-radio-lignes.sql.
      v2.3 · 2026-10-16 · lecture automatique des vocaux reçus (file d'attente, interrupteur 🔊/🔇, déverrouillage du son au premier toucher) ; ouverture directe d'un canal (?canal=ID) depuis la notification du menu ; SOS déclenché depuis mobile.html repris à l'ouverture.
@@ -517,6 +518,7 @@ async function onMessage(m){
     vibrate([60, 40, 60]);
     if (autoOn() && audioUnlocked && !document.hidden) { autoQueue.push(m.id); setTimeout(tryAutoPlay, 350); }
     else chirp();
+    if (ui.conv !== m.canal_id || document.hidden) sysNotify('📻 ' + (m.auteur_nom || agentName(m.auteur_id)), 'Nouveau message radio · ' + canalName(canaux.get(m.canal_id)), 'radio-agent.html?canal=' + encodeURIComponent(m.canal_id), 'rdz-radio-' + m.canal_id, false);
     if (ui.conv !== m.canal_id) notify(m.auteur_id, m.auteur_nom || agentName(m.auteur_id), `Message vocal ${fmtDur(m.duree_s)} · ${canalName(canaux.get(m.canal_id))}`, () => openConv(m.canal_id));
   }
   refreshConv(m.canal_id);
@@ -547,6 +549,7 @@ function onAlerte(a, ev){
   if (!reponses.has(a.id)) reponses.set(a.id, []);
   if (ev === 'INSERT' && a.agent_id !== me.id && a.statut === 'active') {
     stopPlayback(); overlay = {alertId:a.id}; muted = false; startSiren(); vibrate([500,200,500,200,500,200,500]);
+    sysNotify('🚨 Alerte SOS · ' + (a.agent_nom || agentName(a.agent_id)), 'Ouvrez la radio pour voir sa position et répondre.', 'radio-agent.html', 'rdz-sos-' + a.id, true);
   }
   if (a.statut === 'cloturee' && overlay && overlay.alertId === a.id) stopSiren();
   if (overlay && overlay.alertId === a.id) renderOverlay();
@@ -577,7 +580,7 @@ function renderHeader(){
   const gear = c && isCustomGroup(c) ? `<button class="hd-back hd-gear" data-act="manage" aria-label="Gérer le groupe">⚙</button>`
     : c && c.type === 'direct' ? `<button class="hd-back hd-gear" data-act="del-conv" aria-label="Supprimer la conversation">🗑</button>` : '';
   h.innerHTML = `${back}<div class="hd-title"><div class="hd-name">${name}</div><div class="hd-sub" id="hdSub"></div></div>
-    <button class="hd-back hd-gear ${autoOn() ? '' : 'off'}" data-act="autoplay" aria-label="${autoOn() ? 'Lecture automatique activée : toucher pour couper' : 'Lecture automatique coupée : toucher pour activer'}">${autoOn() ? '🔊' : '🔇'}</button>
+    ${'Notification' in window && Notification.permission === 'default' ? '<button class="hd-back hd-gear" data-act="notif" aria-label="Activer les notifications radio">🔔</button>' : ''}
     ${gear}<button class="sos-btn" id="sosBtn" aria-label="SOS : maintenir 1,5 seconde pour alerter tous les collègues"><span>SOS</span></button>`;
   renderHeaderSub();
 }
@@ -759,7 +762,20 @@ let pb = null; const player = new Audio(); player.preload = 'auto';
    Jamais pendant un enregistrement ni par-dessus un vocal en cours : la file
    reprend juste après. Un vocal lu automatiquement compte comme écouté. */
 const LS_AUTO = 'rdz_radio_autoplay';
-const autoOn = () => localStorage.getItem(LS_AUTO) !== '0';
+const autoOn = () => false;   // v3.3 : lecture automatique retirée (bloquée par les navigateurs)
+
+/* v3.3 : notifications système (son + vibration du téléphone) via radio-sw.js.
+   Autorisation demandée une fois par téléphone (bouton dans mobile.html ou ici). */
+let swReg = null;
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('radio-sw.js').then(x => { swReg = x; }).catch(() => {});
+const notifOk = () => 'Notification' in window && Notification.permission === 'granted';
+async function sysNotify(title, body, url, tag, urgent){
+  if (!notifOk()) return;
+  try {
+    const reg = swReg || (await navigator.serviceWorker.ready);
+    await reg.showNotification(title, {body, tag, renotify:true, requireInteraction:!!urgent, vibrate: urgent ? [500,200,500,200,500] : [200,100,200], data:{url}});
+  } catch (e) {}
+}
 let audioUnlocked = false; const autoQueue = [];
 const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 function unlockAudio(){
@@ -1173,7 +1189,7 @@ document.addEventListener('click', e => {
     case 'new-group': groupSheet(); break;
     case 'create-group': createGroup(); break;
     case 'manage': manageSheet(); break;
-    case 'autoplay': toggleAuto(); break;
+    case 'notif': (async () => { try { await Notification.requestPermission(); } catch (e) {} renderHeader(); if (notifOk()) toast('Notifications radio activées.'); })(); break;
     case 'unlock': unlockAudio(); break;
     case 'grp-remove': grpRemove(t.dataset.id); break;
     case 'grp-add': grpAdd(); break;

@@ -1,4 +1,5 @@
-<!-- RDZ · mobile · v6.8 · 2026-11-04 · choix du POSTE dans « Prise de service » : « Je prends mon service » ouvre le service (services_agents) ET connecte la radio sur le poste choisi (radio_prendre_service) ; poste exclusif occupé grisé ; sans réseau : service ouvert quand même, poste radio à valider ensuite.
+<!-- RDZ · mobile · v6.9 · 2026-11-04 · lecture automatique retirée (pastille « Touchez ici pour activer le son radio » supprimée) ; nouveau vocal = bandeau persistant « Nouveau message radio » + notification système du téléphone (son et vibration du téléphone, via radio-sw.js), y compris hors de la radio. Bouton « 🔔 Activer les notifications radio » une seule fois par téléphone.
+     v6.8 · 2026-11-04 · choix du POSTE dans « Prise de service » : « Je prends mon service » ouvre le service (services_agents) ET connecte la radio sur le poste choisi (radio_prendre_service) ; poste exclusif occupé grisé ; sans réseau : service ouvert quand même, poste radio à valider ensuite.
      v6.7 · 2026-11-04 · radio réactivée : bouton « Radio » actif, SOS flottant, pastille, lecture auto et bandeaux d'alerte de nouveau en service (RADIO_ACTIVE = true).
      v6.6 · 2026-10-27 · « Mes fonctions » lu dans le catalogue des fonctions (comptes-agents.html → ⚙ Catalogue des fonctions) : Matériel et toute fonction ajoutée apparaissent sans toucher au code. v6.5 · 2026-10-22 · carte MEMO SITES activée (memo-sites.html), copie hors ligne effacée au changement d'agent. v6.4 · 2026-10-19 · bouton vert « Je prends mon service » dans le sous-menu « Prise de service », sous « Prise de véhicule » (ouvre la ligne services_agents via RDZSync, hors réseau OK ; avertit si aucune validation de consignes aujourd'hui). v6.3 · 2026-10-19 · voyant de service à côté du nom : 🟢 « En service depuis HH:MM » après « Je prends mon service » (prise-de-poste.html), 🔴 « Hors service » avant la prise ou après la fin de service. Lit services_agents + copie locale rdz_service_agent (hors réseau OK). Le voyant rouge ouvre directement « Prise de service ». Nécessite migration-services-agents.sql. v6.2 · 2026-10-16 · radio mise en pause (en cours de développement) : bouton « Radio » grisé « Bientôt disponible », SOS flottant / pastille / lecture auto / bandeaux radio désactivés. Pour réactiver : RADIO_ACTIVE = true (2 endroits). v6.1 · 2026-10-16 · les annonces de la centrale (« Tous les agents ») sont reçues par tous les agents en service (pastille, bip, lecture auto). v6 · 2026-10-16 · lecture automatique des vocaux radio directement sur le menu (même réglage 🔊/🔇 que la radio, file d'attente, accusé d'écoute). v5.9 · 2026-10-16 · la pastille radio ignore les vocaux des conversations supprimées (masques). v5.8 · 2026-10-16 · pastille radio alignée sur radio-agent v3 (ligne privée agent ↔ centrale ; « Tous les agents » réservé au Centraliste). v5.7 · 2026-10-16 · radio dans le menu (en service) : bouton SOS flottant, pastille des vocaux non écoutés sur « Radio » + bip/vibration/bandeau, bandeau rouge si un collègue déclenche un SOS. v5.6 · 2026-10-16 · bouton « Radio » (radio-agent.html) en tête de « Outil terrain ». v5.5 · 2026-10-15 · « Prise de poste » → « Prise de service », « Fin de poste » → « Fin de service » (libellés uniquement). v5.4 · 2026-10-13 · « Journal de bord » renommé « Rapport » ; section « Planning » retirée du menu (planning-agent.html conservé, non lié). v5.3 · 2026-10-09 · carte compacte (bouton à droite, heures repliées). v5.2 · carte déplacée dans « Outil terrain », juste au-dessus du Journal de bord. v5.1 · activation de la feuille uniquement depuis feuille-route-agent.html (plus de choix dans le menu). v5 · carte « Feuille de route active » en haut du menu : l'agent active sa feuille du jour, pointe son arrivée (« Je suis arrivé ») et son départ (« Je repars ») sans ouvrir la feuille de route ; la carte passe automatiquement à la mission suivante. Écrit dans feuille_pointages comme feuille-route-agent.html (RDZSync, hors réseau OK).
      v4.1 · 2026-09-30 · bandeau du menu fixe en haut ;
@@ -1379,10 +1380,15 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     .rm-ov h2{font-size:30px;font-weight:900}
     .rm-ov .tels{display:flex;gap:8px;flex-wrap:wrap}
     .rm-ov .tels a{flex:1;min-width:90px;background:#fff;color:#d71920;font-weight:900;border-radius:12px;padding:13px 6px;text-decoration:none}
-    .rm-snd{position:fixed;left:16px;bottom:calc(30px + env(safe-area-inset-bottom));z-index:80;max-width:calc(100% - 120px);border:1px solid #e1e8f0;background:#fff;color:#172033;
-      border-radius:22px;padding:10px 14px;font:700 13px Inter,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 20px rgba(15,23,42,.16);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .rm-snd.lock{background:#fff8e7;border-color:#f0d594;color:#6b5414}
-    .rm-snd.play{background:#111c2e;color:#fff;border-color:#111c2e}
+    .rm-msg{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 8px);z-index:92;max-width:600px;margin:0 auto;background:#111c2e;color:#fff;border-radius:16px;
+      padding:12px 14px;box-shadow:0 14px 34px rgba(15,23,42,.35);font:14px Inter,"Segoe UI",Arial,sans-serif;display:flex;gap:11px;align-items:center;animation:rmDrop .25s ease-out}
+    .rm-msg .rm-ic{font-size:26px;flex:none}
+    .rm-msg .rm-tx{flex:1;min-width:0}.rm-msg .rm-tx b{display:block;font-size:15px}.rm-msg .rm-tx small{display:block;color:#cbd5e1;font-size:12.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .rm-msg a{flex:none;background:#d71920;color:#fff;text-decoration:none;font-weight:800;border-radius:11px;padding:10px 13px}
+    .rm-msg button{flex:none;background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:10px;width:34px;height:34px;font-size:16px;cursor:pointer}
+    @keyframes rmDrop{from{transform:translateY(-14px);opacity:0}}
+    .rm-notif{position:fixed;left:16px;bottom:calc(30px + env(safe-area-inset-bottom));z-index:80;max-width:calc(100% - 120px);border:1px solid #f0d594;background:#fff8e7;color:#6b5414;
+      border-radius:22px;padding:10px 14px;font:700 13px Inter,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 20px rgba(15,23,42,.16);cursor:pointer}
     .rm-ov button{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:12px;padding:13px;font:700 15px Inter,"Segoe UI",Arial,sans-serif}`;
   document.head.appendChild(css);
   const host = el('screen-menu');
@@ -1391,60 +1397,50 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
   sosBtn.setAttribute('aria-label', 'SOS : maintenir 1,5 seconde pour alerter tous les collègues en service');
   host.appendChild(sosBtn);
 
-  /* ---------- Lecture automatique sur le menu (v6) ----------
-     Même réglage que la radio (rdz_radio_autoplay, 🔊 par défaut). Le navigateur
-     exige un premier toucher sur la page avant de jouer du son : tant que ce n'est
-     pas fait, la pastille en bas à gauche le rappelle. Un vocal lu ici compte comme
-     écouté (radio_ecoutes) et disparaît de la pastille du bouton Radio.
-     Limite : uniquement page ouverte et écran allumé (règle des téléphones). */
-  const LS_AUTO = 'rdz_radio_autoplay', BUCKET = 'radio-vocaux';
-  const autoOn = () => localStorage.getItem(LS_AUTO) !== '0';
-  const player = new Audio(); player.preload = 'auto';
-  const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-  let unlocked = false, playing = null; const queue = [];
-  const snd = document.createElement('button'); snd.className = 'rm-snd'; snd.style.display = 'none'; host.appendChild(snd);
-  function renderSnd(){
-    if (!svc) { snd.style.display = 'none'; return; }
-    snd.style.display = '';
-    snd.classList.toggle('lock', autoOn() && !unlocked); snd.classList.toggle('play', !!playing);
-    snd.textContent = playing ? `🔊 ${playing.nom} · toucher pour arrêter`
-      : !autoOn() ? '🔇 Lecture auto coupée'
-      : !unlocked ? '🔊 Touchez ici pour activer le son radio'
-      : '🔊 Lecture auto activée';
+  /* ---------- Notifications radio sur le menu (v6.9) ----------
+     La lecture automatique est retirée (bloquée par les navigateurs sans toucher).
+     À la place, chaque nouveau vocal déclenche :
+       · un bandeau persistant en haut « 📻 Nouveau message radio » (reste affiché
+         jusqu'à ce qu'on l'ouvre ou le ferme, compte les messages non écoutés) ;
+       · une NOTIFICATION SYSTÈME du téléphone (son + vibration du téléphone, visible
+         dans la barre de notifications) via le service worker radio-sw.js. Le son
+         d'une notification n'est pas soumis au blocage de la lecture automatique.
+     L'autorisation des notifications se donne une seule fois par téléphone
+     (bouton « 🔔 Activer les notifications radio », visible tant qu'elle n'est pas donnée).
+     Limite : la page de l'application doit être ouverte (menu ou radio), même en
+     arrière-plan ; téléphone éteint ou Chrome fermé, rien n'arrive. */
+  let swReg = null;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('radio-sw.js').then(r => { swReg = r; }).catch(() => {});
   }
-  function unlock(){
-    if (unlocked) return;
-    try { if (!actx) { const C = window.AudioContext || window.webkitAudioContext; if (C) actx = new C(); } if (actx && actx.state === 'suspended') actx.resume(); } catch (e) {}
+  const notifOk = () => 'Notification' in window && Notification.permission === 'granted';
+  const notifAsk = () => 'Notification' in window && Notification.permission === 'default' && 'serviceWorker' in navigator;
+  async function sysNotify(title, body, url, tag, urgent){
+    if (!notifOk()) return;
     try {
-      player.muted = true; player.src = SILENT;
-      const p = player.play();
-      const ok = () => { try { player.pause(); } catch (e) {} player.muted = false; player.removeAttribute('src'); unlocked = true; renderSnd(); setTimeout(next, 100); };
-      if (p && p.then) p.then(ok, () => { player.muted = false; }); else ok();
-    } catch (e) { player.muted = false; }
+      const reg = swReg || (await navigator.serviceWorker.ready);
+      await reg.showNotification(title, { body, tag, renotify: true, requireInteraction: !!urgent,
+        vibrate: urgent ? [500, 200, 500, 200, 500] : [200, 100, 200], data: { url } });
+    } catch (e) {}
   }
-  function next(){
-    if (playing || !unlocked || !autoOn() || document.hidden || !svc) return;
-    const m = queue.shift(); if (!m) return;
-    if (!unread.has(m.id)) { next(); return; }              // déjà écouté ailleurs entre-temps
-    const url = sb.storage.from(BUCKET).getPublicUrl(m.audio_path).data.publicUrl;
-    playing = {id: m.id, nom: m.auteur_nom || 'Collègue'}; renderSnd();
-    player.src = url;
-    const done = () => { playing = null; renderSnd(); setTimeout(next, 450); };
-    player.onended = done; player.onerror = done;
-    player.play().then(() => {
-      unread.delete(m.id); renderBadge();
-      sb.from('radio_ecoutes').upsert({message_id: m.id, agent_id: me.id}, {onConflict: 'message_id,agent_id', ignoreDuplicates: true}).then(() => {}, () => {});
-    }, () => { playing = null; unlocked = false; queue.unshift(m); renderSnd(); });
-  }
-  snd.addEventListener('click', e => {
-    e.stopPropagation();
-    if (playing) { try { player.pause(); } catch (_) {} playing = null; queue.length = 0; renderSnd(); return; }
-    if (autoOn() && !unlocked) { unlock(); return; }
-    localStorage.setItem(LS_AUTO, autoOn() ? '0' : '1');
-    if (!autoOn()) queue.length = 0; else unlock();
-    renderSnd();
+  const pill = document.createElement('button'); pill.type = 'button'; pill.className = 'rm-notif'; pill.style.display = 'none';
+  pill.textContent = '🔔 Activer les notifications radio'; host.appendChild(pill);
+  function renderNotifPill(){ pill.style.display = svc && notifAsk() ? '' : 'none'; }
+  pill.addEventListener('click', async () => {
+    try { await Notification.requestPermission(); } catch (e) {}
+    renderNotifPill();
+    if (notifOk()) sysNotify('Radio RDZ', 'Notifications activées : vous serez prévenu de chaque nouveau message radio.', 'mobile.html', 'rdz-radio-test', false);
   });
-  document.addEventListener('pointerdown', e => { if (e.target === snd) return; if (svc && autoOn() && !unlocked) unlock(); }, true);
+  let lastMsg = null;
+  function renderMsgBanner(){
+    let b = el('rm-msg');
+    if (!svc || !unread.size || !lastMsg) { if (b) b.remove(); return; }
+    const n = unread.size;
+    if (!b) { b = document.createElement('div'); b.id = 'rm-msg'; b.className = 'rm-msg'; b.setAttribute('role', 'status'); host.appendChild(b); }
+    b.innerHTML = `<span class="rm-ic">📻</span><span class="rm-tx"><b>${n > 1 ? n + ' nouveaux messages radio' : 'Nouveau message radio'}</b><small>${esc(lastMsg.nom)} · ${esc(lastMsg.canal)} · ${fmtT(lastMsg.t)}</small></span>
+      <a href="${lastMsg.url}">Écouter</a><button type="button" aria-label="Masquer">✕</button>`;
+    b.querySelector('button').onclick = () => { b.remove(); lastMsg = null; };
+  }
 
   /* ---------- Règles d'accès (identiques à radio-agent.html) ---------- */
   const seesAll = () => !!(svc && postes.get(svc.poste_id) && postes.get(svc.poste_id).voit_tout);
@@ -1476,7 +1472,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
       postes.clear(); (po.data || []).forEach(p => postes.set(p.id, p));
       svc = (sv.data || [])[0] || null;
       if (!svc) { hideAll(); return; }
-      sosBtn.style.display = ''; renderSnd();
+      sosBtn.style.display = ''; renderNotifPill();
       const filtre = seesAll() ? `tous.eq.true,membres.cs.{${me.id}},type.eq.centrale` : `tous.eq.true,membres.cs.{${me.id}}`;
       const ca = await sb.from('radio_canaux').select('*').eq('archive', false).or(filtre);
       if (ca.error) return;
@@ -1525,10 +1521,11 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
     let c = canaux.get(m.canal_id);
     if (!c) { const { data } = await sb.from('radio_canaux').select('*').eq('id', m.canal_id).maybeSingle(); if (!canSee(data)) return; c = data; canaux.set(c.id, c); }
     if (!canSee(c)) return;
-    unread.add(m.id); renderBadge(); vib([60, 40, 60]);
-    const auto = autoOn() && unlocked && !document.hidden && m.audio_path;
-    if (auto) { queue.push(m); setTimeout(next, 300); } else beep();
-    toast(m.auteur_nom || 'Collègue', `${auto ? 'Lecture du vocal' : 'Nouveau vocal'} · ${canalName(c)} · toucher pour répondre`, RADIO + '?canal=' + encodeURIComponent(c.id));
+    unread.add(m.id); renderBadge(); vib([60, 40, 60]); beep();
+    const url = RADIO + '?canal=' + encodeURIComponent(c.id), nom = m.auteur_nom || 'Collègue';
+    lastMsg = {nom, canal: canalName(c), t: m.cree_le || new Date().toISOString(), url};
+    renderMsgBanner();
+    sysNotify('📻 ' + nom, `Nouveau message radio · ${canalName(c)}`, url, 'rdz-radio-' + c.id, false);
   }
   function onAlert(a, ev){
     if (!a || !svc) return;
@@ -1541,6 +1538,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
   function renderBadge(){
     const a = document.querySelector(`#outil-terrain-list a[href="${RADIO}"]`); if (!a) return;
     let b = a.querySelector('.rm-badge'); const n = unread.size;
+    if (el('rm-msg') || !n) renderMsgBanner();
     if (!n || !svc) { if (b) b.remove(); return; }
     if (!b) { b = document.createElement('span'); b.className = 'rm-badge'; a.querySelector('.ic').appendChild(b); }
     b.textContent = n > 99 ? '99+' : String(n);
@@ -1561,11 +1559,11 @@ window.addEventListener('pageshow', e=>{ if(e.persisted && document.getElementBy
       <div class="rm-row"><a href="${RADIO}">Voir et répondre</a><button type="button">Masquer</button></div>`;
     d.querySelector('button').onclick = hideAlert;
     host.appendChild(d);
-    if (fresh) { vib([500,200,500,200,500]); beep(); setTimeout(beep, 400); setTimeout(beep, 800); }
+    if (fresh) { vib([500,200,500,200,500]); beep(); setTimeout(beep, 400); setTimeout(beep, 800);
+      sysNotify('🚨 Alerte SOS · ' + (a.agent_nom || 'un collègue'), 'Déclenchée à ' + fmtT(a.declenchee_le) + '. Ouvrez la radio pour voir sa position et répondre.', RADIO, 'rdz-sos-' + a.id, true); }
   }
   function hideAlert(){ const d = el('rm-alert'); if (d) d.remove(); alertShown = null; }
-  function hideAll(){ svc = null; sosBtn.style.display = 'none'; unread.clear(); renderBadge(); hideAlert();
-    try { player.pause(); } catch (e) {} playing = null; queue.length = 0; renderSnd(); }
+  function hideAll(){ svc = null; sosBtn.style.display = 'none'; unread.clear(); renderBadge(); hideAlert(); renderMsgBanner(); renderNotifPill(); }
 
   /* ---------- SOS depuis le menu ---------- */
   let hold = null;
