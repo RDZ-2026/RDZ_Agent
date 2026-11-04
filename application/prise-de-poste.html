@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v4.3 · 2026-10-19 · + bouton « Je prends mon service » en bas de page : ouvre un service (table services_agents, RDZSync, hors réseau OK) → voyant vert à côté du nom dans mobile.html ; avertit si des consignes du site ne sont pas encore validées. Nécessite migration-services-agents.sql.
+<!-- RDZ · prise-de-poste · v4.4 · 2026-11-04 · radio réactivée (RADIO_ACTIVE = true) : le bloc du haut s'appelle désormais « 📻 Mon poste radio » pour ne pas se confondre avec « ✅ Je prends mon service » (services_agents) en bas de page.
+     v4.3 · 2026-10-19 · + bouton « Je prends mon service » en bas de page : ouvre un service (table services_agents, RDZSync, hors réseau OK) → voyant vert à côté du nom dans mobile.html ; avertit si des consignes du site ne sont pas encore validées. Nécessite migration-services-agents.sql.
      v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
      v4.1 · 2026-10-16 · poste « un seul agent à la fois » (radio_postes.exclusif, ex. Centraliste) : affiché « Occupé par X » et non sélectionnable ; contrôle final dans radio_prendre_service. Nécessite migration-radio-exclusif.sql.
      v4 · 2026-10-16 · + « Ma prise de service » : choix du poste (radio_postes) → ouvre le service radio (RPC radio_prendre_service) ; l'agent est connecté à radio-agent.html jusqu'à sa fin de service. Nécessite migration-radio-postes.sql. Reporté sur la version en ligne (charte 2026).
@@ -768,35 +769,35 @@ async function loadRadioService() {
 function renderRadioService() {
   const z = document.getElementById('service-zone');
   if (radioState === 'missing') { z.innerHTML = ''; return; }   // module radio pas encore installé : on n'affiche rien
-  if (radioState === 'loading') { z.innerHTML = `<div class="svc-card"><div class="svc-sub" style="margin:0">Chargement de votre prise de service…</div></div>`; return; }
+  if (radioState === 'loading') { z.innerHTML = `<div class="svc-card"><div class="svc-sub" style="margin:0">Chargement de votre poste radio…</div></div>`; return; }
   if (radioState === 'offline') {
-    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Ma prise de service</div>
-      <div class="svc-err" style="margin:0 0 10px">Pas de réseau : impossible de vérifier votre service radio pour l'instant.</div>
+    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Mon poste radio</div>
+      <div class="svc-err" style="margin:0 0 10px">Pas de réseau : impossible de vérifier votre poste radio pour l'instant.</div>
       <button class="svc-btn ghost" onclick="loadRadioService()">↻ Réessayer</button></div>`;
     return;
   }
   if (radioService && !radioChanging) {
     const t = new Date(radioService.debut).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
     z.innerHTML = `<div class="svc-card">
-      <div class="svc-ok">✓ <b>En service · ${escHtml(radioService.poste_nom || '')}</b><br>Depuis ${t} — vous êtes connecté à la radio jusqu'à votre fin de service.</div>
+      <div class="svc-ok">📻 <b>Radio connectée · poste ${escHtml(radioService.poste_nom || '')}</b><br>Depuis ${t} — jusqu'à votre fin de service.</div>
       <a class="svc-btn" href="${RADIO_URL}">📻 Ouvrir la radio</a>
       <button class="svc-btn ghost" onclick="radioStartChange()">Changer de poste</button></div>`;
     return;
   }
   if (!radioPostes.length) {
-    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Ma prise de service</div><div class="svc-sub" style="margin:0">Aucun poste n'est paramétré. Contactez votre responsable.</div></div>`;
+    z.innerHTML = `<div class="svc-card"><div class="svc-title">📻 Mon poste radio</div><div class="svc-sub" style="margin:0">Aucun poste n'est paramétré. Contactez votre responsable.</div></div>`;
     return;
   }
   const chosen = radioPostes.find(p => p.id === radioPick);
   z.innerHTML = `<div class="svc-card">
-    <div class="svc-title">📻 ${radioChanging ? 'Changer de poste' : 'Ma prise de service'}</div>
-    <div class="svc-sub">Quel poste prenez-vous ? En validant, vous êtes connecté à la radio sur les canaux de ce poste.</div>
+    <div class="svc-title">📻 ${radioChanging ? 'Changer de poste radio' : 'Mon poste radio'}</div>
+    <div class="svc-sub">Quel poste prenez-vous ? En validant, vous êtes connecté à la radio jusqu'à votre fin de service.</div>
     <div class="svc-grid">${radioPostes.map(p => {
       const o = radioOccupe[p.id];
       if (o) return `<button class="svc-poste" disabled title="Un seul agent à la fois sur ce poste">${escHtml(p.nom)}<small>Occupé · ${escHtml(o.agent_nom || 'un agent')} depuis ${new Date(o.debut).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' })}</small></button>`;
       return `<button class="svc-poste ${p.id === radioPick ? 'on' : ''}" onclick="radioChoose('${p.id}')">${escHtml(p.nom)}</button>`;
     }).join('')}</div>
-    <button class="svc-btn" id="svc-validate" ${chosen && !radioBusy ? '' : 'disabled'} onclick="radioValidate()">${radioBusy ? 'Enregistrement…' : chosen ? '✓ Valider ma prise de service · ' + escHtml(chosen.nom) : 'Choisissez votre poste'}</button>
+    <button class="svc-btn" id="svc-validate" ${chosen && !radioBusy ? '' : 'disabled'} onclick="radioValidate()">${radioBusy ? 'Enregistrement…' : chosen ? '✓ Valider mon poste · ' + escHtml(chosen.nom) : 'Choisissez votre poste'}</button>
     ${radioChanging ? `<button class="svc-btn ghost" onclick="radioCancelChange()">Annuler</button>` : ''}
     ${radioErr ? `<div class="svc-err">${escHtml(radioErr)}</div>` : ''}</div>`;
 }
@@ -834,7 +835,7 @@ async function radioValidate() {
 
 // v4.2 : radio en pause tant qu'elle n'est pas terminée → bloc « Ma prise de service »
 // masqué (aucun choix de poste demandé). Pour réactiver : passer RADIO_ACTIVE à true.
-const RADIO_ACTIVE = false;
+const RADIO_ACTIVE = true;   // v4.4 : radio réactivée
 if (RADIO_ACTIVE) {
   renderRadioService();
   loadRadioService();
