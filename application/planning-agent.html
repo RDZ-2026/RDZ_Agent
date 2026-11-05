@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent · v15 · 2026-10-14 · + demandes de tenue / matériel -->
+<!-- RDZ · planning-agent · v16 · 2026-11-05 · vue mois, sélection multiple, synthèse heures -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -166,6 +166,40 @@ main.with-compose{padding-bottom:170px;}
 .eq-qty > button:not(.btn){width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:20px;font-weight:700;}
 .eq-qty b{font-size:18px;min-width:22px;text-align:center;}
 select.finp{appearance:auto;}
+.seg.three{grid-template-columns:1fr 1fr 1fr;}
+.hsum{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+.hsum div{padding:11px 4px;text-align:center;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:3px;}
+.hsum div:first-child{border-left:none;}
+.hsum b{font-size:17px;font-weight:800;letter-spacing:-.01em;}
+.hsum span{font-size:10.5px;color:var(--text2);font-weight:600;}
+.wk{display:flex;justify-content:space-between;align-items:baseline;}
+.wk-h{font-size:12px;font-weight:800;color:var(--text);}
+.srow.dim{opacity:.55;}
+.srow.sel{outline:2px solid var(--ink);outline-offset:-1px;}
+.sel-box{width:26px;height:26px;border-radius:8px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;flex:none;background:#fff;}
+.srow.sel .sel-box{background:var(--ink);border-color:var(--ink);color:#fff;}
+.sel-box svg{width:16px;height:16px;}
+.validate-bar .btn-outline{background:#fff;}
+.validate-bar.sel-mode{background:#e0e7ff;color:#312e81;}
+.sel-bar{position:fixed;left:0;right:0;bottom:calc(62px + env(safe-area-inset-bottom,0px));z-index:26;background:#fff;border-top:1px solid var(--line);padding:10px 12px;box-shadow:0 -6px 18px rgba(0,0,0,.06);}
+.sel-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1fr 2fr;gap:10px;}
+.month .mrow{display:grid;grid-template-columns:repeat(7,1fr) 38px;gap:4px;margin-bottom:4px;}
+.month .mhead div{font-size:11px;font-weight:700;color:var(--text3);text-align:center;}
+.mday{min-height:54px;border-radius:9px;border:1.5px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 1px;gap:1px;font-family:inherit;background:#fafafa;min-width:0;}
+.mday .mn{font-size:13px;font-weight:800;line-height:1.1;}
+.mday .mi svg{width:13px;height:13px;}
+.mday .mh{font-size:9px;font-weight:700;white-space:nowrap;letter-spacing:-.03em;overflow:hidden;max-width:100%;}
+.mday.out{visibility:hidden;}
+.mday.past{opacity:.55;}
+.mday.today{outline:2px solid var(--red);outline-offset:0;}
+.mday.dayk{background:var(--day-bg);border-color:var(--day-bd);color:var(--day-tx);}
+.mday.dayk .mi{color:var(--day-ic);}
+.mday.nightk{background:var(--night-bg);border-color:var(--night-bd);color:#fff;}
+.mday.nightk .mi{color:var(--night-ic);}
+.mday.leavek{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6;}
+.mday.tovalid{box-shadow:0 0 0 2px #f59e0b;}
+.mtot{font-size:10.5px;font-weight:800;color:var(--text2);display:flex;align-items:center;justify-content:center;}
+.mhead div:last-child{font-size:9.5px;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -507,13 +541,14 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v15 · 14.10.2026';
+const APP_VERSION = 'v16 · 05.11.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
 let AGENT = null;        // fiche agents (RDZ_Agent)
 let SHIFTS = [];
 let ABS = { list:[], balance:null, loaded:false };
+let PLAN_SEL = null;     // Set des services cochés (mode sélection) ou null
 let EQ = { loaded:false, linked:false, articles:[], dotations:[], demandes:[] };  // tenues & matériel
 let EQF = { lines:[], article:'', taille:'', qty:1, motif:'', preset:'' };
 let CHANGES = [];        // journal des modifications (serveur)
@@ -773,12 +808,13 @@ function needsConfirm(s){ return isOpen(s) && !s.refusal; }
 function chip(s){ if(s.refusal && isOpen(s)) return `<span class="chip bad">${I.xmark}Refusé</span>`; const st=STATUS[s.status]||{label:s.status,cls:'muted'}; return `<span class="chip ${st.cls}">${st.cls==='ok'?I.check:''}${esc(st.label)}</span>`; }
 
 // ── Navigation / rendu ───────────────────────────────────────
-function go(tab){ VIEW.tab=tab; VIEW.detail=null; render(); window.scrollTo(0,0); }
+function go(tab){ if(tab!=='planning' && PLAN_SEL){ PLAN_SEL=null; } VIEW.tab=tab; VIEW.detail=null; render(); window.scrollTo(0,0); }
 function openShift(id){ VIEW.detail=id; render(); window.scrollTo(0,0); }
 function closeDetail(){ VIEW.detail=null; render(); window.scrollTo(0,0); }
-function setPlanMode(m){ VIEW.planMode=m; render(); }
+function setPlanMode(m){ if(m!=='upcoming' && PLAN_SEL) stopSel(); VIEW.planMode=m; render(); window.scrollTo(0,0); }
 
 function render(){
+  setTimeout(renderSelBar,0);
   const pending = SHIFTS.filter(needsConfirm).length;
   document.querySelectorAll('.tab').forEach(b=>{
     b.classList.toggle('on', b.dataset.tab===VIEW.tab);
@@ -1291,7 +1327,8 @@ function renderChangesBlock(){
 }
 function shiftRow(s){
   const d=new Date(s.date+'T12:00:00');
-  return `<button class="srow k-${shiftKind(s)}" onclick="openShift('${esc(s.id)}')">
+  const selectable = PLAN_SEL && needsConfirm(s), on = selectable && PLAN_SEL.has(s.id);
+  return `<button class="srow k-${shiftKind(s)} ${PLAN_SEL&&!selectable?'dim':''} ${on?'sel':''}" onclick="${selectable? `toggleSel('${esc(s.id)}')` : `openShift('${esc(s.id)}')`}">
     <div class="dblock ${s.date===todayISO()?'today':''}">
       <div class="dw">${esc(d.toLocaleDateString('fr-CH',{weekday:'short'}).replace('.',''))}</div>
       <div class="dn">${d.getDate()}</div>
@@ -1302,37 +1339,131 @@ function shiftRow(s){
       <div class="s2">${kindIcon(s)}${esc(s.start)} – ${esc(s.end)} · ${durLabel(s)}</div>
       <div class="s3">${s.post?esc(s.post)+' · ':''}${chip(s)}</div>
     </div>
-    <span class="chev">${I.chev}</span>
+    ${selectable? `<span class="sel-box">${on?I.check:''}</span>` : `<span class="chev">${I.chev}</span>`}
   </button>`;
 }
+function hhmm2(m){ return Math.floor(m/60)+'h'+(m%60?pad(m%60):''); }
+function sumMin(list){ return list.reduce((n,s)=>n+paidMinutes(s),0); }
+// Synthèse : heures planifiées cette semaine / semaine prochaine / ce mois / mois prochain
+function renderHoursSummary(){
+  const t=todayISO(), wk=mondayOf(t), nwk=addDaysISO(wk,7);
+  const inRange=(a,b)=>SHIFTS.filter(s=>s.date>=a && s.date<b);
+  const ym=t.slice(0,7); const nd=new Date(ym+'-15T12:00:00'); nd.setMonth(nd.getMonth()+1); const nym=isoDate(nd).slice(0,7);
+  const mLbl=x=>new Date(x+'-15T12:00:00').toLocaleDateString('fr-CH',{month:'long'});
+  const tiles=[
+    ['Cette semaine', sumMin(inRange(wk, nwk))],
+    ['Sem. prochaine', sumMin(inRange(nwk, addDaysISO(nwk,7)))],
+    [cap(mLbl(ym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===ym))],
+    [cap(mLbl(nym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===nym))]
+  ];
+  return `<div class="hsum">${tiles.map(([l,m])=>`<div><b>${hhmm2(m)}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
+}
 function renderPlanning(){
-  const now=new Date(), up=VIEW.planMode==='upcoming', t=todayISO();
+  const mode = VIEW.planMode==='month'? 'month' : VIEW.planMode==='past'? 'past' : 'upcoming';
+  let h = `<div class="seg three">
+      <button class="${mode==='upcoming'?'on':''}" onclick="setPlanMode('upcoming')">À venir</button>
+      <button class="${mode==='month'?'on':''}" onclick="setPlanMode('month')">Mois</button>
+      <button class="${mode==='past'?'on':''}" onclick="setPlanMode('past')">Passés</button>
+    </div>`;
+  if(mode==='month') return h + renderMonth();
+  const now=new Date(), up=mode==='upcoming', t=todayISO();
   const shiftItems = SHIFTS.filter(s=> up? sEnd(s)>now : sEnd(s)<=now).map(s=>({ date:s.date, key:sStart(s).getTime(), html:shiftRow(s) }));
   const absItems = ABS.list.filter(a=>a.status==='Acceptée' && (up? a.to>=t : a.to<t)).map(a=>({ date:a.from, key:new Date(a.from+'T00:00:00').getTime(), html:absenceRow(a) }));
   const list = shiftItems.concat(absItems).sort((a,b)=> up? a.key-b.key : b.key-a.key);
-  const ym=t.slice(0,7), month=SHIFTS.filter(s=>s.date.slice(0,7)===ym), mins=month.reduce((n,s)=>n+paidMinutes(s),0);
-  let h = `<div class="seg">
-      <button class="${up?'on':''}" onclick="setPlanMode('upcoming')">À venir</button>
-      <button class="${up?'':'on'}" onclick="setPlanMode('past')">Passés</button>
-    </div>
-    <div class="pdf-bar"><div class="month-sum">${cap(new Date(t+'T12:00:00').toLocaleDateString('fr-CH',{month:'long'}))} : ${month.length} service${month.length>1?'s':''} · ${Math.floor(mins/60)}h${pad(mins%60)}</div>
+  if(up) h += renderHoursSummary();
+  h += `<div class="pdf-bar"><div class="month-sum">Heures planifiées, pauses non payées déduites</div>
       <button class="btn-pdf" onclick="openPdfExport()">${I.pdf}PDF</button></div>`;
   const pending = SHIFTS.filter(needsConfirm);
-  if(up && pending.length) h += `<div class="validate-bar"><span>${pending.length} service${pending.length>1?'s':''} à valider</span><button class="btn btn-red btn-sm" onclick="askConfirm(null)">Tout valider</button></div>`;
+  if(up && pending.length && !PLAN_SEL) h += `<div class="validate-bar"><span>${pending.length} service${pending.length>1?'s':''} à valider</span>
+      ${pending.length>1? `<button class="btn btn-outline btn-sm" onclick="startSel()">Choisir</button>` : ''}
+      <button class="btn btn-red btn-sm" onclick="askConfirm(null)">${pending.length>1?'Tout valider':'Valider'}</button></div>`;
+  if(up && PLAN_SEL) h += `<div class="validate-bar sel-mode"><span>Cochez les services que vous pouvez assurer</span><button class="btn btn-outline btn-sm" onclick="selAll()">${PLAN_SEL.size===pending.length?'Tout décocher':'Tout cocher'}</button></div>`;
   if(!list.length) return h+`<div class="empty"><b>${up?'Aucun service à venir':'Aucun service passé'}</b>${up?'Votre planning n’a pas encore été publié pour la période à venir.':'Les services des '+HISTORY_DAYS+' derniers jours s’affichent ici.'}</div>`;
   const thisWk=mondayOf(t); let last='';
-  list.forEach(s=>{
-    const wk=mondayOf(s.date);
+  list.forEach(it=>{
+    const wk=mondayOf(it.date);
     if(wk!==last){
       last=wk;
       const lbl = wk===thisWk? 'Cette semaine' : wk===addDaysISO(thisWk,7)? 'Semaine prochaine' : wk===addDaysISO(thisWk,-7)? 'Semaine dernière'
         : 'Semaine du '+new Date(wk+'T12:00:00').toLocaleDateString('fr-CH',{day:'numeric',month:'long'});
-      h += `<div class="wk">${esc(lbl)}</div>`;
+      const wMin = sumMin(SHIFTS.filter(x=>x.date>=wk && x.date<addDaysISO(wk,7)));
+      h += `<div class="wk"><span>${esc(lbl)}</span>${wMin? `<span class="wk-h">${hhmm2(wMin)}</span>` : ''}</div>`;
     }
-    h += s.html;
+    h += it.html;
   });
   return h;
 }
+
+// ── Vue mensuelle ────────────────────────────────────────────
+function monthYm(){ const d=new Date(todayISO().slice(0,7)+'-15T12:00:00'); d.setMonth(d.getMonth()+(VIEW.monthOffset||0)); return isoDate(d).slice(0,7); }
+function shiftMonth(n){ VIEW.monthOffset=(VIEW.monthOffset||0)+n; render(); }
+function renderMonth(){
+  const ym=monthYm(), t=todayISO();
+  const first=ym+'-01', start=mondayOf(first);
+  const lastDay=new Date(+ym.slice(0,4), +ym.slice(5,7), 0).getDate();
+  const end=addDaysISO(ym+'-'+pad(lastDay), 6-((new Date(ym+'-'+pad(lastDay)+'T12:00:00').getDay()+6)%7));
+  const monthShifts=SHIFTS.filter(s=>s.date.slice(0,7)===ym);
+  const mMin=sumMin(monthShifts), nights=monthShifts.filter(s=>shiftKind(s)==='night').length, toVal=monthShifts.filter(needsConfirm).length;
+  let rows='', d=start;
+  while(d<=end){
+    let cells='', wMin=0;
+    for(let i=0;i<7;i++){
+      const iso=addDaysISO(d,i), inM=iso.slice(0,7)===ym;
+      const { shifts, abs } = dayEntries(iso);
+      if(inM) wMin += sumMin(shifts);
+      const cls=['mday', inM?'':'out', iso===t?'today':'', iso<t?'past':''];
+      let inner='', click='';
+      if(shifts.length){
+        const s0=shifts[0], k=shiftKind(s0);
+        cls.push(k==='night'?'nightk':'dayk');
+        if(shifts.some(needsConfirm)) cls.push('tovalid');
+        inner = `<span class="mi">${k==='night'?I.moon:I.sun}</span><span class="mh">${shifts.length>1? shifts.length+' serv.' : esc(shortH(s0.start)+'–'+shortH(s0.end))}</span>`;
+        click = shifts.length===1? `openShift('${esc(s0.id)}')` : `openDaySheet('${iso}')`;
+      } else if(abs){ cls.push('leavek'); inner='<span class="mh">'+(abs.kind==='paid'?'Congé':'Indispo')+'</span>'; }
+      cells += `<${click?'button':'div'} class="${cls.join(' ')}" ${click?`onclick="${click}"`:''}><span class="mn">${+iso.slice(8)}</span>${inner}</${click?'button':'div'}>`;
+    }
+    rows += `<div class="mrow">${cells}<div class="mtot">${wMin? hhmm2(wMin) : '—'}</div></div>`;
+    d=addDaysISO(d,7);
+  }
+  const title=cap(new Date(ym+'-15T12:00:00').toLocaleDateString('fr-CH',{month:'long',year:'numeric'}));
+  return `<div class="week month">
+    <div class="week-head">
+      <div><div class="t">${esc(title)}</div><div class="s">${monthShifts.length} service${monthShifts.length>1?'s':''} · ${nights} nuit${nights>1?'s':''}${toVal? ' · <b style="color:var(--warn)">'+toVal+' à valider</b>' : ''}</div></div>
+      <div class="week-nav"><button class="prev" onclick="shiftMonth(-1)" aria-label="Mois précédent">${I.chev}</button><button onclick="shiftMonth(1)" aria-label="Mois suivant">${I.chev}</button></div>
+    </div>
+    <div class="mrow mhead">${['L','M','M','J','V','S','D'].map(x=>`<div>${x}</div>`).join('')}<div>Sem.</div></div>
+    ${rows}
+    <div class="week-foot"><span class="lg"><i class="d"></i>Jour</span><span class="lg"><i class="n"></i>Nuit</span><span class="lg"><i class="r"></i>Repos</span>
+      <span class="week-total">${hhmm2(mMin)} / mois</span></div>
+    ${toVal? `<div class="d-note" style="text-align:left">Les jours entourés en orange ont un service à valider.</div>` : ''}
+    <button class="btn btn-block" onclick="openPdfExportFor('${ym}')">${I.pdf} Exporter ce mois en PDF</button>
+  </div>`;
+}
+function openDaySheet(iso){
+  const { shifts, abs } = dayEntries(iso);
+  $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
+    <h2>${esc(cap(new Date(iso+'T12:00:00').toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long'})))}</h2>
+    <div class="sub">${hhmm2(sumMin(shifts))} planifiées</div>
+    ${shifts.map(s=>shiftRow(s).replace('onclick="openShift(', 'onclick="closeSheet();openShift(')).join('')}${abs? absenceRow(abs) : ''}
+    <button class="btn btn-ghost btn-block" style="margin-top:12px" onclick="closeSheet()">Fermer</button>
+  </div></div>`;
+}
+function openPdfExportFor(ym){ PDF.ym=ym; openPdfExport(); }
+
+// ── Sélection multiple pour valider ──────────────────────────
+function startSel(){ PLAN_SEL=new Set(); render(); renderSelBar(); }
+function stopSel(){ PLAN_SEL=null; const b=document.getElementById('sel-bar'); if(b) b.remove(); render(); }
+function toggleSel(id){ if(!PLAN_SEL) return; PLAN_SEL.has(id)? PLAN_SEL.delete(id) : PLAN_SEL.add(id); render(); renderSelBar(); }
+function selAll(){ const p=SHIFTS.filter(needsConfirm).map(s=>s.id); PLAN_SEL = PLAN_SEL.size===p.length? new Set() : new Set(p); render(); renderSelBar(); }
+function renderSelBar(){
+  let b=document.getElementById('sel-bar');
+  if(!PLAN_SEL || VIEW.tab!=='planning' || VIEW.detail){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement('div'); b.id='sel-bar'; b.className='sel-bar'; document.body.appendChild(b); }
+  const n=PLAN_SEL.size;
+  b.innerHTML = `<div class="sel-in"><button class="btn btn-ghost" onclick="stopSel()">Annuler</button>
+    <button class="btn btn-red" ${n?'':'disabled'} onclick="askConfirm('sel')">Valider ${n||''} service${n>1?'s':''}</button></div>`;
+}
+
 function renderDetail(s){
   if(!s) return '<div class="empty"><b>Service introuvable</b>Il a peut-être été retiré du planning.</div>';
   const ended = sEnd(s)<=new Date();
@@ -1368,8 +1499,12 @@ function renderDetail(s){
 }
 
 // ── Validation (un service ou tous ceux en attente) ──────────
+function confirmItems(id){
+  if(id==='sel') return SHIFTS.filter(s=>PLAN_SEL && PLAN_SEL.has(s.id) && needsConfirm(s)).sort((a,b)=>sStart(a)-sStart(b));
+  return id? SHIFTS.filter(s=>s.id===id && isOpen(s)) : SHIFTS.filter(needsConfirm).sort((a,b)=>sStart(a)-sStart(b));
+}
 function askConfirm(id){
-  const items = id? SHIFTS.filter(s=>s.id===id && isOpen(s)) : SHIFTS.filter(needsConfirm).sort((a,b)=>sStart(a)-sStart(b));
+  const items = confirmItems(id);
   if(!items.length) return;
   const one = items.length===1;
   $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
@@ -1410,18 +1545,23 @@ async function submitRefuse(){
   try{
     await opsRpc('rdz_planning_pilot_refuse_shift', { p_agent_id:String(AGENT.id), p_shift_id:s.id, p_version:s.version, p_reason:reason });
     closeSheet(); toast('Refus envoyé à votre responsable');
+    if(VIEW.detail){ VIEW.detail=null; VIEW.tab='planning'; VIEW.planMode='upcoming'; window.scrollTo(0,0); }
   }catch(e){ return renderRefuse(e.message||'Envoi impossible'); }
   await reload(false);
 }
 async function doConfirm(id){
-  const items = (id? SHIFTS.filter(s=>s.id===id && isOpen(s)) : SHIFTS.filter(needsConfirm)).map(s=>({ id:s.id, version:s.version }));
+  const items = confirmItems(id).map(s=>({ id:s.id, version:s.version }));
   const btn=$('cf-btn'); if(!items.length||!btn) return;
+  const fromDetail = !!VIEW.detail;
   btn.disabled=true; btn.textContent='Envoi…';
   try{
     const n = Number(await opsRpc('rdz_planning_pilot_accept_shifts', { p_agent_id:String(AGENT.id), p_items:items }))||0;
     closeSheet();
     if(n===items.length) toast(n>1? n+' services validés' : 'Service validé');
     else toast((n? n+' validé(s). ' : '')+'Un service a été modifié entre-temps, vérifiez-le à nouveau.', true);
+    // Retour automatique à la liste des services (et sortie du mode sélection)
+    if(id==='sel'){ PLAN_SEL=null; const b=document.getElementById('sel-bar'); if(b) b.remove(); }
+    if(fromDetail){ VIEW.detail=null; VIEW.tab='planning'; VIEW.planMode='upcoming'; window.scrollTo(0,0); }
   }catch(e){ closeSheet(); toast(e.message||'Validation impossible', true); }
   await reload(false);
 }
