@@ -1,4 +1,12 @@
-<!-- RDZ · questionnaires-agent · v3.2 · 2026-10-16
+<!-- RDZ · questionnaires-agent · v4 · 2026-11-05
+     v4 (migration-controle-competences-v4.sql) :
+       - Mises en situation : jeux de rôle à embranchements (le formateur lit la
+         situation, clique le choix de l'agent ; note, bilan, parcours enregistré).
+       - Auto-évaluation des compétences : lien personnel daté → page agent
+         auto-evaluation.html (Oui / Non / Je sais où trouver la procédure) ;
+         suivi et lacunes par agent avec le document à faire lire.
+       - Bouton Menu → index.html.
+     v3.2 · 2026-10-16
      v3.2 : CODE FORMATEUR SEUL, sans nom (demande de Guillaume). Les liens,
        corrections et habilitations sont signés « Formateur ».
      v3.1 · 2026-10-16
@@ -231,7 +239,7 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
       </div>
       <div class="hlinks">
         <button class="hl hidden" id="lock-btn" onclick="lockTrainer()">🔒 Verrouiller</button>
-        <a href="mobile.html">← Menu</a>
+        <a href="../index.html">← Menu</a>
       </div>
     </div>
   </header>
@@ -244,7 +252,7 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
     <section id="s-denied" class="hidden">
       <h2>Accès réservé</h2>
       <div class="note" id="denied-msg">Cette page est réservée aux agents qui préparent les quiz.</div>
-      <a class="btn btn-p" href="mobile.html">← Retour au menu</a>
+      <a class="btn btn-p" href="../index.html">← Retour au menu</a>
     </section>
 
     <!-- CODE FORMATEUR -->
@@ -285,6 +293,12 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
         <span class="ic">🎭</span>
         <span><span class="t">Mises en situation</span>
           <span class="d" style="display:block">Faire jouer un scénario sur site et cocher les actions réalisées par l'agent.</span></span>
+        <span class="chev">›</span>
+      </button>
+      <button class="group-btn" onclick="openAuto()">
+        <span class="ic">📋</span>
+        <span><span class="t">Auto-évaluation</span>
+          <span class="d" style="display:block">Envoyer à un agent sa grille de compétences (Oui / Non / Je sais où trouver). Voir ses lacunes et les documents à lire.</span></span>
         <span class="chev">›</span>
       </button>
       <button class="group-btn" onclick="openHabs()">
@@ -333,13 +347,47 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
       <div class="situ" id="sr-situ"></div>
       <div class="field"><label class="l" for="sr-agent">Agent évalué *</label>
         <select class="f" id="sr-agent"><option value="">Chargement…</option></select></div>
-      <label class="l">Actions attendues — cochez celles réalisées</label>
+      <label class="l" id="sr-steps-l">Actions attendues — cochez celles réalisées</label>
       <div id="sr-steps"></div>
+      <div id="sr-play" class="hidden"></div>
       <div class="watch hidden" id="sr-watch-box"><b>⚠ Point d'attention</b><div id="sr-watch"></div></div>
       <div class="src" id="sr-src"></div>
       <div class="field" style="margin-top:12px"><label class="l" for="sr-comment">Commentaire</label>
         <textarea class="f" id="sr-comment" placeholder="Ce qui a été revu avec l'agent…"></textarea></div>
       <div id="sr-err"></div>
+    </section>
+
+    <!-- AUTO-ÉVALUATION : LISTE -->
+    <section id="s-auto" class="hidden">
+      <button class="back" onclick="goHome()">‹ Accueil</button>
+      <h2>Auto-évaluation des compétences</h2>
+      <div class="lead">L'agent répond seul, sur son téléphone : <b>Oui</b>, <b>Non</b> ou <b>Je sais où trouver la procédure</b>. Un lien = un agent, un seul passage, durée limitée.</div>
+      <div class="toolbar">
+        <input class="f search" id="au-search" placeholder="🔍 Agent…" oninput="renderAuto()">
+        <button class="btn btn-p" onclick="openAutoModal()">+ Envoyer une auto-évaluation</button>
+      </div>
+      <div class="pills" id="au-pills" style="margin-bottom:12px">
+        <button class="pill on" data-f="">Toutes</button>
+        <button class="pill" data-f="termine">Terminées</button>
+        <button class="pill" data-f="en_attente">En attente</button>
+        <button class="pill" data-f="ouvert">Ouvertes</button>
+        <button class="pill" data-f="expire">Expirées</button>
+      </div>
+      <div id="au-err"></div>
+      <div id="au-body"></div>
+    </section>
+
+    <!-- AUTO-ÉVALUATION : DÉTAIL -->
+    <section id="s-autodet" class="hidden">
+      <button class="back" onclick="openAuto()">‹ Auto-évaluations</button>
+      <h2 id="ad-title"></h2>
+      <div class="meta" id="ad-meta"></div>
+      <div class="pills" id="ad-pills" style="margin:10px 0 12px">
+        <button class="pill on" data-f="lacunes">Lacunes seulement</button>
+        <button class="pill" data-f="">Tout</button>
+      </div>
+      <div id="ad-err"></div>
+      <div id="ad-body"></div>
     </section>
 
     <!-- HABILITATIONS -->
@@ -449,6 +497,31 @@ table.res{width:100%;border-collapse:collapse;font-size:13px}
 <!-- Barre collante de la mise en situation -->
 <div class="sticky hidden" id="sr-bar"><div class="in">
   <button class="btn btn-ok" id="sr-save" onclick="saveScenarioReport()">✓ Enregistrer le compte rendu</button>
+</div></div>
+
+<!-- MODALE AUTO-ÉVALUATION -->
+<div class="modal-bg" id="m-auto"><div class="modal">
+  <h3>Envoyer une auto-évaluation</h3>
+  <div class="field"><label class="l" for="au-agent">Agent *</label><select class="f" id="au-agent" onchange="resetAutoLink()"><option value="">Chargement…</option></select></div>
+  <div class="grid2">
+    <div class="field"><label class="l" for="au-camp">Campagne</label><input class="f" id="au-camp" value="IHEID-v4" oninput="resetAutoLink()"></div>
+    <div class="field"><label class="l" for="au-valid">Validité</label>
+      <select class="f" id="au-valid" onchange="resetAutoLink()">
+        <option value="48">48 heures</option><option value="168" selected>7 jours</option><option value="336">14 jours</option>
+      </select></div>
+  </div>
+  <button class="btn btn-p btn-block" id="au-create" onclick="createAutoLink()">🔗 Créer le lien</button>
+  <div id="au-merr" style="margin-top:8px"></div>
+  <div id="au-res" class="hidden" style="margin-top:12px">
+    <div class="linkbox" id="au-link"></div>
+    <div class="lead" id="au-exp" style="margin-bottom:6px"></div>
+    <div class="actions">
+      <button class="btn btn-g btn-sm" onclick="copyLink('au-link')">📋 Copier</button>
+      <button class="btn btn-g btn-sm" onclick="shareWhatsApp('au-link')">💬 WhatsApp</button>
+      <button class="btn btn-g btn-sm" onclick="shareMail('au-link')">✉️ Email</button>
+    </div>
+  </div>
+  <div class="foot"><button class="btn btn-g" onclick="closeModal('m-auto');openAuto()">Fermer</button></div>
 </div></div>
 
 <!-- MODALE HABILITATION -->
@@ -602,7 +675,7 @@ function fDate(iso){ if(!iso) return '—'; const d=new Date(iso);
   return d.toLocaleDateString('fr-CH',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'}); }
 function errText(e){ return (e && (e.message || e.error_description)) || String(e); }
 
-const SECTIONS = ['s-loading','s-denied','s-code','s-home','s-list','s-editor','s-results','s-corr','s-links','s-scen','s-scenrun','s-hab'];
+const SECTIONS = ['s-loading','s-denied','s-code','s-home','s-list','s-editor','s-results','s-corr','s-links','s-scen','s-scenrun','s-hab','s-auto','s-autodet'];
 function show(id){
   SECTIONS.forEach(s => $(s).classList.toggle('hidden', s!==id));
   $('ed-bar').classList.toggle('hidden', id!=='s-editor');
@@ -980,6 +1053,7 @@ async function openShare(id){
   } catch(e){ sel.innerHTML = '<option value="">Liste des agents indisponible</option>'; }
 }
 function shareText(boxId){
+  if (boxId==='au-link') return 'Auto-évaluation des compétences RDZ : ' + $(boxId).textContent;
   const t = templates.find(x => x.id===shareQuizId);
   return 'Quiz de formation RDZ' + (t ? ' — ' + t.title : '') + ' : ' + $(boxId).textContent;
 }
@@ -991,6 +1065,8 @@ function copyLink(boxId){
 }
 function shareWhatsApp(boxId){ window.open('https://wa.me/?text=' + encodeURIComponent(shareText(boxId)), '_blank'); }
 function shareMail(boxId){
+  if (boxId==='au-link'){ location.href = 'mailto:?subject=' + encodeURIComponent('Auto-évaluation des compétences RDZ') +
+    '&body=' + encodeURIComponent('Bonjour,\n\nMerci de remplir ton auto-évaluation des compétences (environ 10 minutes) :\n' + $(boxId).textContent + '\n\nRéponds franchement : « Je sais où trouver la procédure » est une bonne réponse.\n\nMerci.'); return; }
   const t = templates.find(x => x.id===shareQuizId);
   location.href = 'mailto:?subject=' + encodeURIComponent('Quiz de formation RDZ' + (t ? ' — ' + t.title : '')) +
     '&body=' + encodeURIComponent('Bonjour,\n\nMerci de répondre au quiz de formation suivant :\n' + $(boxId).textContent + '\n\nMerci.');
@@ -1369,7 +1445,7 @@ function renderScenarios(){
   $('sc-body').innerHTML = rows.map(x => `<button class="group-btn" data-sc="${esc(x.id)}">
       <span class="ic">🎭</span>
       <span><span class="t">${esc(x.title)}</span>
-        <span class="d" style="display:block">${x.target_site?'📍 '+esc(x.target_site)+' · ':''}${(x.steps||[]).length} actions attendues</span>
+        <span class="d" style="display:block">${x.target_site?'📍 '+esc(x.target_site)+' · ':''}${x.nodes ? '🎲 Jeu de rôle à embranchements' : (x.steps||[]).length+' actions attendues'}</span>
         <span class="d" style="display:block">${esc((x.situation||'').slice(0,140))}${(x.situation||'').length>140?'…':''}</span></span>
       <span class="chev">›</span></button>`).join('');
 }
@@ -1380,7 +1456,8 @@ function renderReports(rows){
     <div style="display:flex;justify-content:space-between;gap:8px"><div class="title">${esc(r.agent_name)}</div>
       <span class="tag ${r.ok_count===r.total?'ok':'warn'}">${r.ok_count}/${r.total}</span></div>
     <div style="font-size:12.5px;color:#666">${esc(r.scenario_title||'')}${r.target_site?' · 📍 '+esc(r.target_site):''} · ${fDate(r.created_at)}${r.trainer?' · par '+esc(r.trainer):''}</div>
-    ${(r.steps_missed||[]).length?`<div class="src" style="font-style:normal;color:var(--bad)">Manqué : ${(r.steps_missed||[]).map(esc).join(' · ')}</div>`:''}
+    ${r.outcome?`<div style="font-size:12.5px;margin-top:4px"><b>${esc(r.outcome)}</b></div>`:''}
+    ${(r.steps_missed||[]).length?`<div class="src" style="font-style:normal;color:var(--bad)">${r.path?'Choix à revoir':'Manqué'} : ${(r.steps_missed||[]).map(esc).join(' · ')}</div>`:''}
     ${r.comment?`<div class="explain">${esc(r.comment)}</div>`:''}
   </div>`).join('');
 }
@@ -1396,12 +1473,49 @@ function runScenario(id){
   $('sr-watch-box').classList.toggle('hidden', !curScen.watch);
   $('sr-src').textContent = curScen.source ? '📄 ' + curScen.source : '';
   $('sr-comment').value = '';
+  const play = !!curScen.nodes;
+  $('sr-steps-l').classList.toggle('hidden', play);
+  $('sr-steps').classList.toggle('hidden', play);
+  $('sr-play').classList.toggle('hidden', !play);
+  $('sr-situ').classList.toggle('hidden', play);
+  if (play) startPlay();
   fillAgentSelect($('sr-agent'));
 }
+/* ---- Jeu de rôle à embranchements ----
+   Le formateur lit la situation à l'agent et clique le choix qu'il annonce.
+   Chaque nœud : t (texte), c (choix : l, go, bad, note), ou fin {titre, txt}. */
+let play = null;
+function startPlay(){ play = { node: curScen.start_node, path: [], end: null }; renderPlay(); }
+function renderPlay(){
+  const n = (curScen.nodes||{})[play.node];
+  const hist = play.path.map((p,i) => `<div class="chk ${p.bad?'':'on'}" style="cursor:default"><span>${i+1}.</span><span>${esc(p.choix)}${p.note?`<br><small style="color:#777">${esc(p.note)}</small>`:''}</span><span class="tag ${p.bad?'bad':'ok'}" style="margin-left:auto">${p.bad?'✕':'✓'}</span></div>`).join('');
+  if (!n){ $('sr-play').innerHTML = hist + '<div class="err">Étape introuvable dans ce scénario.</div>'; return; }
+  if (n.fin || !(n.c||[]).length){
+    const ok = play.node === 'fin' && !play.path.some(p => p.bad);
+    play.end = { titre: (n.fin && n.fin.titre) || 'Fin', success: play.node === 'fin', clean: ok };
+    $('sr-play').innerHTML = hist + `<div class="situ">${esc(n.t||'')}</div>
+      <div class="${play.node==='fin'?'note':'watch'}" style="margin-top:8px"><b>${play.node==='fin'?'✅':'⚠'} ${esc(play.end.titre)}</b>${n.fin && n.fin.txt?`<div style="margin-top:4px">${esc(n.fin.txt)}</div>`:''}</div>
+      <div class="actions" style="margin-top:8px"><button class="btn btn-g btn-sm" onclick="startPlay()">↺ Recommencer</button></div>`;
+    return;
+  }
+  play.end = null;
+  $('sr-play').innerHTML = hist + `<div class="situ">${esc(n.t)}</div>
+    <label class="l">Choix annoncé par l'agent</label>` +
+    n.c.map((c,i) => `<button class="group-btn" data-pc="${i}" style="margin-bottom:6px"><span class="ic">${String.fromCharCode(65+i)}</span><span><span class="t" style="font-weight:normal">${esc(c.l)}</span></span><span class="chev">›</span></button>`).join('') +
+    (play.path.length ? `<div class="actions"><button class="btn btn-g btn-sm" onclick="undoPlay()">‹ Annuler le dernier choix</button></div>` : '');
+}
+function undoPlay(){ const last = play.path.pop(); if (last) play.node = last.node; renderPlay(); }
+$('sr-play').addEventListener('click', e => {
+  const b = e.target.closest('[data-pc]'); if (!b) return;
+  const n = curScen.nodes[play.node], c = n.c[+b.dataset.pc];
+  play.path.push({ node: play.node, choix: c.l, bad: !!c.bad, note: c.note || null });
+  play.node = c.go; renderPlay(); window.scrollTo(0, document.body.scrollHeight);
+});
 async function saveScenarioReport(){
   showErr('sr-err','');
   const ag = agentFrom($('sr-agent'));
   if (!ag){ window.scrollTo(0,0); return showErr('sr-err','Choisissez l\'agent évalué.'); }
+  if (curScen.nodes) return savePlay(ag);
   const boxes = [...$('sr-steps').querySelectorAll('input')];
   const steps = curScen.steps || [];
   const ok = steps.filter((_,i) => boxes[i] && boxes[i].checked), miss = steps.filter((_,i) => !(boxes[i] && boxes[i].checked));
@@ -1417,6 +1531,117 @@ async function saveScenarioReport(){
       context: `Mise en situation « ${sc.title} » : ${ok.length}/${steps.length} actions réalisées.` });
   } catch(e){ window.scrollTo(0,0); showErr('sr-err','Enregistrement impossible : '+errText(e)); }
   finally { b.disabled = false; }
+}
+
+async function savePlay(ag){
+  if (!play || !play.end) { window.scrollTo(0, document.body.scrollHeight); return showErr('sr-err','Menez le jeu de rôle jusqu\'au bilan avant d\'enregistrer.'); }
+  const b = $('sr-save'); b.disabled = true;
+  try {
+    const rid = await rpc('quiz_scenario_play_save', { p_token: trainerToken, p_scenario_id: curScen.id, p_agent_id: ag.id,
+      p_agent_name: ag.name, p_path: play.path, p_outcome: play.end.titre, p_success: play.end.success,
+      p_comment: $('sr-comment').value.trim() || null });
+    const nbBad = play.path.filter(p => p.bad).length, sc = curScen, end = play.end;
+    toast(`Compte rendu enregistré ✓ (${end.titre})`);
+    await openScenarios();
+    if (sc.target_site) openHabModal({ agent_id: ag.id, agent_name: ag.name, site: sc.target_site,
+      statut: end.clean ? 'habilite' : 'a_revoir', report_id: rid,
+      context: `Jeu de rôle « ${sc.title} » : ${end.titre}` + (nbBad ? ` · ${nbBad} choix à revoir` : '') });
+  } catch(e){ showErr('sr-err','Enregistrement impossible : '+errText(e)); }
+  finally { b.disabled = false; }
+}
+
+/* ---- Auto-évaluation ---- */
+const AUTO_URL = new URL('auto-evaluation.html', location.href).href;
+const VAL_LBL = { S:['✓ Oui','ok'], J:['✕ Non','bad'], P:['📄 Sait où trouver','warn'] };
+let autos = [], auFilter = '', adFilter = 'lacunes', adData = null, adInv = null;
+async function openAuto(){
+  show('s-auto'); showErr('au-err','');
+  $('au-body').innerHTML = '<div class="spin"></div>';
+  try { autos = await rpc('autoeval_list', { p_token: trainerToken, p_days: 365 }) || []; renderAuto(); }
+  catch(e){ $('au-body').innerHTML=''; showErr('au-err','Chargement impossible : '+errText(e)); }
+}
+$('au-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  auFilter = b.dataset.f; $('au-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b)); renderAuto();
+});
+function renderAuto(){
+  const q = $('au-search').value.toLowerCase().trim();
+  const rows = autos.filter(a => (!auFilter || a.etat===auFilter) && (!q || (a.agent_name||'').toLowerCase().includes(q)));
+  if (!rows.length){ $('au-body').innerHTML = '<div class="empty">Aucune auto-évaluation dans cette catégorie. Appuyez sur « + Envoyer une auto-évaluation ».</div>'; return; }
+  $('au-body').innerHTML = rows.map(a => {
+    const et = ETAT_LBL[a.etat] || [a.etat,''];
+    const done = a.etat==='termine', canRevoke = a.etat==='en_attente' || a.etat==='ouvert';
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><div class="title">${esc(a.agent_name)}</div><div style="font-size:12.5px;color:#666">Campagne ${esc(a.campagne)} · envoyée ${fDate(a.created_at)}</div></div>
+        <span class="tag ${et[1]}">${et[0]}</span></div>
+      ${done ? `<div class="meta">
+        <span class="tag ok">✓ Oui ${a.oui}</span><span class="tag warn">📄 Sait où trouver ${a.procedure}</span><span class="tag bad">✕ Non ${a.non}</span>
+        ${a.indispensables_non ? `<span class="tag crit">⚠ ${a.indispensables_non} indispensable(s) à Non</span>` : ''}</div>`
+        : `<div class="meta"><span class="tag">Expire ${fDate(a.expires_at)}</span></div>`}
+      ${(done || canRevoke) ? `<div class="actions">
+        ${done ? `<button class="btn btn-p btn-sm" data-au="voir" data-id="${esc(a.id)}">👁 Voir les lacunes</button>` : ''}
+        ${canRevoke ? `<button class="btn btn-bad btn-sm" data-au="revoke" data-id="${esc(a.id)}">✕ Annuler le lien</button>` : ''}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+$('au-body').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-au]'); if (!b) return;
+  if (b.dataset.au==='voir') return openAutoDetail(b.dataset.id);
+  if (!confirm('Annuler ce lien ? L\'agent ne pourra plus l\'utiliser.')) return;
+  b.disabled = true;
+  try { await rpc('autoeval_revoke', { p_token: trainerToken, p_invitation_id: b.dataset.id }); toast('Lien annulé'); await openAuto(); }
+  catch(err){ b.disabled = false; toast('Annulation impossible : '+errText(err), true); }
+});
+function openAutoModal(){
+  resetAutoLink(); showErr('au-merr','');
+  fillAgentSelect($('au-agent'));
+  openModal('m-auto');
+}
+function resetAutoLink(){ $('au-res').classList.add('hidden'); $('au-create').disabled = false; }
+async function createAutoLink(){
+  showErr('au-merr','');
+  const ag = agentFrom($('au-agent'));
+  if (!ag) return showErr('au-merr','Choisissez l\'agent.');
+  const b = $('au-create'); b.disabled = true;
+  try {
+    const r = await rpc('autoeval_link_create', { p_token: trainerToken, p_agent_id: ag.id, p_agent_name: ag.name,
+      p_campagne: $('au-camp').value.trim() || 'IHEID-v4', p_hours: parseInt($('au-valid').value,10) });
+    $('au-link').textContent = AUTO_URL + '?lien=' + encodeURIComponent(r.token);
+    $('au-exp').textContent = `Pour ${ag.name} · valable jusqu'au ${fDate(r.expires_at)} · un seul passage.`;
+    $('au-res').classList.remove('hidden');
+    toast('Lien créé ✓');
+  } catch(e){ b.disabled = false; showErr('au-merr','Création impossible : '+errText(e)); }
+}
+async function openAutoDetail(id){
+  adInv = autos.find(a => String(a.id)===String(id)); if (!adInv) return;
+  show('s-autodet'); showErr('ad-err','');
+  $('ad-title').textContent = adInv.agent_name;
+  $('ad-meta').innerHTML = `<span class="tag">Campagne ${esc(adInv.campagne)}</span><span class="tag ok">Répondu ${fDate(adInv.used_at)}</span>
+    <span class="tag ok">✓ ${adInv.oui}</span><span class="tag warn">📄 ${adInv.procedure}</span><span class="tag bad">✕ ${adInv.non}</span>`;
+  $('ad-body').innerHTML = '<div class="spin"></div>';
+  try { adData = await rpc('autoeval_detail', { p_token: trainerToken, p_invitation_id: id }) || []; renderAutoDetail(); }
+  catch(e){ $('ad-body').innerHTML=''; showErr('ad-err','Chargement impossible : '+errText(e)); }
+}
+$('ad-pills').addEventListener('click', e => {
+  const b = e.target.closest('.pill'); if(!b) return;
+  adFilter = b.dataset.f; $('ad-pills').querySelectorAll('.pill').forEach(p => p.classList.toggle('on', p===b)); renderAutoDetail();
+});
+function renderAutoDetail(){
+  const only = adFilter==='lacunes';
+  const crit = [];
+  adData.forEach(s => (s.items||[]).forEach(i => { if (i.indispensable && i.valeur==='J') crit.push(Object.assign({ section: s.titre }, i)); }));
+  let html = crit.length ? `<div class="watch" style="margin:0 0 12px"><b>⚠ ${crit.length} compétence(s) indispensable(s) à Non — à former en priorité :</b><ul style="margin:6px 0 0 18px">${crit.map(i => `<li>${esc(i.libelle)} <small>(${esc(i.section)})</small>${i.document?`<br><small>📄 ${esc(i.document)}</small>`:''}</li>`).join('')}</ul></div>` : '';
+  adData.forEach(s => {
+    const items = (s.items||[]).filter(i => !only || i.valeur==='J' || i.valeur==='P');
+    if (!items.length) return;
+    html += `<div class="hab-site">${esc(s.titre)}</div>` + items.map(i => {
+      const v = VAL_LBL[i.valeur] || ['— sans réponse',''];
+      return `<div class="hab-row"><div><div class="who" style="font-weight:normal">${esc(i.libelle)}${i.indispensable?' <span class="tag crit">indispensable</span>':''}</div>
+        ${i.document?`<small>📄 ${esc(i.document)}</small>`:''}</div><span class="tag ${v[1]}" style="flex-shrink:0">${v[0]}</span></div>`;
+    }).join('');
+  });
+  $('ad-body').innerHTML = html || '<div class="empty">Aucune lacune déclarée : toutes les réponses sont « Oui ».</div>';
 }
 
 /* ---- Habilitations ---- */
