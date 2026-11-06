@@ -1,3 +1,4 @@
+<!-- RDZ · checklist-evenement-agent · 2026-11-06 · envoi des photos du rapport : sur iPhone le Wi-Fi n'est pas détectable, les photos restaient donc dans le téléphone jusqu'à un envoi manuel. Désormais, après chaque enregistrement du rapport (et à l'ouverture de la page s'il en reste en attente), les photos sont envoyées dès que le rapport est arrivé au serveur, en Wi-Fi comme en 4G. Rien d'autre ne change (graphisme inchangé). -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (e) · Liste des événements : les événements passés ne sont plus affichés (même sans rapport clôturé) — uniquement aujourd'hui + 7 prochains jours. Rien n'est supprimé en base. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (d) · Rapport : plusieurs photos par Événement particulier (1 et 2) ; heure de l'affluence maximum (affluence_max_heure) ; photo « départ des invités » retirée ; photo unique « fin de service » remplacée par « Photos fin de service (état des lieux) », plusieurs photos possibles. Photos stockées dans la nouvelle table evenements_rapports_photos (1 ligne par photo) — voir claude_migration-rapport-evenement-photos.sql. Photos redimensionnées (1600 px, JPEG) avant mise en file hors-ligne. -->
 <!-- RDZ · checklist-evenement-agent · 2026-10-20 (c) · Ordre de service : retrait du bloc « Prise en charge — à signer par l'agent » (nom, date, signature) — le document n'est pas imprimé. -->
@@ -752,6 +753,9 @@ async function saveRapport(cloture){
     renderGallery(cat);
   });
 
+  // 2026-11-06 : envoi des photos sans attendre le Wi-Fi (non détectable sur iPhone)
+  sendPhotosNow();
+
   // Mise à jour optimiste locale : la prochaine sauvegarde connaît déjà l'id et le statut
   currentRapport = Object.assign({}, currentRapport, payload);
   toast((cloture ? '✓ Rapport clôturé' : '💾 Rapport pris en compte') + (navigator.onLine ? '' : ' (hors-ligne — remontera dès le retour du réseau)'));
@@ -759,7 +763,24 @@ async function saveRapport(cloture){
   btn.disabled = false;
 }
 
+/* 2026-11-06 — Les photos n'entrent dans la file d'envoi qu'une fois la ligne
+   du rapport arrivée au serveur : on surveille la file quelques instants et
+   on force l'envoi des photos dès qu'il y en a (Wi-Fi ou 4G). */
+let _sendPhotosTimer = null;
+function sendPhotosNow(){
+  if(_sendPhotosTimer) return;
+  let n = 0;
+  _sendPhotosTimer = setInterval(()=>{
+    n++;
+    let st = { textPending:0, photoPending:0 };
+    try{ st = RDZSync.getStatus(); }catch(e){}
+    if(st.photoPending > 0 && navigator.onLine !== false){ try{ RDZSync.flushPhotos(true); }catch(e){} }
+    if((st.textPending === 0 && st.photoPending === 0) || n >= 60){ clearInterval(_sendPhotosTimer); _sendPhotosTimer = null; }
+  }, 2000);
+}
+
 loadEvents();
+setTimeout(sendPhotosNow, 1500); // photos restées en attente d'une session précédente
 
 // ═══ ORDRE DE SERVICE (repris à l'identique de evenements.html) ═══
 function fmt(d){ if(!d) return ''; const [y,m,dd]=d.split('-'); return `${dd}.${m}.${y}`; }
