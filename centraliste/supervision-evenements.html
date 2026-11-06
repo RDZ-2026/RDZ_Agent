@@ -1,3 +1,4 @@
+<!-- RDZ · supervision-evenements · 2026-11-06 · alignement sur le formulaire agent checklist-evenement-agent du 2026-10-20 (d) : (1) heure de l'affluence maximum (affluence_max_heure) affichée dans l'aperçu, modifiable, et imprimée ; (2) photos lues dans evenements_rapports_photos (plusieurs par catégorie : Événement particulier 1, Événement particulier 2, Fin de service / état des lieux) — aperçu, impression, ajout / retrait dans « Modifier » ; (3) photos pas encore arrivées signalées « 📱 encore dans le téléphone de l'agent » (non imprimées). Anciennes photos (photo_depart_invites_url / photo_fin_service_url) toujours affichées. Graphisme inchangé (classes existantes). -->
 <!-- RDZ · supervision-evenements · 2026-10-11 · (1) rapport d'événement modifiable dans une fenêtre (pop-up) : tous les champs, statut (en cours / clôturé — modifiable même si l'agent l'a clôturé), ajout / remplacement / suppression des 2 photos. (2) aperçu du rapport et de l'ordre de service en pop-up par-dessus la page (comme supervision-rapports), au lieu de s'afficher sous la fiche. -->
 <!-- RDZ · supervision-evenements · 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!DOCTYPE html>
@@ -413,6 +414,7 @@ async function openDetail(id){
     ]);
     reponses = reps||[]; rapport = rap||null;
   }catch(e){ reponses = []; rapport = null; }
+  await loadRapPhotos();
 
   renderChecklistPanel('generique');
   renderChecklistPanel('responsable');
@@ -467,6 +469,35 @@ async function toggleItemAdmin(itemId, formulaire){
   }catch(e){ alert('Erreur : '+e.message); }
 }
 
+// ─── PHOTOS DU RAPPORT (table evenements_rapports_photos, agent 2026-10-20 d) ──
+const EV_PHOTO_CATS = [
+  { k:'evp1',       label:'Événement particulier 1' },
+  { k:'evp2',       label:'Événement particulier 2' },
+  { k:'etat_lieux', label:'Fin de service (état des lieux)' }
+];
+let rapPhotos = [];   // lignes evenements_rapports_photos de l'événement ouvert
+async function loadRapPhotos(){
+  rapPhotos = [];
+  if(!currentEvent) return;
+  try{
+    const { data, error } = await sb.from('evenements_rapports_photos').select('*').eq('evenement_id', currentEvent.id).order('created_at');
+    if(!error) rapPhotos = data || [];
+  }catch(e){ rapPhotos = []; }
+}
+/* Toutes les photos du rapport, anciennes colonnes comprises.
+   url === null → photo enregistrée par l'agent mais pas encore envoyée
+   depuis son téléphone. */
+function allRapPhotos(){
+  const r = rapport || {};
+  const out = [];
+  if(r.photo_depart_invites_url) out.push({ id:'legacy-depart', categorie:'depart', url:r.photo_depart_invites_url, _legacy:true });
+  if(r.photo_fin_service_url)    out.push({ id:'legacy-fin', categorie:'etat_lieux', url:r.photo_fin_service_url, _legacy:true });
+  rapPhotos.forEach(p=>out.push(p));
+  return out;
+}
+function photoCatLabel(k){ if(k==='depart') return 'Départ des invités'; const c = EV_PHOTO_CATS.find(x=>x.k===k); return c ? c.label : 'Photo'; }
+function newUid(){ return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); }); }
+
 // ─── RAPPORT (consultable + modifiable) ───────────────────────────────────────
 let controleValAdmin = null;
 function renderODSPanel(){
@@ -487,14 +518,16 @@ function renderRapportPanel(){
   }
   const t = v => (v||'').slice(0,5) || '—';
   const st = r.statut==='cloture' ? '✓ Clôturé' : '⏳ En cours';
-  const ph = [r.photo_depart_invites_url, r.photo_fin_service_url].filter(Boolean);
+  const allPh = allRapPhotos();
+  const ph = allPh.filter(p=>p.url).map(p=>p.url);
+  const enAttente = allPh.filter(p=>!p.url).length;
   el.innerHTML = `<div class="rp-sum">
       <div class="c"><div class="k">Statut</div><div class="v">${st}${r.cloture_par?`<div style="font-weight:normal;font-size:11.5px;color:#64748b">par ${escHtml(r.cloture_par)}</div>`:''}</div></div>
       <div class="c"><div class="k">Agent</div><div class="v">${escHtml(r.agent_nom||'—')}</div></div>
       <div class="c"><div class="k">Date / début</div><div class="v">${fmtDateR(r.date_evenement)} · ${t(r.heure_debut_evenement)}</div></div>
       <div class="c"><div class="k">Départ invités / fin de service</div><div class="v">${t(r.depart_invites_heure)} · ${t(r.heure_fin_service)}</div></div>
-      <div class="c"><div class="k">Affluence max</div><div class="v">${escHtml(r.affluence_max||'—')}</div></div>
-      <div class="c"><div class="k">Photos</div><div class="v">${ph.length ? ph.map(u=>`<img class="photo-thumb2" style="width:60px;height:46px;margin-right:4px" src="${escHtml(u)}" onclick="openLb('${escHtml(u)}')">`).join('') : '—'}</div></div>
+      <div class="c"><div class="k">Affluence max</div><div class="v">${escHtml(r.affluence_max||'—')}${r.affluence_max_heure?` <span style="font-weight:normal">à ${t(r.affluence_max_heure)}</span>`:''}</div></div>
+      <div class="c"><div class="k">Photos</div><div class="v">${ph.length ? ph.map(u=>`<img class="photo-thumb2" style="width:60px;height:46px;margin-right:4px" src="${escHtml(u)}" onclick="openLb('${escHtml(u)}')">`).join('') : (enAttente ? '' : '—')}${enAttente ? `<div style="font-weight:normal;font-size:11.5px;color:#b45c00;margin-top:4px">📱 ${enAttente} photo(s) encore dans le téléphone de l'agent</div>` : ''}</div></div>
     </div>
     ${r.evenement_particulier_1?`<div class="field2"><label>Événement particulier</label><div style="white-space:pre-wrap;font-size:13px">${escHtml(r.evenement_particulier_1)}</div></div>`:''}
     <button class="btn-save2" onclick="openEditRapport()">✏️ Modifier le rapport</button>
@@ -534,9 +567,36 @@ function edPhotoHtml(key, label){
   </div></div>`;
 }
 function edRenderPhotos(){
-  document.getElementById('ed-ph-depart').innerHTML = edPhotoHtml('depart','Photo — départ des invités');
-  document.getElementById('ed-ph-fin').innerHTML = edPhotoHtml('fin','Photo — fin de service');
+  // Anciennes photos uniques : affichées seulement si le rapport en a une.
+  document.getElementById('ed-ph-depart').innerHTML = (edPhotos.depart.url || edPhotos.depart.dataUrl) ? edPhotoHtml('depart','Photo — départ des invités') : '';
+  document.getElementById('ed-ph-fin').innerHTML = (edPhotos.fin.url || edPhotos.fin.dataUrl) ? edPhotoHtml('fin','Photo — fin de service (ancienne)') : '';
+  edRenderCatPhotos();
 }
+/* Photos par catégorie (table evenements_rapports_photos) */
+let edNewPhotos = { evp1:[], evp2:[], etat_lieux:[] };  // dataUrl à envoyer
+let edDelPhotos = new Set();                             // ids à supprimer
+function edRenderCatPhotos(){
+  const el = document.getElementById('ed-ph-cats'); if(!el) return;
+  el.innerHTML = EV_PHOTO_CATS.map(c=>{
+    const exist = rapPhotos.filter(p=>p.categorie===c.k && !edDelPhotos.has(p.id));
+    const thumbs = exist.map(p=> p.url
+        ? `<div class="ed-photo"><img src="${escHtml(p.url)}" onclick="openLb('${escHtml(p.url)}')"><div class="ph-btns"><button type="button" class="ed-mini del" onclick="edDelCatPhoto('${p.id}')">✕ Retirer</button></div></div>`
+        : `<div class="ed-photo"><div class="ph-empty" title="Photo pas encore envoyée par le téléphone de l'agent">📱</div><div style="font-size:11px;color:#b45c00">Encore dans le téléphone</div></div>`)
+      .concat(edNewPhotos[c.k].map((d,i)=>`<div class="ed-photo"><img src="${d}" onclick="openLb(this.src)"><div class="ph-btns"><button type="button" class="ed-mini del" onclick="edDelNewPhoto('${c.k}',${i})">✕ Retirer</button></div></div>`));
+    return `<div class="field2"><label>Photos — ${c.label}</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start">${thumbs.join('') || '<div class="ed-photo"><div class="ph-empty">📷</div></div>'}</div>
+      <div class="ph-btns" style="margin-top:6px"><button type="button" class="ed-mini" onclick="document.getElementById('ed-file-cat-${c.k}').click()">＋ Ajouter une photo</button></div>
+      <input type="file" accept="image/*" multiple id="ed-file-cat-${c.k}" style="display:none" onchange="edPickCatPhotos('${c.k}',this)">
+    </div>`;
+  }).join('');
+}
+async function edPickCatPhotos(cat, input){
+  const files = Array.from(input.files||[]); input.value='';
+  for(const f of files){ edNewPhotos[cat].push(await compressImage(f)); }
+  edRenderCatPhotos();
+}
+function edDelCatPhoto(id){ edDelPhotos.add(id); edRenderCatPhotos(); }
+function edDelNewPhoto(cat, i){ edNewPhotos[cat].splice(i,1); edRenderCatPhotos(); }
 async function edPickPhoto(key, input){
   const f = input.files && input.files[0]; input.value=''; if(!f) return;
   edPhotos[key].dataUrl = await compressImage(f); edPhotos[key].removed = false;
@@ -550,6 +610,8 @@ function openEditRapport(){
     depart: { url: r.photo_depart_invites_url||null, dataUrl:null, removed:false },
     fin:    { url: r.photo_fin_service_url||null, dataUrl:null, removed:false }
   };
+  edNewPhotos = { evp1:[], evp2:[], etat_lieux:[] };
+  edDelPhotos = new Set();
   document.getElementById('ed-title').textContent = currentEvent.titre || 'Événement';
   document.getElementById('ed-body').innerHTML = `
     <div class="field-row2">
@@ -568,7 +630,10 @@ function openEditRapport(){
     <div class="field2"><label>Contrôle issues secours / extincteurs / défibrillateur</label>
       <div class="chip-row2"><div class="chip2" id="a-chip-oui" onclick="setControleAdmin(true)">Oui</div><div class="chip2" id="a-chip-non" onclick="setControleAdmin(false)">Non</div></div>
     </div>
-    <div class="field2"><label>Affluence max</label><input class="fi" id="a-affluence" value="${escHtml(r.affluence_max||'')}"></div>
+    <div class="field-row2">
+      <div class="field2"><label>Affluence max</label><input class="fi" id="a-affluence" value="${escHtml(r.affluence_max||'')}"></div>
+      <div class="field2"><label>À quelle heure ?</label><input type="time" class="fi" id="a-affluence-heure" value="${(r.affluence_max_heure||'').slice(0,5)}"></div>
+    </div>
     <div class="field2"><label>Événement particulier 1</label><textarea class="fi" id="a-evp1">${escHtml(r.evenement_particulier_1||'')}</textarea></div>
     <div class="field2"><label>Événement particulier 2</label><textarea class="fi" id="a-evp2">${escHtml(r.evenement_particulier_2||'')}</textarea></div>
     <div class="sec-title2">Fin d'événement</div>
@@ -576,6 +641,8 @@ function openEditRapport(){
       <div class="field2"><label>Heure départ invités</label><input type="time" class="fi" id="a-depart-heure" value="${(r.depart_invites_heure||'').slice(0,5)}"></div>
       <div class="field2"><label>Heure fin de service</label><input type="time" class="fi" id="a-fin-heure" value="${(r.heure_fin_service||'').slice(0,5)}"></div>
     </div>
+    <div class="sec-title2">Photos</div>
+    <div id="ed-ph-cats"></div>
     <div class="field-row2"><div id="ed-ph-depart" style="flex:1"></div><div id="ed-ph-fin" style="flex:1"></div></div>`;
   document.querySelectorAll('#ed-body .fi').forEach(inp => inp.style.cssText = 'width:100%;padding:8px 11px;border-radius:8px;border:1px solid var(--rdz-border);font-size:13px;font-family:inherit;');
   controleValAdmin = r.controle_issues_secours ?? null;
@@ -611,6 +678,7 @@ async function saveRapportAdmin(){
     lieu_evenement: document.getElementById('a-lieu').value.trim() || null,
     controle_issues_secours: controleValAdmin,
     affluence_max: document.getElementById('a-affluence').value.trim() || null,
+    affluence_max_heure: document.getElementById('a-affluence-heure').value ? document.getElementById('a-affluence-heure').value+':00' : null,
     evenement_particulier_1: document.getElementById('a-evp1').value.trim() || null,
     evenement_particulier_2: document.getElementById('a-evp2').value.trim() || null,
     depart_invites_heure: document.getElementById('a-depart-heure').value ? document.getElementById('a-depart-heure').value+':00' : null,
@@ -636,6 +704,20 @@ async function saveRapportAdmin(){
       if(error) throw error;
       rapport = data;
     }
+    // Photos par catégorie : retraits puis ajouts (table evenements_rapports_photos)
+    for(const id of edDelPhotos){
+      const { error } = await sb.from('evenements_rapports_photos').delete().eq('id', id);
+      if(error) throw error;
+    }
+    for(const c of EV_PHOTO_CATS){
+      for(const d of edNewPhotos[c.k]){
+        const url = await uploadEventPhoto(d, c.k);
+        const { error } = await sb.from('evenements_rapports_photos').insert({ id:newUid(), rapport_id: rapport.id, evenement_id: currentEvent.id, categorie: c.k, agent_nom: 'Centraliste', url });
+        if(error) throw error;
+      }
+    }
+    edNewPhotos = { evp1:[], evp2:[], etat_lieux:[] }; edDelPhotos = new Set();
+    await loadRapPhotos();
     closeEditRapport();
     renderRapportPanel();
     await computeCounts();
@@ -678,14 +760,17 @@ function buildRapportHtml(){
   html += '<div class="rpt-sec"><div class="rpt-sec-title">Évènements</div><div class="rpt-sec-body">';
   html += '<div class="rpt-field"><label>Lieu de l’évènement</label><div class="fv">' + escR(r.lieu_evenement||'—') + '</div></div>';
   html += '<div class="rpt-field"><label>Contrôle des issues de secours, extincteurs, défibrillateur ?</label><div class="fv">' + (r.controle_issues_secours===true?'Oui':r.controle_issues_secours===false?'Non':'—') + '</div></div>';
-  html += '<div class="rpt-field"><label>Contrôle affluence maximum, comptage ou estimation</label><div class="fv">' + escR(r.affluence_max||'—') + '</div></div>';
+  html += '<div class="rpt-field"><label>Contrôle affluence maximum, comptage ou estimation</label><div class="fv">' + escR(r.affluence_max||'—') + (r.affluence_max_heure ? ' — à ' + escR(r.affluence_max_heure.slice(0,5)) : '') + '</div></div>';
   html += '<div class="rpt-field"><label>Évènement particulier : préciser</label><div class="fv">' + escR(r.evenement_particulier_1||'—') + '</div></div>';
   if(r.evenement_particulier_2) html += '<div class="rpt-field"><label>Évènement 2 : préciser</label><div class="fv">' + escR(r.evenement_particulier_2) + '</div></div>';
+  const evpPh = rapPhotos.filter(p=>p.url && (p.categorie==='evp1' || p.categorie==='evp2'));
+  if(evpPh.length) html += '<div class="rpt-photos">' + evpPh.map(p=>'<div class="rpt-photo-item"><img src="'+p.url+'"><div class="rpt-photo-cap">' + escR(photoCatLabel(p.categorie)) + '</div></div>').join('') + '</div>';
   html += '</div></div>';
 
   const photosHtml = [];
   if(r.photo_depart_invites_url) photosHtml.push('<div class="rpt-photo-item"><img src="'+r.photo_depart_invites_url+'"><div class="rpt-photo-cap">Départ des invités — ' + escR((r.depart_invites_heure||'').slice(0,5)) + '</div></div>');
   if(r.photo_fin_service_url) photosHtml.push('<div class="rpt-photo-item"><img src="'+r.photo_fin_service_url+'"><div class="rpt-photo-cap">Fin de service — ' + escR((r.heure_fin_service||'').slice(0,5)) + '</div></div>');
+  rapPhotos.filter(p=>p.url && p.categorie==='etat_lieux').forEach(p=>photosHtml.push('<div class="rpt-photo-item"><img src="'+p.url+'"><div class="rpt-photo-cap">Fin de service — ' + escR((r.heure_fin_service||'').slice(0,5)) + '</div></div>'));
 
   html += '<div class="rpt-sec"><div class="rpt-sec-title">Fin d’événement</div><div class="rpt-sec-body">';
   html += '<div class="rpt-2col">';
