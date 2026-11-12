@@ -1,4 +1,7 @@
-<!-- RDZ · memo-sites · v1.1 · 2026-10-22 · interdictions de site, pas à pas plein écran,
+<!-- RDZ · memo-sites · v1.2 · 2026-11-12 · onglet « Zones intrusion » (correspondance des zones de la centrale, MSF en premier) :
+     recherche par numéro / local / étage, filtres par état, zones en défaut avec leur motif, avertissement
+     « alarmes internes ». Données lues via memo_zones() (04_zones_centrale.sql), gardées dans la même copie hors ligne.
+     v1.1 · 2026-10-22 · interdictions de site, pas à pas plein écran,
      barre d'urgence (repris de prom_selector_v2.html), page ouvrable hors ligne (sw-memo.js).
      v1 · 2026-10-22
      Fiches d'intervention par site, lues dans Supabase (RDZ_Agent) via la
@@ -163,6 +166,31 @@ details.sous .in .blk{border:none;padding:0 0 12px;margin:0;border-radius:0}
 .gps a em{font-style:normal;font-weight:800;font-size:13px;color:#fff;background:var(--navy);border-radius:8px;padding:6px 10px;flex:0 0 auto}
 
 /* Interdictions */
+/* Zones de la centrale */
+.zone-link{display:flex;align-items:center;gap:8px;margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 12px;
+  font-size:13.5px;font-weight:800;color:var(--navy);cursor:pointer;width:100%;text-align:left}
+.zone-link em{font-style:normal;margin-left:auto;white-space:nowrap;font-size:12px;color:#a1001b}
+.z-avis{background:#fff6ec;border:1px solid #f3c48f;border-left:5px solid #e87722;border-radius:12px;padding:11px 13px;font-size:13.5px;margin-bottom:12px;color:#5c3300}
+.z-q{width:100%;font:inherit;font-size:16px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.z-q:focus{outline:none;border-color:var(--red)}
+.z-f{display:flex;gap:6px;margin:8px 0 6px;flex-wrap:wrap}
+.z-f button{flex:1;min-width:70px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 4px;font-size:12.5px;font-weight:800;cursor:pointer;color:#26384b}
+.z-f button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.z-f button.d[aria-pressed="false"]{color:#a1001b;border-color:#f3c3cb}
+.z-cpt{font-size:12.5px;color:var(--muted);margin:2px 2px 10px}
+.zn{background:#fff;border:1px solid var(--line);border-left:5px solid #c8d2dd;border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.zn.A{border-left-color:#e87722}.zn.I{border-left-color:#2a6db5}
+.zn.D{border-left-color:var(--red);background:#fff7f8;border-color:#f6c3cd}
+.zn .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.zn .num{font-family:var(--mono);font-weight:800;font-size:18px;letter-spacing:.03em}
+.zn .et{font-size:12px;color:var(--muted);text-align:right}
+.zn .tx{font-weight:700;font-size:14.5px;margin-top:2px}
+.zn .tx.vide{font-weight:400;color:var(--muted);font-style:italic}
+.zn .mt{font-size:12.5px;color:var(--muted);margin-top:2px}
+.zn .st{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;color:#fff;margin-top:6px;background:#8795a6}
+.zn .st.A{background:#c96410}.zn .st.I{background:#2a6db5}.zn .st.D{background:var(--red)}
+.zn .cm{margin-top:5px;font-size:13px;font-weight:800;color:#a1001b}
+.z-src{font-size:12px;color:var(--muted);margin-top:12px}
 .ban-link{display:flex;align-items:center;gap:8px;margin-top:12px;background:#fff4f6;border:1px solid #f6c3cd;border-radius:11px;padding:10px 12px;
   font-size:13.5px;font-weight:800;color:#a1001b;cursor:pointer;width:100%;text-align:left}
 .ban{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px;background:#fff}
@@ -272,6 +300,8 @@ const AGENT = {
 };
 
 let FICHES = [];
+let ZONES = {};       // zones de centrale par site (client → {titre, maj, avis, legende, zones})
+let zQ = '', zF = 'tout'; // recherche et filtre de l'onglet zones
 let current = null;   // fiche ouverte
 let tab = 0;          // onglet ouvert
 let PROCS = [];       // procédures « pas à pas » de la fiche ouverte
@@ -289,8 +319,8 @@ function readCache() {
   if (!ok) { localStorage.removeItem(CACHE_KEY); return null; }
   return c;
 }
-function writeCache(fiches) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ agent: AGENT.id, hash: AGENT.hash, ts: Date.now(), fiches })); } catch (e) {}
+function writeCache(fiches, zones) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ agent: AGENT.id, hash: AGENT.hash, ts: Date.now(), fiches, zones: zones || {} })); } catch (e) {}
 }
 
 /* ===================== Chargement ===================== */
@@ -301,7 +331,7 @@ async function load(force) {
       'Ouvrez <a href="mobile.html">l\'application Agent</a> et identifiez-vous avec votre PIN, puis revenez sur Mémo sites.');
   }
   const cache = readCache();
-  if (cache && !force) { FICHES = cache.fiches; setSync(cache.ts, !navigator.onLine); renderList(); }
+  if (cache && !force) { FICHES = cache.fiches; ZONES = cache.zones || {}; setSync(cache.ts, !navigator.onLine); renderList(); }
   else if (!cache) show('v-loading');
 
   if (!sb) { if (!cache) showError('Pas de réseau', "Les fiches n'ont encore jamais été chargées sur ce natel. Réessayez avec du réseau."); return; }
@@ -310,7 +340,13 @@ async function load(force) {
     const { data, error } = await sb.rpc('memo_fiches', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
     if (error) throw error;
     FICHES = Array.isArray(data) ? data : [];
-    writeCache(FICHES);
+    // Zones de centrale : chargées à part. Si la fonction n'existe pas encore
+    // ou échoue, les fiches restent utilisables (on garde l'ancienne copie).
+    try {
+      const z = await sb.rpc('memo_zones', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
+      if (!z.error && z.data && typeof z.data === 'object') ZONES = z.data;
+    } catch (e) {}
+    writeCache(FICHES, ZONES);
     setSync(Date.now(), false);
     if (current) {
       current = FICHES.find(f => f.id === current.id) || null;
@@ -404,6 +440,8 @@ function renderList() {
 /* ===================== Fiche ===================== */
 function tabsOf(f) {
   const t = (f.etapes || []).map((e, i) => ({ n: i + 1, titre: e.titre, resume: e.resume, blocs: e.blocs || [] }));
+  const zc = ZONES[f.client];
+  if (zc && (zc.zones || []).length) t.push({ titre: 'Zones ' + (zc.titre || 'centrale').replace(/^centrale\s+/i, ''), zones: true, blocs: [] });
   if ((f.blocs_rondes || []).length) t.push({ titre: 'Rondes', blocs: f.blocs_rondes });
   if ((f.blocs_notes || []).length) t.push({ titre: 'Annexes', blocs: f.blocs_notes });
   if (f.interdictions && (f.interdictions.liste || []).length) t.push({ titre: 'Interdictions', ban: true, blocs: [] });
@@ -413,7 +451,7 @@ function tabsOf(f) {
 function openFiche(id, push) {
   current = FICHES.find(f => f.id === id);
   if (!current) return renderList();
-  tab = 0;
+  tab = 0; zQ = ''; zF = 'tout';
   buildProcs(current);
   if (push) history.pushState({ fiche: id }, '');
   renderFiche();
@@ -434,8 +472,14 @@ function renderFiche() {
   if (tr.length) h += '<div class="codes">' + tr.map(t =>
     '<div class="plate"><b>' + esc(String(t.code).replace(/(\d{3})(?=\d)/g, '$1 ')) + '</b><span>' + esc(t.label || '') + '</span></div>').join('') + '</div>';
   h += tagsHtml(f);
+  const zc = ZONES[f.client], zi = tabs.findIndex(t => t.zones);
+  if (zi >= 0) {
+    const nd = zc.zones.filter(z => z.etat === 'D').length;
+    h += '<button type="button" class="zone-link" data-tab="' + zi + '">🔎 Retrouver une zone de la ' + esc((zc.titre || 'centrale').toLowerCase()) +
+      (nd ? '<em>' + nd + ' en défaut</em>' : '') + '</button>';
+  }
   const nb = f.interdictions && (f.interdictions.liste || []).length;
-  if (nb) h += '<button type="button" class="ban-link" data-tab="' + (tabs.length - 1) + '">⛔ ' + nb + (nb > 1 ? ' interdictions de site en cours' : ' interdiction de site en cours') + ' — voir la liste</button>';
+  if (nb) h += '<button type="button" class="ban-link" data-tab="' + tabs.findIndex(t => t.ban) + '">⛔ ' + nb + (nb > 1 ? ' interdictions de site en cours' : ' interdiction de site en cours') + ' — voir la liste</button>';
   if (!tabs.length) h += '<div class="note-part">Cette fiche est en cours de rédaction. En cas d\'alarme sur ce site, suivez les consignes du centraliste et appelez l\'astreinte RDZ au <a href="tel:+41793391341"><strong>+41 79 339 13 41</strong></a>.</div>';
   h += '</div>';
 
@@ -448,7 +492,8 @@ function renderFiche() {
     const t = tabs[tab];
     h += '<h2 class="e-title">' + esc(t.titre) + '</h2>';
     if (t.resume) h += '<p class="e-res">' + esc(t.resume) + '</p>';
-    if (t.ban) h += banHtml(f.interdictions);
+    if (t.zones) h += zonesShell(ZONES[f.client]);
+    else if (t.ban) h += banHtml(f.interdictions);
     else h += t.blocs.map(renderBlock).join('');
   }
 
@@ -458,6 +503,7 @@ function renderFiche() {
   }
 
   $('v-fiche').innerHTML = h;
+  if ($('z-res')) renderZones();
   $('dock-procs').innerHTML = PROCS.slice(0, 3).map((p, i) =>
     '<button type="button" class="p' + i + '" data-proc="' + i + '">' + esc(p.court) + '<small>pas à pas</small></button>').join('');
   $('dock-procs').classList.toggle('hidden', !PROCS.length);
@@ -519,6 +565,49 @@ function banHtml(g) {
       '<p>' + fmt(p.motif || '') + '</p><small>Notifiée le ' + esc(p.dateEffet || '—') + (p.note ? ' — ' + esc(p.note) : '') + '</small></div>').join('');
 }
 
+/* ===================== Zones de la centrale ===================== */
+// Coquille de l'onglet (recherche + filtres) ; seule la liste #z-res est
+// redessinée à la frappe, pour ne pas perdre le clavier.
+function zonesShell(zc) {
+  const n = k => zc.zones.filter(z => (z.etat || '') === k).length;
+  const fb = (k, lab, cls) => '<button type="button" data-zf="' + k + '" class="' + (cls || '') + '" aria-pressed="' + (zF === k) + '">' + lab + '</button>';
+  return (zc.avis ? '<div class="z-avis" role="note">' + fmt(zc.avis) + '</div>' : '') +
+    '<input id="z-q" class="z-q" type="search" inputmode="search" autocomplete="off" value="' + esc(zQ) + '" placeholder="Numéro, local ou étage (ex. E75)" aria-label="Rechercher une zone">' +
+    '<div class="z-f">' + fb('tout', 'Tout') + fb('A', 'Actives (' + n('A') + ')') + fb('I', 'Isolées (' + n('I') + ')') + fb('D', 'En défaut (' + n('D') + ')', 'd') + '</div>' +
+    '<p class="z-cpt" id="z-cpt"></p><div id="z-res"></div>' +
+    '<p class="z-src">' + esc(zc.source || '') + (zc.maj ? ' — relevé du ' + esc(zc.maj) : '') + '. Document interne, ne pas diffuser.</p>';
+}
+function renderZones() {
+  const zc = ZONES[current.client];
+  const L = zc.legende || {};
+  const mots = norm(zQ).split(/\s+/).filter(Boolean);
+  const exact = norm(zQ).trim();
+  let r = zc.zones.filter(z => {
+    if (zF !== 'tout' && (z.etat || '') !== zF) return false;
+    if (!mots.length) return true;
+    const cle = norm([z.num, z.etage, z.type, z.zone, z.texte, z.com].join(' '));
+    return mots.every(m => cle.includes(m));
+  });
+  // un numéro exact passe devant (« E75 » ou « 75 »)
+  const isEx = z => { const k = norm(z.num); return k === exact || k === 'e' + exact; };
+  r = r.slice().sort((a, b) => isEx(b) - isEx(a));
+  const tot = zc.zones.length;
+  $('z-cpt').textContent = r.length + (r.length > 1 ? ' zones' : ' zone') + (mots.length || zF !== 'tout' ? ' sur ' + tot : ' au total');
+  if (!r.length) {
+    $('z-res').innerHTML = '<div class="empty">Aucune zone ne correspond.<br>Essayez le numéro seul, par exemple <strong>E75</strong>, ou un mot du local.</div>';
+    return;
+  }
+  $('z-res').innerHTML = r.slice(0, 80).map(z => {
+    const e = z.etat || '';
+    return '<div class="zn ' + e + '"><div class="top"><span class="num">' + esc(z.num) + '</span><span class="et">' +
+      esc(z.etage || '') + (z.type ? ' · ' + esc(z.type) : '') + '</span></div>' +
+      '<div class="tx' + (z.texte ? '' : ' vide') + '">' + esc(z.texte || 'Aucun texte client') + '</div>' +
+      (z.zone ? '<div class="mt">Zone : ' + esc(z.zone) + '</div>' : '') +
+      '<span class="st ' + e + '">' + esc(L[e] || 'Non affectée') + '</span>' +
+      (z.com ? '<div class="cm">' + (e === 'D' ? '⚠ ' : '') + esc(z.com) + '</div>' : '') + '</div>';
+  }).join('') + (r.length > 80 ? '<div class="empty">… et ' + (r.length - 80) + ' autres. Affinez la recherche.</div>' : '');
+}
+
 /* ===================== Pas à pas ===================== */
 function buildProcs(f) {
   PROCS = []; FAIT = {};
@@ -555,11 +644,18 @@ function drawProc() {
 $('q').addEventListener('input', renderList);
 $('list').addEventListener('click', e => { const s = e.target.closest('.site'); if (s) openFiche(s.dataset.id, true); });
 $('v-fiche').addEventListener('click', e => {
-  const tb = e.target.closest('.rail button, .ban-link');
+  const zb = e.target.closest('.z-f button');
+  if (zb) {
+    zF = zb.dataset.zf;
+    $('v-fiche').querySelectorAll('.z-f button').forEach(x => x.setAttribute('aria-pressed', x === zb));
+    renderZones(); return;
+  }
+  const tb = e.target.closest('.rail button, .ban-link, .zone-link');
   if (tb) { tab = +tb.dataset.tab; renderFiche(); window.scrollTo(0, 0); return; }
   const pr = e.target.closest('.go-proc');
   if (pr) openProc(+pr.dataset.proc);
 });
+$('v-fiche').addEventListener('input', e => { if (e.target.id === 'z-q') { zQ = e.target.value; renderZones(); } });
 $('dock-procs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) openProc(+b.dataset.proc); });
 $('proc-b').addEventListener('click', e => {
   const it = e.target.closest('.pit'); if (!it || e.target.closest('a')) return;
