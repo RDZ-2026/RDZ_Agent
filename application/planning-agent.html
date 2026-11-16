@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent · v16 · 2026-11-05 · vue mois, sélection multiple, synthèse heures -->
+<!-- RDZ · planning-agent · v17 · 2026-11-16 · congés : reliquat N-1 séparé + décompte reliquat d'abord -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -200,6 +200,16 @@ select.finp{appearance:auto;}
 .mday.tovalid{box-shadow:0 0 0 2px #f59e0b;}
 .mtot{font-size:10.5px;font-weight:800;color:var(--text2);display:flex;align-items:center;justify-content:center;}
 .mhead div:last-child{font-size:9.5px;}
+.lb{display:flex;align-items:center;gap:14px;padding:4px 0;}
+.lb + .lb{border-top:1px solid var(--line);margin-top:10px;padding-top:12px;}
+.lb.off{opacity:.6;}
+.lb-ring{width:56px;height:56px;flex:none;position:relative;}
+.lb-ring svg{width:56px;height:56px;transform:rotate(-90deg);}
+.lb-ring .v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
+.lb-ring .v b{font-size:17px;font-weight:800;}
+.lb-ring .v small{font-size:9px;color:var(--text2);font-weight:600;margin-top:2px;}
+.lb-urgent{color:#b45309;font-weight:700;}
+.lb-note{font-size:12.5px;color:var(--text2);margin-top:10px;background:var(--bg);border-radius:8px;padding:7px 10px;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -541,7 +551,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v16 · 05.11.2026';
+const APP_VERSION = 'v17 · 16.11.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -739,6 +749,11 @@ async function reload(manual){
         status:a.status, reason:a.reason||'', days:a.days==null?null:Number(a.days) }));
       ABS.balance = abs.balance ? { year:abs.balance.year, opening:Number(abs.balance.opening)||0, taken:Number(abs.balance.taken)||0,
         pending:Number(abs.balance.pending)||0, remaining:Number(abs.balance.remaining)||0 } : null;
+      const N=v=>Number(v)||0;
+      ABS.accounts = (abs.accounts||[]).map(a=>({ year:N(a.year), annual:N(a.annual), carry:N(a.carryover), carryYear:N(a.carryover_year),
+        until:a.carryover_until? String(a.carryover_until).slice(0,10) : '', carryUsed:N(a.carryover_used), carryLeft:N(a.carryover_left),
+        lapsed:N(a.carryover_lapsed), expired:!!a.carryover_expired, annualUsed:N(a.annual_used), annualLeft:N(a.annual_left),
+        pending:N(a.pending), carryLeftP:N(a.carryover_left_after_pending), annualLeftP:N(a.annual_left_after_pending), remaining:N(a.remaining) }));
       ABS.loaded = true;
     }
     LAST_LOAD=Date.now();
@@ -1137,20 +1152,41 @@ async function cancelEq(id){
   await loadEquipment(); render();
 }
 
+// Compte principal : l'année prochaine s'il est déjà paramétré, sinon l'année en cours
+function mainLeaveAccount(){
+  const y=new Date().getFullYear(), acc=(ABS.accounts||[]).filter(a=>a.year<=y+1).sort((a,b)=>b.year-a.year);
+  return acc[0]||null;
+}
+function fmtDM(iso){ return iso? iso.slice(8,10)+'.'+iso.slice(5,7)+'.'+iso.slice(0,4) : ''; }
+function nbj(n){ n=Number(n)||0; return String(Number.isInteger(n)?n:n.toFixed(1)).replace('.',','); }
+function ringSvg(left,total,color){
+  const C=2*Math.PI*26, pct=total>0? Math.max(0,Math.min(1,left/total)) : 0;
+  return `<svg viewBox="0 0 62 62"><circle cx="31" cy="31" r="26" fill="none" stroke="#e5e7eb" stroke-width="6"/><circle cx="31" cy="31" r="26" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*pct).toFixed(1)} ${C.toFixed(1)}"/></svg>`;
+}
 function renderLeaveCard(){
-  const b = ABS.balance, t = todayISO();
-  // Demandes à afficher : en attente + à venir/en cours, puis dernières traitées
+  const t = todayISO(), A = mainLeaveAccount();
   const shown = ABS.list.filter(a=>a.status==='Demandée' || a.to>=t).sort((x,y)=>x.from.localeCompare(y.from)).slice(0,4);
-  let top;
-  if(b){
-    const pct = b.opening>0? Math.max(0,Math.min(1,b.remaining/b.opening)) : 0;
-    const C = 2*Math.PI*26;
-    top = `<div class="leave-top">
-      <div class="leave-ring"><svg viewBox="0 0 62 62"><circle cx="31" cy="31" r="26" fill="none" stroke="#e5e7eb" stroke-width="6"/><circle cx="31" cy="31" r="26" fill="none" stroke="${b.remaining<0?'#b91c1c':'#16a34a'}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*pct).toFixed(1)} ${C.toFixed(1)}"/></svg>
-        <div class="v"><b>${esc(String(Number.isInteger(b.remaining)?b.remaining:b.remaining.toFixed(1)).replace('.',','))}</b><small>jours</small></div></div>
-      <div class="leave-txt"><div class="t">Congés ${esc(b.year)}</div>
-        <div class="s">${jours(b.remaining)} restant${Math.abs(b.remaining)>1?'s':''} sur ${jours(b.opening)}${b.taken? ' · '+jours(b.taken)+' pris':''}${b.pending? '<br>'+jours(b.pending)+' en attente de réponse':''}</div></div>
-    </div>`;
+  let top='';
+  if(A){
+    const rows=[];
+    if(A.carry>0){
+      const daysToGo = A.until? Math.ceil((new Date(A.until+'T23:59:59')-new Date())/864e5) : null;
+      const urgent = !A.expired && A.carryLeft>0 && daysToGo!==null && daysToGo<=45;
+      rows.push(`<div class="lb ${A.expired?'off':''}">
+        <div class="lb-ring">${ringSvg(A.carryLeft, A.carry, A.expired?'#9ca3af':'#f59e0b')}<div class="v"><b>${nbj(A.carryLeft)}</b><small>jours</small></div></div>
+        <div class="leave-txt"><div class="t">Reliquat ${A.carryYear}</div>
+          <div class="s">${A.expired
+            ? (A.lapsed>0? `${jours(A.lapsed)} non pris au ${fmtDM(A.until)} : perdu${A.lapsed>1?'s':''}` : `Entièrement utilisé`)
+            : `${jours(A.carryLeft)} restant${A.carryLeft>1?'s':''} sur ${jours(A.carry)}<br><span class="${urgent?'lb-urgent':''}">À prendre avant le ${fmtDM(A.until)}${urgent? ' · J-'+daysToGo : ''}</span>`}</div></div>
+      </div>`);
+    }
+    rows.push(`<div class="lb">
+      <div class="lb-ring">${ringSvg(A.annualLeft, A.annual, A.annualLeft<0?'#b91c1c':'#16a34a')}<div class="v"><b>${nbj(A.annualLeft)}</b><small>jours</small></div></div>
+      <div class="leave-txt"><div class="t">Congés ${A.year}</div>
+        <div class="s">${jours(A.annualLeft)} restant${Math.abs(A.annualLeft)>1?'s':''} sur ${jours(A.annual)}${A.annualUsed? ' · '+jours(A.annualUsed)+' pris':''}</div></div>
+    </div>`);
+    if(A.pending) rows.push(`<div class="lb-note">${jours(A.pending)} en attente de réponse${A.carry>0 && !A.expired? ' · le reliquat est utilisé en priorité' : ''}</div>`);
+    top = rows.join('');
   } else {
     top = `<div class="leave-top"><div class="leave-txt"><div class="t">Mes congés</div><div class="s">Votre solde de congés n’a pas encore été renseigné. Vous pouvez tout de même faire une demande.</div></div></div>`;
   }
@@ -1188,11 +1224,22 @@ function lfSummary(){
   if(LF.to<LF.from) return '<div class="req-sum warn">La date de fin est avant la date de début.</div>';
   const cal = Math.round((new Date(LF.to+'T12:00:00')-new Date(LF.from+'T12:00:00'))/864e5)+1;
   if(LF.kind!=='paid') return `<div class="req-sum">Indisponibilité de ${jours(cal)} (${esc(absPeriod(LF))}).</div>`;
-  const n = weekdaysBetween(LF.from, LF.to), b = ABS.balance;
+  const n = weekdaysBetween(LF.from, LF.to);
   if(!n) return '<div class="req-sum warn">Cette période ne contient aucun jour ouvré (lundi → vendredi).</div>';
-  if(!b) return `<div class="req-sum">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''}.</div>`;
-  const after = b.remaining - b.pending - n;
-  return `<div class="req-sum ${after<0?'warn':''}">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''}. ${after<0? 'Attention : cela dépasse votre solde disponible ('+jours(b.remaining-b.pending)+').' : 'Il vous resterait '+jours(after)+' si la demande est acceptée.'}</div>`;
+  // Le compte utilisé est celui de l'année de début du congé (même règle que le planning)
+  const A = (ABS.accounts||[]).find(a=>a.year===Number(LF.from.slice(0,4)));
+  if(!A) return `<div class="req-sum">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''}.</div>`;
+  // Reliquat d'abord si le congé commence avant la date limite (demandes en attente déjà déduites)
+  let fromCarry = 0;
+  if(A.carry>0 && !A.expired && A.until && LF.from<=A.until) fromCarry = Math.max(0, Math.min(n, A.carryLeftP));
+  const fromAnnual = n - fromCarry;
+  const annualAfter = A.annualLeftP - fromAnnual, carryAfter = A.carryLeftP - fromCarry;
+  const parts = [];
+  if(fromCarry) parts.push(`<b>${jours(fromCarry)}</b> sur le reliquat ${A.carryYear}`);
+  if(fromAnnual) parts.push(`<b>${jours(fromAnnual)}</b> sur les congés ${A.year}`);
+  return `<div class="req-sum ${annualAfter<0?'warn':''}">${jours(n)} ouvré${n>1?'s':''} décompté${n>1?'s':''} : ${parts.join(' + ')}.<br>${annualAfter<0
+      ? 'Attention : cela dépasse votre solde disponible.'
+      : 'Il vous resterait '+(A.carry>0 && !A.expired && LF.from<=A.until? jours(Math.max(0,carryAfter))+' de reliquat et ' : '')+jours(annualAfter)+' pour '+A.year+' si la demande est acceptée.'}</div>`;
 }
 function renderLeaveForm(errMsg){
   const t=todayISO();
