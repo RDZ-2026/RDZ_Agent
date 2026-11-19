@@ -758,7 +758,7 @@ async function doReprise(id){
 // Stockage EXISTANT journal-photos/materiel/commandes/<n° de bon>__<horodatage>.json :
 // une nouvelle version à chaque changement (historique complet, rien n'est écrasé).
 const ST={preparation:['En préparation','#566579'],valide:['Validé (direction)','#1e4f8a'],envoyee:['Commande envoyée','#6b3fa0'],
-  attente:['En attente de réception','#a76a00'],recue:['Réceptionné','#1b7a3d'],annulee:['Annulé','#b3122a'],reception:['📥 Réception partielle','#a76a00']};
+  attente:['En attente de réception','#a76a00'],recue:['Réceptionné','#1b7a3d'],annulee:['Annulé','#b3122a'],reception:['📥 Réception partielle','#a76a00'],modif:['✏️ Bon modifié','#566579']};
 const stLabel=k=>(ST[k]||[k])[0];
 const stPill=b=>{const k=b.statut;let [l,c]=ST[k]||[k,'#566579'];if(k==='attente'&&b.lignes.some(x=>(x.recu||0)>0))l='Reçu en partie';
   return `<span class="pill" style="background:${c}1a;color:${c}"><span class="dot" style="background:${c}"></span>${esc(l)}</span>`;};
@@ -802,6 +802,7 @@ const DK='rdz_mat_cmd_draft';let PREP=null;
 function prepLoad(){if(PREP)return PREP;try{PREP=JSON.parse(localStorage.getItem(DK)||'null');}catch(e){}if(!PREP||!Array.isArray(PREP.bons)||!PREP.bons.length)PREP={bons:[{fournisseur:''}],lignes:[]};return PREP;}
 function prepSave(){try{localStorage.setItem(DK,JSON.stringify(PREP));}catch(e){}}
 const lid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const bonLbl=(b,i)=>'Bon '+(i+1)+(b&&b.numero?' ('+b.numero+')':'');
 function addToPrep(art,site,local,qte){prepLoad();const a=articlesList().find(x=>x.nom===art)||{};
   if(PREP.lignes.some(l=>l.art===art&&l.site===(site||'')&&l.local===(local||'')))return false;
   PREP.lignes.push({id:lid(),art,icon:a.icon||'📦',nouveau:false,qte:Math.max(1,qte||1),prix:artPrix(art),site:site||'',local:local||'',bon:0});prepSave();return true;}
@@ -812,14 +813,15 @@ function rCmdPrep(){
     <div class="g"><div class="t">${esc(x.art)}${x.nouveau?' <span class="pill p-warn">nouvel article</span>':''}</div><div class="s">${x.qte} × ${chf(x.prix)} = <b>${chf(x.qte*x.prix)}</b>${x.site?' · → '+esc(x.site+' / '+x.local):''}</div></div>
     <button class="btn sm g" onclick="prepLine('${x.id}')">Modifier</button></div>`;
   return `<h2>Préparer une commande</h2><div class="sub">Ajoutez les articles à commander (existants ou nouveaux). Pour les répartir sur plusieurs bons, cochez des lignes puis choisissez le bon. Rien n'est envoyé tant que vous n'avez pas enregistré.</div>
+  ${(P.edit||[]).length?`<div class="note">✏️ Modification de <b>${esc(P.edit.join(', '))}</b> : ajoutez des articles, changez le fournisseur, ou cochez des lignes puis « ➕ Nouveau bon » pour scinder la commande (ex. autre fournisseur). Rien ne change tant que vous n'avez pas enregistré.</div>`:''}
   <div class="actions" style="grid-template-columns:1fr 1fr"><button class="act" onclick="prepLine()"><div class="i">➕</div><div class="l">Ajouter un article</div><div class="d">Existant ou nouveau</div></button>
   <button class="act" onclick="prepSeuil()"><div class="i">⚠️</div><div class="l">Sous le seuil</div><div class="d">Ajouter ce qui manque</div></button></div>
-  ${sel?`<div class="filt" style="margin-top:12px;flex-wrap:wrap"><span>${sel} ligne(s) cochée(s) → mettre sur :</span><span style="display:flex;gap:6px;flex-wrap:wrap">${P.bons.map((b,i)=>`<button class="btn sm g" onclick="prepMove(${i})">Bon ${i+1}</button>`).join('')}<button class="btn sm d" onclick="prepMove(${P.bons.length})">➕ Nouveau bon</button></span></div>`:''}
-  ${P.bons.map((b,i)=>{const ls=P.lignes.filter(x=>x.bon===i);return `<div class="sec">🧾 Bon ${i+1}</div>
+  ${sel?`<div class="filt" style="margin-top:12px;flex-wrap:wrap"><span>${sel} ligne(s) cochée(s) → mettre sur :</span><span style="display:flex;gap:6px;flex-wrap:wrap">${P.bons.map((b,i)=>`<button class="btn sm g" onclick="prepMove(${i})">${esc(bonLbl(b,i))}</button>`).join('')}<button class="btn sm d" onclick="prepMove(${P.bons.length})">➕ Nouveau bon</button></span></div>`:''}
+  ${P.bons.map((b,i)=>{const ls=P.lignes.filter(x=>x.bon===i);return `<div class="sec">🧾 ${esc(bonLbl(b,i))}${b.numero?' <span class="pill p-warn">bon existant — modification</span>':''}</div>
     <div class="card pad"><div class="fr"><div><label class="fl first">Fournisseur</label><select class="fi" onchange="prepFour(${i},this.value)"><option value="">— À définir —</option>${fours.map(f=>`<option ${f===b.fournisseur?'selected':''}>${esc(f)}</option>`).join('')}<option value="__new">➕ Nouveau fournisseur…</option></select></div>
     <div><label class="fl first">Note (facultatif)</label><input class="fi" value="${esc(b.note||'')}" onchange="PREP.bons[${i}].note=this.value;prepSave()" placeholder="Ex. livraison au siège"></div></div></div>
-    <div class="card">${ls.map(lineH).join('')||'<div class="empty">Aucune ligne sur ce bon.</div>'}${ls.length?`<div class="row" style="background:#f7f9fb"><div class="g"><b>Total bon ${i+1}</b></div><b>${chf(sum(ls,x=>x.qte*x.prix))}</b></div>`:''}</div>`;}).join('')}
-  <div class="sticky"><button class="btn full" onclick="prepCreate()" ${nb?'':'disabled'}>✅ Enregistrer ${nb} bon(s) de commande</button>${P.lignes.length?'<button class="btn full g" onclick="prepClear()">🗑 Vider la préparation</button>':''}</div>`;
+    <div class="card">${ls.map(lineH).join('')||'<div class="empty">Aucune ligne sur ce bon.</div>'}${ls.length?`<div class="row" style="background:#f7f9fb"><div class="g"><b>Total ${esc(bonLbl(b,i))}</b></div><b>${chf(sum(ls,x=>x.qte*x.prix))}</b></div>`:''}</div>`;}).join('')}
+  <div class="sticky"><button class="btn full" onclick="prepCreate()" ${nb?'':'disabled'}>✅ Enregistrer ${nb} bon(s) de commande${(P.edit||[]).length?' (modifications comprises)':''}</button>${P.lignes.length?'<button class="btn full g" onclick="prepClear()">🗑 Vider la préparation</button>':''}</div>`;
 }
 function prepSel(id,v){const x=prepLoad().lignes.find(l=>l.id===id);if(x)x.sel=v;prepSave();render();}
 function prepCompact(){const P=PREP;const used=P.bons.map((b,i)=>P.lignes.some(x=>x.bon===i));
@@ -827,7 +829,7 @@ function prepCompact(){const P=PREP;const used=P.bons.map((b,i)=>P.lignes.some(x
   const map={};const nb=[];P.bons.forEach((b,i)=>{if(used[i]){map[i]=nb.length;nb.push(b);}});P.lignes.forEach(x=>x.bon=map[x.bon]);P.bons=nb;}
 function prepMove(i){const P=prepLoad();if(i>=P.bons.length)P.bons.push({fournisseur:''});P.lignes.forEach(x=>{if(x.sel){x.bon=i;x.sel=false;}});prepCompact();prepSave();render();}
 function prepFour(i,v){const P=prepLoad();if(v==='__new')return fourSheet(-1,n=>{P.bons[i].fournisseur=n;prepSave();render();});P.bons[i].fournisseur=v;prepSave();}
-function prepClear(){if(!confirm('Vider la préparation en cours ?'))return;PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();render();}
+function prepClear(){if(!confirm('Vider la préparation en cours ?'+((PREP&&PREP.edit||[]).length?'\n(Les bons existants '+PREP.edit.join(', ')+' restent tels qu\'ils sont enregistrés.)':'')))return;PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();render();}
 function prepSeuil(){const low=located().filter(r=>(r.seuil_alerte||0)>0&&r.quantite_dispo<r.seuil_alerte);let n=0;
   low.forEach(r=>{if(addToPrep(r.art,r.site,r.local,r.seuil_alerte-r.quantite_dispo))n++;});toast(n?'⚠️ '+n+' ligne(s) ajoutée(s)':'Rien de plus à ajouter',n?'ok':'err');render();}
 function prepLine(id){const P=prepLoad();const x=id?P.lignes.find(l=>l.id===id):null;const arts=articlesList();const isNew=(x&&x.nouveau)||!arts.length;
@@ -837,7 +839,7 @@ function prepLine(id){const P=prepLoad();const x=id?P.lignes.find(l=>l.id===id):
     <div class="hint">La fiche de ce nouvel article est créée quand vous enregistrez le bon.</div></div>
   <div class="fr"><div><label class="fl">Quantité</label>${qtyField('pl-q',null,x?x.qte:1)}</div><div><label class="fl">Prix unitaire (CHF)</label><input class="fi" id="pl-p" type="number" min="0" step="0.05" value="${x?(x.prix||''):(!isNew&&arts[0]?artPrix(arts[0].nom)||'':'')}"></div></div>
   <div class="hint">Où le ranger à la réception (modifiable à ce moment-là) :</div>${locSelect('pl',x?x.site:'',x?x.local:'')}
-  ${P.bons.length>1?`<label class="fl">Bon</label><select class="fi" id="pl-b">${P.bons.map((b,i)=>`<option value="${i}" ${(x?x.bon:0)===i?'selected':''}>Bon ${i+1}${b.fournisseur?' — '+esc(b.fournisseur):''}</option>`).join('')}</select>`:''}
+  ${P.bons.length>1?`<label class="fl">Bon</label><select class="fi" id="pl-b">${P.bons.map((b,i)=>`<option value="${i}" ${(x?x.bon:0)===i?'selected':''}>${esc(bonLbl(b,i))}${b.fournisseur?' — '+esc(b.fournisseur):''}</option>`).join('')}</select>`:''}
   <button class="btn full" onclick="savePrepLine('${x?x.id:''}')">${x?'Enregistrer':'Ajouter'}</button>${x?`<button class="btn full g" onclick="delPrepLine('${x.id}')">🗑 Retirer la ligne</button>`:''}<button class="btn full g" onclick="closeSheet()">Annuler</button>`);}
 function savePrepLine(id){const P=prepLoad();let a=$('pl-a').value,nouveau=false,icon;
   if(a==='__new'){a=$('pl-nom').value.trim();if(!a)return toast('Nom de l\'article requis','err');if(a.includes(SEP))return toast('Le nom ne peut pas contenir « — »','err');
@@ -849,21 +851,47 @@ function savePrepLine(id){const P=prepLoad();let a=$('pl-a').value,nouveau=false
   const row={art:a,icon,nouveau,qte,prix,site:$('pl-site').value,local:$('pl-local').value,bon};
   if(cur)Object.assign(cur,row);else P.lignes.push(Object.assign({id:lid()},row));prepCompact();prepSave();closeSheet();render();}
 function delPrepLine(id){const P=prepLoad();P.lignes=P.lignes.filter(l=>l.id!==id);prepCompact();prepSave();closeSheet();render();}
+// Lignes : brouillon ⇄ bon enregistré
+const toBonLine=x=>({art:x.art,icon:x.icon||'📦',nouveau:!!x.nouveau,qte:x.qte,prix:x.prix||0,site:x.site||'',local:x.local||'',recu:x.recu||0});
+const fromBonLine=(x,bon)=>({id:lid(),art:x.art,icon:x.icon||'📦',nouveau:!!x.nouveau,qte:x.qte,prix:x.prix||0,site:x.site||'',local:x.local||'',recu:x.recu||0,bon});
+// Rouvre un bon « En préparation » dans l'écran de préparation (ajout d'articles, changement de fournisseur, scission).
+function bonEdit(nu){const b=BONS.find(x=>x.numero===nu);if(!b||b.statut!=='preparation')return toast('Seuls les bons « En préparation » sont modifiables','err');
+  const P=prepLoad();
+  if(!P.bons.some(x=>x.numero===nu)){
+    if(!P.lignes.length)P.bons=[];          // brouillon vide : le bon rouvert devient « Bon 1 »
+    const i=P.bons.length;P.bons.push({numero:b.numero,fournisseur:b.fournisseur||'',note:b.note||''});
+    b.lignes.forEach(x=>P.lignes.push(fromBonLine(x,i)));
+    P.edit=(P.edit||[]).filter(n=>n!==nu).concat(nu);prepSave();}
+  closeSheet();tab('cmdprep');toast('✏️ '+nu+' ouvert en modification');}
 async function prepCreate(){const P=prepLoad();const groups=P.bons.map((b,i)=>({b,ls:P.lignes.filter(x=>x.bon===i)})).filter(g=>g.ls.length);
   if(!groups.length)return toast('Ajoutez au moins un article','err');
-  if(!confirm(groups.length+' bon(s) de commande vont être créés, au statut « En préparation ». Continuer ?'))return;
-  try{let chg=false;
+  const edit=P.edit||[],upd=groups.filter(g=>g.b.numero),nw=groups.filter(g=>!g.b.numero),gone=edit.filter(n=>!upd.some(g=>g.b.numero===n));
+  const msg=[upd.length?'• '+upd.map(g=>g.b.numero).join(', ')+' : mis à jour':'',nw.length?'• '+nw.length+' nouveau(x) bon(s) créé(s), au statut « En préparation »':'',
+    gone.length?'• '+gone.join(', ')+' : plus aucune ligne → sera annulé (reste dans l\'historique)':''].filter(Boolean).join('\n');
+  if(!confirm(msg+'\n\nContinuer ?'))return;
+  try{
+    if(edit.length){await loadBons();      // relit les bons : personne ne doit les avoir fait avancer entre-temps
+      const bad=edit.filter(n=>{const b=BONS.find(x=>x.numero===n);return !b||b.statut!=='preparation';});
+      if(bad.length)return toast(bad.join(', ')+' n\'est plus « En préparation » (changé entre-temps). Videz la préparation et rouvrez le bon.','err');}
+    let chg=false;
     P.lignes.forEach(x=>{const a=CFG.articles.find(z=>z.nom===x.art);
       if(!a){const r=D.rows.find(r=>r.art===x.art);CFG.articles.push({nom:x.art,icon:x.icon||(r&&r.icon)||'📦',seuil:r?r.seuil_alerte||0:0,prix:x.prix||0});chg=true;}
       else if(!a.prix&&x.prix){a.prix=x.prix;chg=true;}});
     if(chg)await saveCfg();
     const made=[];
-    for(const g of groups){const now=new Date().toISOString();
+    for(const g of nw){const now=new Date().toISOString();
       const b={v:1,numero:nextNumero(),fournisseur:g.b.fournisseur||'',note:g.b.note||'',statut:'preparation',cree_le:now,cree_par:ME.nom,
-        lignes:g.ls.map(x=>({art:x.art,icon:x.icon||'📦',nouveau:!!x.nouveau,qte:x.qte,prix:x.prix||0,site:x.site||'',local:x.local||'',recu:0})),
-        hist:[{statut:'preparation',le:now,par:ME.nom,note:null}]};
+        lignes:g.ls.map(toBonLine),
+        hist:[{statut:'preparation',le:now,par:ME.nom,note:edit.length?'Issu de la scission de '+edit.join(', '):null}]};
       await saveBon(b);made.push(b.numero);}
-    PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();toast('🧾 '+made.join(', ')+' enregistré(s)');F={};tab('cmd');
+    const split=made.length?' — scindé, nouveau(x) bon(s) : '+made.join(', '):'';
+    for(const g of upd){const b=BONS.find(x=>x.numero===g.b.numero);
+      b.fournisseur=g.b.fournisseur||'';b.note=g.b.note||'';b.lignes=g.ls.map(toBonLine);
+      (b.hist=b.hist||[]).push({statut:'modif',le:new Date().toISOString(),par:ME.nom,note:g.ls.length+' ligne(s)'+(b.fournisseur?' · '+b.fournisseur:'')+split});
+      await saveBon(b);}
+    for(const n of gone){const b=BONS.find(x=>x.numero===n);await saveBon(b,'annulee','Toutes les lignes déplacées'+(made.length?' vers '+made.join(', '):''));}
+    PREP={bons:[{fournisseur:''}],lignes:[]};prepSave();
+    toast('🧾 '+[made.length?made.join(', ')+' créé(s)':'',upd.length?upd.map(g=>g.b.numero).join(', ')+' mis à jour':''].filter(Boolean).join(' · '));F={};tab('cmd');
   }catch(e){toast(errTxt(e),'err');}}
 
 // ── Détail, suivi, réception, impression ──
@@ -879,7 +907,8 @@ function bonSheet(nu){const b=BONS.find(x=>x.numero===nu);if(!b)return;const pre
      <td>${prep?`<input class="fi" style="width:70px;padding:6px" type="number" min="0" value="${x.qte}" onchange="editLine('${esc(nu)}',${i},'qte',this.value)">`:x.qte}</td><td>${x.recu||0}</td>
      <td>${prep?`<input class="fi" style="width:90px;padding:6px" type="number" min="0" step="0.05" value="${x.prix||0}" onchange="editLine('${esc(nu)}',${i},'prix',this.value)">`:chf(x.prix)}</td><td>${chf(x.qte*(x.prix||0))}</td></tr>`).join('')}
    <tr><td colspan="4"><b>Total</b></td><td><b>${chf(bonTotal(b))}</b></td></tr></table></div></div>
-   ${prep?'<div class="hint" style="margin-bottom:10px">En préparation : quantités et prix modifiables (quantité 0 = ligne retirée).</div>':''}
+   ${prep?`<div class="hint" style="margin-bottom:10px">En préparation : quantités et prix modifiables ici (quantité 0 = ligne retirée). Pour ajouter des articles, changer le fournisseur ou scinder le bon, utilisez « Modifier le bon ».</div>
+   <button class="btn full" onclick="bonEdit('${esc(nu)}')">✏️ Modifier le bon (ajouter, scinder…)</button>`:''}
    ${acts.join('')}<button class="btn full g" onclick="printBon('${esc(nu)}')">🖨 Imprimer / PDF</button>
    ${enCours(b)?`<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">Autres actions (corriger le statut, annuler)</summary>
      <select class="fi" id="bs-st" style="margin-top:8px">${['preparation','valide','envoyee','attente','annulee'].map(k=>`<option value="${k}" ${k===b.statut?'selected':''}>${stLabel(k)}</option>`).join('')}</select>
