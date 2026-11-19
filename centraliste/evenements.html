@@ -266,6 +266,14 @@
     .rdz-brand-lockup .header-brand-name{font-size:12px!important}
   }
 }
+
+  /* ── Navigation date ◀ ▶ ── */
+  .date-nav{display:inline-flex;align-items:center;gap:6px}
+  .date-step,.date-today{min-height:38px;border:1px solid #cfd9e4;border-radius:9px;background:#fff;color:var(--rdz-ink,#1a1a1a);cursor:pointer;font-size:13px;font-weight:600;transition:background-color .16s,border-color .16s}
+  .date-step{width:38px;padding:0;font-size:12px}
+  .date-today{padding:0 12px}
+  .date-step:hover,.date-today:hover{background:#f4f7fa;border-color:var(--rdz-accent,#e3062c)}
+  .date-step:active,.date-today:active{transform:scale(.96)}
 </style>
 
 </head>
@@ -290,7 +298,12 @@
 <div class="toolbar">
   <div class="toolbar-inner">
     <span class="tlabel">Date</span>
-    <input type="date" class="tdate" id="ref-date" onchange="render()">
+    <div class="date-nav">
+      <button type="button" class="date-step" onclick="shiftRefDate(-1)" title="Jour précédent" aria-label="Jour précédent">&#9664;</button>
+      <input type="date" class="tdate" id="ref-date" onchange="render()">
+      <button type="button" class="date-step" onclick="shiftRefDate(1)" title="Jour suivant" aria-label="Jour suivant">&#9654;</button>
+      <button type="button" class="date-today" onclick="resetRefDate()" title="Revenir à aujourd'hui">Aujourd'hui</button>
+    </div>
     <div class="tsep"></div>
     <span class="tlabel">Site</span>
     <select class="tsel" id="site-filter" onchange="render()">
@@ -1025,6 +1038,19 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 });
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
+// ─── NAVIGATION DATE (◀ ▶ / Aujourd'hui) ─────────────────────────────────────
+function shiftRefDate(delta) {
+  const input = document.getElementById('ref-date');
+  const base = input.value || today();
+  const [y, m, d] = base.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + delta); // calcul en heure locale (pas de décalage UTC)
+  input.value = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  render();
+}
+function resetRefDate() {
+  document.getElementById('ref-date').value = today();
+  render();
+}
 document.getElementById('ref-date').value = today();
 loadAll();
 </script>
