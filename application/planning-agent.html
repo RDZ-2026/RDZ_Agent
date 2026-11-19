@@ -1,4 +1,4 @@
-<!-- RDZ · planning-agent · v17 · 2026-11-16 · congés : reliquat N-1 séparé + décompte reliquat d'abord -->
+<!-- RDZ · planning-agent · v18 · 2026-11-18 · heures de congés payés incluses dans les totaux -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -210,6 +210,10 @@ select.finp{appearance:auto;}
 .lb-ring .v small{font-size:9px;color:var(--text2);font-weight:600;margin-top:2px;}
 .lb-urgent{color:#b45309;font-weight:700;}
 .lb-note{font-size:12.5px;color:var(--text2);margin-top:10px;background:var(--bg);border-radius:8px;padding:7px 10px;}
+.di-txt{font-size:9.5px;font-weight:800;letter-spacing:-.02em;}
+.lv-sub{display:block;font-size:10.5px;font-weight:600;color:#6d28d9;margin-top:2px;}
+.week-total .lv-sub{text-align:right;}
+.lv-paid{font-size:12.5px;font-weight:700;color:#6d28d9;margin:-4px 2px 8px;}
 .msg-banner{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--red);border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;width:100%;text-align:left;color:var(--text);}
 .msg-banner svg{width:20px;height:20px;color:var(--red);flex:none;}
 .msg-banner span{flex:1;}
@@ -551,7 +555,7 @@ const HISTORY_DAYS = 62;
 const HIDDEN_STATUS = 'Planifiée';
 const LS_CHG_SEEN = 'rdz_planning_pilot_changes_seen_'; // + id agent
 const HOME_CHANGES = 5;
-const APP_VERSION = 'v17 · 16.11.2026';
+const APP_VERSION = 'v18 · 18.11.2026';
 // Doit être identique à rdz_planning_pilot_auto_reason() côté SQL
 const AUTO_REASON = 'Heures pré-remplies automatiquement à la fin du service';
 
@@ -746,7 +750,9 @@ async function reload(manual){
     if(chg) setChanges(chg);
     if(abs){
       ABS.list = (abs.absences||[]).map(a=>({ id:String(a.id), kind:a.kind, from:String(a.from).slice(0,10), to:String(a.to).slice(0,10),
-        status:a.status, reason:a.reason||'', days:a.days==null?null:Number(a.days) }));
+        status:a.status, reason:a.reason||'', days:a.days==null?null:Number(a.days),
+        leaveDays:(a.leave_days||[]).map(d=>({ date:String(d.date).slice(0,10), hours:Number(d.hours)||0 })),
+        paidHours:a.paid_hours==null? null : Number(a.paid_hours) }));
       ABS.balance = abs.balance ? { year:abs.balance.year, opening:Number(abs.balance.opening)||0, taken:Number(abs.balance.taken)||0,
         pending:Number(abs.balance.pending)||0, remaining:Number(abs.balance.remaining)||0 } : null;
       const N=v=>Number(v)||0;
@@ -906,6 +912,19 @@ function renderHome(){
 function isoWeek(iso){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+3-((d.getDay()+6)%7)); const w1=new Date(d.getFullYear(),0,4); return 1+Math.round(((d-w1)/864e5-3+((w1.getDay()+6)%7))/7); }
 function weekMonday(){ return addDaysISO(mondayOf(todayISO()), 7*(VIEW.weekOffset||0)); }
 function shiftWeek(n){ VIEW.weekOffset=(VIEW.weekOffset||0)+n; render(); }
+// Minutes payées au titre d'un congé payé ACCEPTÉ ce jour-là (0 sinon).
+// Les heures par jour sont calculées par la base (leave_days) : rien à recalculer ici.
+function leaveMinutesOn(iso){
+  const a = ABS.list.find(x=>x.kind==='paid' && x.status==='Acceptée' && x.from<=iso && x.to>=iso);
+  const d = a && (a.leaveDays||[]).find(x=>x.date===iso);
+  return d? Math.round(d.hours*60) : 0;
+}
+// Total des minutes de congé payé entre deux dates (a incluse, b exclue)
+function leaveMinutesRange(a, b){
+  let n=0; ABS.list.forEach(x=>{ if(x.kind==='paid' && x.status==='Acceptée') (x.leaveDays||[]).forEach(d=>{ if(d.date>=a && d.date<b) n+=Math.round(d.hours*60); }); });
+  return n;
+}
+function monthLeaveMinutes(ym){ const d=new Date(ym+'-15T12:00:00'); d.setMonth(d.getMonth()+1); return leaveMinutesRange(ym+'-01', isoDate(d).slice(0,7)+'-01'); }
 function dayEntries(iso){
   return { shifts: SHIFTS.filter(s=>s.date===iso).sort((a,b)=>sStart(a)-sStart(b)),
            abs: ABS.list.find(a=>a.status==='Acceptée' && a.from<=iso && a.to>=iso) || null };
@@ -915,10 +934,11 @@ function renderWeek(){
   const days=[0,1,2,3,4,5,6].map(i=>addDaysISO(mon,i));
   const WD=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   const fmt=iso=>new Date(iso+'T12:00:00').toLocaleDateString('fr-CH',{day:'numeric',month:'short'}).replace('.','');
-  let total=0;
+  let total=0, leaveTot=0;
   const tiles=days.map((iso,i)=>{
     const { shifts, abs } = dayEntries(iso);
     shifts.forEach(s=>{ total+=paidMinutes(s); });
+    const lv = leaveMinutesOn(iso); total += lv; leaveTot += lv;
     const cls=[iso<t?'past':'', iso===t?'today':''];
     let icon, hrs, click='';
     if(shifts.length){
@@ -928,7 +948,9 @@ function renderWeek(){
       hrs = shifts.length>1? shifts.length+' serv.' : shortH(s.start)+'–'+shortH(s.end);
       click = shifts.length===1? `openShift('${esc(s.id)}')` : 'openWeekDetail()';
     } else if(abs){
-      cls.push('leavek'); icon=I.sun; hrs = abs.kind==='paid'? 'Congé' : 'Indispo'; click='';
+      cls.push('leavek'); click='';
+      if(lv){ icon='<span class="di-txt">Congé</span>'; hrs=hhmm2(lv); }
+      else { icon=I.sun; hrs = abs.kind==='paid'? 'Congé' : 'Indispo'; }
     } else {
       cls.push('rest'); icon='—'; hrs='Repos';
     }
@@ -945,7 +967,7 @@ function renderWeek(){
     </div>
     <div class="days">${tiles}</div>
     <div class="week-foot"><span class="lg"><i class="d"></i>Jour</span><span class="lg"><i class="n"></i>Nuit</span><span class="lg"><i class="r"></i>Repos</span>
-      <span class="week-total">${Math.floor(total/60)}h${total%60?pad(total%60):''} / sem.</span></div>
+      <span class="week-total">${Math.floor(total/60)}h${total%60?pad(total%60):''} / sem.${leaveTot? `<small class="lv-sub">dont congés ${hhmm2(leaveTot)}</small>` : ''}</span></div>
     <button class="btn btn-block" onclick="openWeekDetail()">Voir le détail de la semaine</button>
   </div>`;
 }
@@ -956,14 +978,15 @@ function openWeekDetail(){
   const body=days.map(iso=>{
     const { shifts, abs } = dayEntries(iso);
     shifts.forEach(s=>{ total+=paidMinutes(s); });
+    const lv = leaveMinutesOn(iso); total += lv;
     const lbl=new Date(iso+'T12:00:00').toLocaleDateString('fr-CH',{weekday:'long',day:'numeric',month:'long'});
     const rows = shifts.length? shifts.map(s=>shiftRow(s).replace(`onclick="openShift(`, `onclick="closeSheet();openShift(`)).join('')
-      : abs? absenceRow(abs) : '<div class="wd-rest">Repos</div>';
+      : abs? absenceRow(abs) + (lv? `<div class="lv-paid">Congé payé · ${hhmm2(lv)} payées</div>` : '') : '<div class="wd-rest">Repos</div>';
     return `<div class="wd-day">${esc(lbl)}${iso===todayISO()?' · aujourd’hui':''}</div>${rows}`;
   }).join('');
   $('sheet-root').innerHTML = `<div class="sheet-bg" onclick="if(event.target===this)closeSheet()"><div class="sheet">
     <h2>Semaine ${isoWeek(mon)}</h2>
-    <div class="sub">${Math.floor(total/60)}h${total%60?pad(total%60):''} planifiées (pauses non payées déduites)</div>
+    <div class="sub">${Math.floor(total/60)}h${total%60?pad(total%60):''} payées sur la semaine (services, pauses non payées déduites, et congés payés)</div>
     ${body}
     <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="closeSheet()">Fermer</button>
   </div></div>`;
@@ -1036,12 +1059,13 @@ async function sendPdsa(id, kind){
 function renderStats(up){
   const pending = up.filter(needsConfirm).length;
   const ym = todayISO().slice(0,7);
-  const mins = SHIFTS.filter(s=>s.date.slice(0,7)===ym).reduce((n,s)=>n+paidMinutes(s),0);
+  const leaveMins = monthLeaveMinutes(ym);
+  const mins = SHIFTS.filter(s=>s.date.slice(0,7)===ym).reduce((n,s)=>n+paidMinutes(s),0) + leaveMins;
   const month = new Date().toLocaleDateString('fr-CH',{month:'long'});
   return `<div class="stats">
     <button class="stat" onclick="setPlanMode('upcoming');go('planning')"><span class="n">${up.length}</span><span class="l">Service${up.length>1?'s':''} à venir</span></button>
     <button class="stat ${pending?'alert':''}" onclick="setPlanMode('upcoming');go('planning')"><span class="n">${pending}</span><span class="l">À valider</span></button>
-    <div class="stat"><span class="n">${Math.floor(mins/60)}h${mins%60?pad(mins%60):''}</span><span class="l">En ${esc(month)}</span></div>
+    <div class="stat"><span class="n">${Math.floor(mins/60)}h${mins%60?pad(mins%60):''}</span><span class="l">En ${esc(month)}</span>${leaveMins? `<span class="lv-sub">dont congés ${hhmm2(leaveMins)}</span>` : ''}</div>
   </div>`;
 }
 
@@ -1191,7 +1215,7 @@ function renderLeaveCard(){
     top = `<div class="leave-top"><div class="leave-txt"><div class="t">Mes congés</div><div class="s">Votre solde de congés n’a pas encore été renseigné. Vous pouvez tout de même faire une demande.</div></div></div>`;
   }
   const list = shown.length? `<div class="leave-list">${shown.map(a=>`<div class="lv">
-      <div class="lv-main"><b>${ABS_KIND[a.kind]||'Absence'}${a.days&&a.kind==='paid'?' · '+jours(a.days):''}</b><span>${esc(absPeriod(a))}</span></div>
+      <div class="lv-main"><b>${ABS_KIND[a.kind]||'Absence'}${a.days&&a.kind==='paid'?' · '+jours(a.days):''}${a.kind==='paid' && a.paidHours && a.status==='Acceptée'? ' · '+hhmm2((a.leaveDays||[]).length? a.leaveDays.reduce((n,d)=>n+Math.round(d.hours*60),0) : Math.round(a.paidHours*60))+' payées' : ''}</b><span>${esc(absPeriod(a))}</span></div>
       ${absChip(a)}
       ${a.status==='Demandée'? `<button class="lv-x" onclick="askCancelAbsence('${esc(a.id)}')">Annuler</button>` : ''}
     </div>`).join('')}</div>` : '';
@@ -1398,10 +1422,10 @@ function renderHoursSummary(){
   const ym=t.slice(0,7); const nd=new Date(ym+'-15T12:00:00'); nd.setMonth(nd.getMonth()+1); const nym=isoDate(nd).slice(0,7);
   const mLbl=x=>new Date(x+'-15T12:00:00').toLocaleDateString('fr-CH',{month:'long'});
   const tiles=[
-    ['Cette semaine', sumMin(inRange(wk, nwk))],
-    ['Sem. prochaine', sumMin(inRange(nwk, addDaysISO(nwk,7)))],
-    [cap(mLbl(ym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===ym))],
-    [cap(mLbl(nym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===nym))]
+    ['Cette semaine', sumMin(inRange(wk, nwk)) + leaveMinutesRange(wk, nwk)],
+    ['Sem. prochaine', sumMin(inRange(nwk, addDaysISO(nwk,7))) + leaveMinutesRange(nwk, addDaysISO(nwk,7))],
+    [cap(mLbl(ym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===ym)) + monthLeaveMinutes(ym)],
+    [cap(mLbl(nym)), sumMin(SHIFTS.filter(s=>s.date.slice(0,7)===nym)) + monthLeaveMinutes(nym)]
   ];
   return `<div class="hsum">${tiles.map(([l,m])=>`<div><b>${hhmm2(m)}</b><span>${esc(l)}</span></div>`).join('')}</div>`;
 }
@@ -1433,7 +1457,7 @@ function renderPlanning(){
       last=wk;
       const lbl = wk===thisWk? 'Cette semaine' : wk===addDaysISO(thisWk,7)? 'Semaine prochaine' : wk===addDaysISO(thisWk,-7)? 'Semaine dernière'
         : 'Semaine du '+new Date(wk+'T12:00:00').toLocaleDateString('fr-CH',{day:'numeric',month:'long'});
-      const wMin = sumMin(SHIFTS.filter(x=>x.date>=wk && x.date<addDaysISO(wk,7)));
+      const wMin = sumMin(SHIFTS.filter(x=>x.date>=wk && x.date<addDaysISO(wk,7))) + leaveMinutesRange(wk, addDaysISO(wk,7));
       h += `<div class="wk"><span>${esc(lbl)}</span>${wMin? `<span class="wk-h">${hhmm2(wMin)}</span>` : ''}</div>`;
     }
     h += it.html;
@@ -1450,14 +1474,16 @@ function renderMonth(){
   const lastDay=new Date(+ym.slice(0,4), +ym.slice(5,7), 0).getDate();
   const end=addDaysISO(ym+'-'+pad(lastDay), 6-((new Date(ym+'-'+pad(lastDay)+'T12:00:00').getDay()+6)%7));
   const monthShifts=SHIFTS.filter(s=>s.date.slice(0,7)===ym);
-  const mMin=sumMin(monthShifts), nights=monthShifts.filter(s=>shiftKind(s)==='night').length, toVal=monthShifts.filter(needsConfirm).length;
+  const mLeave=monthLeaveMinutes(ym);
+  const mMin=sumMin(monthShifts)+mLeave, nights=monthShifts.filter(s=>shiftKind(s)==='night').length, toVal=monthShifts.filter(needsConfirm).length;
   let rows='', d=start;
   while(d<=end){
     let cells='', wMin=0;
     for(let i=0;i<7;i++){
       const iso=addDaysISO(d,i), inM=iso.slice(0,7)===ym;
       const { shifts, abs } = dayEntries(iso);
-      if(inM) wMin += sumMin(shifts);
+      const lv = inM? leaveMinutesOn(iso) : 0;
+      if(inM) wMin += sumMin(shifts) + lv;
       const cls=['mday', inM?'':'out', iso===t?'today':'', iso<t?'past':''];
       let inner='', click='';
       if(shifts.length){
@@ -1466,7 +1492,7 @@ function renderMonth(){
         if(shifts.some(needsConfirm)) cls.push('tovalid');
         inner = `<span class="mi">${k==='night'?I.moon:I.sun}</span><span class="mh">${shifts.length>1? shifts.length+' serv.' : esc(shortH(s0.start)+'–'+shortH(s0.end))}</span>`;
         click = shifts.length===1? `openShift('${esc(s0.id)}')` : `openDaySheet('${iso}')`;
-      } else if(abs){ cls.push('leavek'); inner='<span class="mh">'+(abs.kind==='paid'?'Congé':'Indispo')+'</span>'; }
+      } else if(abs){ cls.push('leavek'); inner = abs.kind==='paid'? '<span class="mh">Congé</span>'+(lv? '<span class="mh">'+hhmm2(lv)+'</span>' : '') : '<span class="mh">Indispo</span>'; }
       cells += `<${click?'button':'div'} class="${cls.join(' ')}" ${click?`onclick="${click}"`:''}><span class="mn">${+iso.slice(8)}</span>${inner}</${click?'button':'div'}>`;
     }
     rows += `<div class="mrow">${cells}<div class="mtot">${wMin? hhmm2(wMin) : '—'}</div></div>`;
@@ -1481,7 +1507,7 @@ function renderMonth(){
     <div class="mrow mhead">${['L','M','M','J','V','S','D'].map(x=>`<div>${x}</div>`).join('')}<div>Sem.</div></div>
     ${rows}
     <div class="week-foot"><span class="lg"><i class="d"></i>Jour</span><span class="lg"><i class="n"></i>Nuit</span><span class="lg"><i class="r"></i>Repos</span>
-      <span class="week-total">${hhmm2(mMin)} / mois</span></div>
+      <span class="week-total">${hhmm2(mMin)} / mois${mLeave? `<small class="lv-sub">dont congés ${hhmm2(mLeave)}</small>` : ''}</span></div>
     ${toVal? `<div class="d-note" style="text-align:left">Les jours entourés en orange ont un service à valider.</div>` : ''}
     <button class="btn btn-block" onclick="openPdfExportFor('${ym}')">${I.pdf} Exporter ce mois en PDF</button>
   </div>`;
@@ -1814,7 +1840,11 @@ async function buildPlanningPdf(ym){
   header(true);
   // lignes : services + congés, groupés par semaine
   const items = list.map(s=>({ kind:'shift', date:s.date, key:sStart(s).getTime(), s }))
-    .concat(abs.map(a=>({ kind:'abs', date:a.from<ym+'-01'? ym+'-01' : a.from, key:new Date((a.from<ym+'-01'? ym+'-01':a.from)+'T00:00:00').getTime(), a })))
+    .concat(abs.flatMap(a=>{
+      const days = a.kind==='paid' ? (a.leaveDays||[]).filter(d=>d.date.slice(0,7)===ym) : [];
+      if(days.length) return days.map(d=>({ kind:'leaveday', date:d.date, key:new Date(d.date+'T00:00:00').getTime(), a, mins:Math.round(d.hours*60) }));
+      return [{ kind:'abs', date:a.from<ym+'-01'? ym+'-01' : a.from, key:new Date((a.from<ym+'-01'? ym+'-01':a.from)+'T00:00:00').getTime(), a }];
+    }))
     .sort((p,q)=>p.key-q.key);
   let lastWk='', zebra=false;
   if(!items.length){ doc.setTextColor(107,114,128); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text('Aucun service publié sur ce mois.', M+2, y+4); y+=10; }
@@ -1842,6 +1872,12 @@ async function buildPlanningPdf(ym){
       put(s.start+' – '+s.end+(overnight?' (+1)':''), cols[3]);
       const m=paidMinutes(s); put(Math.floor(m/60)+'h'+pad(m%60), cols[4]);
       doc.setTextColor(...stc); doc.setFont('helvetica','bold'); put(stl, cols[5]);
+    } else if(it.kind==='leaveday'){
+      put(dLabel(it.date), cols[0]);
+      doc.setTextColor(109,40,217); doc.setFont('helvetica','bold'); put('Congé payé', cols[1]);
+      doc.setTextColor(107,114,128); doc.setFont('helvetica','normal'); put('—', cols[2]); put('—', cols[3]);
+      doc.setTextColor(17,24,39); put(Math.floor(it.mins/60)+'h'+pad(it.mins%60), cols[4]);
+      doc.setTextColor(21,128,61); doc.setFont('helvetica','bold'); put('Accepté', cols[5]);
     } else {
       const a=it.a;
       put(a.from===a.to? dLabel(a.from) : dmy(a.from)+' au '+dmy(a.to), cols[0]);
@@ -1853,7 +1889,8 @@ async function buildPlanningPdf(ym){
   });
 
   // Récapitulatif
-  const planned=list.reduce((n,s)=>n+paidMinutes(s),0);
+  const leaveM=monthLeaveMinutes(ym);
+  const planned=list.reduce((n,s)=>n+paidMinutes(s),0) + leaveM;
   const validated=list.filter(s=>s.status==='Contrôlée').reduce((n,s)=>n+paidMinutes(s),0);
   const toVal=list.filter(needsConfirm).length;
   ensure(30); y+=4;
@@ -1862,7 +1899,7 @@ async function buildPlanningPdf(ym){
   doc.text('Récapitulatif du mois', M+4, y+6);
   doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(55,65,81);
   const hm=m=>Math.floor(m/60)+'h'+pad(m%60);
-  doc.text(pdfTxt(list.length+' service'+(list.length>1?'s':'')+' · '+hm(planned)+' planifiées (pauses non payées déduites) · dont '+hm(validated)+' validées'+(abs.length? ' · '+abs.length+' congé'+(abs.length>1?'s':'')+'/absence'+(abs.length>1?'s':''):'')), M+4, y+12);
+  doc.text(pdfTxt(list.length+' service'+(list.length>1?'s':'')+' · '+hm(planned)+' payées (pauses non payées déduites)'+(leaveM? ', dont '+hm(leaveM)+' de congés payés' : '')+' · '+hm(validated)+' validées'+(abs.length? ' · '+abs.length+' congé'+(abs.length>1?'s':'')+'/absence'+(abs.length>1?'s':''):'')), M+4, y+12);
   if(toVal){ doc.setTextColor(180,83,9); doc.text(pdfTxt(toVal+' service'+(toVal>1?'s':'')+' encore à valider dans l\'application.'), M+4, y+18); }
   y+= toVal?26:20;
   doc.setTextColor(156,163,175); doc.setFontSize(8);
