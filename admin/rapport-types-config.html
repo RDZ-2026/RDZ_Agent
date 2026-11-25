@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-types-config · v2 · 2026-11-25 · nouveaux types de question 📷 Photo / 📅 Date / 🔢 Nombre (plage min/max facultative) ; conditions d'affichage multiples (ET / OU, colonne rapport_champs.conditions) ; avertissement avant de renommer ou supprimer une question/une réponse d'un type « hdlt-… » (les mails automatiques de l'Hôpital de La Tour en dépendent) ; module_id enfin enregistré (voir migration-rapports-photo-date-nombre-conditions.sql) — la suppression d'un type annonce donc le nombre de boutons du journal supprimés avec lui. -->
 <!-- RDZ · rapport-types-config · v1 · 2026-09-28
      Retour Laurent : il veut pouvoir créer LUI-MÊME de nouveaux types de
      rapports (ex. "Création de badge"), avec leurs propres questions, sans
@@ -114,6 +115,17 @@ textarea{min-height:70px;resize:vertical;line-height:1.45}
 .opt-row{display:flex;gap:8px;margin-bottom:8px}
 .opt-row input{flex:1}
 .opt-row button{background:none;border:1px solid #eab8b8;color:var(--danger);border-radius:var(--radius-ui);padding:0 10px;cursor:pointer}
+.badge.photo{background:#eef2f7;color:#3b5b7a}
+.badge.date{background:#eaf5ec;color:#1b7a3d}
+.badge.nombre{background:#fff3d9;color:var(--warn)}
+.minmax-row{display:flex;gap:10px}
+.minmax-row>div{flex:1}
+.cond-row{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}
+.cond-row>select,.cond-row>.cond-val{flex:1;min-width:0}
+.cond-row>button{background:none;border:1px solid #eab8b8;color:var(--danger);border-radius:var(--radius-ui);padding:10px;cursor:pointer}
+.cond-mode{display:flex;gap:8px;margin:4px 0 10px}
+.cond-mode label{display:flex;align-items:center;gap:6px;font-size:13px;text-transform:none;font-weight:normal;color:var(--ink);margin:0}
+.hdlt-note{background:#fff8e6;border:1px solid #ecd9a0;color:#8a6d1a;border-radius:var(--radius-ui);padding:9px 11px;font-size:12.5px;line-height:1.45;margin-bottom:12px}
 .btn-mini{background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:8px 12px;font-size:13px;font-weight:bold;cursor:pointer;color:var(--ink)}
 .form-actions{display:flex;gap:10px;margin-top:16px}
 .btn-primary{flex:1;background:var(--red);color:#fff;border:none;border-radius:var(--radius-ui);padding:13px;font-size:14.5px;font-weight:bold;cursor:pointer}
@@ -205,7 +217,13 @@ const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const TYPE_LABELS = { texte:'Texte court', zone_texte:'Texte long', choix:'Choix (boutons)', case:'Case à cocher', heure:'Horodatage' };
+const TYPE_LABELS = { texte:'Texte court', zone_texte:'Texte long', choix:'Choix (boutons)', case:'Case à cocher', heure:'Horodatage', photo:'Photo', date:'Date', nombre:'Nombre' };
+const ALL_TYPES = ['texte','zone_texte','choix','case','heure','photo','date','nombre'];
+/* Types « hdlt-… » : chaque question / réponse est lue par les règles d'envoi
+   des mails de l'Hôpital de La Tour (champ_id + libellé + texte exact des
+   options). Renommer ou supprimer sans prévenir = un mail qui ne part plus. */
+function isHdlt(){ return !!(currentType && /^hdlt-/i.test(currentType.slug||'')); }
+const HDLT_WARN = "⚠ Rapport de l'Hôpital de La Tour : des mails automatiques partent selon les questions et le texte exact des réponses.\n";
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function show(id){ ['s-home','s-type'].forEach(s=>{ document.getElementById(s).classList.toggle('hidden', s!==id); }); window.scrollTo(0,0); }
@@ -319,7 +337,15 @@ async function saveType(id){
 
 async function deleteType(){
   if(!currentType) return;
-  if(!confirm(`Supprimer définitivement « ${currentType.nom} » ? Les catégories et questions de ce type seront supprimées. Les rapports déjà enregistrés avec ce type restent dans la supervision, mais le bouton du journal de bord cessera de fonctionner.`)) return;
+  let nbBoutons = 0;
+  if(currentType.module_id){
+    try{ const { count } = await sb.from('journal_activites').select('id', { count:'exact', head:true }).eq('module_id', currentType.module_id); nbBoutons = count||0; }catch(e){}
+  }
+  let msg = `Supprimer définitivement « ${currentType.nom} » ? Les catégories et questions de ce type seront supprimées. Les rapports déjà enregistrés avec ce type restent dans la supervision.`
+    + (nbBoutons ? `\n\n${nbBoutons} bouton(s) du journal de bord (un par site) seront aussi supprimés.` : '');
+  if(isHdlt()) msg = HDLT_WARN + "Supprimer ce type arrête tous ses mails automatiques.\n\n" + msg;
+  if(!confirm(msg)) return;
+  if(isHdlt() && prompt('Pour confirmer, tape le mot SUPPRIMER') !== 'SUPPRIMER') return;
   try{
     if(currentType.module_id){
       await sb.from('journal_activites').delete().eq('module_id', currentType.module_id);
@@ -491,7 +517,19 @@ function siblingsOf(it){
       (it.parent_id ? true : (x.categorie_id||null)===(it.categorie_id||null)) )
     .sort((a,b)=>(a.ordre||0)-(b.ordre||0));
 }
+function ruleLabel(champId, valeur){
+  const q = items.find(x=>x.id===champId);
+  if(!q) return 'question supprimée';
+  if(q.type==='case' && !(Array.isArray(q.options) && q.options.length)) return `« ${esc(q.libelle)} » = ${valeur==='non'?'Non':'Oui'}`;
+  if(q.type==='case') return `« ${esc(q.libelle)} » : « ${esc(valeur||'')} » cochée`;
+  if(q.type==='photo') return `« ${esc(q.libelle)} » : photo prise`;
+  if(valeur) return `« ${esc(q.libelle)} » = ${esc(valeur)}`;
+  return `« ${esc(q.libelle)} » renseignée`;
+}
 function conditionLabel(it){
+  if(it.conditions && Array.isArray(it.conditions.regles) && it.conditions.regles.length){
+    return it.conditions.regles.map(r=>ruleLabel(r.champ_id, r.valeur)).join(it.conditions.mode==='ou' ? ' <b>OU</b> ' : ' <b>ET</b> ');
+  }
   const parent = items.find(x=>x.id===it.parent_id);
   if(!parent) return 'question parente introuvable';
   if(parent.type==='case') return (it.condition_valeur==='non') ? `« ${esc(parent.libelle)} » = Non` : `« ${esc(parent.libelle)} » = Oui`;
@@ -528,7 +566,8 @@ function renderNode(it, depth, childrenOf){
   const badge = `<span class="badge ${it.type||'texte'}">${esc(TYPE_LABELS[it.type]||it.type)}</span>`;
   const reqBadge = it.obligatoire ? '<span class="badge req">Obligatoire</span>' : '';
   const offBadge = !it.actif ? '<span class="badge off">Inactive</span>' : '';
-  const sub = ((it.type==='choix'||it.type==='case') && Array.isArray(it.options) && it.options.length) ? 'Réponses : '+it.options.join(' / ') : '';
+  const sub = ((it.type==='choix'||it.type==='case') && Array.isArray(it.options) && it.options.length) ? 'Réponses : '+it.options.join(' / ')
+    : (it.type==='nombre' && (it.valeur_min!=null || it.valeur_max!=null)) ? 'Plage normale : ' + (it.valeur_min!=null?it.valeur_min:'…') + ' – ' + (it.valeur_max!=null?it.valeur_max:'…') : '';
   const condNote = it.parent_id ? `<div class="t2" style="font-style:italic">Condition : ${conditionLabel(it)}</div>` : '';
   let html = `<div class="list-item" style="margin-left:${depth*20}px">
     <div class="body">
@@ -581,9 +620,13 @@ async function moveItem(id, dir){
 async function deleteItem(id){
   const it = items.find(x=>x.id===id);
   const descendants = it ? collectDescendants(id, items) : [];
-  const msg = descendants.length
+  let msg = descendants.length
     ? `Supprimer cette question et ${descendants.length} question(s) imbriquée(s) sous elle ?`
     : 'Supprimer cette question ?';
+  const gone = new Set([id, ...descendants]);
+  const refs = items.filter(x=>!gone.has(x.id) && x.conditions && Array.isArray(x.conditions.regles) && x.conditions.regles.some(r=>gone.has(r.champ_id)));
+  if(refs.length) msg += `\n\nAttention : ${refs.length} autre(s) question(s) l'utilisent dans leurs conditions (${refs.map(r=>'« '+r.libelle+' »').join(', ')}). Cette condition sera ignorée.`;
+  if(isHdlt()) msg = HDLT_WARN + "Supprimer une question empêche les mails qui en dépendent de partir.\n\n" + msg;
   if(!confirm(msg)) return;
   try{
     const { error } = await sb.from('rapport_champs').delete().in('id', [id, ...descendants]);
@@ -608,6 +651,7 @@ function openItemForm(it){
   const html = `
     <div class="panel">
       <div class="panel-title">${editing?'Modifier':'Nouvelle'} question</div>
+      ${isHdlt()?`<div class="hdlt-note">⚠ <b>Rapport de l'Hôpital de La Tour.</b> Des mails automatiques partent selon les questions et le <b>texte exact</b> des réponses. Ne renomme pas une question ou une réponse existante sans prévenir : la règle d'envoi correspondante cesserait de fonctionner.</div>`:''}
 
       <div class="field">
         <label>Question parente <span class="hint">(facultatif — pour une question qui n'apparaît que si une autre y répond d'une certaine façon)</span></label>
@@ -636,7 +680,11 @@ function openItemForm(it){
           <button type="button" id="if-type-choix" class="${type==='choix'?'sel':''}" onclick="setItemType('choix')">🔀 Choix</button>
           <button type="button" id="if-type-case" class="${type==='case'?'sel':''}" onclick="setItemType('case')">☑ Case à cocher</button>
           <button type="button" id="if-type-heure" class="${type==='heure'?'sel':''}" onclick="setItemType('heure')">🕐 Horodatage</button>
+          <button type="button" id="if-type-photo" class="${type==='photo'?'sel':''}" onclick="setItemType('photo')">📷 Photo</button>
+          <button type="button" id="if-type-date" class="${type==='date'?'sel':''}" onclick="setItemType('date')">📅 Date</button>
+          <button type="button" id="if-type-nombre" class="${type==='nombre'?'sel':''}" onclick="setItemType('nombre')">🔢 Nombre</button>
         </div>
+        <div class="hint" id="if-type-hint" style="margin-top:6px"></div>
       </div>
       <div class="field"><label>Libellé *</label><input type="text" id="if-libelle" value="${it?esc(it.libelle):''}" placeholder="Ex. Numéro du badge remis"></div>
 
@@ -645,6 +693,14 @@ function openItemForm(it){
         <div class="hint" id="if-options-hint" style="margin:-4px 0 8px"></div>
         <div id="if-options-list"></div>
         <button type="button" class="btn-mini" onclick="addOptionRow()">➕ Ajouter une réponse</button>
+      </div>
+
+      <div id="if-minmax-wrap" class="field ${type==='nombre'?'':'hidden'}">
+        <label>Plage normale <span class="hint">(facultatif — hors plage, l'agent est averti mais peut quand même enregistrer)</span></label>
+        <div class="minmax-row">
+          <div><input type="text" inputmode="decimal" id="if-min" placeholder="Minimum (ex. 6.8)" value="${it&&it.valeur_min!=null?esc(it.valeur_min):''}"></div>
+          <div><input type="text" inputmode="decimal" id="if-max" placeholder="Maximum (ex. 7.6)" value="${it&&it.valeur_max!=null?esc(it.valeur_max):''}"></div>
+        </div>
       </div>
 
       <div class="chk-row"><input type="checkbox" id="if-obligatoire" ${(it&&it.obligatoire)?'checked':''}><label for="if-obligatoire" style="margin:0;text-transform:none;font-weight:normal;color:var(--ink)">Obligatoire (avertissement à l'agent si non répondue)</label></div>
@@ -661,8 +717,22 @@ function openItemForm(it){
   holder.innerHTML = html;
   window._itemOptions = (opts && opts.length) ? opts.slice() : (type==='choix' ? ['',''] : []);
   window._itemCondValeur = it ? (it.condition_valeur||'') : '';
+  window._itemEditing = it || null;
+  // Conditions supplémentaires (chantier 3) : la règle portant sur la question
+  // parente reste dans le sélecteur habituel ; les autres sont listées à part.
+  const cond = it && it.conditions && Array.isArray(it.conditions.regles) ? it.conditions : null;
+  window._itemMode = cond && cond.mode==='ou' ? 'ou' : 'et';
+  window._itemRules = [];
+  if(cond){
+    let parentRuleUsed = false;
+    cond.regles.forEach(r=>{
+      if(!parentRuleUsed && it.parent_id && r.champ_id===it.parent_id){ parentRuleUsed = true; window._itemCondValeur = r.valeur==null ? '' : String(r.valeur); return; }
+      window._itemRules.push({ champ_id: r.champ_id, valeur: r.valeur==null ? '' : String(r.valeur) });
+    });
+  }
   renderOptionRows();
   updateOptionsHint(type);
+  updateTypeHint(type);
   onParentChange();
   holder.scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -670,43 +740,100 @@ function toggleCatWrapVisibility(){
   const hasParent = !!document.getElementById('if-parent').value;
   document.getElementById('if-cat-wrap').classList.toggle('hidden', hasParent);
 }
+/* Contrôle « valeur attendue » d'une règle, selon le type de la question visée.
+   Mêmes valeurs que condition_valeur : case simple → "oui"/"non" ; case à
+   options / choix → texte exact de l'option ; autres types → texte exact,
+   ou vide = « dès qu'une réponse est donnée ». */
+function condValueHtml(target, cur, elId){
+  if(target && target.type==='case' && Array.isArray(target.options) && target.options.length){
+    return `<select id="${elId}">${target.options.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>Si « ${esc(o)} » est cochée</option>`).join('')}</select>`;
+  }
+  if(target && target.type==='case'){
+    return `<select id="${elId}">
+        <option value="oui" ${cur!=='non'?'selected':''}>Si la case est cochée (Oui)</option>
+        <option value="non" ${cur==='non'?'selected':''}>Si la case n'est PAS cochée (Non)</option>
+      </select>`;
+  }
+  if(target && target.type==='choix' && Array.isArray(target.options)){
+    return `<select id="${elId}">${target.options.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>Si la réponse est « ${esc(o)} »</option>`).join('')}</select>`;
+  }
+  if(target && target.type==='photo'){
+    return `<input type="hidden" id="${elId}" value=""><div class="hint" style="padding:10px 0">Dès qu'une photo est prise</div>`;
+  }
+  return `<input type="text" id="${elId}" value="${esc(cur)}" placeholder="Vide = dès qu'une réponse est saisie">`;
+}
 function onParentChange(){
   const parentId = document.getElementById('if-parent').value;
   toggleCatWrapVisibility();
   const wrap = document.getElementById('if-condition-wrap');
-  if(!parentId){ wrap.classList.add('hidden'); wrap.innerHTML=''; return; }
+  if(!parentId){ wrap.classList.add('hidden'); wrap.innerHTML=''; window._itemRules = []; return; }
   const parent = items.find(x=>x.id===parentId);
   wrap.classList.remove('hidden');
   const cur = window._itemCondValeur || '';
-  if(parent && parent.type==='case' && Array.isArray(parent.options) && parent.options.length){
-    wrap.innerHTML = `<label>Condition d'affichage</label>
-      <select id="if-cond-valeur">
-        ${parent.options.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>Si « ${esc(o)} » est cochée</option>`).join('')}
-      </select>`;
-  } else if(parent && parent.type==='case'){
-    wrap.innerHTML = `<label>Condition d'affichage</label>
-      <select id="if-cond-valeur">
-        <option value="oui" ${cur!=='non'?'selected':''}>Si la case est cochée (Oui)</option>
-        <option value="non" ${cur==='non'?'selected':''}>Si la case n'est PAS cochée (Non)</option>
-      </select>`;
-  } else if(parent && parent.type==='choix' && Array.isArray(parent.options)){
-    wrap.innerHTML = `<label>Condition d'affichage</label>
-      <select id="if-cond-valeur">
-        ${parent.options.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>Si la réponse est « ${esc(o)} »</option>`).join('')}
-      </select>`;
-  } else {
-    wrap.innerHTML = `<label>Condition d'affichage <span class="hint">(facultatif)</span></label>
-      <input type="text" id="if-cond-valeur" value="${esc(cur)}" placeholder="Laisser vide = dès qu'une réponse est saisie">
-      <div class="hint" style="margin-top:4px">Ou une valeur précise pour n'apparaître que si la réponse est exactement celle-ci.</div>`;
-  }
+  const generic = parent && !['case','choix','photo'].includes(parent.type);
+  wrap.innerHTML = `<label>Condition d'affichage${generic?' <span class="hint">(facultatif)</span>':''}</label>
+    <div class="hint" style="margin:-2px 0 6px">« ${esc(parent?parent.libelle:'?')} »</div>
+    ${condValueHtml(parent, cur, 'if-cond-valeur')}
+    ${generic?'<div class="hint" style="margin-top:4px">Ou une valeur précise pour n\'apparaître que si la réponse est exactement celle-ci.</div>':''}
+    <div id="if-rules-box" style="margin-top:12px"></div>`;
+  renderRules();
 }
+/* Candidats pour une règle supplémentaire : toutes les questions sauf
+   celle-ci et ses sous-questions (évite une boucle). */
+function ruleCandidates(){
+  const it = window._itemEditing;
+  const excluded = new Set(it ? [it.id, ...collectDescendants(it.id, items)] : []);
+  return items.filter(x=>!excluded.has(x.id));
+}
+function saveRuleValuesFromDom(){
+  (window._itemRules||[]).forEach((r,i)=>{ const el = document.getElementById('if-rule-val-'+i); if(el) r.valeur = el.value; });
+  const m = document.querySelector('input[name="if-mode"]:checked'); if(m) window._itemMode = m.value;
+  const c = document.getElementById('if-cond-valeur'); if(c) window._itemCondValeur = c.value;
+}
+function renderRules(){
+  const box = document.getElementById('if-rules-box'); if(!box) return;
+  const rules = window._itemRules || [];
+  const cands = ruleCandidates();
+  let html = '';
+  if(rules.length){
+    html += `<div class="cond-mode">
+      <label><input type="radio" name="if-mode" value="et" ${window._itemMode!=='ou'?'checked':''} style="width:auto"> Toutes les conditions (ET)</label>
+      <label><input type="radio" name="if-mode" value="ou" ${window._itemMode==='ou'?'checked':''} style="width:auto"> Au moins une (OU)</label>
+    </div>`;
+    html += rules.map((r,i)=>{
+      const target = items.find(x=>x.id===r.champ_id);
+      return `<div class="cond-row">
+        <select onchange="setRuleChamp(${i}, this.value)">
+          <option value="">— Question —</option>
+          ${cands.map(c=>`<option value="${c.id}" ${c.id===r.champ_id?'selected':''}>${esc(c.libelle)}</option>`).join('')}
+        </select>
+        <div class="cond-val">${target ? condValueHtml(target, r.valeur||'', 'if-rule-val-'+i) : '<div class="hint" style="padding:10px 0">Choisis une question</div>'}</div>
+        <button type="button" title="Retirer cette condition" onclick="removeRule(${i})">✕</button>
+      </div>`;
+    }).join('');
+  }
+  html += `<button type="button" class="btn-mini" onclick="addRule()" style="padding:6px 10px;font-size:12px">➕ Ajouter une autre condition</button>`;
+  box.innerHTML = html;
+}
+function addRule(){ saveRuleValuesFromDom(); (window._itemRules = window._itemRules||[]).push({ champ_id:'', valeur:'' }); renderRules(); }
+function removeRule(i){ saveRuleValuesFromDom(); window._itemRules.splice(i,1); renderRules(); }
+function setRuleChamp(i, id){ saveRuleValuesFromDom(); window._itemRules[i] = { champ_id:id, valeur:'' }; renderRules(); }
 function toggleNewCatInput(){ document.getElementById('if-new-cat').classList.toggle('hidden'); }
 function setItemType(t){
-  ['texte','zone_texte','choix','case','heure'].forEach(x=>{
+  ALL_TYPES.forEach(x=>{
     document.getElementById('if-type-'+x).classList.toggle('sel', t===x);
   });
   document.getElementById('if-options-wrap').classList.toggle('hidden', t!=='choix' && t!=='case');
+  document.getElementById('if-minmax-wrap').classList.toggle('hidden', t!=='nombre');
   updateOptionsHint(t);
+  updateTypeHint(t);
+}
+function updateTypeHint(t){
+  const el = document.getElementById('if-type-hint'); if(!el) return;
+  el.textContent = t==='photo' ? "L'agent répond en prenant une ou plusieurs photos avec l'appareil photo du téléphone (pas de galerie). Cocher « Obligatoire » pour exiger au moins une photo."
+    : t==='date' ? "L'agent choisit une date (bouton « Aujourd'hui » pour aller plus vite)."
+    : t==='nombre' ? "L'agent saisit un nombre (virgule ou point acceptés). Plage normale facultative ci-dessous."
+    : '';
 }
 function updateOptionsHint(t){
   const lbl = document.getElementById('if-options-label');
@@ -737,7 +864,14 @@ async function saveItem(id){
   const err = document.getElementById('questions-err'); err.innerHTML='';
   const libelle = document.getElementById('if-libelle').value.trim();
   if(!libelle){ err.innerHTML = '<div class="err">Le libellé est obligatoire.</div>'; return; }
-  const type = ['texte','zone_texte','choix','case','heure'].find(x=>document.getElementById('if-type-'+x).classList.contains('sel')) || 'texte';
+  const type = ALL_TYPES.find(x=>document.getElementById('if-type-'+x).classList.contains('sel')) || 'texte';
+  let valeurMin = null, valeurMax = null;
+  if(type==='nombre'){
+    const pn = v => { v = String(v||'').trim().replace(',', '.'); if(!v) return null; const n = Number(v); return isFinite(n) ? n : NaN; };
+    valeurMin = pn(document.getElementById('if-min').value); valeurMax = pn(document.getElementById('if-max').value);
+    if(Number.isNaN(valeurMin) || Number.isNaN(valeurMax)){ err.innerHTML = '<div class="err">Le minimum et le maximum doivent être des nombres (ex. 6.8).</div>'; return; }
+    if(valeurMin!=null && valeurMax!=null && valeurMin>valeurMax){ err.innerHTML = '<div class="err">Le minimum doit être plus petit que le maximum.</div>'; return; }
+  }
   const optionable = type==='choix' || type==='case';
   const rawOptions = optionable ? window._itemOptions.map(o=>o.trim()).filter(Boolean) : [];
   if(type==='choix' && rawOptions.length<2){
@@ -752,6 +886,29 @@ async function saveItem(id){
   const parentId = document.getElementById('if-parent').value || null;
   const condEl = document.getElementById('if-cond-valeur');
   const conditionValeur = (parentId && condEl) ? (condEl.value || null) : null;
+  // Conditions multiples : seulement s'il y a au moins une règle en plus de la
+  // question parente. Sinon conditions = null → comportement d'avant.
+  saveRuleValuesFromDom();
+  const extra = parentId ? (window._itemRules||[]).filter(r=>r.champ_id) : [];
+  const conditions = extra.length ? {
+    mode: window._itemMode==='ou' ? 'ou' : 'et',
+    regles: [{ champ_id: parentId, valeur: conditionValeur }].concat(extra.map(r=>({ champ_id: r.champ_id, valeur: (r.valeur===''||r.valeur==null) ? null : r.valeur })))
+  } : null;
+
+  // Garde-fou HDLT : renommer une question ou le texte d'une réponse casse la
+  // règle d'envoi correspondante (sans erreur visible).
+  if(id && isHdlt()){
+    const old = items.find(x=>x.id===id);
+    if(old){
+      const changes = [];
+      if((old.libelle||'') !== libelle) changes.push(`question renommée : « ${old.libelle} » → « ${libelle} »`);
+      if((old.type||'texte') !== type) changes.push(`type changé : ${TYPE_LABELS[old.type]||old.type} → ${TYPE_LABELS[type]||type}`);
+      const oldOpts = Array.isArray(old.options) ? old.options : [];
+      const lost = oldOpts.filter(o=>!rawOptions.includes(o));
+      if(lost.length) changes.push('réponse(s) renommée(s) ou retirée(s) : ' + lost.map(o=>`« ${o} »`).join(', '));
+      if(changes.length && !confirm(HDLT_WARN + '\nCette modification touche :\n- ' + changes.join('\n- ') + "\n\nLes mails liés cesseront de partir tant que les règles d'envoi ne sont pas mises à jour dans le module Rapports (Direction & Administration).\n\nEnregistrer quand même ?")) return;
+    }
+  }
 
   let categorieId = null;
   if(!parentId){
@@ -774,12 +931,12 @@ async function saveItem(id){
 
   try{
     if(id){
-      const row = { libelle, type, options, obligatoire, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur };
+      const row = { libelle, type, options, obligatoire, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur, conditions, valeur_min: valeurMin, valeur_max: valeurMax };
       const { error } = await sb.from('rapport_champs').update(row).eq('id', id);
       if(error) throw error;
     } else {
       const maxOrdre = items.reduce((m,i)=>Math.max(m, i.ordre||0), 0);
-      const row = { rapport_type_id: currentType.id, site_id: null, libelle, type, options, obligatoire, ordre: maxOrdre+10, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur };
+      const row = { rapport_type_id: currentType.id, site_id: null, libelle, type, options, obligatoire, ordre: maxOrdre+10, actif, parent_id: parentId, categorie_id: categorieId, condition_valeur: conditionValeur, conditions, valeur_min: valeurMin, valeur_max: valeurMax };
       const { error } = await sb.from('rapport_champs').insert(row);
       if(error) throw error;
     }
