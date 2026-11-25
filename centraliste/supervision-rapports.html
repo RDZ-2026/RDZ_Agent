@@ -1,3 +1,4 @@
+<!-- v40 · 2026-11-25 · nouveaux types de question des rapports personnalisés : 📷 Photo (valeur = liste d'id journal_photos, affichée « n photo(s) » — les images restent dans la galerie du rapport), 📅 Date (affichée JJ.MM.AAAA), 🔢 Nombre. « Modifier » : réponse Photo en lecture seule (ses id ne sont jamais effacés), Date en sélecteur de date, Nombre relu comme vrai nombre. -->
 <!-- v39 · 2026-10-30 · Modifier : ordre des photos réglable par glisser-déposer (ordinateur) ou flèches ◀ ▶ (tablette / téléphone), numéro affiché sur chaque vignette. Enregistré aussitôt dans journal_photos.ordre ; le détail, l'impression/PDF et l'export suivent cet ordre. Les photos jamais réordonnées restent dans l'ordre d'avant. Nécessite migration-ordre-photos.sql. -->
 <!-- v38 · 2026-10-23 · Modifier : Site, Activité et Localisation deviennent des menus déroulants, mêmes listes que côté agent (sites actifs ; journal_activites et journal_localisations du site, + communes à tous les sites) ; changer le site recharge les deux autres listes et met aussi à jour site_id. Une valeur actuelle absente des listes reste affichée et conservée. Rien d'autre ne change (aucun CSS ajouté). -->
 <!-- v37 · 2026-10-23 · « Type d'action » renommé « Constat » partout à l'écran (tableau, détail, Modifier, Classer, statistiques) — colonnes inchangées ; liste de secours du référentiel mise à jour (v2). Rien d'autre ne change. -->
@@ -1112,6 +1113,8 @@ function isCustomTypeReport(r){ return r.kind==='standard' && !!r.raw.rapport_ty
 function customTypeInfo(r){ return RAPPORT_TYPES[r.raw.rapport_type_id] || null; }
 function customTypeLabel(r){ const t = customTypeInfo(r); return t ? ((t.icone?t.icone+' ':'')+t.nom) : (r.raw.activite || 'Rapport'); }
 function reponseValueText(q){
+  if(q.type==='photo'){ const n = Array.isArray(q.valeur) ? q.valeur.length : 0; return n ? n + ' photo(s) — voir les photos du rapport' : '—'; }
+  if(q.type==='date' && typeof q.valeur==='string' && /^\d{4}-\d{2}-\d{2}$/.test(q.valeur)) return q.valeur.split('-').reverse().join('.');
   if(Array.isArray(q.valeur)) return q.valeur.length ? q.valeur.join(', ') : '—';
   if(q.type==='case') return q.valeur ? 'Oui' : 'Non';
   if(q.valeur==null || q.valeur==='') return '—';
@@ -1650,6 +1653,15 @@ function renderReponsesEditHtml(r){
   if(!reponses.length) return '';
   const rows = qaGroupedHtml(reponses, q=>{
     const i = q._i;
+    if(q.type==='photo'){
+      return `<div class="efield"><label>${esc(q.libelle)}</label><div class="hint">${esc(reponseValueText(q))} (non modifiable ici)</div></div>`;
+    }
+    if(q.type==='date'){
+      return `<div class="efield"><label>${esc(q.libelle)}</label><input type="date" id="ef-rep-${i}" value="${esc(q.valeur||'')}"></div>`;
+    }
+    if(q.type==='nombre'){
+      return `<div class="efield"><label>${esc(q.libelle)}</label><input type="text" inputmode="decimal" id="ef-rep-${i}" value="${esc(q.valeur==null?'':String(q.valeur))}"></div>`;
+    }
     if(q.type==='case'){
       if(Array.isArray(q.valeur)){
         // Case à cocher avec liste (choix multiples) : toutes les options de la
@@ -1937,7 +1949,19 @@ async function saveEdit(id){
   if(isNewFormatAlarme(r) || isCustomTypeReport(r)){
     const reponses = parseReponses(r.raw.reponses).map((q,i)=>{
       let valeur = q.valeur;
-      if(Array.isArray(q.valeur)){
+      if(q.type==='photo'){
+        // lecture seule : on garde les id tels quels
+      } else if(q.type==='date'){
+        const el = document.getElementById('ef-rep-'+i);
+        if(el) valeur = el.value || null;
+      } else if(q.type==='nombre'){
+        const el = document.getElementById('ef-rep-'+i);
+        if(el){
+          const t = el.value.trim().replace(',', '.');
+          const n = Number(t);
+          valeur = t === '' ? null : (isFinite(n) ? n : q.valeur);
+        }
+      } else if(Array.isArray(q.valeur)){
         valeur = Array.from(document.querySelectorAll('.ef-rep-multi[data-repidx="'+i+'"]:checked')).map(el=>el.dataset.val);
       } else {
         const el = document.getElementById('ef-rep-'+i);
