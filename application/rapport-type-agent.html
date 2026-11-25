@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-type-agent · v3 · 2026-11-25 · (1) nouveaux types de question : 📷 Photo (appareil photo uniquement, valeur = liste des id journal_photos), 📅 Date (valeur "AAAA-MM-JJ"), 🔢 Nombre (valeur numérique, avertissement hors plage valeur_min/valeur_max) ; (2) rapports « hdlt-… » : les photos partent tout de suite (même en 4G) et AVANT le rapport, qui attend au plus 60 s de réseau — le mail automatique trouve donc les liens des photos (journal_photos.url) ; (3) conditions d'affichage multiples ET / OU (rapport_champs.conditions), compatibles avec parent_id/condition_valeur. RDZSync passe en v5 (compatible v4). -->
 <!-- RDZ · rapport-type-agent · 2026-10-20 · boutons à la fin du formulaire (plus flottants) ; brouillons : bouton « 💾 Enregistrer » (rapport gardé de côté, repris plus tard depuis l'encadré « Rapports en cours » ou depuis fin-de-service.html) + « ✓ Enregistrer et clôturer » (seul ce bouton transmet le rapport au centraliste). Brouillons dans la table rapports_brouillons + copie locale rdz_brouillons (hors ligne) — voir claude_migration-rapports-brouillons.sql. Photos d'un brouillon : journal_photos (entree_id = id du futur rapport). -->
 <!-- RDZ · rapport-type-agent · 2026-10-15 · bouton 🎤 Dicter rétabli sur les zones de texte et les légendes photo (dictée vocale du navigateur ; masqué si le téléphone ne la gère pas). 2026-10-10 · correctif heure de Genève : la date proposée/enregistrée était la date UTC (toISOString) — entre minuit et 2 h du matin, le rapport était daté de la VEILLE. Désormais date locale (ymdLocal). -->
 <!-- RDZ · rapport-type-agent · v1 · 2026-09-28
@@ -139,6 +140,17 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 .draft-toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
 .draft-toast.on{opacity:1}
 
+/* 2026-11-25 : questions Photo / Date / Nombre */
+.q-photo-btn{width:100%;background:#fff;border:1px solid var(--line);border-radius:var(--radius-ui);padding:12px;font-size:14px;font-weight:bold;cursor:pointer;color:var(--ink);font-family:var(--font)}
+.q-photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.q-photo-th{position:relative;width:84px;height:84px}
+.q-photo-th img,.q-photo-th .photo-wait{width:84px;height:84px;object-fit:cover;border-radius:var(--radius-ui);border:1px solid var(--line-soft)}
+.q-photo-th button{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:none;background:var(--danger);color:#fff;font-size:13px;font-weight:bold;cursor:pointer;line-height:26px;padding:0}
+.q-num-warn{font-size:12.5px;margin-top:6px;color:#8a6d1a}
+.q-num-warn.bad{color:var(--danger);font-weight:bold}
+.done-sync{font-size:13.5px;line-height:1.45;margin:-10px 0 20px;padding:10px 12px;border-radius:10px;background:#fff8e6;border:1px solid #ecd9a0;color:#5b4a1a}
+.done-sync.ok{background:#eef6ef;border-color:#bfe3c6;color:var(--ok)}
+
 /* 2026-10-20 : boutons à la fin du formulaire (plus de barre flottante en bas de l'écran) */
 .save-bar{position:static!important;background:none!important;padding:16px 0 8px!important;margin-top:12px}
 </style>
@@ -202,6 +214,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
         </div>
         <input type="file" id="photo-camera" accept="image/*" capture="environment" style="display:none">
         <input type="file" id="photo-gallery" accept="image/*" style="display:none">
+        <input type="file" id="qphoto-input" accept="image/*" capture="environment" style="display:none">
         <div id="photo-list"></div>
       </div>
 
@@ -217,6 +230,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
         <div class="big">✅</div>
         <h2>Rapport clôturé</h2>
         <p id="done-sub">Il a été transmis au centraliste.</p>
+        <div id="done-sync" class="done-sync hidden"></div>
         <a class="ci" href="journal-de-bord.html" style="display:block;text-decoration:none">↩ Retour au journal</a>
       </div>
     </section>
@@ -225,9 +239,19 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 
 <script>
 /* ============================================================================
-   RDZ · rdz-sync · v4 · file d'attente hors-ligne PARTAGÉE entre tous les modules
-   (copie de référence application/rdz-sync-v4.js, collée telle quelle — voir
+   RDZ · rdz-sync · v5 · file d'attente hors-ligne PARTAGÉE entre tous les modules
+   (copie de référence application/rdz-sync-v5.js, collée telle quelle — voir
    claude/instructions-projet.md)
+   v5 (2026-11-25), compatible v4 (mêmes clés localStorage, mêmes appels) :
+   - save({..., urgentPhotos:true}) : les photos de cette ligne partent tout
+     de suite, même en réseau mobile (pas d'attente du WiFi) ;
+   - save({..., waitForPhotoRows:[ids], maxWaitMs:60000}) : cette ligne attend
+     que les photos des lignes indiquées soient envoyées, au plus maxWaitMs
+     de réseau disponible (compté à partir du premier essai en ligne), puis
+     part quoi qu'il arrive. Une page encore en v4 ignore cette attente et
+     envoie la ligne tout de suite (rien n'est perdu) ;
+   - prioritize([ids]) : rend urgentes les photos déjà en file de ces lignes ;
+   - isPending(id) : vrai tant qu'une ligne ou une photo de cet id est en file.
    ============================================================================ */
 (function (global) {
   'use strict';
@@ -241,6 +265,8 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
   var _onChange = null;
   var _flushingText = false;
   var _flushingPhotos = false;
+  var _flushTextAgain = false;
+  var _retryTimer = null;
 
   function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
   function writeLS(key, arr) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {} notify(); }
@@ -338,6 +364,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
       photoField: item.photoField || null,
       bucket: item.bucket || null,
       pendingPhotos: item.photos || [],
+      urgent: !!item.urgentPhotos,
+      waitPhotoRows: (item.waitForPhotoRows && item.waitForPhotoRows.length) ? item.waitForPhotoRows.slice() : null,
+      holdMs: item.maxWaitMs || 60000,
+      holdUntil: null,
       ts: new Date().toISOString(),
       tries: 0
     };
@@ -346,15 +376,60 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
     return textEntry.id;
   }
 
+  function isPending(id) {
+    if (id == null) return false;
+    return readLS(Q_TEXT).some(function (x) { return x.row && x.row.id === id; }) ||
+           readLS(Q_PHOTO).some(function (p) { return p.rowId === id; });
+  }
+  function photosDone(ids) {
+    for (var k = 0; k < ids.length; k++) if (isPending(ids[k])) return false;
+    return true;
+  }
+  function scheduleRetry(ms) {
+    if (_retryTimer) clearTimeout(_retryTimer);
+    _retryTimer = setTimeout(function () { _retryTimer = null; flushText(); }, Math.max(200, ms));
+  }
+  function prioritize(ids) {
+    if (!ids || !ids.length) return;
+    var set = {}; ids.forEach(function (x) { set[x] = 1; });
+    var pq = readLS(Q_PHOTO), ch = false;
+    pq.forEach(function (p) { if (set[p.rowId] && !p.urgent) { p.urgent = true; ch = true; } });
+    if (ch) writeLS(Q_PHOTO, pq);
+    var tq = readLS(Q_TEXT); ch = false;
+    tq.forEach(function (t) { if (t.row && set[t.row.id] && !t.urgent) { t.urgent = true; ch = true; } });
+    if (ch) writeLS(Q_TEXT, tq);
+    flushPhotos(false); flushText();
+  }
+
   function flushText() {
-    if (_flushingText || !_client) return;
+    if (!_client) return;
+    if (_flushingText) { _flushTextAgain = true; return; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    _flushingText = true;
+    _flushingText = true; _flushTextAgain = false;
     var q = readLS(Q_TEXT); var i = 0;
 
     function next() {
-      if (i >= q.length) { _flushingText = false; return; }
+      if (i >= q.length) {
+        _flushingText = false;
+        if (_flushTextAgain) { _flushTextAgain = false; setTimeout(flushText, 0); }
+        return;
+      }
       var it = q[i];
+      // v5 : ligne qui attend ses photos (rapports HDLT) — on la saute tant
+      // que les photos ne sont pas parties, dans la limite de holdMs.
+      if (it.waitPhotoRows && it.waitPhotoRows.length && !photosDone(it.waitPhotoRows)) {
+        var cur0 = readLS(Q_TEXT);
+        var k0 = cur0.findIndex(function (x) { return x.id === it.id; });
+        var until = (k0 > -1 && cur0[k0].holdUntil) || it.holdUntil;
+        if (!until) {
+          until = Date.now() + (it.holdMs || 60000);
+          if (k0 > -1) { cur0[k0].holdUntil = until; writeLS(Q_TEXT, cur0); }
+        }
+        if (Date.now() < until) {
+          flushPhotos(false);   // relance les photos urgentes (échec réseau passager)
+          scheduleRetry(Math.min(until - Date.now() + 100, 5000)); i++; return next();
+        }
+      }
       var qb = _client.from(it.table);
       var req = (it.op === 'upsert')
         ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
@@ -378,11 +453,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
               pq.push({
                 id: uid(), module: it.module, table: it.table, rowId: rowId,
                 bucket: it.bucket, field: p.field || it.photoField, name: p.name || 'photo.jpg',
-                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0
+                dataUrl: p.dataUrl, ts: new Date().toISOString(), tries: 0,
+                urgent: !!it.urgent
               });
             });
             writeLS(Q_PHOTO, pq);
-            tryAutoPhotos();
+            if (it.urgent) flushPhotos(false); else tryAutoPhotos();
           }
         }
         i++; next();
@@ -398,13 +474,24 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 
   function flushPhotos(force) {
     if (_flushingPhotos || !_client) return;
-    if (!force && isWifi() !== true) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    _flushingPhotos = true;
     var q = readLS(Q_PHOTO); var i = 0;
+    // v5 : sans WiFi (et sans appui manuel), seules les photos urgentes partent.
+    if (!force && isWifi() !== true) {
+      q = q.filter(function (p) { return p.urgent; });
+      if (!q.length) return;
+    }
+    _flushingPhotos = true;
+    var done = {};
 
     function next() {
-      if (i >= q.length) { _flushingPhotos = false; return; }
+      if (i >= q.length) {
+        _flushingPhotos = false;
+        // Des photos urgentes arrivées pendant cet envoi ?
+        var more = readLS(Q_PHOTO).some(function (p) { return p.urgent && !done[p.id]; });
+        if (more) setTimeout(function () { flushPhotos(false); }, 0);
+        return;
+      }
       var p = q[i];
       var path = p.module + '/' + Date.now() + '_' + p.name;
       var blob = dataUrlToBlob(p.dataUrl);
@@ -423,6 +510,9 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
           if (idx > -1) cur.splice(idx, 1);
           writeLS(Q_PHOTO, cur);
           pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+          done[p.id] = 1;
+          // v5 : une ligne attend peut-être cette photo pour partir.
+          if (readLS(Q_TEXT).some(function (t) { return t.waitPhotoRows && t.waitPhotoRows.length; })) setTimeout(flushText, 0);
           i++; next();
         })
         .catch(function () {
@@ -446,6 +536,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#d71920;box-sh
 
   var API = {
     init: init, save: save, flushText: flushText, flushPhotos: flushPhotos,
+    prioritize: prioritize, isPending: isPending,
     getStatus: getStatus, QUEUE_KEYS: { text: Q_TEXT, photo: Q_PHOTO, log: Q_LOG }
   };
   (typeof window !== 'undefined' ? window : global).RDZSync = API;
@@ -473,6 +564,10 @@ const params = new URLSearchParams(location.search);
 const SITE_ID   = params.get('site_id') || '';
 const SITE_NOM  = params.get('site') || '';
 const TYPE_SLUG = params.get('type') || '';
+/* Rapports de l'Hôpital de La Tour : chaque clôture déclenche des mails
+   automatiques (déclencheur rpt_notify_dispatch sur journal_entrees). Leurs
+   photos partent donc tout de suite et AVANT le rapport (voir closeOp). */
+const IS_HDLT = /^hdlt-/i.test(TYPE_SLUG);
 
 let photos = [];
 let questions = [];   // [{id, libelle, type, options, obligatoire, valeur, categorie_id, parent_id, condition_valeur}]
@@ -553,13 +648,34 @@ async function loadQuestions(){
       id:c.id, libelle:c.libelle, type:c.type||'texte',
       options:Array.isArray(c.options)?c.options:[], obligatoire:!!c.obligatoire,
       categorie_id: c.categorie_id||null, parent_id: c.parent_id||null, condition_valeur: c.condition_valeur||null,
-      valeur: c.type==='case' ? (Array.isArray(c.options)&&c.options.length ? [] : false) : (c.type==='heure' ? null : '')
+      conditions: (c.conditions && Array.isArray(c.conditions.regles)) ? c.conditions : null,
+      valeur_min: c.valeur_min==null ? null : Number(c.valeur_min), valeur_max: c.valeur_max==null ? null : Number(c.valeur_max),
+      valeur: null
     }));
+    questions.forEach(q=>{ q.valeur = emptyValeur(q); });
     renderQuestions();
   }catch(e){ box.innerHTML = '<div class="err">Impossible de charger les questions (réseau ?).</div>'; }
 }
 
-/* ---------- Visibilité conditionnelle ("poupée russe") ---------- */
+/* Valeur vide selon le type — format enregistré dans journal_entrees.reponses :
+   case simple false · case à options [] · photo [] (id journal_photos) ·
+   heure / date / nombre null · texte et zone_texte ''. */
+function emptyValeur(q){
+  if(q.type==='case') return (Array.isArray(q.options) && q.options.length) ? [] : false;
+  if(q.type==='photo') return [];
+  if(q.type==='heure' || q.type==='date' || q.type==='nombre') return null;
+  return '';
+}
+function hasValue(v){ return Array.isArray(v) ? v.length>0 : !(v==='' || v==null || v===false); }
+
+/* ---------- Visibilité conditionnelle ("poupée russe") ----------
+   Une question est visible si sa question parente l'est, ET :
+   - sans `conditions` : la réponse de la parente correspond à condition_valeur
+     (comportement d'origine, inchangé) ;
+   - avec `conditions` {mode:'et'|'ou', regles:[{champ_id, valeur}]} : toutes
+     les règles (ET) ou au moins une (OU) sont remplies. Une règle n'est
+     remplie que si la question visée est elle-même visible. Une règle visant
+     une question introuvable (supprimée / inactive) est ignorée. */
 function qById(id){ return questions.find(q=>q.id===id); }
 function conditionMet(parent, childConditionValeur){
   if(!parent) return true;
@@ -576,18 +692,31 @@ function conditionMet(parent, childConditionValeur){
     if(!childConditionValeur) return !!parent.valeur;
     return parent.valeur === childConditionValeur;
   }
-  if(childConditionValeur) return String(parent.valeur||'') === childConditionValeur;
-  return !!(parent.valeur !== '' && parent.valeur != null && parent.valeur !== false);
-}
-function isVisible(q){
-  let cur = q;
-  while(cur.parent_id){
-    const parent = qById(cur.parent_id);
-    if(!parent) return true;
-    if(!conditionMet(parent, cur.condition_valeur)) return false;
-    cur = parent;
+  if(parent.type === 'photo') return Array.isArray(parent.valeur) && parent.valeur.length>0;
+  if(parent.type === 'nombre' && childConditionValeur!=null && childConditionValeur!==''){
+    const want = Number(String(childConditionValeur).replace(',','.'));
+    return parent.valeur!=null && isFinite(want) && parent.valeur === want;
   }
-  return true;
+  if(childConditionValeur) return String(parent.valeur==null ? '' : parent.valeur) === childConditionValeur;
+  return hasValue(parent.valeur);
+}
+function isVisible(q, stack){
+  stack = stack || new Set();
+  if(stack.has(q.id)) return false;   // boucle de conditions : on n'affiche pas
+  stack.add(q.id);
+  try{
+    const parent = q.parent_id ? qById(q.parent_id) : null;
+    if(parent && !isVisible(parent, stack)) return false;
+    const regles = (q.conditions && Array.isArray(q.conditions.regles)) ? q.conditions.regles : null;
+    if(regles && regles.length){
+      const actives = regles.filter(r=>r && qById(r.champ_id));
+      if(!actives.length) return true;
+      const ok = r => { const t = qById(r.champ_id); return isVisible(t, stack) && conditionMet(t, r.valeur==null ? null : String(r.valeur)); };
+      return q.conditions.mode==='ou' ? actives.some(ok) : actives.every(ok);
+    }
+    if(parent) return conditionMet(parent, q.condition_valeur);
+    return true;
+  } finally { stack.delete(q.id); }
 }
 function depthOf(q){
   let d=0, cur=q;
@@ -659,6 +788,32 @@ function renderOneQuestion(q, depth){
         <button type="button" class="q-heure-now" onclick="stampHeure('${q.id}')">🕐 Maintenant</button>
       </div></div>`;
   }
+  if(q.type==='photo'){
+    const ids = Array.isArray(q.valeur) ? q.valeur : [];
+    const thumbs = ids.map(pid=>{
+      const np = photos.find(p=>p.id===pid), sp = savedPhotos.find(p=>p.id===pid);
+      const src = np ? np.dataUrl : (sp ? (sp.url || sp._preview) : null);
+      return `<div class="q-photo-th">${src ? `<img src="${src}" alt="">` : `<div class="photo-wait">⏳<br>en attente<br>d'envoi</div>`}
+        <button type="button" title="Retirer" onclick="removeQPhoto('${q.id}','${pid}')">✕</button></div>`;
+    }).join('');
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <button type="button" class="q-photo-btn" onclick="takeQPhoto('${q.id}')">📷 ${ids.length ? 'Ajouter une photo' : 'Prendre une photo'}</button>
+      ${ids.length ? `<div class="q-photo-list">${thumbs}</div>` : ''}</div>`;
+  }
+  if(q.type==='date'){
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <div class="q-heure-row">
+        <input type="date" value="${esc(q.valeur||'')}" onchange="setDateVal('${q.id}',this.value)">
+        <button type="button" class="q-heure-now" onclick="setDateVal('${q.id}', ymdLocal())">📅 Aujourd'hui</button>
+      </div></div>`;
+  }
+  if(q.type==='nombre'){
+    const raw = q._raw!==undefined ? q._raw : (q.valeur==null ? '' : String(q.valeur));
+    const plage = (q.valeur_min!=null || q.valeur_max!=null) ? `<div class="hint">Plage normale : ${q.valeur_min!=null?q.valeur_min:'…'} – ${q.valeur_max!=null?q.valeur_max:'…'}</div>` : '';
+    return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
+      <input type="text" inputmode="decimal" value="${esc(raw)}" oninput="setNombre('${q.id}',this.value)" onblur="renderQuestions()">
+      ${plage}<div id="nw-${q.id}">${nombreWarnHtml(q)}</div></div>`;
+  }
   if(q.type==='zone_texte'){
     return `<div class="field${cls}"${style}><label>${esc(q.libelle)}${req}</label>
       <div class="dictable"><textarea id="qt-${q.id}" placeholder="Décrivez ou dictez…" oninput="setQValeur('${q.id}',this.value)" onblur="renderQuestions()">${esc(q.valeur||'')}</textarea><button type="button" class="mic" data-target="qt-${q.id}">🎤 Dicter</button></div></div>`;
@@ -677,6 +832,65 @@ function toggleCaseOption(id,opt){
 }
 function stampHeure(id){ const q=qById(id); q.valeur = nowHM(); renderQuestions(); }
 function setQValeur(id,val){ const q=qById(id); if(q) q.valeur = val; }
+function setDateVal(id,val){ const q=qById(id); if(!q) return; q.valeur = val || null; renderQuestions(); }
+/* Nombre : virgule ou point acceptés ; enregistré comme vrai nombre (7.2). */
+function parseNombre(raw){
+  const t = String(raw==null?'':raw).trim().replace(/\s/g,'').replace(',', '.');
+  if(!t) return { valeur:null, invalid:false };
+  const n = Number(t);
+  return isFinite(n) ? { valeur:n, invalid:false } : { valeur:null, invalid:true };
+}
+function horsPlage(q){
+  if(q.type!=='nombre' || q.valeur==null) return false;
+  return (q.valeur_min!=null && q.valeur < q.valeur_min) || (q.valeur_max!=null && q.valeur > q.valeur_max);
+}
+function nombreWarnHtml(q){
+  if(q._invalid) return `<div class="q-num-warn bad">Ce n'est pas un nombre (ex. 7.2).</div>`;
+  if(horsPlage(q)) return `<div class="q-num-warn">⚠ Hors plage normale (${q.valeur_min!=null?q.valeur_min:'…'} – ${q.valeur_max!=null?q.valeur_max:'…'}) : vérifie la mesure. Tu peux quand même enregistrer.</div>`;
+  return '';
+}
+function setNombre(id,raw){
+  const q=qById(id); if(!q) return;
+  const r = parseNombre(raw);
+  q._raw = raw; q.valeur = r.valeur; q._invalid = r.invalid;
+  const w = document.getElementById('nw-'+id); if(w) w.innerHTML = nombreWarnHtml(q);
+}
+/* Photo d'une question : appareil photo uniquement (pas de galerie). L'id de
+   la future ligne journal_photos est fixé tout de suite : c'est lui qui est
+   enregistré dans la réponse (valeur = liste d'id). */
+let qPhotoTarget = null;
+function takeQPhoto(id){ qPhotoTarget = id; document.getElementById('qphoto-input').click(); }
+async function onQPhotoPicked(input){
+  const file = input.files && input.files[0]; input.value='';
+  const q = qPhotoTarget ? qById(qPhotoTarget) : null;
+  if(!file || !q) return;
+  const dataUrl = await compressImage(file);
+  if(!Array.isArray(q.valeur)) q.valeur = [];
+  const pid = uid();
+  const n = q.valeur.length + 1;
+  photos.push({ id: pid, champ_id: q.id, name:'photo_'+pid+'.jpg', dataUrl, legende: q.libelle + (n>1 ? ' ('+n+')' : '') });
+  q.valeur.push(pid);
+  renderQuestions();
+}
+async function removeQPhoto(qid, pid){
+  const q = qById(qid); if(!q) return;
+  const ni = photos.findIndex(p=>p.id===pid);
+  if(ni>-1){ photos.splice(ni,1); }
+  else {
+    const si = savedPhotos.findIndex(p=>p.id===pid);
+    if(si>-1){
+      const ok = await removeSavedPhoto(si);
+      if(!ok) return;
+    }
+  }
+  q.valeur = (q.valeur||[]).filter(x=>x!==pid);
+  renderQuestions();
+}
+function questionPhotoIds(){
+  const out = new Set();
+  questions.forEach(q=>{ if(q.type==='photo' && Array.isArray(q.valeur)) q.valeur.forEach(id=>out.add(id)); });
+  return out;
+}
 
 /* ---------- photos ---------- */
 function compressImage(file){
@@ -701,16 +915,19 @@ async function onPhotoPicked(input){
   const file = input.files && input.files[0]; input.value='';
   if(!file) return;
   const dataUrl = await compressImage(file);
-  photos.push({ name:'photo_'+uid()+'.jpg', dataUrl, legende:'' });
+  const pid = uid();
+  photos.push({ id: pid, name:'photo_'+pid+'.jpg', dataUrl, legende:'' });
   renderPhotos();
 }
 document.getElementById('photo-camera').addEventListener('change', e=>onPhotoPicked(e.target));
 document.getElementById('photo-gallery').addEventListener('change', e=>onPhotoPicked(e.target));
+document.getElementById('qphoto-input').addEventListener('change', e=>onQPhotoPicked(e.target));
 
 function renderPhotos(){
   const box = document.getElementById('photo-list');
   // Photos déjà enregistrées (brouillon repris) puis nouvelles photos — 2026-10-20
-  const saved = savedPhotos.map((p,i)=>`
+  const qIds = questionPhotoIds();
+  const saved = savedPhotos.map((p,i)=> qIds.has(p.id) ? '' : `
     <div class="photo-item">
       ${(p.url||p._preview) ? `<img src="${p.url||p._preview}" alt="">` : `<div class="photo-wait">⏳<br>en attente<br>d'envoi</div>`}
       <div class="pmeta">
@@ -721,7 +938,7 @@ function renderPhotos(){
         <button type="button" class="rm" onclick="removeSavedPhoto(${i})">✕ Retirer</button>
       </div>
     </div>`).join('');
-  box.innerHTML = saved + photos.map((p,i)=>`
+  box.innerHTML = saved + photos.map((p,i)=> p.champ_id ? '' : `
     <div class="photo-item">
       <img src="${p.dataUrl}" alt="">
       <div class="pmeta">
@@ -735,6 +952,7 @@ function renderPhotos(){
   bindMics();
 }
 function removePhoto(i){ photos.splice(i,1); renderPhotos(); }
+function freePhotosCount(){ return photos.filter(p=>!p.champ_id).length; }
 
 /* ---------- dictée (Web Speech API, best-effort) ----------
    2026-10-15 : boutons 🎤 rétablis. Démarrage au toucher (pointerdown) pour
@@ -786,12 +1004,17 @@ function toggleDictation(id){
 function closeOp(){
   const err = document.getElementById('rapport-err'); err.innerHTML='';
   const ordered = buildOrderedVisibleList();
-  const manquantes = ordered.filter(({q})=>q.obligatoire && (q.valeur===''||q.valeur==null||q.valeur===false||(Array.isArray(q.valeur)&&!q.valeur.length)));
+  const manquantes = ordered.filter(({q})=>q.obligatoire && !hasValue(q.valeur));
+  const invalides = ordered.filter(({q})=>q.type==='nombre' && q._invalid);
+  const horsP = ordered.filter(({q})=>horsPlage(q));
 
-  if(!closeOp._confirmed && manquantes.length){
-    err.innerHTML = '<div class="warn-box"><b>Avant de clôturer :</b><ul style="margin:6px 0 0 18px">'
-      + manquantes.map(({q})=>`<li>${esc(q.libelle)}</li>`).join('')
-      + '</ul><div style="margin-top:8px">Ré-appuyez sur « Enregistrer et clôturer » pour confirmer quand même — ou « Enregistrer » pour compléter plus tard.</div></div>';
+  if(!closeOp._confirmed && (manquantes.length || invalides.length || horsP.length)){
+    const li = arr => arr.map(({q})=>`<li>${esc(q.libelle)}</li>`).join('');
+    err.innerHTML = '<div class="warn-box"><b>Avant de clôturer :</b>'
+      + (manquantes.length ? '<div style="margin-top:6px">Non renseigné :</div><ul style="margin:4px 0 0 18px">' + li(manquantes) + '</ul>' : '')
+      + (invalides.length ? '<div style="margin-top:6px">Nombre illisible (sera laissé vide) :</div><ul style="margin:4px 0 0 18px">' + li(invalides) + '</ul>' : '')
+      + (horsP.length ? '<div style="margin-top:6px">Hors plage normale, à vérifier :</div><ul style="margin:4px 0 0 18px">' + horsP.map(({q})=>`<li>${esc(q.libelle)} : ${esc(String(q.valeur))}</li>`).join('') + '</ul>' : '')
+      + '<div style="margin-top:8px">Ré-appuyez sur « Enregistrer et clôturer » pour confirmer quand même — ou « Enregistrer » pour compléter plus tard.</div></div>';
     window.scrollTo(0,document.body.scrollHeight);
     closeOp._confirmed = true;
     return;
@@ -820,9 +1043,26 @@ function closeOp(){
     reponses: JSON.stringify(reponses),
     created_at: new Date().toISOString()
   };
+  const nNew = photos.length;
+  if(IS_HDLT){
+    /* HDLT : l'arrivée de la ligne dans journal_entrees déclenche les mails.
+       On met donc d'abord les photos en file (urgentes, envoyées même en 4G),
+       puis le rapport, qui attend qu'elles soient parties (60 s de réseau au
+       plus) : le mail trouve ainsi les liens journal_photos.url. */
+    const photoIds = savedPhotos.map(p=>p.id).concat(photos.map(p=>p.id));
+    queuePhotos(entreeId, true);
+    if(photoIds.length) RDZSync.prioritize(photoIds);
+    RDZSync.save({ module:'rapport-type-agent', table:'journal_entrees', row, op:'upsert', onConflict:'id',
+      waitForPhotoRows: photoIds.length ? photoIds : null, maxWaitMs: 60000 });
+    closeDraftRecord();
+    closeOp._confirmed = false;
+    document.getElementById('done-sub').textContent = 'Il a été transmis au centraliste.';
+    watchHdltSend(entreeId, photoIds.length);
+    show('screen-done');
+    return;
+  }
   RDZSync.save({ module:'rapport-type-agent', table:'journal_entrees', row, op:'upsert', onConflict:'id' });
 
-  const nNew = photos.length;
   queuePhotos(entreeId);
   closeDraftRecord();   // le brouillon passe en « clôturé » : il sort de la liste des rapports en cours
   closeOp._confirmed = false;
@@ -830,6 +1070,25 @@ function closeOp(){
   document.getElementById('done-sub').textContent =
     'Il a été transmis au centraliste.' + (nNew ? ` ${nNew} photo(s) partiront en WiFi.` : '');
   show('screen-done');
+}
+/* Écran « Rapport clôturé » d'un rapport HDLT : suivi de l'envoi, pour que
+   l'agent ne quitte pas la page pendant les quelques secondes d'envoi. */
+let hdltWatch = null;
+function watchHdltSend(entreeId, nPhotos){
+  const box = document.getElementById('done-sync');
+  clearInterval(hdltWatch);
+  const tick = ()=>{
+    if(!RDZSync.isPending(entreeId)){
+      box.className = 'done-sync ok';
+      box.textContent = nPhotos ? '✅ Rapport et photo(s) envoyés.' : '✅ Rapport envoyé.';
+      clearInterval(hdltWatch); hdltWatch = null; return;
+    }
+    box.className = 'done-sync';
+    box.textContent = !navigator.onLine
+      ? "📵 Pas de réseau : le rapport et ses photos partiront automatiquement dès le retour du réseau."
+      : (nPhotos ? '📤 Envoi des photos puis du rapport… Reste sur cette page quelques secondes.' : '📤 Envoi du rapport…');
+  };
+  tick(); hdltWatch = setInterval(tick, 1000);
 }
 
 
@@ -853,20 +1112,20 @@ function applyFormState(s){
   setSelDraft('f-loc', s.loc);
   document.getElementById('f-loc-autre').value = s.loc_autre || '';
   const vals = s.valeurs || {};
-  questions.forEach(q => { if(Object.prototype.hasOwnProperty.call(vals, q.id)) q.valeur = vals[q.id]; });
+  questions.forEach(q => { q._raw = undefined; q._invalid = false; if(Object.prototype.hasOwnProperty.call(vals, q.id)) q.valeur = vals[q.id]; });
   renderQuestions();
 }
 function draftResume(s){
   const parts = [];
   if(s.loc && s.loc !== '__autre') parts.push(s.loc);
   else if(s.loc_autre) parts.push(s.loc_autre);
-  const firstTxt = questions.map(q => (s.valeurs||{})[q.id]).find(v => typeof v === 'string' && v.trim() && !/^\d{1,2}:\d{2}$/.test(v));
+  const firstTxt = questions.map(q => (s.valeurs||{})[q.id]).find(v => typeof v === 'string' && v.trim() && !/^\d{1,2}:\d{2}$/.test(v) && !/^\d{4}-\d{2}-\d{2}$/.test(v));
   if(firstTxt) parts.push(firstTxt.trim().slice(0,60));
   const when = (s.date ? s.date.split('-').reverse().slice(0,2).join('.') : '') + (s.heure ? ' ' + s.heure : '');
   return (when.trim() ? when.trim() + ' — ' : '') + (parts.join(' — ') || 'sans détail');
 }
 function resetAdapter(){
-  questions.forEach(q => { q.valeur = q.type==='case' ? (Array.isArray(q.options)&&q.options.length ? [] : false) : (q.type==='heure' ? null : ''); });
+  questions.forEach(q => { q.valeur = emptyValeur(q); q._raw = undefined; q._invalid = false; });
   renderQuestions();
   if(typeof closeOp !== 'undefined') closeOp._confirmed = false;
 }
@@ -962,7 +1221,7 @@ function storeDraftRow(row, newMeta){
 }
 /* Met en file les photos : nouvelles photos (insert + upload) et légendes
    modifiées sur les photos déjà enregistrées. Renvoie la liste des nouvelles. */
-function queuePhotos(entreeId){
+function queuePhotos(entreeId, urgent){
   const meta = [];
   savedPhotos.forEach(p => {
     if((p.legende||'') !== (p._leg0||'')){
@@ -973,13 +1232,14 @@ function queuePhotos(entreeId){
     }
   });
   photos.forEach(p => {
-    const pid = uid(), created = new Date().toISOString();
+    const pid = p.id || uid(), created = new Date().toISOString();
     RDZSync.save({
       module: DRAFT_MODULE, table: 'journal_photos',
       row: { id: pid, entree_id: entreeId, legende: p.legende || null, created_at: created },
       op: 'upsert', onConflict: 'id',
       bucket: 'journal-photos', photoField: 'url',
-      photos: [{ name: p.name, dataUrl: p.dataUrl }]
+      photos: [{ name: p.name, dataUrl: p.dataUrl }],
+      urgentPhotos: !!urgent
     });
     meta.push({ id: pid, legende: p.legende || '', created_at: created });
     savedPhotos.push({ id: pid, entree_id: entreeId, legende: p.legende || '', _leg0: p.legende || '', url: null, created_at: created, _preview: p.dataUrl });
@@ -1017,7 +1277,7 @@ async function resumeDraft(id){
   ((local && local.photos_meta) || []).forEach(m => {
     if(!savedPhotos.find(p => p.id === m.id)) savedPhotos.push({ id: m.id, entree_id: d.id, legende: m.legende || '', _leg0: m.legende || '', url: null, created_at: m.created_at });
   });
-  renderPhotos(); renderDrafts();
+  renderPhotos(); renderQuestions(); renderDrafts();
   window.scrollTo(0,0);
 }
 function deleteDraft(id){
@@ -1035,15 +1295,16 @@ function newReport(){
   show('screen-form'); refreshDrafts();
 }
 async function removeSavedPhoto(i){
-  const p = savedPhotos[i]; if(!p) return;
-  if(!p.url){ alert("Cette photo n'est pas encore envoyée : elle pourra être retirée une fois arrivée sur le serveur."); return; }
-  if(!navigator.onLine){ alert('Pas de réseau : impossible de retirer une photo déjà enregistrée pour le moment.'); return; }
-  if(!confirm('Retirer cette photo du rapport ?')) return;
+  const p = savedPhotos[i]; if(!p) return false;
+  if(!p.url){ alert("Cette photo n'est pas encore envoyée : elle pourra être retirée une fois arrivée sur le serveur."); return false; }
+  if(!navigator.onLine){ alert('Pas de réseau : impossible de retirer une photo déjà enregistrée pour le moment.'); return false; }
+  if(!confirm('Retirer cette photo du rapport ?')) return false;
   try{
     const { error } = await sb.from('journal_photos').delete().eq('id', p.id);
     if(error) throw error;
     savedPhotos.splice(i,1); renderPhotos();
-  }catch(e){ alert('Suppression impossible : ' + (e.message||e)); }
+    return true;
+  }catch(e){ alert('Suppression impossible : ' + (e.message||e)); return false; }
 }
 async function draftsBoot(){
   if(document.getElementById('screen-form').classList.contains('hidden')) return;
