@@ -1,3 +1,4 @@
+<!-- RDZ · ronde-agent · v3 · 2026-11-26 · (1) pointeau DÉSACTIVÉ pointé (QR ou NFC) = reconnu, compté en point supplémentaire avec la mention « pointeau désactivé » ; (2) puce NFC non répertoriée = fenêtre « Puce non répertoriée — la signaler » : emplacement + au moins 1 photo obligatoires → point supplémentaire + ligne rondes_puces_signalees (traitée dans Gestion des rondes → Puces à identifier). Nécessite migration-rondes-v2.sql : tant qu'elle n'est pas détectée, rien de nouveau n'est envoyé (la file hors-ligne n'est jamais bloquée). -->
 <!-- RDZ · ronde-agent · v2 · 2026-11-26 · lecture des puces NFC (Web NFC, téléphones Android avec Chrome) : le numéro de série de la puce est comparé à rondes_pointeaux.nfc_serial (ex. puces Guardtek reprises) ; le pointage se fait au choix par puce NFC ou par QR code ; méthode enregistrée (nfc / qr). Pas d'image automatique pour une puce NFC (la caméra n'est pas ouverte). Sur iPhone : QR uniquement. -->
 <!-- RDZ · ronde-agent · v1 · 2026-11-25 · création : l'agent choisit son site puis sa ronde, scanne les QR codes des pointeaux (reconnaissance automatique, image prise au moment du scan), ajoute photos (4 max) / commentaire / rapport main courante sur un point, peut scanner un point du site hors de sa ronde (point supplémentaire), termine la ronde avec un motif si des points manquent. Fonctionne hors réseau (RDZSync v4 + ronde en cours gardée sur le téléphone). Tables : rondes_executions / rondes_scans / rondes_photos (migration-rondes.sql). Relu par centraliste/supervision-rondes.html. -->
 <!DOCTYPE html>
@@ -133,6 +134,8 @@ main{flex:1;padding:18px 16px 26px;padding-bottom:max(90px,env(safe-area-inset-b
 .nfc-row button{margin-left:auto;background:var(--rdz-navy2);color:#fff;border:none;border-radius:9px;padding:8px 10px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 .nfc-dot{width:10px;height:10px;border-radius:50%;background:#16a34a;flex:0 0 10px;animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tag-off{display:inline-block;font-size:11.5px;font-weight:800;color:#92400e;background:#fef3c7;border-radius:999px;padding:2px 8px;margin-left:4px}
+.sig-serial{font-family:"Courier New",monospace;font-weight:700;background:#f1f5f9;border-radius:6px;padding:2px 7px}
 .scan-sub{font-size:12.5px;color:#334155;margin-top:2px}
 .lbl{font-size:12px;font-weight:800;color:#475569;margin:14px 0 7px;text-transform:uppercase;letter-spacing:.04em}
 .photos{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
@@ -305,7 +308,7 @@ select{width:100%;font-family:inherit;font-size:15px;background:#fff;border:1px 
       <button class="btn btn-light" onclick="boot(true)">Nouvelle ronde</button>
     </section>
 
-    <div class="foot">RDZ · Rondes · v2</div>
+    <div class="foot">RDZ · Rondes · v3</div>
   </main>
 </div>
 
@@ -321,6 +324,11 @@ select{width:100%;font-family:inherit;font-size:15px;background:#fff;border:1px 
 </div>
 
 <!-- Terminer la ronde -->
+<!-- Signaler une puce non répertoriée -->
+<div id="signal" class="modal hidden">
+  <div class="sheet" id="signal-body"></div>
+</div>
+
 <div id="finish" class="modal hidden" onclick="if(event.target===this)closeFinish()">
   <div class="sheet" id="finish-body"></div>
 </div>
@@ -689,6 +697,7 @@ function parseCode(txt){
 
 /* ───────────── Démarrage ───────────── */
 async function boot(fresh){
+  checkSchemaV2();
   if(!AGENT_NOM){ show('screen-noagent'); return; }
   RUN = lsGet(LS_RUN, null);
   if(RUN && RUN.exec && RUN.exec.statut === 'en_cours'){ selScanId = RUN.lastScanId || null; renderRun(); show('screen-run'); loadMotifs(); nfcAutoResume(); return; }
@@ -746,7 +755,7 @@ async function pickSite(id){
   try{
     const [r, p] = await withTimeout(Promise.all([
       sb.from('rondes').select('*').eq('site_id', curSite.id).eq('actif', true).order('ordre'),
-      sb.from('rondes_pointeaux').select('*').eq('site_id', curSite.id).eq('actif', true).order('ordre')
+      sb.from('rondes_pointeaux').select('*').eq('site_id', curSite.id).order('ordre')   // v3 : désactivés aussi (reconnus en point supplémentaire)
     ]));
     if(r.error) throw r.error; if(p.error) throw p.error;
     curRef = { rondes: r.data||[], pointeaux: p.data||[], ts: new Date().toISOString() };
@@ -757,7 +766,7 @@ async function pickSite(id){
 }
 function rondePoints(ronde){
   const byId = new Map(curRef.pointeaux.map(p => [String(p.id), p]));
-  return (ronde.pointeaux||[]).map(id => byId.get(String(id))).filter(Boolean);
+  return (ronde.pointeaux||[]).map(id => byId.get(String(id))).filter(p => p && p.actif !== false);
 }
 function renderRondes(){
   const box = document.getElementById('ronde-list');
@@ -796,9 +805,9 @@ function startRonde(){
     created_at: now, updated_at: now
   };
   RUN = {
-    exec, scans: [], thumbs: {}, lastScanId: null,
+    exec, scans: [], thumbs: {}, meta: {}, lastScanId: null,
     planned: pts.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'' })),
-    sitePoints: curRef.pointeaux.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'', nfc_serial: normSerial(p.nfc_serial) }))
+    sitePoints: curRef.pointeaux.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'', nfc_serial: normSerial(p.nfc_serial), actif: p.actif !== false }))
   };
   saveExec(); persistRun();
   nfcStart(true);
@@ -874,8 +883,9 @@ function scanCardHtml(s){
   return `<div class="scan-card ${s.hors_ronde ? 'supp' : ''}">
     <div class="scan-head">
       ${auto && auto.src ? `<img class="scan-auto" src="${auto.src}" alt="Image du scan">` : ''}
-      <div><div class="scan-title">✓ ${esc(s.pointeau_nom)}</div>
-      <div class="scan-sub">Pointé à ${hm(s.scanned_at)}${s.methode === 'nfc' ? ' · 📶 puce NFC' : ''}${s.hors_ronde ? ' · point supplémentaire' : ''}</div></div>
+      <div><div class="scan-title">${metaOf(s).signal ? '📶 Puce non répertoriée' : '✓ ' + esc(s.pointeau_nom)}${metaOf(s).inactif ? '<span class="tag-off">pointeau désactivé</span>' : ''}</div>
+      <div class="scan-sub">${metaOf(s).signal ? 'Signalée à ' + hm(s.scanned_at) + ' · <span class="sig-serial">' + esc(metaOf(s).signal.serial) + '</span><br>📍 ' + esc(metaOf(s).signal.emplacement)
+        : 'Pointé à ' + hm(s.scanned_at) + (s.methode === 'nfc' ? ' · 📶 puce NFC' : '') + (s.hors_ronde ? ' · point supplémentaire' : '')}</div></div>
     </div>
     <div class="lbl">Photos (facultatif)</div>
     <div class="photos">${tiles}</div>
@@ -902,7 +912,7 @@ function renderList(){
   if(supp.length){
     html += `<div class="section-h">Points supplémentaires</div>` + supp.map(s => `
       <button class="pt supp" onclick="tapScan('${s.id}')"><span class="n">+</span>
-      <span class="nm">${esc(s.pointeau_nom)}${s.commentaire ? `<small>💬 ${esc(s.commentaire)}</small>` : ''}</span><span class="tm">${hm(s.scanned_at)}</span></button>`).join('');
+      <span class="nm">${metaOf(s).signal ? '📶 Puce non répertoriée' : esc(s.pointeau_nom)}${metaOf(s).inactif ? '<span class="tag-off">désactivé</span>' : ''}${metaOf(s).signal ? `<small>📍 ${esc(metaOf(s).signal.emplacement)}</small>` : ''}${s.commentaire ? `<small>💬 ${esc(s.commentaire)}</small>` : ''}</span><span class="tm">${hm(s.scanned_at)}</span></button>`).join('');
   }
   document.getElementById('r-list').innerHTML = html;
 }
@@ -1026,6 +1036,9 @@ async function recordPoint(pt, img, methode){
     scanned_at: now, rang: RUN.scans.length + 1, ordre_prevu: idx >= 0 ? idx + 1 : null, hors_ronde: idx < 0,
     methode: methode || 'qr', commentaire: null, rapport_ids: [], created_at: now, updated_at: now
   };
+  const inactif = pt.actif === false;
+  if(SCHEMA_V2) s.pointeau_inactif = inactif;   // colonne ajoutée par migration-rondes-v2.sql
+  (RUN.meta = RUN.meta || {})[s.id] = { inactif };
   RUN.scans.push(s);
   saveScan(s);
   RUN.thumbs[s.id] = [];
@@ -1039,7 +1052,7 @@ async function recordPoint(pt, img, methode){
   selScanId = s.id; focusId = null; addSlotOpen = false;
   persistRun(); renderRun(); checkStorage();
   buzz(120);
-  toast((s.hors_ronde ? '➕ Point supplémentaire : ' : '✓ ') + pt.nom, 'good');
+  toast((inactif ? '➕ Point supplémentaire (pointeau désactivé) : ' : s.hors_ronde ? '➕ Point supplémentaire : ' : '✓ ') + pt.nom, 'good');
   window.scrollTo(0,0);
 }
 
@@ -1089,8 +1102,86 @@ function onNfc(serial){
   nfcLast = { s: sn, t: Date.now() };
   if(!document.getElementById('scanner').classList.contains('hidden')) closeScanner();
   const pt = RUN.sitePoints.find(p => p.nfc_serial && p.nfc_serial === sn);
-  if(!pt){ buzz([80,60,80]); toast("Cette puce n'est enregistrée sur aucun point de ce site (n° " + sn + ').', 'bad'); return; }
+  if(!pt){
+    const prev = Object.entries(RUN.meta||{}).find(([, m]) => m.signal && m.signal.serial === sn);
+    if(prev){ buzz(40); toast('Puce déjà signalée pendant cette ronde.'); tapScan(prev[0]); return; }
+    if(!SCHEMA_V2){ buzz([80,60,80]); toast("Cette puce n'est enregistrée sur aucun point de ce site (n° " + sn + ').', 'bad'); return; }
+    buzz([80,60,80]); openSignal(sn); return;
+  }
   recordPoint(pt, null, 'nfc');
+}
+
+/* ───────────── Puce NFC non répertoriée : signalement ─────────────
+   Emplacement + au moins une photo OBLIGATOIRES. Le passage est compté comme
+   point supplémentaire (pointeau_id vide) ; la puce part dans
+   rondes_puces_signalees pour être identifiée par le centraliste. */
+const SCHEMA_KEY_V2 = 'rdz_schema_rondes_v2';
+let SCHEMA_V2 = false; try{ SCHEMA_V2 = localStorage.getItem(SCHEMA_KEY_V2) === '1'; }catch(e){}
+async function checkSchemaV2(){
+  try{
+    const [a, b] = await withTimeout(Promise.all([
+      sb.from('rondes_puces_signalees').select('id').limit(1),
+      sb.from('rondes_scans').select('pointeau_inactif').limit(1)
+    ]), 6000);
+    SCHEMA_V2 = !a.error && !b.error;
+    try{ localStorage.setItem(SCHEMA_KEY_V2, SCHEMA_V2 ? '1' : '0'); }catch(e){}
+  }catch(e){ /* hors réseau : dernière valeur connue */ }
+}
+function metaOf(s){ return (RUN && RUN.meta && RUN.meta[s.id]) || {}; }
+let SIG = null;
+function openSignal(serial){
+  SIG = { serial, photos: [] };
+  renderSignal();
+  document.getElementById('signal').classList.remove('hidden');
+}
+function renderSignal(){
+  if(!SIG) return;
+  const emp = document.getElementById('sig-emp') ? document.getElementById('sig-emp').value : '';
+  const tiles = SIG.photos.map(p => `<div class="ph full"><img src="${p.src}" alt=""></div>`).join('')
+    + (SIG.photos.length < MAX_PHOTOS ? `<div class="ph"><button onclick="pickPhoto('__signal','photo-camera')">📷 Caméra</button><button onclick="pickPhoto('__signal','photo-gallery')">🖼 Galerie</button></div>` : '');
+  document.getElementById('signal-body').innerHTML = `<h3>📶 Puce non répertoriée</h3>
+    <p>Cette puce n'est enregistrée sur aucun point de ce site. Signalez-la : elle sera ajoutée à votre ronde comme point supplémentaire, puis identifiée par le centraliste.</p>
+    <p style="margin-top:6px">N° de la puce : <span class="sig-serial">${esc(SIG.serial)}</span></p>
+    <div class="lbl">Où se trouve-t-elle ? (obligatoire)</div>
+    <textarea id="sig-emp" placeholder="Ex. porte du local poubelles, rez-de-chaussée, côté gauche">${esc(emp)}</textarea>
+    <div class="lbl">Photo de la puce dans son environnement (au moins 1)</div>
+    <div class="photos">${tiles}</div>
+    <div id="sig-err"></div>
+    <div style="margin-top:14px"><button class="btn btn-red" onclick="submitSignal()">📶 Signaler la puce</button>
+    <button class="btn btn-light" onclick="closeSignal()">Annuler (ne rien enregistrer)</button></div>`;
+}
+function closeSignal(){ SIG = null; document.getElementById('signal').classList.add('hidden'); }
+async function submitSignal(){
+  if(!SIG || !RUN) return;
+  const emp = (document.getElementById('sig-emp').value || '').trim();
+  const err = document.getElementById('sig-err');
+  if(!emp){ err.innerHTML = '<div class="err" style="margin-top:10px">Indiquez où se trouve la puce.</div>'; return; }
+  if(!SIG.photos.length){ err.innerHTML = '<div class="err" style="margin-top:10px">Prenez au moins une photo de la puce.</div>'; return; }
+  const now = new Date().toISOString();
+  const s = {
+    id: uid(), execution_id: RUN.exec.id, ronde_id: RUN.exec.ronde_id, site_id: RUN.exec.site_id, site_nom: RUN.exec.site_nom,
+    pointeau_id: null, pointeau_code: null, pointeau_nom: ('Puce non répertoriée · ' + emp).slice(0, 120), agent_nom: AGENT_NOM,
+    scanned_at: now, rang: RUN.scans.length + 1, ordre_prevu: null, hors_ronde: true,
+    methode: 'nfc', commentaire: null, rapport_ids: [], created_at: now, updated_at: now, pointeau_inactif: false
+  };
+  RUN.scans.push(s); saveScan(s);
+  RUN.thumbs[s.id] = [];
+  for(const ph of SIG.photos){
+    const pid = uid();
+    RDZSync.save({ module:'ronde-agent', table:'rondes_photos',
+      row:{ id: pid, execution_id: RUN.exec.id, scan_id: s.id, type:'agent', created_at: now },
+      op:'upsert', onConflict:'id', bucket: BUCKET, photoField:'url', photos:[{ name:'puce_'+pid+'.jpg', dataUrl: ph.dataUrl }] });
+    RUN.thumbs[s.id].push({ id: pid, type:'agent', src: ph.src });
+  }
+  RDZSync.save({ module:'ronde-agent', table:'rondes_puces_signalees', op:'upsert', onConflict:'id',
+    row:{ id: uid(), execution_id: RUN.exec.id, scan_id: s.id, site_id: RUN.exec.site_id, site_nom: RUN.exec.site_nom,
+          nfc_serial: SIG.serial, emplacement: emp, agent_nom: AGENT_NOM, signale_at: now, statut: 'a_identifier' } });
+  (RUN.meta = RUN.meta || {})[s.id] = { signal: { serial: SIG.serial, emplacement: emp } };
+  closeSignal();
+  selScanId = s.id; focusId = null; addSlotOpen = false;
+  persistRun(); renderRun(); checkStorage();
+  buzz(120); toast('📶 Puce signalée — ajoutée en point supplémentaire', 'good');
+  window.scrollTo(0,0);
 }
 
 /* ───────────── Photos de l'agent ───────────── */
@@ -1115,6 +1206,12 @@ function compressImage(file){
 }
 async function onPhotoPicked(input){
   const file = input.files && input.files[0]; input.value = '';
+  if(file && photoTargetScan === '__signal'){
+    if(SIG.photos.length >= MAX_PHOTOS) return;
+    const dataUrl = await compressImage(file);
+    SIG.photos.push({ dataUrl, src: await thumb(dataUrl, 240) });
+    renderSignal(); return;
+  }
   const s = file && RUN && RUN.scans.find(x => x.id === photoTargetScan);
   if(!s) return;
   const list = RUN.thumbs[s.id] = RUN.thumbs[s.id] || [];
