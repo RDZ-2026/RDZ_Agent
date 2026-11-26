@@ -1,3 +1,4 @@
+<!-- RDZ · rondes-gestion · v6 · 2026-11-26 · rubrique « 📶 Puces à identifier » (puces NFC signalées par les agents, regroupées par numéro : photos, emplacement, passages) avec Créer un pointeau / Rattacher à un pointeau existant / Ignorer ; dans l'éditeur de ronde, seuls les pointeaux ACTIFS peuvent être ajoutés. Nécessite migration-rondes-v2.sql. -->
 <!-- RDZ · rondes-gestion · v5 · 2026-11-26 · numéro de puce NFC par pointeau (saisie manuelle, ou lecture directe avec un téléphone Android sous Chrome) ; contrôle qu'une puce n'est pas déjà attribuée à un autre point ; badge « 📶 NFC » dans la liste. -->
 <!-- RDZ · rondes-gestion · v4 · 2026-11-26 · en-tête aligné sur le tableau de bord (index.html) : barre bleu nuit avec logo, coordonnées, bandeau titre « RDZ » ; plus de bandeau bordeaux. Titre d'onglet « RDZ Security Management SA — Gestion des rondes ». Fonctionnement inchangé. -->
 <!-- RDZ · rondes-gestion · v3 · 2026-11-26 · planche entamée : choix de la première étiquette libre en cliquant sur une mini-planche (remplace la saisie du numéro). -->
@@ -159,6 +160,7 @@ label.f{display:block;font-size:12px;font-weight:700;color:#555;text-transform:u
     <p class="lead">Créez les pointeaux d'un site, composez les rondes et imprimez les étiquettes QR. Les agents les retrouvent dans l'application, menu « Rondes ».</p>
     <div class="groups">
       <button class="group-btn" onclick="goSites()"><span class="ic">📍</span><span><div class="t">Pointeaux & rondes d'un site</div><div class="d">Points de contrôle, photos de repérage, rondes et étiquettes QR.</div></span></button>
+      <button class="group-btn" onclick="goPuces()"><span class="ic">📶</span><span><div class="t">Puces à identifier <span class="badge" id="pu-count" style="background:#fde2e2;color:var(--danger)"></span></div><div class="d">Puces NFC non répertoriées, signalées par les agents pendant leurs rondes : créer un pointeau, rattacher ou ignorer.</div></span></button>
       <button class="group-btn" onclick="goMotifs()"><span class="ic">🏷</span><span><div class="t">Motifs de ronde incomplète</div><div class="d">La liste proposée à l'agent quand il termine une ronde sans avoir pointé tous les points.</div></span></button>
     </div>
   </section>
@@ -234,6 +236,16 @@ label.f{display:block;font-size:12px;font-weight:700;color:#555;text-transform:u
     </div>
   </section>
 
+  <!-- Puces à identifier -->
+  <section id="v-puces" class="hidden">
+    <button class="back" onclick="goHome()">← Toutes les rubriques</button>
+    <h2>Puces à identifier</h2>
+    <p class="lead">Puces NFC trouvées par les agents pendant leurs rondes, qui ne correspondent à aucun pointeau. Le site, l'emplacement décrit et la photo permettent de les retrouver.</p>
+    <div class="toolbar"><select id="pu-filtre" style="max-width:260px" onchange="loadPuces()"><option value="a_identifier">À identifier</option><option value="traitees">Déjà traitées</option></select><span class="grow"></span></div>
+    <div id="pu-msg"></div>
+    <div id="pu-list"></div>
+  </section>
+
   <!-- Motifs -->
   <section id="v-motifs" class="hidden">
     <button class="back" onclick="goHome()">← Toutes les rubriques</button>
@@ -273,7 +285,7 @@ let ptEdit = null, ptPhoto = null, rdEdit = null;
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function norm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
-function view(id){ ['v-home','v-sites','v-site','v-motifs'].forEach(v => document.getElementById(v).classList.toggle('hidden', v !== id)); window.scrollTo(0,0); }
+function view(id){ ['v-home','v-sites','v-site','v-motifs','v-puces'].forEach(v => document.getElementById(v).classList.toggle('hidden', v !== id)); window.scrollTo(0,0); }
 function msg(boxId, html, kind){ const b = document.getElementById(boxId); b.innerHTML = html ? `<div class="${kind||'err'}">${html}</div>` : ''; if(html && kind === 'ok-msg') setTimeout(()=>{ if(b.innerHTML.includes(html)) b.innerHTML=''; }, 3500); }
 function newCode(){ let s = ''; const a = new Uint32Array(6); crypto.getRandomValues(a); a.forEach(x => s += CODE_ALPHABET[x % CODE_ALPHABET.length]); return s; }
 function qrUrl(code){ return APP_URL + '?p=' + code; }
@@ -428,7 +440,7 @@ async function savePt(){
     const row = { nom, consigne: document.getElementById('pf-cons').value.trim() || null, photo_url, nfc_serial: nfc || null,
       actif: document.getElementById('pf-actif').checked, updated_at: new Date().toISOString() };
     if(isNew){
-      Object.assign(row, { code, site_id: site.id, site_nom: site.nom, ordre: PTS.length ? Math.max(...PTS.map(p => p.ordre||0)) + 1 : 1 });
+      Object.assign(row, { id: crypto.randomUUID(), code, site_id: site.id, site_nom: site.nom, ordre: PTS.length ? Math.max(...PTS.map(p => p.ordre||0)) + 1 : 1 });
       let res = await sb.from('rondes_pointeaux').insert(row);
       if(res.error && res.error.code === '23505'){ row.code = newCode(); res = await sb.from('rondes_pointeaux').insert(row); }   // code déjà pris (très rare)
       if(res.error) throw res.error;
@@ -436,7 +448,10 @@ async function savePt(){
       const res = await sb.from('rondes_pointeaux').update(Object.assign(row, { site_nom: site.nom })).eq('id', ptEdit.id);
       if(res.error) throw res.error;
     }
-    closePtForm(); await loadSite();
+    const fromPuce = ptEdit._fromPuce;
+    if(fromPuce && nfc === fromPuce) await markPuces(fromPuce, 'rattachee', isNew ? row.id : ptEdit.id);
+    closePtForm(); await loadSite(); refreshPuceCount();
+    if(fromPuce && nfc === fromPuce){ msg('site-msg', '✓ Pointeau créé avec la puce ' + esc(fromPuce) + ' : la puce est retirée des « Puces à identifier ». Ajoutez le point à une ronde si besoin.', 'ok-msg'); return; }
     msg('site-msg', isNew ? '✓ Pointeau créé. Pensez à l\'ajouter à une ronde et à imprimer son étiquette.' : '✓ Pointeau modifié.', 'ok-msg');
   }catch(e){
     err.innerHTML = `<div class="err">${esc(e.message||e)}</div>`;
@@ -514,14 +529,16 @@ function renderRdForm(){
           <div class="arrows"><button onclick="rdMove(${k},-1)" ${k===0?'disabled':''}>▲</button><button onclick="rdMove(${k},1)" ${k===inR.length-1?'disabled':''}>▼</button></div>
           <button class="btn sm danger" onclick="rdRemove('${p.id}')">✕</button></div>`).join('') : '<div class="state-msg">Ajoutez des points depuis la liste de droite.</div>'}</div>
       <div><div class="col-h">Points disponibles du site (${avail.length}) ${avail.length ? `<button class="btn sm" style="margin-left:8px" onclick="rdAddAll()">Tout ajouter</button>` : ''}</div>
-        ${avail.length ? avail.map(p => `<div class="row ${p.actif ? '' : 'off'}"><div class="main"><div class="nm">${esc(p.nom)}</div></div><button class="btn sm" onclick="rdAdd('${p.id}')">＋ Ajouter</button></div>`).join('') : `<div class="state-msg">${PTS.length ? 'Tous les points sont dans la ronde.' : 'Aucun pointeau : créez-les dans l\'onglet « Pointeaux ».'}</div>`}</div>
+        ${avail.length ? avail.map(p => p.actif
+          ? `<div class="row"><div class="main"><div class="nm">${esc(p.nom)}</div></div><button class="btn sm" onclick="rdAdd('${p.id}')">＋ Ajouter</button></div>`
+          : `<div class="row off"><div class="main"><div class="nm">${esc(p.nom)}</div><div class="meta">Désactivé : réactivez-le dans « Pointeaux » pour l'ajouter à une ronde.</div></div></div>`).join('') : `<div class="state-msg">${PTS.length ? 'Tous les points sont dans la ronde.' : 'Aucun pointeau : créez-les dans l\'onglet « Pointeaux ».'}</div>`}</div>
     </div>
     <div id="rf-err" style="margin-top:10px"></div>
     <div class="toolbar" style="margin-top:12px"><button class="btn red" id="rf-save" onclick="saveRd()">Enregistrer la ronde</button><button class="btn" onclick="rdEdit=null;renderRdForm()">Annuler</button></div>
   </div>`;
 }
-function rdAdd(id){ rdEdit.pts.push(String(id)); renderRdForm(); }
-function rdAddAll(){ PTS.forEach(p => { if(!rdEdit.pts.includes(String(p.id))) rdEdit.pts.push(String(p.id)); }); renderRdForm(); }
+function rdAdd(id){ const p = PTS.find(x => String(x.id) === String(id)); if(!p || !p.actif) return; rdEdit.pts.push(String(id)); renderRdForm(); }
+function rdAddAll(){ PTS.forEach(p => { if(p.actif && !rdEdit.pts.includes(String(p.id))) rdEdit.pts.push(String(p.id)); }); renderRdForm(); }
 function rdRemove(id){ rdEdit.pts = rdEdit.pts.filter(x => x !== String(id)); renderRdForm(); }
 function rdMove(k, d){
   const byId = new Map(PTS.map(p => [String(p.id), p]));
@@ -672,6 +689,137 @@ function printLabels(){
   document.getElementById('print-root').innerHTML = b.html;
   setTimeout(() => window.print(), 50);
 }
+
+/* ───────────── Puces à identifier ─────────────
+   Source : rondes_puces_signalees (migration-rondes-v2.sql), regroupées par
+   numéro de puce. Photos = rondes_photos dont scan_id = scan du signalement. */
+let PUCES = [];
+async function refreshPuceCount(){
+  const el = document.getElementById('pu-count'); if(!el) return;
+  try{
+    const { data, error } = await sb.from('rondes_puces_signalees').select('nfc_serial').eq('statut', 'a_identifier');
+    if(error) throw error;
+    const n = new Set((data||[]).map(d => d.nfc_serial)).size;
+    el.textContent = n ? n : ''; el.style.display = n ? '' : 'none';
+  }catch(e){ el.style.display = 'none'; }
+}
+async function goPuces(){ view('v-puces'); if(!SITES.length) await loadSitesList(); await loadPuces(); }
+async function loadSitesList(){
+  const { data } = await sb.from('sites').select('id,nom').eq('actif',true).order('nom');
+  SITES = (data||[]).map(s => ({ id:String(s.id), nom:s.nom }));
+}
+async function loadPuces(){
+  const box = document.getElementById('pu-list'); msg('pu-msg', '');
+  box.innerHTML = '<div class="state-msg">Chargement…</div>';
+  const filtre = document.getElementById('pu-filtre').value;
+  let q = sb.from('rondes_puces_signalees').select('*').order('signale_at', { ascending:false }).limit(1000);
+  q = filtre === 'a_identifier' ? q.eq('statut', 'a_identifier') : q.neq('statut', 'a_identifier');
+  const { data, error } = await q;
+  if(error){ box.innerHTML = `<div class="err">Chargement impossible : ${esc(error.message)}<br>La migration « migration-rondes-v2.sql » a-t-elle été lancée ?</div>`; return; }
+  const rows = data || [];
+  const scanIds = rows.map(r => r.scan_id).filter(Boolean);
+  let photos = [];
+  if(scanIds.length){ const r = await sb.from('rondes_photos').select('scan_id,url,type').in('scan_id', scanIds); photos = r.data || []; }
+  const serials = [...new Set(rows.map(r => r.nfc_serial))];
+  let owners = [];
+  if(serials.length){ const r = await sb.from('rondes_pointeaux').select('id,nom,site_nom,nfc_serial').in('nfc_serial', serials); owners = r.data || []; }
+  const groups = new Map();
+  rows.forEach(r => {
+    const k = r.nfc_serial + '|' + (r.site_id||'');
+    if(!groups.has(k)) groups.set(k, { serial: r.nfc_serial, site_id: r.site_id, site_nom: r.site_nom, rows: [] });
+    groups.get(k).rows.push(r);
+  });
+  PUCES = [...groups.values()].map(g => Object.assign(g, {
+    photos: photos.filter(p => p.url && g.rows.some(r => r.scan_id === p.scan_id)).map(p => p.url),
+    owner: owners.find(o => o.nfc_serial === g.serial) || null,
+    emplacements: [...new Set(g.rows.map(r => r.emplacement))],
+    agents: [...new Set(g.rows.map(r => r.agent_nom).filter(Boolean))],
+    statut: g.rows[0].statut, pointeau_id: g.rows[0].pointeau_id
+  }));
+  refreshPuceCount();
+  if(!PUCES.length){ box.innerHTML = `<div class="state-msg">${filtre === 'a_identifier' ? 'Aucune puce à identifier. 👍' : 'Aucune puce traitée pour l\'instant.'}</div>`; return; }
+  box.innerHTML = PUCES.map((g,i) => {
+    const last = g.rows[0], first = g.rows[g.rows.length-1];
+    const d = iso => new Date(iso).toLocaleString('fr-CH', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const etat = g.statut === 'ignoree' ? '<span class="badge">Ignorée</span>' : g.statut === 'rattachee' ? '<span class="badge" style="background:#e5f4ea;color:var(--ok)">Rattachée</span>' : '';
+    const acts = filtre === 'a_identifier'
+      ? (g.owner
+          ? `<div class="hint" style="margin:0 0 6px">Cette puce est désormais attribuée au point « ${esc(g.owner.nom)} » (${esc(g.owner.site_nom)}).</div><button class="btn sm" onclick="puceDone(${i})">✓ Marquer comme traitée</button>`
+          : `<button class="btn sm red" onclick="puceCreate(${i})">＋ Créer un pointeau</button>
+             <button class="btn sm" onclick="puceAttachForm(${i})">🔗 Rattacher à un pointeau existant</button>
+             <button class="btn sm danger" onclick="puceIgnore(${i})">Ignorer</button>`)
+      : `<button class="btn sm" onclick="puceReset(${i})">↩ Remettre à identifier</button>`;
+    return `<div class="card">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${g.photos.slice(0,4).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="" style="width:120px;height:90px;object-fit:cover;border:1px solid var(--line);border-radius:var(--radius-ui)"></a>`).join('') || '<div class="th empty" style="width:120px;height:90px;display:grid;place-items:center;background:var(--bg-meta);color:#999">⏳ photo<br>en attente</div>'}</div>
+        <div style="flex:1;min-width:260px">
+          <div class="nm" style="font-weight:700;font-size:15px">📍 ${esc(g.site_nom||'Site inconnu')} — puce <span class="code">${esc(g.serial)}</span> ${etat}</div>
+          <div class="meta" style="margin-top:6px;line-height:1.5">${g.emplacements.map(e => '« ' + esc(e) + ' »').join('<br>')}</div>
+          <div class="hint">${g.rows.length} passage${g.rows.length>1?'s':''} · ${g.rows.length > 1 ? 'du ' + d(first.signale_at) + ' au ' + d(last.signale_at) : 'le ' + d(last.signale_at)} · ${esc(g.agents.join(', '))}</div>
+          <div class="toolbar" style="margin:10px 0 0">${acts}</div>
+          <div id="pu-attach-${i}"></div>
+        </div>
+      </div></div>`;
+  }).join('');
+}
+async function markPuces(serial, statut, pointeauId){
+  const { error } = await sb.from('rondes_puces_signalees').update({ statut, pointeau_id: pointeauId || null, traite_at: statut === 'a_identifier' ? null : new Date().toISOString() })
+    .eq('nfc_serial', serial).eq('statut', statut === 'a_identifier' ? (PUCES.find(g => g.serial === serial)||{}).statut || 'ignoree' : 'a_identifier');
+  if(error) throw error;
+}
+async function puceCreate(i){
+  const g = PUCES[i]; if(!g) return;
+  if(!SITES.find(s => s.id === String(g.site_id))) await loadSitesList();
+  if(!SITES.find(s => s.id === String(g.site_id))){ msg('pu-msg', 'Le site de cette puce est introuvable ou désactivé.'); return; }
+  await openSite(String(g.site_id));
+  editPt(null);
+  ptEdit._fromPuce = g.serial;
+  ptEdit.photo_url = g.photos[0] || '';
+  document.getElementById('pf-nom').value = (g.emplacements[0] || '').slice(0, 80);
+  document.getElementById('pf-nfc').value = g.serial;
+  if(ptEdit.photo_url){ document.getElementById('pf-prev').innerHTML = `<img src="${esc(ptEdit.photo_url)}" alt="">`; document.getElementById('pf-rm').style.display = ''; }
+  document.querySelector('#pt-form h3').textContent = 'Nouveau pointeau — puce ' + g.serial;
+  msg('site-msg', 'Le formulaire est prérempli avec la puce signalée (nom = emplacement décrit par l\'agent, photo de l\'agent). Corrigez le nom si besoin puis enregistrez.', 'ok-msg');
+}
+async function puceAttachForm(i){
+  const g = PUCES[i]; if(!g) return;
+  const box = document.getElementById('pu-attach-' + i);
+  box.innerHTML = '<div class="hint">Chargement des pointeaux du site…</div>';
+  const { data, error } = await sb.from('rondes_pointeaux').select('id,nom,code,nfc_serial,actif').eq('site_id', String(g.site_id)).order('ordre');
+  if(error){ box.innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  const list = (data||[]).sort((a,b) => (a.nfc_serial ? 1 : 0) - (b.nfc_serial ? 1 : 0));
+  if(!list.length){ box.innerHTML = '<div class="hint">Aucun pointeau sur ce site : utilisez « Créer un pointeau ».</div>'; return; }
+  box.innerHTML = `<div class="inline" style="margin-top:10px"><select id="pu-sel-${i}">${list.map(p => `<option value="${p.id}">${esc(p.nom)} (${esc(p.code)})${p.nfc_serial ? ' — a déjà la puce ' + esc(p.nfc_serial) : ''}${p.actif ? '' : ' — désactivé'}</option>`).join('')}</select>
+    <button class="btn sm red" style="flex:0 0 auto" onclick="puceAttach(${i})">Rattacher</button></div>`;
+  box._list = list;
+}
+async function puceAttach(i){
+  const g = PUCES[i], box = document.getElementById('pu-attach-' + i);
+  const p = (box._list||[]).find(x => x.id === document.getElementById('pu-sel-' + i).value); if(!p) return;
+  if(p.nfc_serial && p.nfc_serial !== g.serial && !confirm(`Le point « ${p.nom} » a déjà la puce ${p.nfc_serial}.\nLa remplacer par ${g.serial} ?`)) return;
+  try{
+    const { data: dup } = await sb.from('rondes_pointeaux').select('id,nom').eq('nfc_serial', g.serial);
+    const other = (dup||[]).find(d => d.id !== p.id);
+    if(other) throw new Error(`Cette puce est déjà attribuée au point « ${other.nom} ».`);
+    const { error } = await sb.from('rondes_pointeaux').update({ nfc_serial: g.serial, updated_at: new Date().toISOString() }).eq('id', p.id);
+    if(error) throw error;
+    await markPuces(g.serial, 'rattachee', p.id);
+    await loadPuces(); msg('pu-msg', `✓ Puce ${esc(g.serial)} rattachée au point « ${esc(p.nom)} ».`, 'ok-msg');
+  }catch(e){ msg('pu-msg', esc(e.message||e)); }
+}
+async function puceIgnore(i){
+  const g = PUCES[i]; if(!g || !confirm(`Ignorer la puce ${g.serial} ?\nElle ne sera plus proposée (vous la retrouverez dans « Déjà traitées »).`)) return;
+  try{ await markPuces(g.serial, 'ignoree', null); await loadPuces(); msg('pu-msg', '✓ Puce ignorée.', 'ok-msg'); }catch(e){ msg('pu-msg', esc(e.message||e)); }
+}
+async function puceDone(i){
+  const g = PUCES[i]; if(!g) return;
+  try{ await markPuces(g.serial, 'rattachee', g.owner && g.owner.id); await loadPuces(); }catch(e){ msg('pu-msg', esc(e.message||e)); }
+}
+async function puceReset(i){
+  const g = PUCES[i]; if(!g) return;
+  try{ await markPuces(g.serial, 'a_identifier', null); await loadPuces(); msg('pu-msg', '✓ Puce remise dans « À identifier ».', 'ok-msg'); }catch(e){ msg('pu-msg', esc(e.message||e)); }
+}
+refreshPuceCount();
 
 /* ───────────── Motifs ───────────── */
 async function goMotifs(){ view('v-motifs'); await loadMotifs(); }
