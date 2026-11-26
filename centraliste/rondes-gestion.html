@@ -1,3 +1,4 @@
+<!-- RDZ · rondes-gestion · v5 · 2026-11-26 · numéro de puce NFC par pointeau (saisie manuelle, ou lecture directe avec un téléphone Android sous Chrome) ; contrôle qu'une puce n'est pas déjà attribuée à un autre point ; badge « 📶 NFC » dans la liste. -->
 <!-- RDZ · rondes-gestion · v4 · 2026-11-26 · en-tête aligné sur le tableau de bord (index.html) : barre bleu nuit avec logo, coordonnées, bandeau titre « RDZ » ; plus de bandeau bordeaux. Titre d'onglet « RDZ Security Management SA — Gestion des rondes ». Fonctionnement inchangé. -->
 <!-- RDZ · rondes-gestion · v3 · 2026-11-26 · planche entamée : choix de la première étiquette libre en cliquant sur une mini-planche (remplace la saisie du numéro). -->
 <!-- RDZ · rondes-gestion · v2 · 2026-11-26 · format HERMA 9642 (40 × 40 mm, 4 × 6, mesuré par Laurent : haut 14 mm, gauche 17 mm, écart 7 mm) ajouté et sélectionné par défaut ; étiquette carrée = grand QR (~26 mm) + nom + code ; réglage fin du décalage (mémorisé sur l'ordinateur) ; page de test (contours des cases). -->
@@ -330,7 +331,7 @@ function renderPts(){
     return `<div class="row ${p.actif ? '' : 'off'}">
       <div class="arrows"><button onclick="movePt(${i},-1)" ${i===0?'disabled':''}>▲</button><button onclick="movePt(${i},1)" ${i===PTS.length-1?'disabled':''}>▼</button></div>
       ${p.photo_url ? `<img class="th" src="${esc(p.photo_url)}" alt="">` : '<div class="th empty">📷</div>'}
-      <div class="main"><div class="nm">${esc(p.nom)} <span class="code">${esc(p.code)}</span>${p.actif ? '' : '<span class="badge">Désactivé</span>'}</div>
+      <div class="main"><div class="nm">${esc(p.nom)} <span class="code">${esc(p.code)}</span>${p.nfc_serial ? `<span class="badge" title="Puce NFC ${esc(p.nfc_serial)}">📶 NFC</span>` : ''}${p.actif ? '' : '<span class="badge">Désactivé</span>'}</div>
         <div class="meta">${p.consigne ? '📌 ' + esc(p.consigne) + '<br>' : ''}${rn.length ? 'Rondes : ' + rn.map(esc).join(', ') : '<i>Dans aucune ronde</i>'}</div></div>
       <div class="acts">
         <button class="btn sm" onclick="editPt('${p.id}')">Modifier</button>
@@ -354,12 +355,27 @@ function editPt(id){
       <button class="btn sm" type="button" onclick="document.getElementById('ph-gallery').click()">🖼 Galerie</button>
       <button class="btn sm danger" type="button" id="pf-rm" onclick="removePtPhoto()" ${ptEdit.photo_url ? '' : 'style="display:none"'}>Retirer la photo</button></div>
     <p class="hint">Cadrez serré sur l'emplacement de l'étiquette (porte, mur, local) plutôt qu'une vue large d'une zone sensible.</p>
+    <label class="f">N° de puce NFC (facultatif)</label>
+    <div class="inline"><input type="text" id="pf-nfc" value="${esc(ptEdit.nfc_serial||'')}" placeholder="Ex. 043D291A6F6681" maxlength="40" style="font-family:'Courier New',monospace;text-transform:uppercase">
+      ${('NDEFReader' in window) ? '<button class="btn sm" type="button" style="flex:0 0 auto" onclick="readNfcInto()">📶 Lire la puce</button>' : ''}</div>
+    <p class="hint" id="pf-nfc-hint">Si une puce NFC est déjà posée à cet endroit (ex. ancienne puce Guardtek), indiquez son numéro : les agents équipés d'un téléphone Android pourront pointer en touchant la puce. ${('NDEFReader' in window) ? 'Touchez « Lire la puce » puis approchez le téléphone.' : 'La lecture directe n\'est possible que depuis un téléphone Android avec Chrome.'}</p>
     <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="pf-actif" ${ptEdit.actif ? 'checked' : ''}> Actif</label>
     <div id="pf-err" style="margin-top:10px"></div>
     <div class="toolbar" style="margin-top:12px"><button class="btn red" id="pf-save" onclick="savePt()">Enregistrer</button><button class="btn" onclick="closePtForm()">Annuler</button></div>
   </div>`;
   document.getElementById('pf-nom').focus();
   document.getElementById('pt-form').scrollIntoView({ behavior:'smooth' });
+}
+function normSerial(x){ return String(x||'').replace(/[^0-9a-f]/gi, '').toUpperCase(); }
+async function readNfcInto(){
+  const hint = document.getElementById('pf-nfc-hint');
+  try{
+    const reader = new NDEFReader(), ctrl = new AbortController();
+    await reader.scan({ signal: ctrl.signal });
+    hint.innerHTML = '<b>📶 Approchez le téléphone de la puce…</b>';
+    reader.onreading = ev => { document.getElementById('pf-nfc').value = normSerial(ev.serialNumber); hint.innerHTML = '✓ Puce lue : <b>' + esc(normSerial(ev.serialNumber)) + '</b>'; ctrl.abort(); };
+    setTimeout(() => ctrl.abort(), 30000);
+  }catch(e){ hint.innerHTML = '<span style="color:var(--danger)">Lecture NFC impossible : ' + esc(e.message||e) + '</span>'; }
 }
 function closePtForm(){ ptEdit = null; ptPhoto = null; document.getElementById('pt-form').innerHTML = ''; }
 function compressImage(file){
@@ -394,6 +410,14 @@ async function savePt(){
   try{
     const isNew = !ptEdit.id;
     const code = isNew ? newCode() : ptEdit.code;
+    const nfc = normSerial(document.getElementById('pf-nfc').value);
+    if(nfc && (nfc.length < 8 || nfc.length > 20)) throw new Error('Numéro de puce NFC invalide : 8 à 20 caractères (chiffres 0-9 et lettres A-F).');
+    if(nfc){
+      const { data: dup, error: de } = await sb.from('rondes_pointeaux').select('id,nom,site_nom').eq('nfc_serial', nfc);
+      if(de) throw de;
+      const other = (dup||[]).find(d => d.id !== ptEdit.id);
+      if(other) throw new Error(`Cette puce NFC est déjà attribuée au point « ${other.nom} » (${other.site_nom}).`);
+    }
     let photo_url = ptEdit._removePhoto ? null : (ptEdit.photo_url || null);
     if(ptPhoto){
       const path = 'reperage/' + code + '_' + Date.now() + '.jpg';
@@ -401,7 +425,7 @@ async function savePt(){
       if(up.error) throw new Error('Photo non envoyée : ' + up.error.message + ' (le dossier « rondes-photos » existe-t-il ? voir migration-rondes.sql)');
       photo_url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
     }
-    const row = { nom, consigne: document.getElementById('pf-cons').value.trim() || null, photo_url,
+    const row = { nom, consigne: document.getElementById('pf-cons').value.trim() || null, photo_url, nfc_serial: nfc || null,
       actif: document.getElementById('pf-actif').checked, updated_at: new Date().toISOString() };
     if(isNew){
       Object.assign(row, { code, site_id: site.id, site_nom: site.nom, ordre: PTS.length ? Math.max(...PTS.map(p => p.ordre||0)) + 1 : 1 });
