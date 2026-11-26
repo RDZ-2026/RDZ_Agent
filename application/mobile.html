@@ -1,3 +1,4 @@
+<!-- RDZ · mobile · v7.0 · 2026-11-25 · carte « Rondes » ajoutée dans « Outil terrain », juste sous « Rapport » (ronde-agent.html). Rien d'autre ne change. -->
 <!-- RDZ · mobile · v6.9 · 2026-11-04 · lecture automatique retirée (pastille « Touchez ici pour activer le son radio » supprimée) ; nouveau vocal = bandeau persistant « Nouveau message radio » + notification système du téléphone (son et vibration du téléphone, via radio-sw.js), y compris hors de la radio. Bouton « 🔔 Activer les notifications radio » une seule fois par téléphone.
      v6.8 · 2026-11-04 · choix du POSTE dans « Prise de service » : « Je prends mon service » ouvre le service (services_agents) ET connecte la radio sur le poste choisi (radio_prendre_service) ; poste exclusif occupé grisé ; sans réseau : service ouvert quand même, poste radio à valider ensuite.
      v6.7 · 2026-11-04 · radio réactivée : bouton « Radio » actif, SOS flottant, pastille, lecture auto et bandeaux d'alerte de nouveau en service (RADIO_ACTIVE = true).
@@ -742,6 +743,8 @@ const OUTIL_TERRAIN_ITEMS = [
   //        Pour la réactiver : supprimer « disabled: true » ici ET passer RADIO_ACTIVE à true plus bas.
   { icon: '📻', name: 'Radio', desc: "Messages vocaux avec vos collègues en service et bouton SOS.", href: 'radio-agent.html' },
   { icon: '📓', name: 'Rapport', desc: "Noter toute activité et toute action effectuée pendant le service.", href: 'journal-de-bord.html' },
+  // v7.0 : rondes par QR code (ronde-agent.html) — points créés par le centraliste dans Gestion des rondes.
+  { icon: '🔁', name: 'Rondes', desc: "Pointer les points de contrôle d'une ronde en scannant leur QR code.", href: 'ronde-agent.html' },
   { icon: '📇', name: 'MEMO SITES', desc: "Fiches Mémo des sites RDZ", href: 'memo-sites.html' }
 ];
 
