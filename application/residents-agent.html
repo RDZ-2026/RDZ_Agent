@@ -1,3 +1,4 @@
+<!-- RDZ · residents-agent · v2 · 2026-11-26 (appel évacuation partagé entre agents via RDZSync v5 + sous-locataires) -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -94,6 +95,62 @@ html,body{background:var(--rdz-bg)}body{font-family:Inter,-apple-system,BlinkMac
 .state-msg{padding:52px 20px}.state-msg p{color:var(--rdz-muted)}.state-msg small{color:#94a3b8}
 @media(max-width:390px){.app-header{padding:10px 12px}.app-header-txt{padding-left:94px}.app-header-txt:before{width:84px;height:38px}.app-header-name{display:none}.app-header-sub{font-size:11px}.content{padding:14px 12px 36px}.search-btns{gap:7px}}
 </style>
+<style id="rdz-rollcall">
+/* ── APPEL ÉVACUATION / POINT DE RASSEMBLEMENT ───────────────────────── */
+.rc-open-btn{width:100%;margin-top:12px;min-height:48px;border:none;border-radius:10px;background:#b91c1c;color:#fff;font:700 13px/1.2 inherit;font-family:inherit;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;box-shadow:0 5px 14px rgba(185,28,28,.22);display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px}
+.rc-open-btn:active{background:#991b1b}
+.rc-open-btn small{display:block;font-size:10.5px;font-weight:600;text-transform:none;letter-spacing:0;opacity:.85}
+.rc-overlay{position:fixed;inset:0;z-index:200;background:var(--rdz-bg);display:none;flex-direction:column}
+.rc-overlay.open{display:flex}
+.rc-top{background:linear-gradient(135deg,var(--rdz-navy),var(--rdz-navy-2));border-bottom:3px solid #b91c1c;color:#fff;padding:10px 12px 12px;flex-shrink:0;box-shadow:0 5px 18px rgba(15,23,42,.16)}
+.rc-top-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rc-title{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.rc-sub{font-size:10.5px;color:rgba(255,255,255,.7);margin-top:2px}
+.rc-close{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;font:700 12px inherit;font-family:inherit;border-radius:9px;padding:8px 12px;min-height:38px;cursor:pointer;white-space:nowrap}
+.rc-counters{display:flex;gap:8px;margin-top:10px}
+.rc-count{flex:1;border-radius:10px;padding:7px 8px;text-align:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+.rc-count b{display:block;font-size:20px;line-height:1.1}
+.rc-count span{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;opacity:.8}
+.rc-count.ok b{color:#4ade80}.rc-count.ko b{color:#fca5a5}
+.rc-bar{background:#fff;border-bottom:1px solid var(--rdz-border);padding:10px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.rc-chips{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.rc-chip{flex-shrink:0;border:1px solid var(--rdz-border);background:var(--rdz-soft);color:var(--rdz-text);border-radius:999px;padding:7px 11px;font:700 11.5px inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+.rc-chip.on{background:var(--rdz-navy);border-color:var(--rdz-navy);color:#fff}
+.rc-chip.view.on.ko{background:#b91c1c;border-color:#b91c1c}
+.rc-chip.view.on.ok{background:#15803d;border-color:#15803d}
+.rc-search{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--rdz-border);border-radius:10px;font-size:15px;font-family:inherit;color:var(--rdz-text)}
+.rc-search:focus{outline:none;border-color:#b91c1c;box-shadow:0 0 0 3px rgba(185,28,28,.1)}
+.rc-actions{display:flex;gap:6px}
+.rc-act{flex:1;min-height:38px;border:1px solid var(--rdz-border);background:var(--rdz-soft);color:var(--rdz-text);border-radius:9px;font:700 11px inherit;font-family:inherit;cursor:pointer;padding:6px}
+.rc-act.danger{color:#b91c1c}
+.rc-add{display:none;gap:6px;flex-wrap:wrap}
+.rc-add.open{display:flex}
+.rc-add input,.rc-add select{flex:1 1 120px;min-height:40px;padding:8px 10px;border:1px solid var(--rdz-border);border-radius:9px;font-size:14px;font-family:inherit}
+.rc-add button{min-height:40px;padding:8px 14px;border:none;border-radius:9px;background:var(--rdz-navy);color:#fff;font:700 12px inherit;font-family:inherit;cursor:pointer}
+.rc-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 40px}
+.rc-site{margin-bottom:14px}
+.rc-site-h{position:sticky;top:-10px;z-index:2;background:var(--rdz-bg);padding:8px 2px 6px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--rdz-text)}
+.rc-site-h span{font-weight:700;color:var(--rdz-muted);letter-spacing:0;text-transform:none}
+.rc-row{width:100%;display:flex;align-items:center;gap:10px;text-align:left;background:#fff;border:1px solid var(--rdz-border);border-left:4px solid #cbd5e1;border-radius:10px;padding:10px 10px;margin-bottom:6px;font-family:inherit;color:var(--rdz-text);cursor:pointer;min-height:54px}
+.rc-row:active{transform:scale(.99)}
+.rc-row.ok{background:#f0fdf4;border-color:#bbf7d0;border-left-color:#16a34a}
+.rc-room{min-width:58px;font-size:15px;font-weight:800;color:var(--rdz-text);font-variant-numeric:tabular-nums}
+.rc-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rc-who b{font-size:14px;line-height:1.25}
+.rc-who small{font-size:11px;color:var(--rdz-muted)}
+.rc-tag{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:999px;padding:2px 7px;margin-right:4px}
+.rc-tag.ss{background:#fee2e2;color:#7f1d1d}.rc-tag.sub{background:#ede9fe;color:#3b0764}.rc-tag.ex{background:#fef9c3;color:#713f12}
+.rc-mark{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:transparent}
+.rc-row.ok .rc-mark{background:#16a34a;border-color:#16a34a;color:#fff}
+.rc-time{font-size:10px;color:#15803d;font-weight:700;margin-top:1px}
+.rc-empty{text-align:center;color:var(--rdz-muted);padding:40px 10px;font-size:13px}
+.rc-sync{margin-top:8px;font-size:11.5px;font-weight:700;border-radius:8px;padding:6px 9px;background:rgba(255,255,255,.08)}
+.rc-sync.on{color:#86efac}.rc-sync.off{color:#fdba74;background:rgba(251,146,60,.15)}.rc-sync.wait{color:#fde68a}
+.rc-open-btn.live{animation:rcpulse 1.4s ease-in-out infinite}
+@keyframes rcpulse{0%,100%{box-shadow:0 0 0 0 rgba(185,28,28,.55)}50%{box-shadow:0 0 0 8px rgba(185,28,28,0)}}
+.rc-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--rdz-navy);color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;z-index:300;opacity:0;pointer-events:none;transition:.25s;max-width:90vw;text-align:center}
+.rc-toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
 </head>
 <body>
 
@@ -123,6 +180,9 @@ html,body{background:var(--rdz-bg)}body{font-family:Inter,-apple-system,BlinkMac
       <span class="hint-chip">Plaque : « GE 123 »</span>
       <span class="hint-chip">Casier : « 110 »</span>
     </div>
+    <button class="rc-open-btn" id="rc-open-btn" onclick="openRollcall()">
+      🚨 <span>Appel évacuation — point de rassemblement<small id="rc-open-sub">Liste de tous les occupants présents, à pointer</small></span>
+    </button>
   </div>
 
   <div id="search-results">
@@ -134,6 +194,327 @@ html,body{background:var(--rdz-bg)}body{font-family:Inter,-apple-system,BlinkMac
   </div>
 </div>
 
+<!-- ══ APPEL ÉVACUATION ══ -->
+<div class="rc-overlay" id="rc-overlay">
+  <div class="rc-top">
+    <div class="rc-top-row">
+      <div>
+        <div class="rc-title">🚨 Appel évacuation</div>
+        <div class="rc-sub" id="rc-sub">—</div>
+      </div>
+      <button class="rc-close" onclick="closeRollcall()">‹ Fermer</button>
+    </div>
+    <div class="rc-sync wait" id="rc-sync">… connexion</div>
+    <div class="rc-counters">
+      <div class="rc-count ok"><b id="rc-n-ok">0</b><span>Présents</span></div>
+      <div class="rc-count ko"><b id="rc-n-ko">0</b><span>Manquants</span></div>
+      <div class="rc-count"><b id="rc-n-all">0</b><span>Attendus</span></div>
+    </div>
+  </div>
+  <div class="rc-bar">
+    <div class="rc-chips" id="rc-sites"></div>
+    <div class="rc-chips">
+      <button class="rc-chip view on" data-view="all" onclick="rcSetView('all')">Tous</button>
+      <button class="rc-chip view ko" data-view="ko" onclick="rcSetView('ko')">Manquants</button>
+      <button class="rc-chip view ok" data-view="ok" onclick="rcSetView('ok')">Présents</button>
+    </div>
+    <input type="search" class="rc-search" id="rc-search" placeholder="Pointer : nom ou n° de chambre…" oninput="rcSetQuery(this.value)" autocomplete="off">
+    <div class="rc-actions">
+      <button class="rc-act" onclick="rcShareMissing()">📋 Liste manquants</button>
+      <button class="rc-act" onclick="rcToggleAdd()">＋ Personne</button>
+      <button class="rc-act danger" onclick="rcCloseAppel()">✓ Clôturer l'appel</button>
+    </div>
+    <div class="rc-add" id="rc-add">
+      <input id="rc-add-name" placeholder="Nom Prénom (visiteur, invité…)">
+      <input id="rc-add-room" placeholder="Chambre / lieu" style="flex:0 1 110px">
+      <select id="rc-add-site"></select>
+      <button onclick="rcAddExtra()">Ajouter présent</button>
+    </div>
+  </div>
+  <div class="rc-list" id="rc-list"></div>
+</div>
+
+<script>
+/* ═══ RDZSync v5 — brique commune, collée telle quelle (voir application/rdz-sync-v5.js) ═══ */
+// RDZ · rdz-sync · v5 · 2026-09-24
+// Brique commune de synchronisation hors-ligne, partagée par tous les modules agents.
+// À coller telle quelle dans chaque module agent qui écrit dans Supabase (sauf exception
+// « collision en direct »). Variante réduite : SANS le badge flottant auto-rendu — chaque
+// module a déjà son propre indicateur ; garder tout le reste identique.
+//
+// ── Nouveautés v5 (vs v4) ────────────────────────────────────────────────────────────────
+// 1. PHOTOS EN « GRANDE MÉMOIRE » (IndexedDB) au lieu de localStorage.
+//    Bug corrigé : localStorage est plafonné à ~5 Mo. Au-delà de 7-8 photos en attente,
+//    l'écriture échouait (QuotaExceededError) et la photo était PERDUE. Désormais seuls les
+//    OCTETS (dataURL) des photos vont en IndexedDB (centaines de Mo) ; la petite fiche de
+//    suivi (module/table/rowId/champ/tentatives) reste en localStorage sous
+//    'rdz_sync_photo_queue'. Conséquence importante : les compteurs et le détail affichés par
+//    fin-de-service.html et admin/reset-sync.html continuent de fonctionner SANS changement,
+//    car ils lisent ces fiches légères. La photo est copiée en grande mémoire DÈS la prise de
+//    vue (dans save()), avant toute tentative d'envoi → plus aucune perte possible ensuite.
+// 2. PROGRESSION + INTERRUPTION/REPRISE. getStatus() expose désormais : photoSending,
+//    photoDone, photoTotal, photoStopped. stopPhotos() interrompt proprement APRÈS la photo
+//    en cours (jamais au milieu d'un fichier). Reprendre = rappeler flushPhotos(true).
+// 3. EFFACEMENT APRÈS CONFIRMATION SERVEUR (principe inchangé, désormais explicite) : une
+//    photo n'est retirée de la file ET supprimée de la grande mémoire QU'APRÈS confirmation
+//    du serveur (upload + mise à jour de la ligne réussis). Rien n'est effacé « en aveugle ».
+// 4. REPLI SÛR : si IndexedDB est indisponible (navigateur exotique / mode privé), on retombe
+//    automatiquement sur l'ancien comportement (octets en localStorage) — jamais de perte.
+//
+// Transport (inchangé — option B, coût mini) : le TEXTE part sur TOUT réseau (4G/5G/WiFi).
+// Les PHOTOS partent automatiquement sur WiFi ; sur réseau mobile elles ne partent QUE sur
+// action forcée — bouton manuel ou envoi de fin de service — via flushPhotos(true).
+//
+// API : RDZSync.init({client,onChange}), save({module,table,row,op?,onConflict?,photoField?,
+//   bucket?,photos:[{name,dataUrl,field?}]}), flushText(), flushPhotos(force), stopPhotos(),
+//   getStatus() -> {textPending, photoPending, photoSending, photoStopped, photoDone,
+//   photoTotal, log, isWifi}.
+(function (global) {
+  'use strict';
+  var Q_TEXT = 'rdz_sync_queue', Q_PHOTO = 'rdz_sync_photo_queue', Q_LOG = 'rdz_sync_log', LOG_MAX = 30;
+  var _client = null, _onChange = null, _flushingText = false, _flushingPhotos = false;
+  var _photoStop = false, _run = { done: 0 };
+
+  // ── Grande mémoire (IndexedDB) : ne stocke QUE les octets des photos, clé = id de la photo ──
+  var IDB_NAME = 'rdz_sync_idb', IDB_STORE = 'photo_blobs', _idb = null, _idbFail = false;
+  function idbOpen(cb) {
+    if (_idb) return cb(_idb);
+    if (_idbFail || typeof indexedDB === 'undefined') return cb(null);
+    try {
+      var rq = indexedDB.open(IDB_NAME, 1);
+      rq.onupgradeneeded = function () { var d = rq.result; if (!d.objectStoreNames.contains(IDB_STORE)) d.createObjectStore(IDB_STORE); };
+      rq.onsuccess = function () { _idb = rq.result; cb(_idb); };
+      rq.onerror = function () { _idbFail = true; console.warn('RDZSync: IndexedDB indisponible, repli localStorage', rq.error); cb(null); };
+    } catch (e) { _idbFail = true; cb(null); }
+  }
+  function idbPut(key, val, done) { idbOpen(function (d) { if (!d) return done(false); try { var tx = d.transaction(IDB_STORE, 'readwrite'); tx.objectStore(IDB_STORE).put(val, key); tx.oncomplete = function () { done(true); }; tx.onerror = function () { done(false); }; } catch (e) { done(false); } }); }
+  function idbGet(key, done) { idbOpen(function (d) { if (!d) return done(null); try { var tx = d.transaction(IDB_STORE, 'readonly'); var r = tx.objectStore(IDB_STORE).get(key); r.onsuccess = function () { done(r.result != null ? r.result : null); }; r.onerror = function () { done(null); }; } catch (e) { done(null); } }); }
+  function idbDel(key, done) { idbOpen(function (d) { if (!d) return done && done(false); try { var tx = d.transaction(IDB_STORE, 'readwrite'); tx.objectStore(IDB_STORE).delete(key); tx.oncomplete = function () { done && done(true); }; tx.onerror = function () { done && done(false); }; } catch (e) { done && done(false); } }); }
+  function idbAllKeys(done) { idbOpen(function (d) { if (!d) return done([]); try { var tx = d.transaction(IDB_STORE, 'readonly'); var r = tx.objectStore(IDB_STORE).getAllKeys(); r.onsuccess = function () { done(r.result || []); }; r.onerror = function () { done([]); }; } catch (e) { done([]); } }); }
+
+  function readLS(key) { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; } }
+  function writeLS(key, arr) {
+    try { localStorage.setItem(key, JSON.stringify(arr)); notify(); return true; }
+    catch (e) { console.warn('RDZSync: échec écriture locale (mémoire pleine ?)', key, e && (e.message || e)); notify(); return false; }
+  }
+  function notify() { var st = getStatus(); if (typeof _onChange === 'function') { try { _onChange(st); } catch (e) {} } }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(','); var mime = (parts[0].match(/:(.*?);/) || [, 'application/octet-stream'])[1];
+    var bin = atob(parts[1]); var n = bin.length; var u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], { type: mime });
+  }
+  function pushLog(entry) { var log = readLS(Q_LOG); log.unshift(entry); if (log.length > LOG_MAX) log = log.slice(0, LOG_MAX); writeLS(Q_LOG, log); }
+  function isWifi() {
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return null;
+      if (typeof c.type === 'string') return c.type === 'wifi';
+      return null;
+    } catch (e) { return null; }
+  }
+
+  // Nettoyage défensif des octets orphelins en grande mémoire (photos dont plus aucune fiche
+  // n'existe — ex. file vidée via reset-sync). Exécuté à l'init.
+  function gcOrphans() {
+    idbAllKeys(function (keys) {
+      if (!keys || !keys.length) return;
+      var live = {};
+      readLS(Q_PHOTO).forEach(function (p) { if (p && p.id) live[p.id] = 1; });
+      readLS(Q_TEXT).forEach(function (t) { (t.pendingPhotos || []).forEach(function (p) { if (p && p.id) live[p.id] = 1; }); });
+      keys.forEach(function (k) { if (!live[k]) idbDel(k); });
+    });
+  }
+
+  function init(opts) {
+    opts = opts || {};
+    _client = opts.client || _client;
+    if (typeof opts.onChange === 'function') _onChange = opts.onChange;
+    if (typeof global.addEventListener === 'function') global.addEventListener('online', function () { flushText(); tryAutoPhotos(); });
+    try {
+      var c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (c && typeof c.addEventListener === 'function') c.addEventListener('change', tryAutoPhotos);
+    } catch (e) {}
+    gcOrphans();
+    flushText(); tryAutoPhotos(); notify();
+    return API;
+  }
+  function tryAutoPhotos() { if (isWifi() === true) flushPhotos(false); }
+
+  function save(item) {
+    var bucket = item.bucket || null;
+    var photoField = item.photoField || null;
+    var incoming = item.photos || [];
+    // Fiches légères (SANS octets) attachées au texte : {id, field, name}. Les octets (dataURL)
+    // sont copiés TOUT DE SUITE en grande mémoire (IndexedDB), clé = id de la photo. En repli
+    // (IndexedDB indisponible), on garde les octets inline dans la fiche (ancien comportement).
+    var pending = incoming.map(function (p) {
+      var pid = uid();
+      var meta = { id: pid, field: p.field || photoField, name: p.name || 'photo.jpg' };
+      idbPut(pid, p.dataUrl, function (ok) { if (!ok) { meta.dataUrl = p.dataUrl; } });
+      return meta;
+    });
+    var textEntry = {
+      id: uid(),
+      module: item.module || 'inconnu', table: item.table, op: item.op || 'insert',
+      onConflict: item.onConflict || null, row: Object.assign({}, item.row || {}),
+      photoField: photoField, bucket: bucket,
+      pendingPhotos: pending, ts: new Date().toISOString(), tries: 0
+    };
+    var q = readLS(Q_TEXT); q.push(textEntry);
+    var ok = writeLS(Q_TEXT, q);
+    if (!ok) {
+      // Même le texte (léger) ne passe pas : la petite mémoire est vraiment saturée. Les photos
+      // étant désormais en grande mémoire, retenter sans elles n'aide plus — on prévient l'agent.
+      console.warn('RDZSync: échec d\'enregistrement local du texte (petite mémoire pleine) pour', item.table);
+      if (global.toast) { try { global.toast('❌ Mémoire locale pleine — ce rapport n\'a PAS pu être enregistré, contactez le centraliste', 5000); } catch (e) {} }
+      return null;
+    }
+    setTimeout(flushText, 0);
+    return textEntry.id;
+  }
+
+  function flushText() {
+    if (_flushingText || !_client) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    _flushingText = true; var q = readLS(Q_TEXT); var i = 0;
+    function next() {
+      if (i >= q.length) {
+        _flushingText = false;
+        if (readLS(Q_TEXT).length) setTimeout(flushText, 0);
+        return;
+      }
+      var it = q[i]; var qb = _client.from(it.table);
+      // Pas de .select() après écriture : ne dépend que du droit d'ÉCRITURE (voir piège n°6).
+      var req = (it.op === 'upsert')
+        ? qb.upsert(it.row, it.onConflict ? { onConflict: it.onConflict } : undefined)
+        : qb.insert(it.row);
+      req.then(function (res) {
+        if (res && res.error) throw res.error;
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) cur.splice(idx, 1);
+        writeLS(Q_TEXT, cur);
+        pushLog({ ts: new Date().toISOString(), module: it.module, table: it.table, kind: 'texte', ok: true });
+        var rowId = it.row && it.row.id != null ? it.row.id : null;
+        if (it.pendingPhotos && it.pendingPhotos.length) {
+          if (rowId == null) {
+            console.warn('RDZSync: photos ignorées — aucun id fourni dans row.id pour', it.table);
+          } else {
+            // Le texte est confirmé côté serveur : les photos peuvent maintenant partir. On
+            // déplace les fiches légères vers la file photo (les octets sont déjà en grande mémoire).
+            var pq = readLS(Q_PHOTO);
+            it.pendingPhotos.forEach(function (p) {
+              pq.push({ id: p.id, module: it.module, table: it.table, rowId: rowId, bucket: it.bucket,
+                        field: p.field || it.photoField, name: p.name || 'photo.jpg',
+                        dataUrl: p.dataUrl || null, // non-null seulement en repli localStorage
+                        ts: new Date().toISOString(), tries: 0 });
+            });
+            writeLS(Q_PHOTO, pq); tryAutoPhotos();
+          }
+        }
+        i++; next();
+      }).catch(function (err) {
+        console.warn('RDZSync: échec écriture', it.module, it.table, err && (err.message || err));
+        var cur = readLS(Q_TEXT); var idx = cur.findIndex(function (x) { return x.id === it.id; });
+        if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_TEXT, cur); }
+        i++; next();
+      });
+    }
+    next();
+  }
+
+  // Récupère les octets d'une photo : d'abord la grande mémoire (IndexedDB), sinon le repli
+  // localStorage (champ dataUrl inline, présent uniquement si IndexedDB était indisponible).
+  function getPhotoBytes(p, cb) {
+    if (p.dataUrl) return cb(p.dataUrl);
+    idbGet(p.id, function (v) {
+      if (v) return cb(v);
+      // Filet anti-course : dans un cas de timing extrême, la photo vient peut-être tout juste
+      // d'être écrite en grande mémoire et n'est pas encore relisible. On retente une fois avant
+      // de conclure qu'elle est introuvable (jamais de perte : la fiche reste en file).
+      setTimeout(function () { idbGet(p.id, function (v2) { cb(v2 || null); }); }, 250);
+    });
+  }
+
+  function flushPhotos(force) {
+    if (_flushingPhotos || !_client) return;
+    if (!force && isWifi() !== true) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (force) _photoStop = false;
+    _flushingPhotos = true; _run = { done: 0 }; notify();
+    var q = readLS(Q_PHOTO); var i = 0; var passSuccess = false;
+    function next() {
+      if (_photoStop) { _flushingPhotos = false; notify(); return; }
+      if (i >= q.length) {
+        _flushingPhotos = false;
+        // On ne reboucle QUE si ce passage a fait progresser au moins une photo (sinon on
+        // laisserait tourner en boucle sur des photos définitivement rejetées par le serveur —
+        // on attend alors le prochain événement réseau ou un envoi forcé).
+        if (!_photoStop && passSuccess && readLS(Q_PHOTO).length) { setTimeout(function () { flushPhotos(force); }, 0); }
+        else notify();
+        return;
+      }
+      var p = q[i];
+      getPhotoBytes(p, function (dataUrl) {
+        if (!dataUrl) {
+          console.warn('RDZSync: octets photo introuvables en mémoire pour', p.id, p.table);
+          var cur0 = readLS(Q_PHOTO); var idx0 = cur0.findIndex(function (x) { return x.id === p.id; });
+          if (idx0 > -1) { cur0[idx0].tries = (cur0[idx0].tries || 0) + 1; cur0[idx0].lastError = 'octets introuvables en mémoire'; writeLS(Q_PHOTO, cur0); }
+          i++; next(); return;
+        }
+        var path = p.module + '/' + Date.now() + '_' + p.name; var blob = dataUrlToBlob(dataUrl);
+        _client.storage.from(p.bucket).upload(path, blob, { upsert: true })
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            var pub = _client.storage.from(p.bucket).getPublicUrl(path);
+            var url = pub && pub.data ? pub.data.publicUrl : null;
+            var patch = {}; patch[p.field] = url;
+            return _client.from(p.table).update(patch).eq('id', p.rowId);
+          })
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            // Confirmation serveur OK → on retire la fiche ET on efface les octets de la grande mémoire.
+            var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+            if (idx > -1) cur.splice(idx, 1);
+            writeLS(Q_PHOTO, cur);
+            idbDel(p.id);
+            passSuccess = true; _run.done++;
+            pushLog({ ts: new Date().toISOString(), module: p.module, table: p.table, kind: 'photo', ok: true });
+            i++; next();
+          })
+          .catch(function (err) {
+            console.warn('RDZSync: échec upload photo', p.module, p.table, err && (err.message || err));
+            var cur = readLS(Q_PHOTO); var idx = cur.findIndex(function (x) { return x.id === p.id; });
+            if (idx > -1) { cur[idx].tries = (cur[idx].tries || 0) + 1; cur[idx].lastError = err && (err.message || String(err)) || null; writeLS(Q_PHOTO, cur); }
+            i++; next();
+          });
+      });
+    }
+    next();
+  }
+
+  function stopPhotos() { _photoStop = true; notify(); }
+
+  function getStatus() {
+    var photoPending = readLS(Q_PHOTO).length;
+    return {
+      textPending: readLS(Q_TEXT).length,
+      photoPending: photoPending,
+      photoSending: _flushingPhotos && !_photoStop,
+      photoStopped: _photoStop,
+      photoDone: _run.done,
+      photoTotal: _run.done + photoPending,
+      log: readLS(Q_LOG),
+      isWifi: isWifi()
+    };
+  }
+
+  var API = { init: init, save: save, flushText: flushText, flushPhotos: flushPhotos, stopPhotos: stopPhotos, getStatus: getStatus };
+  (typeof window !== 'undefined' ? window : global).RDZSync = API;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
 <script>
 const SUPABASE_URL = 'https://pdewmubikmotqzbxmyeq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkZXdtdWJpa21vdHF6YnhteWVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDU3MjgsImV4cCI6MjA5NDg4MTcyOH0.SRuhERPmB5_7a58nJ5oMg4a8mujnoLBv8dxkxvyNWao';
@@ -564,7 +945,471 @@ function clearSearch() {
   document.getElementById('search-results').innerHTML = `<div class="state-msg"><div class="ico">🔍</div><p>Entrez un nom, un numéro de chambre, une plaque ou un numéro de casier.</p><small>La recherche est partielle — « dup » trouve « Dupont »</small></div>`;
 }
 
-loadAll();
+// ══════════════════════════════════════════════════════════════
+// APPEL ÉVACUATION — POINT DE RASSEMBLEMENT (pointage partagé entre agents)
+// Liste tous les occupants présents aujourd'hui : titulaires au contrat actif,
+// sous-locataires d'un contrat actif, courts séjours en cours. Tri Site →
+// Chambre → Nom. Chaque pointage est :
+//   1) enregistré tout de suite sur le téléphone (marche hors réseau),
+//   2) envoyé via RDZSync dès qu'il y a du réseau (4G/5G ou WiFi),
+//   3) relu toutes les 8 s chez les autres agents (fusion : le plus récent gagne).
+// Boucle de remontée : evacuation_appels + evacuation_pointages (Supabase),
+// relus par ce même écran sur chaque téléphone (et disponibles pour la direction).
+// Si deux agents démarrent un appel en même temps (ex. hors réseau), l'appel le
+// plus ancien est conservé et les pointages de l'autre y sont fusionnés.
+// ══════════════════════════════════════════════════════════════
+const RC_STORE = 'rdz_rollcall_v2';
+const RC_MODULE = 'residents-agent';
+const RC_POLL_MS = 8000;
+const RC_MAX_AGE_H = 12; // un appel non clôturé depuis plus de 12 h n'est plus rejoint
+const RC = { list: [], site: 'ALL', view: 'all', q: '', timer: null, online: null, lastOk: null,
+             state: rcEmptyState() };
+
+function rcEmptyState() { return { appel: null, checks: {}, extras: {} }; }
+function rcLoadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(RC_STORE));
+    if (s && s.checks) {
+      RC.state = Object.assign(rcEmptyState(), s);
+      // Appel trop ancien (oublié, jamais clôturé) : on repart à zéro
+      if (RC.state.appel && Date.now() - Date.parse(RC.state.appel.started_at) > RC_MAX_AGE_H * 3600e3) RC.state = rcEmptyState();
+    }
+  } catch (e) {}
+}
+function rcSaveState() { try { localStorage.setItem(RC_STORE, JSON.stringify(RC.state)); } catch (e) {} }
+function rcAgent() { return (localStorage.getItem('rdz_agent_nom') || '').trim() || 'Agent'; }
+function rcToday() { return new Date().toLocaleDateString('sv-SE'); } // AAAA-MM-JJ (heure locale)
+function rcDay(d) { return (d || '').toString().split('T')[0]; }
+function rcActive(start, end, today) {
+  const s = rcDay(start), e = rcDay(end);
+  return (!s || s <= today) && (!e || e >= today);
+}
+function rcSiteOf(code) {
+  code = (code || '').trim().toUpperCase() || 'AUTRE';
+  const label = buildingToSite(code) || (code === 'REGM_MDE' ? 'IHEID - REGM / MDE' : code === 'AUTRE' ? 'Site non précisé' : code);
+  return { code, label };
+}
+function rcTime(ts) { return new Date(ts).toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' }); }
+function rcCmpRoom(a, b) {
+  if (!a && !b) return 0; if (!a) return 1; if (!b) return -1;
+  return a.localeCompare(b, 'fr', { numeric: true, sensitivity: 'base' });
+}
+function rcIsOk(key) { const c = RC.state.checks[key]; return !!(c && c.p); }
+
+// ── Construction de la liste des occupants attendus ─────────────────────────
+function rcBuildList() {
+  const today = rcToday();
+  const out = [];
+  const roomBuilding = new Map(); // chambre → bâtiment (pour classer les courts séjours REGM_MDE)
+  data.residents.forEach(r => { if (r.room_space && r.building) roomBuilding.set(normRoom(r.room_space), r.building.toUpperCase()); });
+
+  // Titulaires : une ligne par chambre + personne, contrat couvrant aujourd'hui.
+  // Les sous-locations ne sont retenues que sur les lignes dont le contrat est en cours.
+  const map = new Map();
+  data.residents.forEach(r => {
+    if (!rcActive(r.contract_start, r.contract_end, today)) return;
+    const k = normRoom(r.room_space) + '|' + normalize(r.name_last) + '|' + normalize(r.name_first);
+    if (!map.has(k)) map.set(k, { r, subs: new Map() });
+    const sub = (r.sublease_tenant || '').trim();
+    if (sub) map.get(k).subs.set(normalize(sub), { name: sub, room: (r.sublease_room || r.room_space || '').trim() });
+  });
+  map.forEach(({ r, subs }) => {
+    const site = rcSiteOf(r.building);
+    const room = (r.room_space || '').trim();
+    const name = [(r.name_last || '').toUpperCase(), r.name_first || ''].join(' ').trim();
+    const subList = [...subs.values()];
+    out.push({
+      key: 'R|' + site.code + '|' + normRoom(room) + '|' + normalize(name),
+      kind: 'resident', site, room, name, sortName: normalize(r.name_last + ' ' + r.name_first),
+      note: subList.length ? 'Sous-loue sa chambre à ' + subList.map(s => s.name).join(', ') : (r.room_type || '')
+    });
+    subList.forEach(s => {
+      out.push({
+        key: 'L|' + site.code + '|' + normRoom(s.room) + '|' + normalize(s.name),
+        kind: 'sublease', site, room: s.room, name: s.name, sortName: normalize(s.name),
+        note: 'Sous-locataire de ' + name
+      });
+    });
+  });
+
+  // Courts séjours en cours (hors annulés)
+  data.short_stays.forEach(ss => {
+    if (/annul|cancel/i.test(ss.entry_status || '')) return;
+    if (!rcActive(ss.checkin_date, ss.checkout_date, today)) return;
+    let b = (ss.building || '').toUpperCase();
+    if (b === 'REGM_MDE' && roomBuilding.has(normRoom(ss.room_space))) b = roomBuilding.get(normRoom(ss.room_space));
+    const site = rcSiteOf(b);
+    out.push({
+      key: 'S|' + (ss.entry_id || '') + '|' + normRoom(ss.room_space) + '|' + normalize(ss.entry_name),
+      kind: 'shortstay', site, room: (ss.room_space || '').trim(),
+      name: ss.entry_name || '—', sortName: normalize(ss.entry_name),
+      note: ss.nb_guests > 1 ? ss.nb_guests + ' occupants' : ''
+    });
+  });
+
+  // Personnes ajoutées à la main (par moi ou par un collègue)
+  Object.entries(RC.state.extras).forEach(([key, x]) => {
+    out.push({ key, kind: 'extra', site: rcSiteOf(x.site), room: x.chambre || '', name: x.nom, sortName: normalize(x.nom),
+               note: x.by ? 'Ajouté par ' + x.by : '' });
+  });
+
+  out.sort((a, b) =>
+    a.site.label.localeCompare(b.site.label, 'fr') ||
+    rcCmpRoom(a.room, b.room) ||
+    a.sortName.localeCompare(b.sortName, 'fr'));
+  out.forEach(p => { p.search = normalize([p.name, p.room].join(' ')) + ' ' + normRoom(p.room); }); // nom + chambre seulement (pas la note, pour ne pas pointer la mauvaise personne)
+  RC.list = out;
+  RC.byKey = new Map(out.map(p => [p.key, p]));
+}
+
+// ── Envoi vers Supabase (via la file RDZSync : part dès qu'il y a du réseau) ──
+function rcNewAppel() {
+  const d = new Date();
+  const stamp = d.toLocaleDateString('sv-SE').replace(/-/g, '') + '-' + d.toTimeString().slice(0, 5).replace(':', '');
+  RC.state.appel = { id: 'EV-' + stamp + '-' + Math.random().toString(36).slice(2, 7), started_at: d.toISOString(), started_by: rcAgent() };
+  rcSendAppel();
+  rcSaveState();
+}
+function rcSendAppel(closed) {
+  const a = RC.state.appel; if (!a) return;
+  RDZSync.save({ module: RC_MODULE, table: 'evacuation_appels', op: 'upsert', onConflict: 'id',
+    row: { id: a.id, started_at: a.started_at, started_by: a.started_by,
+           closed_at: closed ? new Date().toISOString() : null, closed_by: closed ? rcAgent() : null } });
+}
+function rcSendCheck(key) {
+  const a = RC.state.appel, c = RC.state.checks[key]; if (!a || !c) return;
+  const p = RC.byKey && RC.byKey.get(key);
+  const x = RC.state.extras[key];
+  RDZSync.save({ module: RC_MODULE, table: 'evacuation_pointages', op: 'upsert', onConflict: 'appel_id,person_key',
+    row: { appel_id: a.id, person_key: key, present: !!c.p, pointe_at: new Date(c.ts).toISOString(), agent: c.by,
+           site: x ? x.site : (p ? p.site.code : null), chambre: x ? x.chambre : (p ? p.room : null),
+           nom: x ? x.nom : (p ? p.name : null), type: x ? 'ajout' : (p ? p.kind : null) } });
+}
+
+// ── Synchronisation : rejoindre/fusionner l'appel partagé, relire les pointages ──
+async function rcSync() {
+  try { RDZSync.flushText(); } catch (e) {}
+  if (navigator.onLine === false) { RC.online = false; rcUpdateSyncInfo(); return; }
+  try {
+    const since = new Date(Date.now() - RC_MAX_AGE_H * 3600e3).toISOString();
+    const { data: open, error } = await sb.from('evacuation_appels').select('*')
+      .is('closed_at', null).gte('started_at', since).order('started_at', { ascending: true }).order('id', { ascending: true }).limit(10);
+    if (error) throw error;
+    const oldest = open && open[0];
+    const mine = RC.state.appel;
+
+    if (mine) {
+      // Mon appel a-t-il été clôturé par un collègue ?
+      const { data: myRow, error: e2 } = await sb.from('evacuation_appels').select('id,closed_at,closed_by').eq('id', mine.id).limit(1);
+      if (e2) throw e2;
+      if (myRow && myRow[0] && myRow[0].closed_at) {
+        // Appel terminé : on vide la liste locale (tout est archivé côté serveur) ;
+        // si un autre appel est déjà ouvert, on le rejoint sans y reporter l'ancien pointage.
+        RC.state = rcEmptyState();
+        if (oldest) RC.state.appel = { id: oldest.id, started_at: oldest.started_at, started_by: oldest.started_by };
+        rcSaveState();
+        rcToast(`Appel clôturé par ${myRow[0].closed_by || 'un collègue'}.`);
+        rcBuildList(); rcRenderSites(); rcRender();
+        if (!oldest) { RC.online = true; RC.lastOk = Date.now(); rcUpdateSyncInfo(); return; }
+      }
+      // Un appel plus ancien est ouvert : on le rejoint et on y fusionne nos pointages
+      else if (oldest && oldest.id !== mine.id &&
+          (oldest.started_at < mine.started_at || (oldest.started_at === mine.started_at && oldest.id < mine.id))) {
+        rcSendAppel(true); // clôture de mon appel en doublon
+        RC.state.appel = { id: oldest.id, started_at: oldest.started_at, started_by: oldest.started_by };
+        Object.keys(RC.state.checks).forEach(rcSendCheck);
+        rcSaveState();
+        rcToast(`Pointages fusionnés dans l'appel de ${oldest.started_by || 'un collègue'}.`);
+      }
+    } else if (oldest) {
+      RC.state.appel = { id: oldest.id, started_at: oldest.started_at, started_by: oldest.started_by };
+      rcSaveState();
+    }
+
+    if (RC.state.appel) {
+      const { data: rows, error: e3 } = await sb.from('evacuation_pointages').select('*').eq('appel_id', RC.state.appel.id);
+      if (e3) throw e3;
+      let extrasChanged = false;
+      (rows || []).forEach(r => {
+        const ts = Date.parse(r.pointe_at) || 0;
+        const loc = RC.state.checks[r.person_key];
+        if (!loc || ts > loc.ts) RC.state.checks[r.person_key] = { p: !!r.present, ts, by: r.agent || '' };
+        if (r.type === 'ajout' && !RC.state.extras[r.person_key]) {
+          RC.state.extras[r.person_key] = { nom: r.nom || '—', chambre: r.chambre || '', site: r.site || '', by: r.agent || '' };
+          extrasChanged = true;
+        }
+      });
+      rcSaveState();
+      if (extrasChanged) { rcBuildList(); rcRenderSites(); rcRender(); } else rcRefreshRows();
+    }
+    RC.online = true; RC.lastOk = Date.now();
+  } catch (err) {
+    console.warn('Appel évacuation : synchro impossible', err && (err.message || err));
+    RC.online = false;
+  }
+  rcUpdateSyncInfo();
+}
+
+function rcUpdateSyncInfo() {
+  const el = document.getElementById('rc-sync'); if (!el) return;
+  let pending = 0;
+  try { pending = (JSON.parse(localStorage.getItem('rdz_sync_queue') || '[]')).filter(x => x.module === RC_MODULE).length; } catch (e) {}
+  const agents = new Set(Object.values(RC.state.checks).map(c => c.by).filter(Boolean));
+  const a = RC.state.appel;
+  let txt, cls;
+  if (RC.online === false || navigator.onLine === false) { txt = `🟠 Hors réseau — pointages gardés sur le téléphone${pending ? ` (${pending} en attente d'envoi)` : ''}`; cls = 'off'; }
+  else if (pending) { txt = `⏳ Envoi en cours… ${pending} pointage(s) en attente`; cls = 'wait'; }
+  else if (RC.online) { txt = `🟢 Partagé en direct${agents.size ? ` · ${agents.size} agent(s) pointent` : ''}`; cls = 'on'; }
+  else { txt = '… connexion'; cls = 'wait'; }
+  el.textContent = txt; el.className = 'rc-sync ' + cls;
+  const started = a ? new Date(a.started_at).toLocaleString('fr-CH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : null;
+  document.getElementById('rc-sub').textContent = a
+    ? `Appel ouvert le ${started} par ${a.started_by || '—'}`
+    : `Aucun appel en cours — le 1er pointage le démarre · occupants au ${fmt(rcToday())}`;
+}
+
+// ── Ouverture / fermeture ───────────────────────────────────────────────────
+async function openRollcall() {
+  rcLoadState();
+  document.getElementById('rc-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('rc-list').innerHTML = '<div class="rc-empty">Chargement des résidents…</div>';
+  await dataReady;
+  if (!data.residents.length && !data.short_stays.length) {
+    document.getElementById('rc-list').innerHTML = '<div class="rc-empty">⚠️ Aucune donnée résident chargée (réseau ?). Rechargez la page dès que possible.</div>';
+    return;
+  }
+  rcBuildList(); rcRenderSites(); rcRender(); rcUpdateSyncInfo();
+  rcSync();
+  clearInterval(RC.timer); RC.timer = setInterval(rcSync, RC_POLL_MS);
+}
+function closeRollcall() {
+  clearInterval(RC.timer); RC.timer = null;
+  document.getElementById('rc-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  rcUpdateOpenBtn();
+}
+
+// ── Affichage ───────────────────────────────────────────────────────────────
+function rcInScope(p) {
+  if (RC.site === 'ALL' || p.site.code === RC.site) return true;
+  return p.site.code === 'REGM_MDE' && (RC.site === 'REGM' || RC.site === 'MDE');
+}
+function rcRenderSites() {
+  const sites = new Map();
+  RC.list.forEach(p => { if (!sites.has(p.site.code)) sites.set(p.site.code, p.site.label); });
+  if (RC.site !== 'ALL' && !sites.has(RC.site)) RC.site = 'ALL';
+  const short = l => l.replace(/^IHEID - /, '');
+  let html = `<button class="rc-chip${RC.site === 'ALL' ? ' on' : ''}" data-site="ALL">Tous les sites</button>`;
+  let opts = '';
+  sites.forEach((label, code) => {
+    html += `<button class="rc-chip${RC.site === code ? ' on' : ''}" data-site="${escHtml(code)}">${escHtml(short(label))}</button>`;
+    opts += `<option value="${escHtml(code)}"${RC.site === code ? ' selected' : ''}>${escHtml(short(label))}</option>`;
+  });
+  const box = document.getElementById('rc-sites');
+  box.innerHTML = html;
+  box.querySelectorAll('[data-site]').forEach(b => b.onclick = () => rcSetSite(b.dataset.site));
+  document.getElementById('rc-add-site').innerHTML = opts;
+}
+
+function rcRowInner(p) {
+  const c = RC.state.checks[p.key];
+  const ok = !!(c && c.p);
+  const tag = { shortstay: '<span class="rc-tag ss">Court séjour</span>', sublease: '<span class="rc-tag sub">Sous-locataire</span>',
+                extra: '<span class="rc-tag ex">Ajouté</span>', resident: '' }[p.kind] || '';
+  const small = tag + (p.note ? escHtml(p.note) : '');
+  return `<span class="rc-room">${escHtml(p.room || '—')}</span>
+    <span class="rc-who"><b>${escHtml(p.name)}</b>${small ? `<small>${small}</small>` : ''}${ok ? `<span class="rc-time">✓ ${rcTime(c.ts)}${c.by ? ' · ' + escHtml(c.by) : ''}</span>` : ''}</span>
+    <span class="rc-mark">✓</span>`;
+}
+
+function rcRender() {
+  const el = document.getElementById('rc-list');
+  const groups = new Map();
+  RC.list.filter(rcInScope).forEach(p => {
+    if (!groups.has(p.site.code)) groups.set(p.site.code, { label: p.site.label, rows: [] });
+    groups.get(p.site.code).rows.push(p);
+  });
+  if (!groups.size) { el.innerHTML = '<div class="rc-empty">Aucun occupant attendu pour ce site aujourd\'hui.</div>'; rcUpdateCounts(); return; }
+  let html = '';
+  groups.forEach((g, code) => {
+    html += `<div class="rc-site" data-site="${escHtml(code)}"><div class="rc-site-h">${escHtml(g.label)} <span data-site-count="${escHtml(code)}"></span></div>`;
+    g.rows.forEach(p => {
+      html += `<button class="rc-row${rcIsOk(p.key) ? ' ok' : ''}" data-key="${escHtml(p.key)}" data-s="${escHtml(p.search)}">${rcRowInner(p)}</button>`;
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+  rcApplyFilters();
+}
+
+// Mise à jour en place (après une synchro) sans perdre la position de défilement
+function rcRefreshRows() {
+  document.querySelectorAll('#rc-list .rc-row').forEach(row => {
+    const p = RC.byKey.get(row.dataset.key); if (!p) return;
+    const ok = rcIsOk(p.key);
+    const c = RC.state.checks[p.key];
+    const sig = ok ? 'ok' + c.ts : 'ko';
+    if (row.dataset.sig === sig) return;
+    row.dataset.sig = sig;
+    row.classList.toggle('ok', ok);
+    row.innerHTML = rcRowInner(p);
+  });
+  rcApplyFilters();
+}
+
+function rcApplyFilters() {
+  const q = normalize(RC.q), qRoom = normRoom(RC.q);
+  document.querySelectorAll('#rc-list .rc-site').forEach(sec => {
+    let visible = 0;
+    sec.querySelectorAll('.rc-row').forEach(row => {
+      const ok = row.classList.contains('ok');
+      let show = RC.view === 'all' || (RC.view === 'ok' ? ok : !ok);
+      if (show && q) show = row.dataset.s.includes(q) || (qRoom.length >= 2 && row.dataset.s.includes(qRoom));
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    sec.style.display = visible ? '' : 'none';
+  });
+  rcUpdateCounts();
+}
+
+function rcUpdateCounts() {
+  const scope = RC.list.filter(rcInScope);
+  const ok = scope.filter(p => rcIsOk(p.key)).length;
+  document.getElementById('rc-n-ok').textContent = ok;
+  document.getElementById('rc-n-ko').textContent = scope.length - ok;
+  document.getElementById('rc-n-all').textContent = scope.length;
+  const siteCounts = {};
+  scope.forEach(p => {
+    const c = siteCounts[p.site.code] || (siteCounts[p.site.code] = { ok: 0, all: 0 });
+    c.all++; if (rcIsOk(p.key)) c.ok++;
+  });
+  document.querySelectorAll('[data-site-count]').forEach(s => {
+    const c = siteCounts[s.dataset.siteCount]; if (c) s.textContent = `${c.ok} / ${c.all} présents`;
+  });
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const row = e.target.closest && e.target.closest('#rc-list .rc-row');
+  if (row) rcToggle(row);
+});
+
+function rcToggle(row) {
+  const key = row.dataset.key;
+  const p = RC.byKey.get(key); if (!p) return;
+  if (rcIsOk(key)) {
+    if (!confirm(`Retirer le pointage de ${p.name} ?`)) return;
+    RC.state.checks[key] = { p: false, ts: Date.now(), by: rcAgent() };
+  } else {
+    RC.state.checks[key] = { p: true, ts: Date.now(), by: rcAgent() };
+    if (navigator.vibrate) navigator.vibrate(40);
+  }
+  if (!RC.state.appel) rcNewAppel(); // le 1er pointage démarre l'appel partagé
+  rcSaveState();
+  rcSendCheck(key);
+  row.dataset.sig = '';
+  // Après un pointage via la recherche : on vide le champ pour la personne suivante
+  if (RC.q && rcIsOk(key)) { const s = document.getElementById('rc-search'); s.value = ''; RC.q = ''; s.focus(); }
+  rcRefreshRows();
+  rcUpdateSyncInfo();
+}
+
+function rcSetSite(code) { RC.site = code; rcRenderSites(); rcRender(); }
+function rcSetView(v) {
+  RC.view = v;
+  document.querySelectorAll('.rc-chip.view').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  rcApplyFilters();
+}
+function rcSetQuery(v) { RC.q = v; rcApplyFilters(); }
+
+function rcToggleAdd() {
+  const f = document.getElementById('rc-add');
+  f.classList.toggle('open');
+  if (f.classList.contains('open')) {
+    document.getElementById('rc-add-name').value = RC.q || '';
+    document.getElementById('rc-add-name').focus();
+  }
+}
+function rcAddExtra() {
+  const nom = document.getElementById('rc-add-name').value.trim();
+  const chambre = document.getElementById('rc-add-room').value.trim();
+  const site = document.getElementById('rc-add-site').value;
+  if (!nom) { document.getElementById('rc-add-name').focus(); return; }
+  if (!RC.state.appel) rcNewAppel();
+  const key = 'X|' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  RC.state.extras[key] = { nom, chambre, site, by: rcAgent() };
+  RC.state.checks[key] = { p: true, ts: Date.now(), by: rcAgent() };
+  rcSaveState();
+  rcBuildList();
+  rcSendCheck(key);
+  document.getElementById('rc-add-name').value = '';
+  document.getElementById('rc-add-room').value = '';
+  document.getElementById('rc-add').classList.remove('open');
+  document.getElementById('rc-search').value = ''; RC.q = '';
+  rcRenderSites(); rcRender(); rcUpdateSyncInfo();
+}
+
+async function rcShareMissing() {
+  const scope = RC.list.filter(rcInScope);
+  const missing = scope.filter(p => !rcIsOk(p.key));
+  const now = new Date().toLocaleString('fr-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const siteLbl = RC.site === 'ALL' ? 'Tous les sites' : rcSiteOf(RC.site).label;
+  let txt = `RDZ — APPEL ÉVACUATION\n${siteLbl} — ${now}\nPrésents : ${scope.length - missing.length} / ${scope.length}\nMANQUANTS : ${missing.length}\n`;
+  let cur = '';
+  missing.forEach(p => {
+    if (p.site.label !== cur) { cur = p.site.label; txt += `\n[${cur}]\n`; }
+    const extra = p.kind === 'shortstay' ? '  [court séjour]' : p.kind === 'sublease' ? '  [sous-locataire]' : (p.kind === 'resident' && /^Sous-loue/.test(p.note) ? '  [chambre sous-louée]' : '');
+    txt += `${p.room || '—'}  ${p.name}${extra}\n`;
+  });
+  try {
+    if (navigator.share) { await navigator.share({ title: 'Appel évacuation — manquants', text: txt }); return; }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(txt); rcToast(`Liste des ${missing.length} manquants copiée.`); }
+  catch (e) { rcSetView('ko'); rcToast('Copie impossible — la vue « Manquants » est affichée.'); }
+}
+
+function rcCloseAppel() {
+  if (!RC.state.appel) { rcToast('Aucun appel en cours.'); return; }
+  const n = Object.values(RC.state.checks).filter(c => c.p).length;
+  if (!confirm(`Clôturer l'appel pour TOUS les agents ?\n${n} personne(s) pointée(s) — le pointage reste archivé.`)) return;
+  rcSendAppel(true);
+  RC.state = rcEmptyState();
+  rcSaveState();
+  document.getElementById('rc-search').value = ''; RC.q = '';
+  rcBuildList(); rcRenderSites(); rcRender(); rcUpdateSyncInfo();
+  rcToast('Appel clôturé.');
+}
+
+function rcToast(msg) {
+  let t = document.getElementById('rc-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'rc-toast'; t.className = 'rc-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3500);
+}
+window.toast = window.toast || rcToast; // utilisé par RDZSync en cas de mémoire pleine
+
+// Bouton d'accès : signale un appel en cours (le mien ou celui d'un collègue)
+async function rcUpdateOpenBtn() {
+  rcLoadState();
+  const btn = document.getElementById('rc-open-btn'), sub = document.getElementById('rc-open-sub');
+  const setLive = (txt) => { sub.textContent = txt; btn.classList.add('live'); };
+  btn.classList.remove('live');
+  sub.textContent = 'Liste de tous les occupants présents, à pointer';
+  if (RC.state.appel) setLive(`Appel en cours (${RC.state.appel.started_by || '—'}) — touchez pour reprendre`);
+  try {
+    const since = new Date(Date.now() - RC_MAX_AGE_H * 3600e3).toISOString();
+    const { data: open } = await sb.from('evacuation_appels').select('started_by,started_at').is('closed_at', null).gte('started_at', since).order('started_at').limit(1);
+    if (open && open[0]) setLive(`Appel en cours lancé par ${open[0].started_by || 'un collègue'} à ${rcTime(open[0].started_at)} — touchez pour rejoindre`);
+  } catch (e) {}
+}
+
+window.addEventListener('online', () => { if (RC.timer) rcSync(); });
+RDZSync.init({ client: sb, onChange: () => { if (RC.timer) rcUpdateSyncInfo(); } });
+const dataReady = loadAll();
+rcUpdateOpenBtn();
+setInterval(() => { if (!RC.timer) rcUpdateOpenBtn(); }, 60000);
 </script>
 </body>
 </html>
