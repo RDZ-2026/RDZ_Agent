@@ -1,3 +1,4 @@
+<!-- RDZ · ronde-agent · v2 · 2026-11-26 · lecture des puces NFC (Web NFC, téléphones Android avec Chrome) : le numéro de série de la puce est comparé à rondes_pointeaux.nfc_serial (ex. puces Guardtek reprises) ; le pointage se fait au choix par puce NFC ou par QR code ; méthode enregistrée (nfc / qr). Pas d'image automatique pour une puce NFC (la caméra n'est pas ouverte). Sur iPhone : QR uniquement. -->
 <!-- RDZ · ronde-agent · v1 · 2026-11-25 · création : l'agent choisit son site puis sa ronde, scanne les QR codes des pointeaux (reconnaissance automatique, image prise au moment du scan), ajoute photos (4 max) / commentaire / rapport main courante sur un point, peut scanner un point du site hors de sa ronde (point supplémentaire), termine la ronde avec un motif si des points manquent. Fonctionne hors réseau (RDZSync v4 + ronde en cours gardée sur le téléphone). Tables : rondes_executions / rondes_scans / rondes_photos (migration-rondes.sql). Relu par centraliste/supervision-rondes.html. -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -125,6 +126,13 @@ main{flex:1;padding:18px 16px 26px;padding-bottom:max(90px,env(safe-area-inset-b
 .scan-auto{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:0 0 64px;background:#dfe7e2}
 .scan-title{font-size:17px;font-weight:800;color:var(--rdz-green);letter-spacing:-.01em}
 .scan-card.supp .scan-title{color:var(--rdz-blue)}
+.nfc-row{display:flex;align-items:center;gap:10px;border-radius:12px;padding:10px 12px;font-size:13.5px;font-weight:700;margin-bottom:12px}
+.nfc-row.on{background:#ecfdf3;border:1px solid #b7e4c7;color:#166534}
+.nfc-row.off{background:#eef5ff;border:1px solid #cfe0fb;color:#1e3a8a}
+.nfc-row.na{background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;font-weight:600}
+.nfc-row button{margin-left:auto;background:var(--rdz-navy2);color:#fff;border:none;border-radius:9px;padding:8px 10px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.nfc-dot{width:10px;height:10px;border-radius:50%;background:#16a34a;flex:0 0 10px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .scan-sub{font-size:12.5px;color:#334155;margin-top:2px}
 .lbl{font-size:12px;font-weight:800;color:#475569;margin:14px 0 7px;text-transform:uppercase;letter-spacing:.04em}
 .photos{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
@@ -274,6 +282,7 @@ select{width:100%;font-family:inherit;font-size:15px;background:#fff;border:1px 
         <div class="prog-meta" id="r-meta"></div>
       </div>
       <div id="r-sync"></div>
+      <div id="r-nfc"></div>
       <div id="r-focus"></div>
       <div class="section-h">Points de la ronde</div>
       <div id="r-list"></div>
@@ -296,7 +305,7 @@ select{width:100%;font-family:inherit;font-size:15px;background:#fff;border:1px 
       <button class="btn btn-light" onclick="boot(true)">Nouvelle ronde</button>
     </section>
 
-    <div class="foot">RDZ · Rondes · v1</div>
+    <div class="foot">RDZ · Rondes · v2</div>
   </main>
 </div>
 
@@ -682,7 +691,7 @@ function parseCode(txt){
 async function boot(fresh){
   if(!AGENT_NOM){ show('screen-noagent'); return; }
   RUN = lsGet(LS_RUN, null);
-  if(RUN && RUN.exec && RUN.exec.statut === 'en_cours'){ selScanId = RUN.lastScanId || null; renderRun(); show('screen-run'); loadMotifs(); return; }
+  if(RUN && RUN.exec && RUN.exec.statut === 'en_cours'){ selScanId = RUN.lastScanId || null; renderRun(); show('screen-run'); loadMotifs(); nfcAutoResume(); return; }
   RUN = null;
   if(!fresh){
     const p = new URLSearchParams(location.search).get('p');
@@ -765,7 +774,7 @@ function pickRonde(id){
   const pts = rondePoints(curRonde);
   document.getElementById('st-site').textContent = '📍 ' + curSite.nom;
   document.getElementById('st-name').textContent = curRonde.nom;
-  document.getElementById('st-sub').textContent = pts.length + ' point' + (pts.length>1?'s':'') + ' à pointer. Ordre conseillé ci-dessous — un point scanné dans le désordre est accepté.';
+  document.getElementById('st-sub').textContent = pts.length + ' point' + (pts.length>1?'s':'') + ' à pointer' + (pts.some(p => p.nfc_serial) && NFC_OK ? ' (puce NFC ou QR code)' : '') + '. Ordre conseillé ci-dessous — un point pointé dans le désordre est accepté.';
   document.getElementById('st-list').innerHTML = pts.length ? pts.map((p,i) => `
     <div class="pt"><span class="n">${i+1}</span><span class="nm">${esc(p.nom)}${p.consigne ? `<small>${esc(p.consigne)}</small>` : ''}</span></div>`).join('')
     : '<div class="state-msg">Cette ronde ne contient aucun point actif.</div>';
@@ -789,9 +798,10 @@ function startRonde(){
   RUN = {
     exec, scans: [], thumbs: {}, lastScanId: null,
     planned: pts.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'' })),
-    sitePoints: curRef.pointeaux.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'' }))
+    sitePoints: curRef.pointeaux.map(p => ({ id:String(p.id), code:p.code, nom:p.nom, consigne:p.consigne||'', photo_url:p.photo_url||'', nfc_serial: normSerial(p.nfc_serial) }))
   };
   saveExec(); persistRun();
+  nfcStart(true);
   selScanId = null; focusId = null;
   renderRun(); show('screen-run');
   buzz(60);
@@ -829,6 +839,7 @@ function renderRun(){
   document.getElementById('r-bar').style.width = (tot ? Math.round(done*100/tot) : 0) + '%';
   document.getElementById('r-meta').textContent = 'Commencée à ' + hm(e.debut_at) + (supp ? ' · ' + supp + ' point(s) supplémentaire(s)' : '');
   renderSync();
+  renderNfc();
   renderFocus();
   renderList();
 }
@@ -848,7 +859,7 @@ function renderFocus(){
       ${n.consigne ? `<div class="next-cons">📌 ${esc(n.consigne)}</div>` : ''}
       ${n.photo_url ? `<img class="next-photo" src="${esc(n.photo_url)}" alt="Repérage du point" onerror="this.remove()">` : ''}
     </div>` : `<div class="next-card"><div class="next-done">✅ Tous les points de la ronde sont pointés.<br>Vous pouvez terminer la ronde.</div></div>`)
-    + `<button class="btn btn-red btn-scan" onclick="openScanner()">📷 Scanner un point</button>`;
+    + `<button class="btn btn-red btn-scan" onclick="openScanner()">📷 Scanner un QR code</button>`;
 }
 function scanCardHtml(s){
   const photos = (RUN.thumbs[s.id] || []);
@@ -864,7 +875,7 @@ function scanCardHtml(s){
     <div class="scan-head">
       ${auto && auto.src ? `<img class="scan-auto" src="${auto.src}" alt="Image du scan">` : ''}
       <div><div class="scan-title">✓ ${esc(s.pointeau_nom)}</div>
-      <div class="scan-sub">Pointé à ${hm(s.scanned_at)}${s.hors_ronde ? ' · point supplémentaire' : ''}</div></div>
+      <div class="scan-sub">Pointé à ${hm(s.scanned_at)}${s.methode === 'nfc' ? ' · 📶 puce NFC' : ''}${s.hors_ronde ? ' · point supplémentaire' : ''}</div></div>
     </div>
     <div class="lbl">Photos (facultatif)</div>
     <div class="photos">${tiles}</div>
@@ -1002,6 +1013,9 @@ async function onCode(txt, img){
     toast(code ? "Ce QR code n'appartient pas à ce site." : "Ce QR code n'est pas un pointeau RDZ.", 'bad');
     return;
   }
+  return recordPoint(pt, img, 'qr');
+}
+async function recordPoint(pt, img, methode){
   const already = scanOf(pt.id);
   if(already){ buzz(40); toast('Déjà pointé à ' + hm(already.scanned_at)); tapScan(already.id); return; }
   const idx = RUN.planned.findIndex(p => p.id === pt.id);
@@ -1010,7 +1024,7 @@ async function onCode(txt, img){
     id: uid(), execution_id: RUN.exec.id, ronde_id: RUN.exec.ronde_id, site_id: RUN.exec.site_id, site_nom: RUN.exec.site_nom,
     pointeau_id: pt.id, pointeau_code: pt.code, pointeau_nom: pt.nom, agent_nom: AGENT_NOM,
     scanned_at: now, rang: RUN.scans.length + 1, ordre_prevu: idx >= 0 ? idx + 1 : null, hors_ronde: idx < 0,
-    methode: 'qr', commentaire: null, rapport_ids: [], created_at: now, updated_at: now
+    methode: methode || 'qr', commentaire: null, rapport_ids: [], created_at: now, updated_at: now
   };
   RUN.scans.push(s);
   saveScan(s);
@@ -1027,6 +1041,56 @@ async function onCode(txt, img){
   buzz(120);
   toast((s.hors_ronde ? '➕ Point supplémentaire : ' : '✓ ') + pt.nom, 'good');
   window.scrollTo(0,0);
+}
+
+/* ───────────── Puces NFC (Web NFC — Android + Chrome) ─────────────
+   On lit le numéro de série gravé dans la puce (event.serialNumber,
+   ex. « 04:3d:29:1a:6f:66:81 ») et on le compare à rondes_pointeaux.nfc_serial
+   (même numéro sans « : », en majuscules — format des références Guardtek).
+   La lecture démarre au clic « Démarrer la ronde » (geste obligatoire la
+   première fois) ; ensuite, une fois l'autorisation accordée, elle reprend
+   seule à chaque ouverture de la page tant que la ronde est en cours. */
+const NFC_OK = ('NDEFReader' in window);
+let nfcState = 'off', nfcCtrl = null, nfcLast = { s:'', t:0 };
+function normSerial(x){ return String(x||'').replace(/[^0-9a-f]/gi, '').toUpperCase(); }
+async function nfcStart(fromGesture){
+  if(!NFC_OK || nfcState === 'on' || !RUN) return;
+  try{
+    const reader = new NDEFReader();
+    nfcCtrl = new AbortController();
+    await reader.scan({ signal: nfcCtrl.signal });
+    nfcState = 'on';
+    reader.onreading = ev => onNfc(ev.serialNumber);
+    reader.onreadingerror = () => toast('Puce illisible : réessayez en la touchant bien à plat.', 'bad');
+  }catch(e){
+    nfcState = (e && e.name === 'NotAllowedError') ? 'denied' : 'off';
+    if(fromGesture && nfcState === 'denied') toast("NFC refusé : autorisez-le dans les réglages de Chrome, ou utilisez les QR codes.", 'bad');
+  }
+  renderNfc();
+}
+function nfcStop(){ try{ nfcCtrl && nfcCtrl.abort(); }catch(e){} nfcCtrl = null; nfcState = 'off'; }
+async function nfcAutoResume(){
+  if(!NFC_OK || !RUN) return;
+  try{ const st = await navigator.permissions.query({ name:'nfc' }); if(st.state === 'granted') nfcStart(false); }catch(e){}
+}
+function renderNfc(){
+  const box = document.getElementById('r-nfc'); if(!box || !RUN) return;
+  const hasNfc = (RUN.sitePoints||[]).some(p => p.nfc_serial);
+  if(!NFC_OK){ box.innerHTML = hasNfc ? '<div class="nfc-row na">📶 Lecture des puces NFC impossible sur ce téléphone (iPhone ou navigateur non compatible) : utilisez les QR codes.</div>' : ''; return; }
+  if(nfcState === 'on') box.innerHTML = '<div class="nfc-row on"><span class="nfc-dot"></span>NFC actif : approchez le téléphone d\'une puce</div>';
+  else if(nfcState === 'denied') box.innerHTML = '<div class="nfc-row off">📶 NFC refusé pour cette page. Autorisez-le dans les réglages du site (Chrome), ou utilisez les QR codes.<button onclick="nfcStart(true)">Réessayer</button></div>';
+  else box.innerHTML = '<div class="nfc-row off">📶 Lecture des puces NFC désactivée<button onclick="nfcStart(true)">Activer le NFC</button></div>';
+}
+function onNfc(serial){
+  if(!RUN) return;
+  const sn = normSerial(serial);
+  if(!sn) return;
+  if(sn === nfcLast.s && Date.now() - nfcLast.t < 2500) return;   // même puce lue plusieurs fois d'affilée
+  nfcLast = { s: sn, t: Date.now() };
+  if(!document.getElementById('scanner').classList.contains('hidden')) closeScanner();
+  const pt = RUN.sitePoints.find(p => p.nfc_serial && p.nfc_serial === sn);
+  if(!pt){ buzz([80,60,80]); toast("Cette puce n'est enregistrée sur aucun point de ce site (n° " + sn + ').', 'bad'); return; }
+  recordPoint(pt, null, 'nfc');
 }
 
 /* ───────────── Photos de l'agent ───────────── */
@@ -1160,6 +1224,7 @@ function finishRonde(){
   saveExec();
   const done = RUN;
   RUN = null; try{ localStorage.removeItem(LS_RUN); }catch(e){}
+  nfcStop();
   closeFinish();
   document.getElementById('d-title').textContent = m.length ? '✅ Ronde terminée (incomplète)' : '✅ Ronde complète';
   document.getElementById('d-sub').textContent = e.ronde_nom + ' · ' + e.site_nom + ' · ' + hm(e.debut_at) + ' → ' + hm(e.fin_at) + ' (' + dur(e.debut_at, e.fin_at) + ')' + (motif ? ' · Motif : ' + motif : '');

@@ -1,3 +1,4 @@
+<!-- RDZ · rapport-standard · 2026-11-25 · ouverture depuis une ronde (ronde-agent.html : ?ronde_rid=…&pointeau=…) : le rapport prend l'id choisi par la ronde (la supervision des rondes le retrouve), l'emplacement est prérempli avec le nom du pointeau, et les liens « Journal » deviennent « Ronde ». Sans ces paramètres, rien ne change. -->
 <!-- RDZ · rapport-standard · 2026-10-23 · « Type d'action » renommé « Constat » (libellé écran uniquement, colonnes inchangées) ; liste de secours du référentiel mise à jour (v2 : Accès / Stationnement désactivée, 5 nouveaux constats). Rien d'autre ne change. -->
 <!-- RDZ · rapport-standard · 2026-10-22 (b) · retrait des champs « Actions réalisées » (cases) et « Statut de clôture » : l'agent décrit ses actions dans « Qu'avez-vous fait ? » comme avant. Restent : Catégorie → Type d'action (référentiel commun) + Gravité. -->
 <!-- RDZ · rapport-standard · 2026-10-22 · référentiel commun agent / supervision (migration-referentiel-constats.sql) : listes Catégorie → Type d'action lues dans ref_categories_constat / ref_types_constat (mêmes libellés que supervision-rapports.html, plus de liste recopiée à la main) ; code stable type_constat_code enregistré ; Gravité (proposée selon le type), Actions réalisées (cases) et Statut de clôture ajoutés (obligatoires à la clôture seulement, gardés dans les brouillons) ; « Autre… » → précision dans categorie_autre comme avant ; catégorie préremplie si le bouton du journal de bord en transmet une. Sans la migration en base : seules les colonnes existantes sont envoyées (la file hors-ligne n'est jamais bloquée). Graphisme inchangé. -->
@@ -676,6 +677,18 @@ const ACTIVITE = params.get('activite') || 'Passage / intervention';
 let photos = [];
 /* 2026-10-22 — référentiel commun */
 const CAT_PREFILL = params.get('categorie') || ''; // code catégorie transmis par le bouton du journal de bord
+/* 2026-11-25 — rapport ouvert depuis une ronde (ronde-agent.html) : la ronde choisit l'id du
+   rapport et le garde sur le point scanné ; on l'utilise pour le premier rapport enregistré. */
+let RONDE_RID = params.get('ronde_rid') || '';
+const FROM_RONDE = !!RONDE_RID;
+const RONDE_POINT = params.get('pointeau') || '';
+function takeRondeRid(){ const r = RONDE_RID || uid(); RONDE_RID = ''; return r; }
+if(FROM_RONDE){
+  document.querySelectorAll('a[href="journal-de-bord.html"]').forEach(a => {
+    a.href = 'ronde-agent.html';
+    a.textContent = a.textContent.replace('Retour au journal', 'Retour à la ronde').replace('Ouvrir le journal de bord', 'Retour à la ronde').replace('Journal', 'Ronde');
+  });
+}
 let gravTouched = false;
 /* Colonnes de migration-referentiel-constats.sql présentes en base ?
    Mémorisé sur l'appareil. Tant que ce n'est pas confirmé, on n'envoie QUE
@@ -724,6 +737,11 @@ function resetForm(){
   document.getElementById('f-actions').value = '';
   document.getElementById('f-loc').value = '';
   document.getElementById('f-loc-autre').value = '';
+  if(RONDE_POINT){   // 2026-11-25 : emplacement = pointeau de la ronde
+    const sel = document.getElementById('f-loc');
+    if([...sel.options].some(o => o.value === RONDE_POINT)) sel.value = RONDE_POINT;
+    else document.getElementById('f-loc-autre').value = 'Pointeau : ' + RONDE_POINT;
+  }
   const pre = CAT_PREFILL && RDZRef.get().catByCode[CAT_PREFILL];
   document.getElementById('f-nature').value = (pre && STD_TAXONOMY[pre.libelle]) ? pre.libelle : '';
   resetExtras();
@@ -925,7 +943,7 @@ function saveEntry(){
   const grav = document.getElementById('f-grav').value || null;
   let loc = document.getElementById('f-loc').value;
   if(loc==='__autre') loc='';
-  const entreeId = currentDraftId || uid();   // même id que le brouillon s'il y en a un
+  const entreeId = currentDraftId || takeRondeRid();   // même id que le brouillon s'il y en a un (ou id choisi par la ronde)
   const row = {
     id: entreeId,
     site_id: SITE_ID || null,
@@ -1113,7 +1131,7 @@ function queuePhotos(entreeId){
 }
 function saveDraft(){
   const err = document.getElementById('rapport-err'); if(err) err.innerHTML = '';
-  if(!currentDraftId){ currentDraftId = uid(); draftCreatedAt = new Date().toISOString(); }
+  if(!currentDraftId){ currentDraftId = takeRondeRid(); draftCreatedAt = new Date().toISOString(); }
   const meta = queuePhotos(currentDraftId);
   storeDraftRow(makeDraftRow('brouillon'), meta);
   renderPhotos();
