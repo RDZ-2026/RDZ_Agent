@@ -1,3 +1,4 @@
+<!-- RDZ · journal-config · v3 · 2026-11-27 · activités : champ « Postes » (ex. B1, B2) — sur un site qui a des postes, le journal de bord demande d'abord le poste puis n'affiche que ses activités + celles sans poste. Masqué tant que 07_postes_activites.sql n'est pas exécuté. Rien d'autre ne change. -->
 <!-- RDZ · journal-config · v2 · 2026-10-22 · activités menant au rapport : menu « Catégorie préremplie » (référentiel commun, migration-referentiel-constats.sql) — masqué si la migration n'est pas faite. Rien d'autre ne change. -->
 <!-- RDZ · journal-config · v1 · 2026-08-08 -->
 <!DOCTYPE html>
@@ -278,6 +279,12 @@ async function actCatUpd(id, v){
   try{ const { error } = await sb.from('journal_activites').update({ categorie_code: v || null }).eq('id', id); if(error) throw error;
     const a=activites.find(x=>x.id===id); if(a) a.categorie_code = v || null; toast('Modifié ✓'); }catch(e){ toast('Échec', true); }
 }
+/* 2026-11-27 — postes (ex. « B1, B2 ») ; vide = activité affichée pour tous les postes */
+async function actPostesUpd(id, v){
+  const postes = [...new Set(String(v||'').split(/[,;]/).map(x => x.trim()).filter(Boolean))];
+  try{ const { error } = await sb.from('journal_activites').update({ postes }).eq('id', id); if(error) throw error;
+    const a=activites.find(x=>x.id===id); if(a) a.postes = postes; toast('Postes enregistrés ✓'); }catch(e){ toast('Échec', true); }
+}
 async function actInit(){
   await loadSites(); await loadModules(); await loadRefCats();
   document.getElementById('act-site').innerHTML = siteOptions();
@@ -313,6 +320,8 @@ async function actLoad(){
               <option value="">— aucune (l'agent choisit) —</option>
               ${refCats.map(c=>`<option value="${esc(c.code)}" ${a.categorie_code===c.code?'selected':''}>${esc(c.libelle)}</option>`).join('')}
             </select></div>` : ''}
+          ${Array.isArray(a.postes) ? `<div class="mini">Postes :
+            <input type="text" style="width:auto;min-width:150px;display:inline-block" placeholder="vide = tous les postes" value="${esc(a.postes.join(', '))}" onchange="actPostesUpd(${a.id}, this.value)"></div>` : ''}
         </div>
         <button class="del" onclick="actDel(${a.id})">🗑</button>
       </div>`).join('');
