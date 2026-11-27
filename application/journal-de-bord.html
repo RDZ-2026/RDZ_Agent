@@ -1,3 +1,4 @@
+<!-- RDZ · journal-de-bord · v4.2 · 2026-11-27 · choix du POSTE avant les activités quand le site en a (ex. HDLT : B1, B2, B11, B12) : l'agent ne voit plus que les rapports de son poste + ceux « pour tous les postes ». Postes réglés dans journal-config (journal_activites.postes, 07_postes_activites.sql). Dernier poste choisi retenu par site. Sans postes : liste inchangée. -->
 <!-- RDZ · journal-de-bord · v4.1 · 2026-10-23 · nouvelle charte (identique à mobile.html v6.5 : bandeau marine + logo, cartes arrondies) appliquée sur la base v3.3 — rétablit la barre de recherche des sites, la catégorie transmise au rapport (v3.2) et l'intitulé « Rapport » (v3.1), perdus en v4. -->
 <!-- RDZ · journal-de-bord · v3.3 · 2026-10-22 · barre de recherche au-dessus de la liste des sites (filtre sur le nom, sans tenir compte des accents ni des majuscules). -->
 <!-- RDZ · journal-de-bord · v3.2 · 2026-10-22 · un bouton relié à une catégorie (journal_activites.categorie_code, réglée dans journal-config) la transmet au rapport, qui la préremplit. -->
@@ -121,6 +122,10 @@ main{flex:1;padding:18px 16px 26px;padding-bottom:max(26px,env(safe-area-inset-b
   .group-btn .ic{width:48px;height:48px;flex-basis:48px}
   .group-btn .t{font-size:15px}
 }
+/* v4.2 — choix du poste */
+.poste-last{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:2px 8px;border-radius:20px;background:#eaf5ec;color:#1b7a3d;margin-left:8px;vertical-align:2px}
+.poste-back{background:none;border:none;color:var(--red,#d71920);font-size:14px;font-weight:bold;cursor:pointer;padding:6px 0;margin:0 0 10px}
+.all-link{display:block;width:100%;background:none;border:1px dashed #cbd5e1;border-radius:12px;padding:12px;margin-top:6px;font-size:13.5px;font-weight:bold;color:#475569;cursor:pointer}
 </style>
 </head>
 <body>
@@ -162,11 +167,11 @@ main{flex:1;padding:18px 16px 26px;padding-bottom:max(26px,env(safe-area-inset-b
         <div id="crumbs"></div>
         <div class="step-rule"></div>
       </div>
-      <div class="section-h">Activités</div>
+      <div class="section-h" id="act-h">Activités</div>
       <div id="activite-list"><div class="state-msg"><div class="spin"></div>Chargement…</div></div>
     </section>
 
-    <div class="foot">RDZ · Rapport · v4.1</div>
+    <div class="foot">RDZ · Rapport · v4.2</div>
   </main>
 </div>
 
@@ -177,6 +182,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentSite = null;      // {id, nom}
+let ACTS = [];               // activités du site (chargées une fois)
+let POSTE = null;            // poste choisi : null = pas encore choisi, '*' = tout afficher
 let SITES = [];              // sites actifs, chargés une fois ; la recherche filtre cette liste
 const TINTS = ['', 'c1', 'c2', 'c3', 'c4'];   // pastilles d'icône en alternance, comme dans mobile.html
 
@@ -187,7 +194,7 @@ function loading(txt){ return `<div class="state-msg"><div class="spin"></div>${
 
 function renderCrumbs(){
   const c = document.getElementById('crumbs');
-  c.innerHTML = currentSite ? `<span class="site-chip">📍 ${esc(currentSite.nom)}</span>` : '';
+  c.innerHTML = currentSite ? `<span class="site-chip">📍 ${esc(currentSite.nom)}${POSTE && POSTE !== '*' ? ' · ' + esc(POSTE) : ''}</span>` : '';
 }
 
 /* ---------- Écran 1 : sites ---------- */
@@ -218,7 +225,7 @@ function renderSites(){
       </button>`).join('');
 }
 document.getElementById('site-q').addEventListener('input', renderSites);
-function pickSite(s){ currentSite = s; renderCrumbs(); loadActivites(); show('screen-activite'); }
+function pickSite(s){ currentSite = s; POSTE = null; renderCrumbs(); loadActivites(); show('screen-activite'); }
 function goSite(){ renderCrumbs(); show('screen-site'); }
 
 /* ---------- Écran 2 : activités ---------- */
@@ -230,13 +237,58 @@ async function loadActivites(){
       .eq('actif',true).or('site_id.is.null,site_id.eq.'+currentSite.id).order('ordre');
     if(error) throw error;
     if(!data || !data.length){ box.innerHTML = '<div class="state-msg">Aucune activité configurée pour ce site.</div>'; return; }
-    box.innerHTML = data.map((a,i)=>`
+    ACTS = data;
+    renderActivites();
+  }catch(e){ box.innerHTML = `<div class="err">Impossible de charger les activités (réseau ?).<button onclick="loadActivites()">Réessayer</button></div>`; }
+}
+
+/* ---------- v4.2 : postes ---------- */
+function postesDe(a){ return Array.isArray(a.postes) ? a.postes.filter(Boolean) : []; }
+function postesSite(){
+  return [...new Set(ACTS.flatMap(postesDe))].sort((x,y)=>x.localeCompare(y,'fr',{numeric:true}));
+}
+function actBtn(a,i){ return `
       <button class="group-btn ${TINTS[i % TINTS.length]}" onclick='pickActivite(${JSON.stringify(a).replace(/'/g,"&#39;")})'>
         <span class="ic">${esc(a.icone||'📝')}</span>
         <span class="txt"><span class="t">${esc(a.label)}</span>${a.description?`<span class="d">${esc(a.description)}</span>`:''}</span>
         <span class="chev">›</span>
-      </button>`).join('');
-  }catch(e){ box.innerHTML = `<div class="err">Impossible de charger les activités (réseau ?).<button onclick="loadActivites()">Réessayer</button></div>`; }
+      </button>`; }
+function renderActivites(){
+  const box = document.getElementById('activite-list'), h = document.getElementById('act-h');
+  const postes = postesSite();
+  renderCrumbs();
+  // Site sans postes : liste complète, comme avant
+  if(!postes.length || POSTE === '*'){
+    h.textContent = 'Activités';
+    box.innerHTML = (postes.length ? '<button class="poste-back" onclick="choisirPoste(null)">‹ Choisir un poste</button>' : '') + ACTS.map(actBtn).join('');
+    return;
+  }
+  // Étape poste
+  if(POSTE === null){
+    const last = localStorage.getItem('rdz_jdb_poste_' + currentSite.id);
+    h.textContent = 'Quel poste ?';
+    box.innerHTML = postes.map((p,i)=>{
+      const n = ACTS.filter(a => postesDe(a).includes(p)).length;
+      return `<button class="group-btn ${TINTS[i % TINTS.length]}" onclick='choisirPoste(${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+        <span class="ic">🏥</span>
+        <span class="txt"><span class="t">${esc(p)}${p === last ? '<span class="poste-last">Dernier choisi</span>' : ''}</span><span class="d">${n} rapport${n>1?'s':''} propre${n>1?'s':''} à ce poste</span></span>
+        <span class="chev">›</span>
+      </button>`; }).join('') +
+      '<button class="all-link" onclick="choisirPoste(\'*\')">Tout afficher (' + ACTS.length + ')</button>';
+    return;
+  }
+  // Activités du poste + activités sans poste
+  const propres = ACTS.filter(a => postesDe(a).includes(POSTE));
+  const communes = ACTS.filter(a => !postesDe(a).length);
+  h.textContent = 'Activités — ' + POSTE;
+  box.innerHTML = '<button class="poste-back" onclick="choisirPoste(null)">‹ Changer de poste</button>' +
+    propres.map(actBtn).join('') +
+    (communes.length ? '<div class="section-h">Pour tous les postes</div>' + communes.map((a,i)=>actBtn(a,i+propres.length)).join('') : '');
+}
+function choisirPoste(p){
+  POSTE = p;
+  if(p && p !== '*') localStorage.setItem('rdz_jdb_poste_' + currentSite.id, p);
+  renderActivites(); window.scrollTo(0,0);
 }
 
 /* Route vers le module cible en transmettant site + activité dans l'adresse.
@@ -249,6 +301,7 @@ function pickActivite(a){
   const p = new URLSearchParams();
   if(currentSite){ p.set('site_id', currentSite.id); p.set('site', currentSite.nom); }
   p.set('activite', a.label);
+  if(POSTE && POSTE !== '*') p.set('poste', POSTE); // v4.2 : poste choisi (ignoré par les modules qui n'en ont pas besoin)
   if(a.categorie_code) p.set('categorie', a.categorie_code); // 2026-10-22 : catégorie préremplie dans le rapport (ignorée par les autres modules)
   target += (target.indexOf('?') >= 0 ? '&' : '?') + p.toString();
   window.location.href = target;
