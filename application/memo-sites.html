@@ -1,4 +1,9 @@
-<!-- RDZ · memo-sites · v1.3 · 2026-11-27 · onglet « 📚 Consignes » : consignes permanentes du site (ex. les 55 consignes HDLT reprises de Guardtek),
+<!-- RDZ · memo-sites · v1.4 · 2026-11-27 · consignes gérées depuis admin/memo-config.html (06_memo_parametrage.sql) :
+     « J'ai pris connaissance » par consigne (remonte au paramétrage ; une consigne modifiée redevient « à lire »),
+     compteur « à lire » sur la fiche et dans la liste, consignes temporaires (date de fin), consignes générales
+     (groupe « * ») et sites sans fiche (ex. Rosset) affichés quand même avec leurs seules consignes, plusieurs groupes
+     cumulés sur une même fiche. Confirmations faites hors réseau gardées sur le natel et envoyées au retour du réseau.
+     v1.3 · 2026-11-27 · onglet « 📚 Consignes » : consignes permanentes du site (ex. les 55 consignes HDLT reprises de Guardtek),
      sur toutes les fiches dont le nom commence par le groupe (HDLT - B2, HDLT - B11…). Rubriques, recherche, filtre par poste
      (présélectionné d'après le nom de la fiche). Données lues via memo_consignes() (05_consignes_memo.sql), gardées dans la même
      copie hors ligne (effacée en fin de service). Aucun code d'accès dans ces textes.
@@ -166,6 +171,16 @@ details.sous .in .blk{border:none;padding:0 0 12px;margin:0;border-radius:0}
 .c-rub{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:18px 2px 8px}
 details.sous summary small{display:block;font-weight:600;font-size:11.5px;color:var(--muted);margin-top:2px}
 .c-pdf{color:var(--muted);font-size:13.5px;padding:0 0 12px}
+/* Prises de connaissance (v1.4) */
+.c-new{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:2px 7px;border-radius:20px;background:#ffe8ec;color:#a1001b;margin-right:6px;vertical-align:1px}
+.c-tmp{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:20px;background:#fff3df;color:#8a4b00;margin-right:6px;vertical-align:1px}
+.c-ok{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:2px 0 14px;border:none;border-radius:11px;background:var(--ok);color:#fff;font-weight:800;font-size:14px;padding:11px;cursor:pointer}
+.c-done{font-size:12.5px;color:var(--ok);font-weight:700;padding:0 0 12px}
+.lire-link{display:flex;align-items:center;gap:8px;margin-top:10px;background:#fff8e8;border:1px solid #f3d39a;border-radius:11px;padding:10px 12px;
+  font-size:13.5px;font-weight:800;color:#7a4300;cursor:pointer;width:100%;text-align:left}
+.tag.lire{background:#ffe8ec;color:#a1001b}
+.site.pseudo .nm:before{content:'📚 ';}
+.site.gen{border-color:#f3d39a;background:#fffdf7}
 
 .gps{display:grid;gap:8px}
 .gps a{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
@@ -308,6 +323,8 @@ const AGENT = {
 
 let FICHES = [];
 let ZONES = {};       // zones de centrale par site (client → {titre, maj, avis, legende, zones})
+let PSEUDO = [];       // consignes générales + sites sans fiche (affichés avec leurs seules consignes)
+const LUS_KEY = 'rdz_memo_lus_attente'; // confirmations faites hors réseau, à envoyer
 let CONSIGNES = {};   // consignes permanentes par groupe de fiches ('HDLT' → [{rubrique, titre, postes, contenu, format}])
 let cQ = '', cP = null; // recherche et poste de l'onglet Consignes
 let zQ = '', zF = 'tout'; // recherche et filtre de l'onglet zones
@@ -355,15 +372,18 @@ async function load(force) {
       const z = await sb.rpc('memo_zones', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
       if (!z.error && z.data && typeof z.data === 'object') ZONES = z.data;
     } catch (e) {}
+    // Consignes : on envoie d'abord les « J'ai pris connaissance » faits hors réseau
+    await flushLus();
     // Consignes permanentes : même principe, chargées à part.
     try {
       const c = await sb.rpc('memo_consignes', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
       if (!c.error && c.data && typeof c.data === 'object') CONSIGNES = c.data;
     } catch (e) {}
+    buildPseudo();
     writeCache(FICHES, ZONES, CONSIGNES);
     setSync(Date.now(), false);
     if (current) {
-      current = FICHES.find(f => f.id === current.id) || null;
+      current = allSites().find(f => f.id === current.id) || null;
       if (current) { if (procOpen < 0) { buildProcs(current); renderFiche(); } } else renderList();
     }
     else renderList();
@@ -415,13 +435,14 @@ function digits(s) { return String(s || '').replace(/\D/g, ''); }
 function telHref(n) { return 'tel:' + String(n).replace(/[^\d+]/g, ''); }
 function mapHref(dest) { return 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest); }
 
-function tagsHtml(f) {
+function tagsHtml(f, extra) {
   const t = (f.types || []).map(x => {
     const n = norm(x);
     const cls = n.includes('incend') ? 'feu' : n.includes('effrac') ? 'eff' : '';
     return '<span class="tag ' + cls + '">' + esc(x) + '</span>';
   });
   if (f.statut === 'partiel') t.push('<span class="tag part">Fiche incomplète</span>');
+  if (extra) t.push(extra);
   return t.length ? '<div class="tags">' + t.join('') + '</div>' : '';
 }
 
@@ -434,18 +455,22 @@ function renderList() {
   const qd = digits(q), qn = norm(q);
   const isCode = qd.length >= 2 && qd.length === q.replace(/\s/g, '').length;
 
-  const res = FICHES.filter(f => {
+  buildPseudo();
+  const res = allSites().filter(f => {
     if (!q) return true;
+    if (f.pseudo) return norm(f.client).includes(qn);
     if (isCode) return (f.codes || []).some(c => c.code.startsWith(qd)) || digits(f.prom).includes(qd);
     return [f.client, f.nom_complet, f.adresse, (f.types || []).join(' ')].some(x => norm(x).includes(qn));
   });
 
   $('list').innerHTML = res.length ? res.map(f => {
     const codes = (f.codes || []).length ? f.codes.map(c => c.code.replace(/(\d{3})(?=\d)/g, '$1 ')).join('<br>') : esc(f.prom && f.prom !== '—' ? f.prom : '');
-    return '<button class="site" type="button" data-id="' + esc(f.id) + '">' +
+    const nl = aLire(f).length;
+    return '<button class="site' + (f.pseudo ? ' pseudo' : '') + (f.groupe === '*' ? ' gen' : '') + '" type="button" data-id="' + esc(f.id) + '">' +
       '<div class="body"><div class="nm">' + esc(f.client) + '</div>' +
-      '<div class="ad">' + esc(f.adresse && f.adresse !== 'Non communiquée' ? f.adresse : (f.nom_complet || '')) + '</div>' +
-      tagsHtml(f) + '</div><div class="prom">' + codes + '</div></button>';
+      '<div class="ad">' + esc(f.pseudo ? f.nom_complet : (f.adresse && f.adresse !== 'Non communiquée' ? f.adresse : (f.nom_complet || ''))) + '</div>' +
+      tagsHtml(f, nl ? '<span class="tag lire">' + nl + ' à lire</span>' : '') +
+      '</div><div class="prom">' + codes + '</div></button>';
   }).join('') : '<div class="empty">Aucun site ne correspond à « ' + esc(q) + ' ».<br>Vérifiez le code PROM ou cherchez par nom.</div>';
 
   show('v-list');
@@ -464,7 +489,7 @@ function tabsOf(f) {
 }
 
 function openFiche(id, push) {
-  current = FICHES.find(f => f.id === id);
+  current = allSites().find(f => f.id === id);
   if (!current) return renderList();
   tab = 0; zQ = ''; zF = 'tout'; cQ = ''; cP = null;
   buildProcs(current);
@@ -487,6 +512,8 @@ function renderFiche() {
   if (tr.length) h += '<div class="codes">' + tr.map(t =>
     '<div class="plate"><b>' + esc(String(t.code).replace(/(\d{3})(?=\d)/g, '$1 ')) + '</b><span>' + esc(t.label || '') + '</span></div>').join('') + '</div>';
   h += tagsHtml(f);
+  const nl = aLire(f).length, ci = tabs.findIndex(t => t.consignes);
+  if (nl && ci >= 0 && !f.pseudo) h += '<button type="button" class="lire-link" data-tab="' + ci + '">📌 ' + nl + (nl > 1 ? ' consignes à lire' : ' consigne à lire') + ' — à confirmer</button>';
   const zc = ZONES[f.client], zi = tabs.findIndex(t => t.zones);
   if (zi >= 0) {
     const nd = zc.zones.filter(z => z.etat === 'D').length;
@@ -629,10 +656,58 @@ function renderZones() {
 // Une liste par groupe (ex. 'HDLT') : affichée sur chaque fiche dont le nom
 // commence par ce groupe. Le poste est présélectionné d'après le nom de la
 // fiche (« HDLT - B2 » → B2), modifiable par l'agent.
+// v1.4 : une fiche cumule les consignes de tous les groupes qui la concernent
+// (ex. « ERGON » et « ERGON Seujet »). Le groupe « * » (consignes générales)
+// et les groupes sans fiche sont affichés comme des sites à part (PSEUDO).
 function consignesOf(f) {
+  if (f.pseudo) return CONSIGNES[f.groupe] || [];
   const n = norm(f.client);
-  const g = Object.keys(CONSIGNES || {}).find(k => n.startsWith(norm(k)));
-  return g ? (CONSIGNES[g] || []) : [];
+  return Object.keys(CONSIGNES || {}).filter(k => k !== '*' && n.startsWith(norm(k)))
+    .sort((a, b) => a.length - b.length).flatMap(k => CONSIGNES[k] || []);
+}
+function aLire(f) { return consignesOf(f).filter(c => c.id && c.lu === false); }
+function buildPseudo() {
+  const keys = Object.keys(CONSIGNES || {}).filter(k => (CONSIGNES[k] || []).length);
+  const orphelins = keys.filter(k => k !== '*' && !FICHES.some(f => norm(f.client).startsWith(norm(k))))
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+  PSEUDO = (keys.includes('*') ? ['*'] : []).concat(orphelins).map(k => ({
+    id: 'grp:' + k, pseudo: true, groupe: k,
+    client: k === '*' ? 'Consignes générales' : k,
+    nom_complet: k === '*' ? 'Valables pour tous les sites' : 'Pas encore de fiche — consignes uniquement'
+  }));
+}
+function allSites() { if (!PSEUDO.length) buildPseudo(); return PSEUDO.concat(FICHES); }
+
+/* « J'ai pris connaissance » : affichage immédiat, envoi dès qu'il y a du réseau */
+function lusEnAttente() {
+  try { const p = JSON.parse(localStorage.getItem(LUS_KEY) || 'null'); return p && p.agent === AGENT.id ? p.ids : []; } catch (e) { return []; }
+}
+function setLusEnAttente(ids) {
+  if (ids.length) localStorage.setItem(LUS_KEY, JSON.stringify({ agent: AGENT.id, ids }));
+  else localStorage.removeItem(LUS_KEY);
+}
+async function flushLus() {
+  const ids = lusEnAttente();
+  if (!ids.length || !sb) return;
+  try {
+    const { error } = await sb.rpc('memo_consigne_lue', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash, p_ids: ids });
+    if (!error) setLusEnAttente([]);
+  } catch (e) {}
+}
+async function marquerLu(id) {
+  Object.values(CONSIGNES).forEach(l => (l || []).forEach(c => { if (c.id === id) c.lu = true; }));
+  writeCache(FICHES, ZONES, CONSIGNES);
+  setLusEnAttente([...new Set(lusEnAttente().concat(id))]);
+  // mise à jour sur place (les consignes ouvertes restent ouvertes)
+  const b = $('v-fiche').querySelector('.c-ok[data-id="' + id + '"]');
+  if (b) {
+    const det = b.closest('details'), badge = det && det.querySelector('summary .c-new');
+    if (badge) badge.remove();
+    b.outerHTML = '<div class="c-done">✓ Vous en avez pris connaissance</div>';
+  }
+  const ll = $('v-fiche').querySelector('.lire-link'), nl = current ? aLire(current).length : 0;
+  if (ll) { if (nl) ll.innerHTML = '📌 ' + nl + (nl > 1 ? ' consignes à lire' : ' consigne à lire') + ' — à confirmer'; else ll.remove(); }
+  await flushLus();
 }
 function consPostes(list) { return [...new Set(list.flatMap(c => c.postes || []))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })); }
 function consignesShell(f) {
@@ -670,8 +745,14 @@ function renderConsignes() {
   r.forEach(c => {
     if (c.rubrique !== rub) { rub = c.rubrique; h += '<div class="c-rub">' + esc(rub) + '</div>'; }
     const vide = !(c.contenu && String(c.contenu).trim());
-    h += '<details class="sous"' + (mots.length ? ' open' : '') + '><summary><span>' + esc(c.titre) + ((c.postes || []).length ? '<small>' + esc(c.postes.join(', ')) + '</small>' : '') +
-      '</span></summary><div class="in">' + (vide ? '<div class="c-pdf">📄 Document à venir (ancien PDF en cours de reprise).</div>' : consBlocs(c.contenu)) + '</div></details>';
+    const nouv = c.id && c.lu === false;
+    const fin = c.fin ? String(c.fin).slice(0, 10).split('-').reverse().join('.') : '';
+    const sous = [(c.postes || []).length ? esc(c.postes.join(', ')) : '', fin ? 'jusqu\'au ' + fin : ''].filter(Boolean).join(' · ');
+    h += '<details class="sous"' + (mots.length ? ' open' : '') + '><summary><span>' + (nouv ? '<span class="c-new">À lire</span>' : '') + esc(c.titre) +
+      (sous ? '<small>' + sous + '</small>' : '') +
+      '</span></summary><div class="in">' + (vide ? '<div class="c-pdf">📄 Document à venir (ancien PDF en cours de reprise).</div>' : consBlocs(c.contenu)) +
+      (c.id ? (nouv ? '<button type="button" class="c-ok" data-id="' + esc(c.id) + '">✓ J\'ai pris connaissance</button>' : '<div class="c-done">✓ Vous en avez pris connaissance</div>') : '') +
+      '</div></details>';
   });
   $('c-res').innerHTML = h;
 }
@@ -724,7 +805,9 @@ $('v-fiche').addEventListener('click', e => {
     $('v-fiche').querySelectorAll('.z-f button').forEach(x => x.setAttribute('aria-pressed', x === zb));
     renderZones(); return;
   }
-  const tb = e.target.closest('.rail button, .ban-link, .zone-link');
+  const ok = e.target.closest('.c-ok');
+  if (ok) { marquerLu(ok.dataset.id); return; }
+  const tb = e.target.closest('.rail button, .ban-link, .zone-link, .lire-link');
   if (tb) { tab = +tb.dataset.tab; renderFiche(); window.scrollTo(0, 0); return; }
   const pr = e.target.closest('.go-proc');
   if (pr) openProc(+pr.dataset.proc);
