@@ -1,3 +1,4 @@
+<!-- RDZ · prise-de-poste · v4.5 · 2026-11-27 · + bloc « 📚 Consignes permanentes » : seules les consignes du site nouvelles ou modifiées depuis la dernière lecture de l'agent sont à lire (« J'ai lu », table consignes_site_lectures via RDZSync, hors ligne OK) ; bouton vers la bibliothèque complète consignes-site.html. Les consignes temporaires (table consignes) restent inchangées. Nécessite migration-consignes-site.sql. -->
 <!-- RDZ · prise-de-poste · v4.4 · 2026-11-04 · radio réactivée (RADIO_ACTIVE = true) : le bloc du haut s'appelle désormais « 📻 Mon poste radio » pour ne pas se confondre avec « ✅ Je prends mon service » (services_agents) en bas de page.
      v4.3 · 2026-10-19 · + bouton « Je prends mon service » en bas de page : ouvre un service (table services_agents, RDZSync, hors réseau OK) → voyant vert à côté du nom dans mobile.html ; avertit si des consignes du site ne sont pas encore validées. Nécessite migration-services-agents.sql.
      v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
@@ -161,6 +162,21 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
   .start-zone .svc-btn{font-size:14px;padding:15px}
   .start-zone .svc-btn.go{background:#1b7a3d;box-shadow:0 5px 14px rgba(27,122,61,.22)}
   .start-zone .svc-btn.go:active{background:#145c2e}
+  /* v4.5 : consignes permanentes */
+  .perm-zone{max-width:760px;margin:0 auto;padding:0 14px 18px}
+  .perm-card{background:#fff;border:1px solid var(--rdz-border);border-left:4px solid var(--rdz-red);border-radius:var(--rdz-radius);box-shadow:var(--rdz-shadow);padding:16px 18px;margin-bottom:14px}
+  .perm-title{font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--rdz-text)}
+  .perm-sub{font-size:12.5px;color:var(--rdz-gray);margin:4px 0 12px}
+  .perm-item{border:1px solid var(--rdz-border);border-radius:10px;margin-bottom:8px;overflow:hidden}
+  .perm-head{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;background:var(--rdz-soft)}
+  .perm-head .t{flex:1;font-weight:bold;font-size:13.5px;color:var(--rdz-text)}
+  .perm-head .r{font-size:11.5px;color:var(--rdz-gray);font-weight:normal;margin-top:2px}
+  .perm-head .tog{font-size:12px;font-weight:bold;color:var(--rdz-red);white-space:nowrap}
+  .perm-body{padding:12px 14px;font-size:13.5px;line-height:1.55;color:var(--rdz-text)}
+  .perm-body p{margin:0 0 9px}.perm-body ul{margin:0 0 9px 20px}
+  .perm-read{width:100%;margin-top:6px;background:#1b7a3d;color:#fff;border:none;border-radius:9px;padding:12px;font-weight:bold;font-size:13.5px;cursor:pointer}
+  .perm-ok{background:#eef6ef;border:1px solid #bfe3c6;color:#1b7a3d;border-radius:9px;padding:10px 12px;font-size:13px;margin-bottom:10px}
+  .perm-lib{display:block;text-align:center;text-decoration:none;border:1px solid var(--rdz-border);border-radius:10px;padding:12px;font-weight:bold;font-size:13.5px;color:var(--rdz-text);background:#fff}
 </style>
 </head>
 <body>
@@ -192,6 +208,8 @@ body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI"
 <div class="content" id="content">
   <div class="state-msg"><div class="big">⏳</div>Chargement…</div>
 </div>
+
+<div class="perm-zone" id="perm-zone"></div>
 
 <div class="start-zone" id="start-zone"></div>
 
@@ -526,6 +544,7 @@ function goToday() {
 function onFilterChange() {
   localStorage.setItem(LS_SITE, document.getElementById('site-select').value);
   render();
+  renderPerm();
 }
 
 function validateSite(siteId) {
@@ -889,9 +908,10 @@ function startService() {
   if (svcLocal()) { renderStartZone(); return; }
   const isToday = (document.getElementById('date-select').value || today()) === today();
   const pending = isToday ? PENDING_SITES.slice() : [];
-  const msg = pending.length
+  let msg = pending.length
     ? `Les consignes ne sont pas encore validées pour :\n\n${pending.map(n => '• ' + n).join('\n')}\n\nPrendre votre service quand même ?`
     : 'Confirmer votre prise de service maintenant ?';
+  if (PERM_UNREAD > 0) msg = `${PERM_UNREAD} consigne(s) permanente(s) nouvelle(s) ou modifiée(s) pas encore lue(s).\n\n` + msg;
   if (!window.confirm(msg)) return;
   // Un ancien service resté ouvert sur cet appareil (fin oubliée) est refermé au passage.
   try {
@@ -913,8 +933,81 @@ function startService() {
   renderStartZone();
 }
 
+// ── CONSIGNES PERMANENTES DU SITE (v4.5) ─────────────────────────────────────
+// Table consignes_site (procédures, numéros utiles, notes de service…). Ici,
+// seules les consignes NOUVELLES OU MODIFIÉES depuis la dernière lecture de
+// l'agent sont proposées ; la bibliothèque complète est dans consignes-site.html.
+// Lecture = une ligne consignes_site_lectures (consigne, version, agent) via
+// RDZSync. Copies locales partagées avec consignes-site.html (hors ligne).
+const LS_PERM_CACHE = 'rdz_consignes_site_cache';
+const LS_PERM_LUES = 'rdz_consignes_site_lues';
+const PERM_AGENT = String(AGENT_ID || AGENT_NOM || 'inconnu');
+let permRows = [], permLues = new Set(), permOpen = {}, PERM_UNREAD = 0;
+function permLS(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+function permFmt(t) {
+  return String(t || '').replace(/\r/g, '').split(/\n\s*\n/).map(b => {
+    const lines = b.split('\n').filter(l => l.trim() !== '');
+    if (!lines.length) return '';
+    if (lines.every(l => /^\s*[-•]\s+/.test(l))) return '<ul>' + lines.map(l => '<li>' + escHtml(l.replace(/^\s*[-•]\s+/, '')) + '</li>').join('') + '</ul>';
+    return '<p>' + lines.map(l => /^\s*[-•]\s+/.test(l) ? '• ' + escHtml(l.replace(/^\s*[-•]\s+/, '')) : escHtml(l)).join('<br>') + '</p>';
+  }).join('');
+}
+async function loadPerm() {
+  try {
+    const { data, error } = await sb.from('consignes_site').select('*').eq('actif', true).order('ordre');
+    if (error) throw error;
+    permRows = data || [];
+    try { localStorage.setItem(LS_PERM_CACHE, JSON.stringify({ at: new Date().toISOString(), rows: permRows })); } catch (e) {}
+  } catch (e) { permRows = (permLS(LS_PERM_CACHE, {}).rows) || []; }
+  permLues = new Set(permLS(LS_PERM_LUES, {})[PERM_AGENT] || []);
+  try {
+    const { data, error } = await sb.from('consignes_site_lectures').select('consigne_id,version').eq('agent_id', PERM_AGENT);
+    if (!error) (data || []).forEach(l => permLues.add(l.consigne_id + ':' + l.version));
+  } catch (e) {}
+  renderPerm();
+}
+function permALire(c) { return !!(c.contenu && c.contenu.trim()) && !permLues.has(c.id + ':' + c.version); }
+function renderPerm() {
+  const z = document.getElementById('perm-zone');
+  const siteVal = document.getElementById('site-select').value;
+  const list = siteVal === 'all' ? sites : sites.filter(s => s.id === siteVal);
+  let html = '', unread = 0;
+  list.forEach(site => {
+    const rows = permRows.filter(c => c.site_id === site.id);
+    if (!rows.length) return;
+    const todo = rows.filter(permALire);
+    unread += todo.length;
+    html += `<div class="perm-card">
+      <div class="perm-title">📚 Consignes permanentes${list.length > 1 ? ' — ' + escHtml(site.nom) : ''}</div>
+      <div class="perm-sub">${todo.length ? `${todo.length} consigne(s) nouvelle(s) ou modifiée(s) depuis ta dernière lecture.` : 'Les consignes du site, à consulter pendant ton service.'}</div>
+      ${todo.length ? todo.map(c => `<div class="perm-item">
+          <div class="perm-head" onclick="permToggle('${c.id}')">
+            <div class="t">${escHtml(c.titre)}<div class="r">${escHtml(c.rubrique)}${(c.postes || []).length ? ' · ' + escHtml(c.postes.join(', ')) : ''}</div></div>
+            <div class="tog">${permOpen[c.id] ? 'Fermer ▲' : 'Lire ▼'}</div>
+          </div>
+          ${permOpen[c.id] ? `<div class="perm-body">${permFmt(c.contenu)}<button class="perm-read" onclick="permRead('${c.id}')">✓ J'ai lu</button></div>` : ''}
+        </div>`).join('') : '<div class="perm-ok">✓ Tu es à jour : aucune consigne nouvelle ou modifiée.</div>'}
+      <a class="perm-lib" href="consignes-site.html?site_id=${encodeURIComponent(site.id)}&site=${encodeURIComponent(site.nom)}">📚 Toutes les consignes du site (${rows.length})</a>
+    </div>`;
+  });
+  PERM_UNREAD = unread;
+  z.innerHTML = html;
+}
+function permToggle(id) { permOpen[id] = !permOpen[id]; renderPerm(); }
+function permRead(id) {
+  const c = permRows.find(x => x.id === id); if (!c) return;
+  // Pas d'id dans row (colonne uuid, piège n°10) : upsert sur la clé unique.
+  RDZSync.save({ module: 'prise-de-poste', table: 'consignes_site_lectures', op: 'upsert', onConflict: 'consigne_id,version,agent_id',
+    row: { consigne_id: c.id, version: c.version, agent_id: PERM_AGENT, agent_nom: AGENT_NOM, site_id: c.site_id, lu_at: new Date().toISOString() } });
+  permLues.add(c.id + ':' + c.version);
+  const m = permLS(LS_PERM_LUES, {}); m[PERM_AGENT] = [...new Set((m[PERM_AGENT] || []).concat(c.id + ':' + c.version))];
+  try { localStorage.setItem(LS_PERM_LUES, JSON.stringify(m)); } catch (e) {}
+  delete permOpen[id];
+  renderPerm();
+}
+
 renderStartZone();
-loadAll();
+loadAll().then(loadPerm);
 </script>
 </body>
 </html>
