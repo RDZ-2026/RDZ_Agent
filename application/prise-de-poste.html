@@ -1,4 +1,5 @@
-<!-- RDZ · prise-de-poste · v4.6 · 2026-11-27 · retour au contenu de la v4.4 : le bloc « Consignes permanentes » de la v4.5 est retiré (les consignes de l'hôpital sont dans Mémo sites).
+<!-- RDZ · prise-de-poste · v4.7 · 2026-11-27 · consignes : une consigne déjà validée par l'agent lors d'une prise de poste précédente (même texte) ne lui est plus présentée « à lire » ; elle reste consultable dans « 📚 Consignes déjà lues ». Une consigne nouvelle ou dont le texte a changé repasse « à lire ». Basé sur l'historique consignes_lectures (copie locale pour le hors-ligne). Titre / rubrique affichés s'ils sont renseignés. -->
+     v4.6 · 2026-11-27 · retour au contenu de la v4.4 : le bloc « Consignes permanentes » de la v4.5 est retiré (les consignes de l'hôpital sont dans Mémo sites).
      v4.4 · 2026-11-04 · radio réactivée (RADIO_ACTIVE = true) : le bloc du haut s'appelle désormais « 📻 Mon poste radio » pour ne pas se confondre avec « ✅ Je prends mon service » (services_agents) en bas de page.
      v4.3 · 2026-10-19 · + bouton « Je prends mon service » en bas de page : ouvre un service (table services_agents, RDZSync, hors réseau OK) → voyant vert à côté du nom dans mobile.html ; avertit si des consignes du site ne sont pas encore validées. Nécessite migration-services-agents.sql.
      v4.2 · 2026-10-16 · radio en pause : bloc « Ma prise de service » (choix du poste) masqué. Pour réactiver : RADIO_ACTIVE = true.
@@ -60,6 +61,14 @@
   .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #1e5c2e; margin-top: 5px; flex-shrink: 0; }
   .cons-text { font-size: 13px; color: var(--rdz-black); line-height: 1.5; margin-bottom: 5px; white-space: pre-wrap; }
   .cons-dates { display: flex; gap: 7px; flex-wrap: wrap; font-size: 10px; color: var(--rdz-gray); font-weight: 600; }
+  .cons-title { font-weight: 700; font-size: 13.5px; color: var(--rdz-black); margin-bottom: 2px; }
+  .cons-rub { font-size: 11px; color: var(--rdz-gray); margin-bottom: 4px; }
+  .badge-new { font-size: 9px; background: #fdecee; color: #8B1A1A; padding: 2px 6px; border-radius: 2px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+  details.cons-read > summary { cursor: pointer; list-style: none; padding: 11px 14px; font-size: 12.5px; font-weight: 700; color: var(--rdz-gray); border-top: 1px solid var(--rdz-border); }
+  details.cons-read > summary::-webkit-details-marker { display: none; }
+  details.cons-read > summary::after { content: ' ▼'; font-size: 10px; }
+  details.cons-read[open] > summary::after { content: ' ▲'; }
+  .cons-ok { padding: 10px 14px; font-size: 12.5px; color: #1b7a3d; }
   .badge-perm { font-size: 9px; background: #dbeafe; color: #1e3a5f; padding: 2px 6px; border-radius: 2px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
 
   /* EVENEMENTS */
@@ -444,6 +453,55 @@ let journaux = {}; // constat_id -> [entrées]
 // Overlay optimiste : validations faites dans cette session, avant même confirmation réseau —
 // l'agent ne doit jamais attendre le retour serveur pour voir sa validation prise en compte.
 let localValidations = {}; // site_id -> {validated_at, agent_nom}
+// v4.7 — Consignes déjà connues de l'agent : « id|empreinte du texte » de chaque consigne
+// présente dans une de ses validations passées (consignes_lectures.consignes_json).
+// Une consigne nouvelle, ou dont le texte a changé, n'y figure pas → « à lire ».
+// Copie locale par agent pour fonctionner hors ligne.
+const LS_CONS_CONNUES = 'rdz_consignes_connues';
+let knownCons = new Set(), knownIds = new Set(), knownLoaded = false, OPEN_READ = {};
+function txtHash(t) { let h = 5381; const s = String(t || ''); for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function consKey(c) { return c.id + '|' + txtHash(c.texte); }
+function rememberCons(list) {
+  list.forEach(c => { knownCons.add(consKey(c)); knownIds.add(c.id); });
+  try {
+    const all = JSON.parse(localStorage.getItem(LS_CONS_CONNUES) || '{}');
+    all[String(AGENT_ID || AGENT_NOM)] = [...knownCons];
+    localStorage.setItem(LS_CONS_CONNUES, JSON.stringify(all));
+  } catch (e) {}
+}
+async function loadKnown() {
+  try {
+    const all = JSON.parse(localStorage.getItem(LS_CONS_CONNUES) || '{}');
+    (all[String(AGENT_ID || AGENT_NOM)] || []).forEach(k => { knownCons.add(k); knownIds.add(k.split('|')[0]); });
+  } catch (e) {}
+  if (AGENT_ID) {
+    try {
+      const { data, error } = await sb.from('consignes_lectures').select('consignes_json')
+        .eq('agent_id', AGENT_ID).order('validated_at', { ascending: false }).limit(500);
+      if (!error && data) {
+        const seen = [];
+        data.forEach(r => (Array.isArray(r.consignes_json) ? r.consignes_json : []).forEach(c => { if (c && c.id) seen.push(c); }));
+        rememberCons(seen);
+      }
+    } catch (e) {}
+  }
+  knownLoaded = true;
+}
+function consCard(c, badge) {
+  return `<div class="cons-card">
+    <div class="dot-green"></div>
+    <div style="flex:1">
+      ${c.titre ? `<div class="cons-title">${escHtml(c.titre)}</div>` : ''}
+      ${c.rubrique ? `<div class="cons-rub">${escHtml(c.rubrique)}</div>` : ''}
+      <div class="cons-text">${escHtml(c.texte)}</div>
+      <div class="cons-dates">
+        ${badge ? `<span class="badge-new">${badge}</span>` : ''}
+        <span>📅 Dès le ${fmt(c.date_debut)}</span>
+        ${c.date_fin ? `<span>⛔ Jusqu'au ${fmt(c.date_fin)}</span>` : `<span class="badge-perm">Permanente</span>`}
+      </div>
+    </div>
+  </div>`;
+}
 let PENDING_SITES = [];    // v4.3 : sites du jour affichés dont les consignes ne sont pas encore validées
 
 function typeIcon(t) {
@@ -536,7 +594,7 @@ function validateSite(siteId) {
   const evList = evenements.filter(e => e.site_id === siteId && e.date === ref);
   const ctList = constats.filter(c => c.site_id === siteId && c.statut !== 'Résolu');
 
-  const consSnap = consList.map(c => ({ id: c.id, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
+  const consSnap = consList.map(c => ({ id: c.id, titre: c.titre || null, texte: c.texte, date_debut: c.date_debut, date_fin: c.date_fin }));
   const evSnap = evList.map(e => ({ id: e.id, titre: e.titre, heure_debut: e.heure_debut, heure_fin: e.heure_fin }));
   const ctSnap = ctList.map(c => ({
     id: c.id, description: c.description, categorie: c.categorie, statut: c.statut, procedure: c.procedure || null,
@@ -573,6 +631,7 @@ function validateSite(siteId) {
 
   // Validation « prise en compte » immédiatement, sans attendre le réseau (voir localValidations).
   localValidations[siteId] = { validated_at: nowIso, agent_nom: AGENT_NOM };
+  if (ref === today()) rememberCons(consList);   // v4.7 : ne seront plus « à lire » aux prochaines prises de poste
   render();
 }
 
@@ -587,6 +646,8 @@ async function render() {
     el.innerHTML = `<div class="state-msg"><div class="big">📋</div>Aucun site disponible.</div>`;
     return;
   }
+
+  if (!knownLoaded) await loadKnown();
 
   // Récupère les validations déjà enregistrées pour l'agent, ce jour, ces sites
   let validations = {};
@@ -635,18 +696,20 @@ async function render() {
       <div class="site-hdr"><div class="site-name">${escHtml(site.nom)}</div></div>
 
       <div class="sub-section">
-        <div class="sub-hdr"><div class="sub-title">📋 Consignes actives</div><div class="sub-count">${consList.length}</div></div>
-        ${consList.length === 0 ? '<div class="empty-sub">Aucune consigne active.</div>' : consList.map(c => `
-          <div class="cons-card">
-            <div class="dot-green"></div>
-            <div>
-              <div class="cons-text">${escHtml(c.texte)}</div>
-              <div class="cons-dates">
-                <span>📅 Dès le ${fmt(c.date_debut)}</span>
-                ${c.date_fin ? `<span>⛔ Jusqu'au ${fmt(c.date_fin)}</span>` : `<span class="badge-perm">Permanente</span>`}
-              </div>
-            </div>
-          </div>`).join('')}
+        ${(() => {
+          // v4.7 : « à lire » = jamais validée par l'agent, ou texte modifié depuis ; le reste est replié.
+          const toRead = consList.filter(c => !knownCons.has(consKey(c)));
+          const read = consList.filter(c => knownCons.has(consKey(c)))
+            .sort((x, y) => (x.rubrique || '').localeCompare(y.rubrique || '', 'fr') || (x.titre || '').localeCompare(y.titre || '', 'fr'));
+          return `<div class="sub-hdr"><div class="sub-title">📋 Consignes à lire</div><div class="sub-count">${toRead.length}</div></div>
+          ${consList.length === 0 ? '<div class="empty-sub">Aucune consigne active.</div>'
+            : (toRead.length ? toRead.map(c => consCard(c, knownIds.has(c.id) ? 'Modifiée' : 'Nouvelle')).join('')
+              : '<div class="cons-ok">✓ Aucune consigne nouvelle ou modifiée depuis ta dernière prise de poste.</div>')}
+          ${read.length ? `<details class="cons-read" ${OPEN_READ[site.id] ? 'open' : ''} ontoggle="OPEN_READ['${site.id}']=this.open">
+            <summary>📚 Consignes déjà lues (${read.length})</summary>
+            ${read.map(c => consCard(c, '')).join('')}
+          </details>` : ''}`;
+        })()}
       </div>
 
       <div class="sub-section">
