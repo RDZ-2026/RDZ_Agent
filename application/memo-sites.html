@@ -1,4 +1,8 @@
-<!-- RDZ · memo-sites · v1.2 · 2026-11-12 · onglet « Zones intrusion » (correspondance des zones de la centrale, MSF en premier) :
+<!-- RDZ · memo-sites · v1.3 · 2026-11-27 · onglet « 📚 Consignes » : consignes permanentes du site (ex. les 55 consignes HDLT reprises de Guardtek),
+     sur toutes les fiches dont le nom commence par le groupe (HDLT - B2, HDLT - B11…). Rubriques, recherche, filtre par poste
+     (présélectionné d'après le nom de la fiche). Données lues via memo_consignes() (05_consignes_memo.sql), gardées dans la même
+     copie hors ligne (effacée en fin de service). Aucun code d'accès dans ces textes.
+     v1.2 · 2026-11-12 · onglet « Zones intrusion » (correspondance des zones de la centrale, MSF en premier) :
      recherche par numéro / local / étage, filtres par état, zones en défaut avec leur motif, avertissement
      « alarmes internes ». Données lues via memo_zones() (04_zones_centrale.sql), gardées dans la même copie hors ligne.
      v1.1 · 2026-10-22 · interdictions de site, pas à pas plein écran,
@@ -159,6 +163,9 @@ details.sous summary:after{content:'+';font-size:20px;line-height:1;color:var(--
 details.sous[open] summary:after{content:'–'}
 details.sous .in{padding:0 14px 2px}
 details.sous .in .blk{border:none;padding:0 0 12px;margin:0;border-radius:0}
+.c-rub{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:18px 2px 8px}
+details.sous summary small{display:block;font-weight:600;font-size:11.5px;color:var(--muted);margin-top:2px}
+.c-pdf{color:var(--muted);font-size:13.5px;padding:0 0 12px}
 
 .gps{display:grid;gap:8px}
 .gps a{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
@@ -301,6 +308,8 @@ const AGENT = {
 
 let FICHES = [];
 let ZONES = {};       // zones de centrale par site (client → {titre, maj, avis, legende, zones})
+let CONSIGNES = {};   // consignes permanentes par groupe de fiches ('HDLT' → [{rubrique, titre, postes, contenu, format}])
+let cQ = '', cP = null; // recherche et poste de l'onglet Consignes
 let zQ = '', zF = 'tout'; // recherche et filtre de l'onglet zones
 let current = null;   // fiche ouverte
 let tab = 0;          // onglet ouvert
@@ -319,8 +328,8 @@ function readCache() {
   if (!ok) { localStorage.removeItem(CACHE_KEY); return null; }
   return c;
 }
-function writeCache(fiches, zones) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ agent: AGENT.id, hash: AGENT.hash, ts: Date.now(), fiches, zones: zones || {} })); } catch (e) {}
+function writeCache(fiches, zones, consignes) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ agent: AGENT.id, hash: AGENT.hash, ts: Date.now(), fiches, zones: zones || {}, consignes: consignes || {} })); } catch (e) {}
 }
 
 /* ===================== Chargement ===================== */
@@ -331,7 +340,7 @@ async function load(force) {
       'Ouvrez <a href="mobile.html">l\'application Agent</a> et identifiez-vous avec votre PIN, puis revenez sur Mémo sites.');
   }
   const cache = readCache();
-  if (cache && !force) { FICHES = cache.fiches; ZONES = cache.zones || {}; setSync(cache.ts, !navigator.onLine); renderList(); }
+  if (cache && !force) { FICHES = cache.fiches; ZONES = cache.zones || {}; CONSIGNES = cache.consignes || {}; setSync(cache.ts, !navigator.onLine); renderList(); }
   else if (!cache) show('v-loading');
 
   if (!sb) { if (!cache) showError('Pas de réseau', "Les fiches n'ont encore jamais été chargées sur ce natel. Réessayez avec du réseau."); return; }
@@ -346,7 +355,12 @@ async function load(force) {
       const z = await sb.rpc('memo_zones', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
       if (!z.error && z.data && typeof z.data === 'object') ZONES = z.data;
     } catch (e) {}
-    writeCache(FICHES, ZONES);
+    // Consignes permanentes : même principe, chargées à part.
+    try {
+      const c = await sb.rpc('memo_consignes', { p_agent_id: AGENT.id, p_pin_hash: AGENT.hash });
+      if (!c.error && c.data && typeof c.data === 'object') CONSIGNES = c.data;
+    } catch (e) {}
+    writeCache(FICHES, ZONES, CONSIGNES);
     setSync(Date.now(), false);
     if (current) {
       current = FICHES.find(f => f.id === current.id) || null;
@@ -442,6 +456,7 @@ function tabsOf(f) {
   const t = (f.etapes || []).map((e, i) => ({ n: i + 1, titre: e.titre, resume: e.resume, blocs: e.blocs || [] }));
   const zc = ZONES[f.client];
   if (zc && (zc.zones || []).length) t.push({ titre: 'Zones ' + (zc.titre || 'centrale').replace(/^centrale\s+/i, ''), zones: true, blocs: [] });
+  if (consignesOf(f).length) t.push({ titre: '📚 Consignes', consignes: true, blocs: [] });
   if ((f.blocs_rondes || []).length) t.push({ titre: 'Rondes', blocs: f.blocs_rondes });
   if ((f.blocs_notes || []).length) t.push({ titre: 'Annexes', blocs: f.blocs_notes });
   if (f.interdictions && (f.interdictions.liste || []).length) t.push({ titre: 'Interdictions', ban: true, blocs: [] });
@@ -451,7 +466,7 @@ function tabsOf(f) {
 function openFiche(id, push) {
   current = FICHES.find(f => f.id === id);
   if (!current) return renderList();
-  tab = 0; zQ = ''; zF = 'tout';
+  tab = 0; zQ = ''; zF = 'tout'; cQ = ''; cP = null;
   buildProcs(current);
   if (push) history.pushState({ fiche: id }, '');
   renderFiche();
@@ -494,6 +509,7 @@ function renderFiche() {
     if (t.resume) h += '<p class="e-res">' + esc(t.resume) + '</p>';
     if (t.zones) h += zonesShell(ZONES[f.client]);
     else if (t.ban) h += banHtml(f.interdictions);
+    else if (t.consignes) h += consignesShell(f);
     else h += t.blocs.map(renderBlock).join('');
   }
 
@@ -504,6 +520,7 @@ function renderFiche() {
 
   $('v-fiche').innerHTML = h;
   if ($('z-res')) renderZones();
+  if ($('c-res')) renderConsignes();
   $('dock-procs').innerHTML = PROCS.slice(0, 3).map((p, i) =>
     '<button type="button" class="p' + i + '" data-proc="' + i + '">' + esc(p.court) + '<small>pas à pas</small></button>').join('');
   $('dock-procs').classList.toggle('hidden', !PROCS.length);
@@ -608,6 +625,57 @@ function renderZones() {
   }).join('') + (r.length > 80 ? '<div class="empty">… et ' + (r.length - 80) + ' autres. Affinez la recherche.</div>' : '');
 }
 
+/* ===================== Consignes permanentes ===================== */
+// Une liste par groupe (ex. 'HDLT') : affichée sur chaque fiche dont le nom
+// commence par ce groupe. Le poste est présélectionné d'après le nom de la
+// fiche (« HDLT - B2 » → B2), modifiable par l'agent.
+function consignesOf(f) {
+  const n = norm(f.client);
+  const g = Object.keys(CONSIGNES || {}).find(k => n.startsWith(norm(k)));
+  return g ? (CONSIGNES[g] || []) : [];
+}
+function consPostes(list) { return [...new Set(list.flatMap(c => c.postes || []))].sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })); }
+function consignesShell(f) {
+  const list = consignesOf(f), postes = consPostes(list);
+  if (cP === null) {
+    const m = String(f.client).match(/\bB\s?(\d+)\b/i);
+    cP = m && postes.includes('B' + m[1]) ? 'B' + m[1] : 'tout';
+  }
+  const fb = (k, lab) => '<button type="button" data-cp="' + esc(k) + '" aria-pressed="' + (cP === k) + '">' + esc(lab) + '</button>';
+  return '<input id="c-q" class="z-q" type="search" inputmode="search" autocomplete="off" value="' + esc(cQ) + '" placeholder="Rechercher une consigne (ex. piscine, camion)" aria-label="Rechercher une consigne">' +
+    (postes.length > 1 ? '<div class="z-f c-f">' + fb('tout', 'Tous les postes') + postes.map(p => fb(p, p === 'HDLT' ? 'HDLT (B1)' : p)).join('') + '</div>' : '') +
+    '<p class="z-cpt" id="c-cpt"></p><div id="c-res"></div>';
+}
+// Texte → blocs du mémo : paragraphes (ligne vide) et listes (« - »).
+function consBlocs(t) {
+  return String(t || '').replace(/\r/g, '').split(/\n\s*\n/).map(b => {
+    const lines = b.split('\n').filter(l => l.trim());
+    if (!lines.length) return '';
+    if (lines.every(l => /^\s*[-•]\s+/.test(l))) return renderBlock({ t: 'liste', items: lines.map(l => l.replace(/^\s*[-•]\s+/, '')) });
+    return renderBlock({ txt: lines.join('\n') });
+  }).join('');
+}
+function renderConsignes() {
+  const all = consignesOf(current);
+  const mots = norm(cQ).split(/\s+/).filter(Boolean);
+  const r = all.filter(c => {
+    if (cP && cP !== 'tout' && (c.postes || []).length && !(c.postes || []).includes(cP)) return false;
+    if (!mots.length) return true;
+    const cle = norm([c.rubrique, c.titre, c.contenu].join(' '));
+    return mots.every(m => cle.includes(m));
+  });
+  $('c-cpt').textContent = r.length + (r.length > 1 ? ' consignes' : ' consigne') + (mots.length || (cP && cP !== 'tout') ? ' sur ' + all.length : '');
+  if (!r.length) { $('c-res').innerHTML = '<div class="empty">Aucune consigne ne correspond.</div>'; return; }
+  let h = '', rub = null;
+  r.forEach(c => {
+    if (c.rubrique !== rub) { rub = c.rubrique; h += '<div class="c-rub">' + esc(rub) + '</div>'; }
+    const vide = !(c.contenu && String(c.contenu).trim());
+    h += '<details class="sous"' + (mots.length ? ' open' : '') + '><summary><span>' + esc(c.titre) + ((c.postes || []).length ? '<small>' + esc(c.postes.join(', ')) + '</small>' : '') +
+      '</span></summary><div class="in">' + (vide ? '<div class="c-pdf">📄 Document à venir (ancien PDF en cours de reprise).</div>' : consBlocs(c.contenu)) + '</div></details>';
+  });
+  $('c-res').innerHTML = h;
+}
+
 /* ===================== Pas à pas ===================== */
 function buildProcs(f) {
   PROCS = []; FAIT = {};
@@ -644,6 +712,12 @@ function drawProc() {
 $('q').addEventListener('input', renderList);
 $('list').addEventListener('click', e => { const s = e.target.closest('.site'); if (s) openFiche(s.dataset.id, true); });
 $('v-fiche').addEventListener('click', e => {
+  const cb = e.target.closest('.c-f button');
+  if (cb) {
+    cP = cb.dataset.cp;
+    $('v-fiche').querySelectorAll('.c-f button').forEach(x => x.setAttribute('aria-pressed', x === cb));
+    renderConsignes(); return;
+  }
   const zb = e.target.closest('.z-f button');
   if (zb) {
     zF = zb.dataset.zf;
@@ -655,7 +729,10 @@ $('v-fiche').addEventListener('click', e => {
   const pr = e.target.closest('.go-proc');
   if (pr) openProc(+pr.dataset.proc);
 });
-$('v-fiche').addEventListener('input', e => { if (e.target.id === 'z-q') { zQ = e.target.value; renderZones(); } });
+$('v-fiche').addEventListener('input', e => {
+  if (e.target.id === 'z-q') { zQ = e.target.value; renderZones(); }
+  if (e.target.id === 'c-q') { cQ = e.target.value; renderConsignes(); }
+});
 $('dock-procs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) openProc(+b.dataset.proc); });
 $('proc-b').addEventListener('click', e => {
   const it = e.target.closest('.pit'); if (!it || e.target.closest('a')) return;
