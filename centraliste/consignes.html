@@ -1,4 +1,4 @@
-<!-- RDZ · consignes · v2 · 2026-08-08 -->
+<!-- RDZ · consignes · v3 · 2026-11-27 · champs facultatifs « Titre » et « Rubrique » (colonnes consignes.titre / consignes.rubrique, migration-consignes-titre-rubrique.sql) : utiles pour les longues consignes permanentes (ex. hôpital), affichés dans la liste, l'impression et la prise de poste. v2 · 2026-08-08 -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -321,6 +321,17 @@
       <label>Site concerné</label>
       <select id="f-site"></select>
     </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Titre <span style="font-weight:normal;text-transform:none">(facultatif)</span></label>
+        <input type="text" id="f-titre" placeholder="Ex : Valeurs de la piscine">
+      </div>
+      <div class="field">
+        <label>Rubrique <span style="font-weight:normal;text-transform:none">(facultatif)</span></label>
+        <input type="text" id="f-rub" list="rub-list" placeholder="Ex : Incendie">
+        <datalist id="rub-list"></datalist>
+      </div>
+    </div>
     <div class="field">
       <label>Texte de la consigne</label>
       <textarea id="f-text" placeholder="Décrivez la consigne avec précision…"></textarea>
@@ -472,6 +483,8 @@ function render() {
           <div class="dot ${active ? 'dot-on' : 'dot-off'}"></div>
           <div class="card-num">${String(i + 1).padStart(2, '0')}</div>
           <div class="card-body">
+            ${c.titre ? `<div style="font-weight:700;font-size:14px;margin-bottom:2px">${escTxt(c.titre)}</div>` : ''}
+            ${c.rubrique ? `<div style="font-size:11px;color:var(--rdz-gray);margin-bottom:4px">${escTxt(c.rubrique)}</div>` : ''}
             <div class="card-text">${c.texte}</div>
             <div class="card-dates">
               <span>📅 Dès le ${fmt(c.date_debut)}</span>
@@ -506,6 +519,9 @@ function openAdd() {
   editId = null;
   document.getElementById('modal-title').textContent = 'Nouvelle consigne';
   document.getElementById('f-text').value = '';
+  document.getElementById('f-titre').value = '';
+  document.getElementById('f-rub').value = '';
+  fillRubriques();
   document.getElementById('f-start').value = today();
   document.getElementById('f-end').value = '';
   document.getElementById('f-site').innerHTML = sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
@@ -517,12 +533,22 @@ function openEdit(id) {
   const c = consignes.find(x => x.id === id);
   document.getElementById('modal-title').textContent = 'Modifier la consigne';
   document.getElementById('f-text').value = c.texte;
+  document.getElementById('f-titre').value = c.titre || '';
+  document.getElementById('f-rub').value = c.rubrique || '';
+  fillRubriques();
   document.getElementById('f-start').value = c.date_debut;
   document.getElementById('f-end').value = c.date_fin || '';
   document.getElementById('f-site').innerHTML = sites.map(s =>
     `<option value="${s.id}"${s.id === c.site_id ? ' selected' : ''}>${s.nom}</option>`).join('');
   document.getElementById('modal-consigne').classList.add('open');
 }
+
+// Rubriques déjà utilisées, proposées à la saisie (pas de liste figée).
+function fillRubriques() {
+  const r = [...new Set(consignes.map(c => c.rubrique).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  document.getElementById('rub-list').innerHTML = r.map(x => `<option value="${escTxt(x)}">`).join('');
+}
+function escTxt(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
 
 function closeModal() {
   document.getElementById('modal-consigne').classList.remove('open');
@@ -534,6 +560,8 @@ async function save() {
   const site_id = document.getElementById('f-site').value;
   const date_debut = document.getElementById('f-start').value;
   const date_fin = document.getElementById('f-end').value || null;
+  const titre = document.getElementById('f-titre').value.trim() || null;
+  const rubrique = document.getElementById('f-rub').value.trim() || null;
   if (!date_debut) { alert('Veuillez saisir une date de début.'); return; }
 
   const btn = document.getElementById('btn-save');
@@ -543,14 +571,14 @@ async function save() {
   try {
     if (editId) {
       const { error } = await sb.from('consignes')
-        .update({ site_id, texte, date_debut, date_fin })
+        .update({ site_id, texte, date_debut, date_fin, titre, rubrique })
         .eq('id', editId);
       if (error) throw error;
       const idx = consignes.findIndex(x => x.id === editId);
-      if (idx >= 0) consignes[idx] = { ...consignes[idx], site_id, texte, date_debut, date_fin };
+      if (idx >= 0) consignes[idx] = { ...consignes[idx], site_id, texte, date_debut, date_fin, titre, rubrique };
     } else {
       const { data, error } = await sb.from('consignes')
-        .insert({ site_id, texte, date_debut, date_fin })
+        .insert({ site_id, texte, date_debut, date_fin, titre, rubrique })
         .select().single();
       if (error) throw error;
       consignes.push(data);
@@ -660,7 +688,7 @@ function showPrint() {
       const bg = i % 2 === 0 ? '#ffffff' : '#faf9f7';
       html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact">
         <td style="padding:7px 8px;font-size:10px;font-weight:700;color:#9a9a9a;border-right:1px solid #e5e2dd;text-align:center;vertical-align:top">${String(i + 1).padStart(2, '0')}</td>
-        <td style="padding:7px 10px;font-size:11px;color:#1a1a1a;line-height:1.55;border-right:1px solid #e5e2dd;white-space:pre-wrap">${escHtml(c.texte)}</td>
+        <td style="padding:7px 10px;font-size:11px;color:#1a1a1a;line-height:1.55;border-right:1px solid #e5e2dd;white-space:pre-wrap">${c.titre ? `<strong>${escHtml(c.titre)}</strong>${c.rubrique ? ` <span style="color:#6b6b6b;font-size:10px">— ${escHtml(c.rubrique)}</span>` : ''}\n` : ''}${escHtml(c.texte)}</td>
         <td style="padding:7px 8px;font-size:10px;color:#5a5a5a;text-align:center;vertical-align:top;border-right:1px solid #e5e2dd;white-space:nowrap">${fmt(c.date_debut)}</td>
         <td style="padding:7px 8px;font-size:10px;text-align:center;vertical-align:top;white-space:nowrap;${c.date_fin ? 'color:#5a5a5a' : 'color:#8B1A1A;font-weight:700'}">${c.date_fin ? fmt(c.date_fin) : '—'}</td>
       </tr>`;
